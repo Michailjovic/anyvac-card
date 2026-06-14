@@ -1066,25 +1066,33 @@ let AnyVacCard = class AnyVacCard extends i$2 {
     }
     // ── Render: map ─────────────────────────────────────────────────────────
     _renderMap(vac) {
-        if (!vac.map)
+        const base = vac.base ?? (vac.image_base?.src && !vac.map?.entity ? "image" : "map");
+        const ib = vac.image_base;
+        const imgSrc = ib?.src;
+        const mapEntity = vac.map?.entity;
+        const mapUrl = mapEntity ? this._mapUrl(mapEntity) : null;
+        const showImage = (base === "image" || base === "combined") && !!imgSrc;
+        const showMap = (base === "map" || base === "combined") && !!mapUrl;
+        if (!showImage && !showMap)
             return A;
-        const { entity, rotation = 0, scale = 100, offset_x = 0, offset_y = 0 } = vac.map;
-        const url = this._mapUrl(entity);
-        if (!url)
-            return A;
+        const m = vac.map;
         return b `
-      <div class="map-wrap">
-        <img
-          class="map-img"
-          src=${url}
-          alt="Vacuum map"
-          style=${o({
-            left: (50 + offset_x) + "%",
-            top: (50 + offset_y) + "%",
-            width: scale + "%",
-            transform: "translate(-50%,-50%) rotate(" + rotation + "deg)",
-        })}
-        />
+      <div class="map-wrap ${showImage ? "map-wrap--image" : ""}">
+        ${showImage ? b `
+          <img class="image-base-img" src=${imgSrc} alt="Floorplan"
+            style=${o({
+            transform: "translate(" + (ib?.offset_x ?? 0) + "%," + (ib?.offset_y ?? 0) + "%) rotate(" + (ib?.rotation ?? 0) + "deg) scale(" + ((ib?.scale ?? 100) / 100) + ")",
+        })} />
+        ` : A}
+        ${showMap ? b `
+          <img class="map-img ${showImage ? "map-img--overlay" : ""}" src=${mapUrl} alt="Vacuum map"
+            style=${o({
+            left: (50 + (m?.offset_x ?? 0)) + "%",
+            top: (50 + (m?.offset_y ?? 0)) + "%",
+            width: (m?.scale ?? 100) + "%",
+            transform: "translate(-50%,-50%) rotate(" + (m?.rotation ?? 0) + "deg)",
+        })} />
+        ` : A}
         ${(vac.rooms ?? []).map((r) => this._renderRoomOverlay(r, vac))}
       </div>
     `;
@@ -1475,6 +1483,10 @@ AnyVacCard.styles = i$5 `
       transform-origin: center center;
       object-fit: cover;
     }
+
+    .map-wrap--image { padding-top: 0; }
+    .image-base-img { position: relative; display: block; width: 100%; height: auto; transform-origin: center center; }
+    .map-img--overlay { opacity: 0.55; pointer-events: none; }
 
     /* ── Room buttons ────────────────────────────────────────────────── */
     .room-btn {
@@ -1953,6 +1965,10 @@ let AnyVacCardEditor = class AnyVacCardEditor extends i$2 {
     _setMap(vacIdx, updates) {
         const existing = this._config.vacuums[vacIdx].map ?? { ...DEFAULT_MAP };
         this._setVacuum(vacIdx, { map: { ...existing, ...updates } });
+    }
+    _setImageBase(vacIdx, updates) {
+        const existing = this._config.vacuums[vacIdx].image_base ?? { src: "" };
+        this._setVacuum(vacIdx, { image_base: { ...existing, ...updates } });
     }
     _setRoom(vacIdx, roomIdx, updates) {
         const rooms = [...(this._config.vacuums[vacIdx].rooms ?? [])];
@@ -2612,6 +2628,14 @@ let AnyVacCardEditor = class AnyVacCardEditor extends i$2 {
         const map = vac.map ?? { ...DEFAULT_MAP };
         const mapUrl = map.entity
             ? (this.hass.states[map.entity]?.attributes["entity_picture"] ?? "") : "";
+        const base = vac.base ?? "map";
+        const ib = vac.image_base;
+        const useImg = (base === "image" || base === "combined") && !!ib?.src;
+        const previewUrl = useImg ? (ib.src) : mapUrl;
+        const pvRot = useImg ? (ib.rotation ?? 0) : (map.rotation ?? 0);
+        const pvScale = useImg ? (ib.scale ?? 100) : (map.scale ?? 100);
+        const pvOx = useImg ? (ib.offset_x ?? 0) : (map.offset_x ?? 0);
+        const pvOy = useImg ? (ib.offset_y ?? 0) : (map.offset_y ?? 0);
         const rooms = vac.rooms ?? [];
         return b `
       <div class="tab-body">
@@ -2626,9 +2650,19 @@ let AnyVacCardEditor = class AnyVacCardEditor extends i$2 {
           </div>
         ` : A}
 
+        ${this._selectField("Base layer", (vac.base ?? "map"), [{ value: "map", label: "Vacuum map" }, { value: "image", label: "Custom image" }, { value: "combined", label: "Image + map" }], v => this._setVacuum(mapVac, { base: v }))}
+
+        ${vac.base === "image" || vac.base === "combined" ? b `
+          ${this._textField("Image src (URL)", vac.image_base?.src, v => this._setImageBase(mapVac, { src: v }), "/local/anyvac/flat.svg")}
+          ${this._numberSlider("Image rotation", vac.image_base?.rotation ?? 0, 0, 360, 90, v => this._setImageBase(mapVac, { rotation: v }), "°")}
+          ${this._numberSlider("Image scale", vac.image_base?.scale ?? 100, 50, 200, 5, v => this._setImageBase(mapVac, { scale: v }), "%")}
+          ${this._numberSlider("Image offset X", vac.image_base?.offset_x ?? 0, -50, 50, 1, v => this._setImageBase(mapVac, { offset_x: v }), "%")}
+          ${this._numberSlider("Image offset Y", vac.image_base?.offset_y ?? 0, -50, 50, 1, v => this._setImageBase(mapVac, { offset_y: v }), "%")}
+        ` : A}
+
         ${this._entityPicker("Map image entity", map.entity, ["image"], v => this._setMap(mapVac, { entity: v }))}
 
-        ${mapUrl ? b `
+        ${previewUrl ? b `
           <div class="map-pos-container ${this._mapRoom !== null ? "map-pos-container--active" : ""}"
             @click=${(e) => {
             if (this._mapRoom === null)
@@ -2639,12 +2673,12 @@ let AnyVacCardEditor = class AnyVacCardEditor extends i$2 {
             this._setRoom(mapVac, this._mapRoom, { map_x: x, map_y: y });
         }}>
             <div class="map-preview-wrap">
-              <img class="map-preview-img" src=${mapUrl} alt="Map preview"
+              <img class="map-preview-img" src=${previewUrl} alt="Map preview"
                 style=${o({
-            left: (50 + (map.offset_x ?? 0)) + "%",
-            top: (50 + (map.offset_y ?? 0)) + "%",
-            width: (map.scale ?? 100) + "%",
-            transform: "translate(-50%,-50%) rotate(" + (map.rotation ?? 0) + "deg)",
+            left: (50 + pvOx) + "%",
+            top: (50 + pvOy) + "%",
+            width: pvScale + "%",
+            transform: "translate(-50%,-50%) rotate(" + pvRot + "deg)",
         })} />
               ${rooms.map((r, ri) => b `
                 <div class="pos-dot ${ri === this._mapRoom ? "pos-dot--active" : ""}"
@@ -2722,7 +2756,7 @@ let AnyVacCardEditor = class AnyVacCardEditor extends i$2 {
               ` : A}
             ` : A}
           ` : b `<p class="hint">Add rooms in the Vacuums tab to position them here.</p>`}
-        ` : b `<p class="hint">Select a map entity above to enable the calibration preview.</p>`}
+        ` : b `<p class="hint">Select a map or image above to enable the placement preview.</p>`}
 
       </div>`;
     }

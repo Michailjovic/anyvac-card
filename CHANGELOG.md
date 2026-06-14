@@ -29,10 +29,15 @@ on top from here.
 - **GUI editor** — three tabs (Vacuums / Maps / Global): sensors, clean-action editor, room
   placement, map seating sliders, notifications and server-side tracker deploy.
 
+### Added (AnyVac extensions)
+
+- **Configurable image base** — a custom floorplan/photo as the base layer (`base: map | image |
+  combined`). Set an `image src` (URL to SVG / WebP / PNG / JPG) with its own rotation / scale /
+  offset sliders. In `combined` mode the vacuum map overlays the image. Room overlays work on any
+  base. Editor: Maps tab → *Base layer* selector + image fields.
+
 ### Planned next
 
-- Graft the configurable **image base** (custom photo / SVG / WebP floorplan as the base layer,
-  alongside or instead of the vacuum map).
 - Milestone 2: calibrated interactive map (zones, pin & go, live robot position).
 - Milestone 3: companion `anyvac` integration (clean-history, statistics) replacing the
   helper/blueprint backend.

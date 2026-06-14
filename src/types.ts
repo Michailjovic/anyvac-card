@@ -42,6 +42,14 @@ export interface MapConfig {
   offset_y: number;
 }
 
+export interface ImageBaseConfig {
+  src: string;
+  rotation?: number;
+  scale?: number;
+  offset_x?: number;
+  offset_y?: number;
+}
+
 export interface RoomThreshold {
   days: number;
   color: string;
@@ -165,6 +173,8 @@ export interface VacuumConfig {
   battery_entity?: string;
   last_clean_entity?: string;
   progress_entity?: string;
+  base?: "image" | "map" | "combined";
+  image_base?: ImageBaseConfig;
   map?: MapConfig;
   rooms?: RoomConfig[];
   clean_action?: CleanAction;

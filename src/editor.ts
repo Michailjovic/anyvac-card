@@ -155,6 +155,11 @@ export class AnyVacCardEditor extends LitElement {
     this._setVacuum(vacIdx, { map: { ...existing, ...updates } });
   }
 
+  private _setImageBase(vacIdx: number, updates: Partial<NonNullable<VacuumConfig["image_base"]>>): void {
+    const existing = this._config.vacuums[vacIdx].image_base ?? { src: "" };
+    this._setVacuum(vacIdx, { image_base: { ...existing, ...updates } });
+  }
+
   private _setRoom(vacIdx: number, roomIdx: number, updates: Partial<RoomConfig>): void {
     const rooms = [...(this._config.vacuums[vacIdx].rooms ?? [])];
     rooms[roomIdx] = { ...rooms[roomIdx], ...updates };
@@ -860,6 +865,14 @@ export class AnyVacCardEditor extends LitElement {
     const map = vac.map ?? { ...DEFAULT_MAP };
     const mapUrl = map.entity
       ? ((this.hass.states[map.entity]?.attributes["entity_picture"] as string) ?? "") : "";
+    const base = vac.base ?? "map";
+    const ib = vac.image_base;
+    const useImg = (base === "image" || base === "combined") && !!ib?.src;
+    const previewUrl = useImg ? (ib!.src) : mapUrl;
+    const pvRot   = useImg ? (ib!.rotation ?? 0)  : (map.rotation ?? 0);
+    const pvScale = useImg ? (ib!.scale ?? 100)   : (map.scale ?? 100);
+    const pvOx    = useImg ? (ib!.offset_x ?? 0)  : (map.offset_x ?? 0);
+    const pvOy    = useImg ? (ib!.offset_y ?? 0)  : (map.offset_y ?? 0);
     const rooms = vac.rooms ?? [];
 
     return html`
@@ -875,10 +888,22 @@ export class AnyVacCardEditor extends LitElement {
           </div>
         ` : nothing}
 
+        ${this._selectField("Base layer", (vac.base ?? "map"),
+          [{ value: "map", label: "Vacuum map" }, { value: "image", label: "Custom image" }, { value: "combined", label: "Image + map" }],
+          v => this._setVacuum(mapVac, { base: v }))}
+
+        ${vac.base === "image" || vac.base === "combined" ? html`
+          ${this._textField("Image src (URL)", vac.image_base?.src, v => this._setImageBase(mapVac, { src: v }), "/local/anyvac/flat.svg")}
+          ${this._numberSlider("Image rotation", vac.image_base?.rotation ?? 0, 0, 360, 90, v => this._setImageBase(mapVac, { rotation: v }), "°")}
+          ${this._numberSlider("Image scale", vac.image_base?.scale ?? 100, 50, 200, 5, v => this._setImageBase(mapVac, { scale: v }), "%")}
+          ${this._numberSlider("Image offset X", vac.image_base?.offset_x ?? 0, -50, 50, 1, v => this._setImageBase(mapVac, { offset_x: v }), "%")}
+          ${this._numberSlider("Image offset Y", vac.image_base?.offset_y ?? 0, -50, 50, 1, v => this._setImageBase(mapVac, { offset_y: v }), "%")}
+        ` : nothing}
+
         ${this._entityPicker("Map image entity", map.entity, ["image"],
           v => this._setMap(mapVac, { entity: v }))}
 
-        ${mapUrl ? html`
+        ${previewUrl ? html`
           <div class="map-pos-container ${this._mapRoom !== null ? "map-pos-container--active" : ""}"
             @click=${(e: MouseEvent) => {
               if (this._mapRoom === null) return;
@@ -888,12 +913,12 @@ export class AnyVacCardEditor extends LitElement {
               this._setRoom(mapVac, this._mapRoom, { map_x: x, map_y: y });
             }}>
             <div class="map-preview-wrap">
-              <img class="map-preview-img" src=${mapUrl} alt="Map preview"
+              <img class="map-preview-img" src=${previewUrl} alt="Map preview"
                 style=${styleMap({
-                  left:      (50 + (map.offset_x ?? 0)) + "%",
-                  top:       (50 + (map.offset_y ?? 0)) + "%",
-                  width:     (map.scale ?? 100) + "%",
-                  transform: "translate(-50%,-50%) rotate(" + (map.rotation ?? 0) + "deg)",
+                  left:      (50 + pvOx) + "%",
+                  top:       (50 + pvOy) + "%",
+                  width:     pvScale + "%",
+                  transform: "translate(-50%,-50%) rotate(" + pvRot + "deg)",
                 })} />
               ${rooms.map((r, ri) => html`
                 <div class="pos-dot ${ri === this._mapRoom ? "pos-dot--active" : ""}"
@@ -975,7 +1000,7 @@ export class AnyVacCardEditor extends LitElement {
               ` : nothing}
             ` : nothing}
           ` : html`<p class="hint">Add rooms in the Vacuums tab to position them here.</p>`}
-        ` : html`<p class="hint">Select a map entity above to enable the calibration preview.</p>`}
+        ` : html`<p class="hint">Select a map or image above to enable the placement preview.</p>`}
 
       </div>`;
   }

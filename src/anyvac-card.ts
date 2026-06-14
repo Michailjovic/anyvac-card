@@ -959,24 +959,33 @@ export class AnyVacCard extends LitElement {
   // ── Render: map ─────────────────────────────────────────────────────────
 
   private _renderMap(vac: VacuumConfig) {
-    if (!vac.map) return nothing;
-    const { entity, rotation = 0, scale = 100, offset_x = 0, offset_y = 0 } = vac.map;
-    const url = this._mapUrl(entity);
-    if (!url) return nothing;
+    const base = vac.base ?? (vac.image_base?.src && !vac.map?.entity ? "image" : "map");
+    const ib = vac.image_base;
+    const imgSrc = ib?.src;
+    const mapEntity = vac.map?.entity;
+    const mapUrl = mapEntity ? this._mapUrl(mapEntity) : null;
+    const showImage = (base === "image" || base === "combined") && !!imgSrc;
+    const showMap = (base === "map" || base === "combined") && !!mapUrl;
+    if (!showImage && !showMap) return nothing;
 
+    const m = vac.map;
     return html`
-      <div class="map-wrap">
-        <img
-          class="map-img"
-          src=${url}
-          alt="Vacuum map"
-          style=${styleMap({
-            left: (50 + offset_x) + "%",
-            top:  (50 + offset_y) + "%",
-            width: scale + "%",
-            transform: "translate(-50%,-50%) rotate(" + rotation + "deg)",
-          })}
-        />
+      <div class="map-wrap ${showImage ? "map-wrap--image" : ""}">
+        ${showImage ? html`
+          <img class="image-base-img" src=${imgSrc!} alt="Floorplan"
+            style=${styleMap({
+              transform: "translate(" + (ib?.offset_x ?? 0) + "%," + (ib?.offset_y ?? 0) + "%) rotate(" + (ib?.rotation ?? 0) + "deg) scale(" + ((ib?.scale ?? 100) / 100) + ")",
+            })} />
+        ` : nothing}
+        ${showMap ? html`
+          <img class="map-img ${showImage ? "map-img--overlay" : ""}" src=${mapUrl!} alt="Vacuum map"
+            style=${styleMap({
+              left: (50 + (m?.offset_x ?? 0)) + "%",
+              top:  (50 + (m?.offset_y ?? 0)) + "%",
+              width: (m?.scale ?? 100) + "%",
+              transform: "translate(-50%,-50%) rotate(" + (m?.rotation ?? 0) + "deg)",
+            })} />
+        ` : nothing}
         ${(vac.rooms ?? []).map((r) => this._renderRoomOverlay(r, vac))}
       </div>
     `;
@@ -1387,6 +1396,10 @@ export class AnyVacCard extends LitElement {
       transform-origin: center center;
       object-fit: cover;
     }
+
+    .map-wrap--image { padding-top: 0; }
+    .image-base-img { position: relative; display: block; width: 100%; height: auto; transform-origin: center center; }
+    .map-img--overlay { opacity: 0.55; pointer-events: none; }
 
     /* ── Room buttons ────────────────────────────────────────────────── */
     .room-btn {
