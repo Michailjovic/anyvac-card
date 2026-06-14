@@ -895,6 +895,11 @@ export class AnyVacCardEditor extends LitElement {
         ${this._numberSlider("Card height (0=auto)", vac.base_height ?? 0, 0, 700, 10,
           v => this._setVacuum(mapVac, { base_height: v > 0 ? v : undefined }), "px")}
 
+        ${vac.base === "combined" ? html`
+          ${this._numberSlider("Overlay opacity", vac.overlay_opacity ?? 55, 0, 100, 5,
+            v => this._setVacuum(mapVac, { overlay_opacity: v }), "%")}
+        ` : nothing}
+
         ${vac.base === "image" || vac.base === "combined" ? html`
           ${this._textField("Image src (URL)", vac.image_base?.src, v => this._setImageBase(mapVac, { src: v }), "/local/anyvac/flat.svg")}
           ${this._numberSlider("Image rotation", vac.image_base?.rotation ?? 0, 0, 360, 90, v => this._setImageBase(mapVac, { rotation: v }), "°")}

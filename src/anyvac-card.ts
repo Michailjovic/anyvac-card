@@ -988,6 +988,7 @@ export class AnyVacCard extends LitElement {
               top:  (50 + (m?.offset_y ?? 0)) + "%",
               width: (m?.scale ?? 100) + "%",
               transform: "translate(-50%,-50%) rotate(" + (m?.rotation ?? 0) + "deg)",
+              ...(showImage ? { opacity: String((vac.overlay_opacity ?? 55) / 100) } : {}),
             })} />
         ` : nothing}
         ${(vac.rooms ?? []).map((r) => this._renderRoomOverlay(r, vac))}

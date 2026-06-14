@@ -1095,6 +1095,7 @@ let AnyVacCard = class AnyVacCard extends i$2 {
             top: (50 + (m?.offset_y ?? 0)) + "%",
             width: (m?.scale ?? 100) + "%",
             transform: "translate(-50%,-50%) rotate(" + (m?.rotation ?? 0) + "deg)",
+            ...(showImage ? { opacity: String((vac.overlay_opacity ?? 55) / 100) } : {}),
         })} />
         ` : A}
         ${(vac.rooms ?? []).map((r) => this._renderRoomOverlay(r, vac))}
@@ -2659,6 +2660,10 @@ let AnyVacCardEditor = class AnyVacCardEditor extends i$2 {
         ${this._selectField("Base layer", (vac.base ?? "map"), [{ value: "map", label: "Vacuum map" }, { value: "image", label: "Custom image" }, { value: "combined", label: "Image + map" }], v => this._setVacuum(mapVac, { base: v }))}
 
         ${this._numberSlider("Card height (0=auto)", vac.base_height ?? 0, 0, 700, 10, v => this._setVacuum(mapVac, { base_height: v > 0 ? v : undefined }), "px")}
+
+        ${vac.base === "combined" ? b `
+          ${this._numberSlider("Overlay opacity", vac.overlay_opacity ?? 55, 0, 100, 5, v => this._setVacuum(mapVac, { overlay_opacity: v }), "%")}
+        ` : A}
 
         ${vac.base === "image" || vac.base === "combined" ? b `
           ${this._textField("Image src (URL)", vac.image_base?.src, v => this._setImageBase(mapVac, { src: v }), "/local/anyvac/flat.svg")}

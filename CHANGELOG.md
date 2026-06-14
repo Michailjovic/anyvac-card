@@ -34,7 +34,8 @@ on top from here.
 - **Configurable image base** — a custom floorplan/photo as the base layer (`base: map | image |
   combined`). Set an `image src` (URL to SVG / WebP / PNG / JPG) with its own rotation / scale /
   offset sliders. In `combined` mode the vacuum map overlays the image. Room overlays work on any
-  base. Editor: Maps tab → *Base layer* selector + image fields.
+  base. In `combined` mode the overlay opacity is adjustable via a slider. Editor: Maps tab →
+  *Base layer* selector + image fields + overlay opacity.
 - **Card height control** (`base_height`) — fix the card/stage height independent of the image's
   natural size; the image is fitted inside (`object-fit: contain`) and `scale`/offset seat it.
   Editor: Maps tab → *Card height* slider (0 = auto).

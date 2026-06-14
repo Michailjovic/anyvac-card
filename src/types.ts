@@ -177,6 +177,8 @@ export interface VacuumConfig {
   image_base?: ImageBaseConfig;
   /** Fixed base/stage height in px (controls card size). 0/undefined = auto. */
   base_height?: number;
+  /** Overlay map opacity in combined mode (0-100). */
+  overlay_opacity?: number;
   map?: MapConfig;
   rooms?: RoomConfig[];
   clean_action?: CleanAction;
