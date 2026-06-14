@@ -23,3 +23,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - **Basic control** — start / pause / stop / dock / locate, room selection and select-all.
 - **Status panel** — mapped status label + colour, battery, current room, error, progress.
 - **GUI editor** — tabbed (Vacuums / Map / Presets / Global).
+- **Full visual design** ported from the original card — pill vacuum badges (multi-vacuum switch),
+  dark glassy status card with the robot image, large status label, battery, progress bar, preset
+  chips, and hold-to-activate action buttons (START with per-room icons + all/none, Pause / Resume /
+  Dock / Locate) with the hold-ring fill animation.

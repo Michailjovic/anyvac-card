@@ -95,6 +95,8 @@ const CARD_NAME = "AnyVac Card";
 const CARD_DESCRIPTION = "Modern, universal card for robot vacuums — configurable image base, interactive map, value-add insights.";
 /** Default accent colour. */
 const ACCENT = "#3b82f6";
+/** Hold duration (ms) reserved for hold-to-confirm actions. */
+const HOLD_DURATION_MS = 500;
 /**
  * Raw vendor status string -> [label, accent colour].
  * Roborock-centric for the MVP (S6 / S7 / S8). Unknown statuses fall back to
@@ -164,14 +166,22 @@ function normalizeActivity(status) {
     }
 }
 
+const BADGE_BG = "rgba(30,30,30,0.85)";
+const ACCENT_BG = "rgba(59,130,246,0.18)";
+const ACCENT_BG_ACTIVE = "rgba(59,130,246,0.30)";
 console.info(`%c ${CARD_NAME} %c v${CARD_VERSION} `, "color:#fff;background:#3b82f6;font-weight:700;border-radius:3px 0 0 3px;padding:2px 4px;", "color:#3b82f6;background:#0f172a;border-radius:0 3px 3px 0;padding:2px 4px;");
 let AnyVacCard = class AnyVacCard extends i$2 {
     constructor() {
         super(...arguments);
-        /** entity_id -> selected region ids */
         this._selected = {};
-        /** entity_id -> active preset id */
         this._preset = {};
+        this._shown = 0;
+        this._holdId = null;
+        this._holdTimer = null;
+        this._holdEnd = () => {
+            this._cancelHold();
+            this._holdId = null;
+        };
     }
     static getConfigElement() {
         return document.createElement(EDITOR_TAG);
@@ -185,11 +195,33 @@ let AnyVacCard = class AnyVacCard extends i$2 {
         this._config = config;
     }
     getCardSize() {
-        return 6;
+        return 7;
+    }
+    // ── hold-to-activate ────────────────────────────────────────────────────────
+    _holdStart(id, action) {
+        return (e) => {
+            e.preventDefault();
+            this._cancelHold();
+            this._holdId = id;
+            this._holdTimer = setTimeout(() => {
+                this._holdTimer = null;
+                this._holdId = null;
+                action();
+            }, HOLD_DURATION_MS);
+        };
+    }
+    _cancelHold() {
+        if (this._holdTimer !== null) {
+            clearTimeout(this._holdTimer);
+            this._holdTimer = null;
+        }
     }
     // ── selection / preset state ───────────────────────────────────────────────
     _selectedIds(vac) {
         return this._selected[vac.entity] ?? [];
+    }
+    _hasSelection(vac) {
+        return this._selectedIds(vac).length > 0;
     }
     _toggleRegion(vac, region) {
         const cur = new Set(this._selectedIds(vac));
@@ -200,11 +232,13 @@ let AnyVacCard = class AnyVacCard extends i$2 {
         this._selected = { ...this._selected, [vac.entity]: [...cur] };
     }
     _selectAll(vac) {
-        const ids = (vac.regions ?? []).map((r) => r.id);
-        this._selected = { ...this._selected, [vac.entity]: ids };
+        this._selected = { ...this._selected, [vac.entity]: (vac.regions ?? []).map((r) => r.id) };
     }
     _clearSel(vac) {
         this._selected = { ...this._selected, [vac.entity]: [] };
+    }
+    _isRegionSelected(vac, region) {
+        return this._selectedIds(vac).includes(region.id);
     }
     _activePresetId(vac) {
         const explicit = this._preset[vac.entity];
@@ -252,9 +286,7 @@ let AnyVacCard = class AnyVacCard extends i$2 {
             return;
         }
         if (strategy === "segment") {
-            const segments = regions
-                .map((r) => r.segment_id)
-                .filter((n) => typeof n === "number");
+            const segments = regions.map((r) => r.segment_id).filter((n) => typeof n === "number");
             if (!segments.length)
                 return;
             await this._svc("vacuum", "send_command", {
@@ -264,25 +296,22 @@ let AnyVacCard = class AnyVacCard extends i$2 {
             });
             return;
         }
-        // "area" — native HA Areas, calibration-free (preferred)
         const areaIds = regions.map((r) => r.area_id ?? r.id);
         if (!areaIds.length)
             return;
         await this._svc("vacuum", "clean_area", { cleaning_area_id: areaIds }, { entity_id: vac.entity });
     }
-    async _start(vac) {
-        const ids = this._selectedIds(vac);
-        if (!ids.length) {
-            await this._svc("vacuum", "start", {}, { entity_id: vac.entity });
-            return;
-        }
-        const regions = (vac.regions ?? []).filter((r) => ids.includes(r.id));
+    async _startClean(vac) {
+        const regions = (vac.regions ?? []).filter((r) => this._selectedIds(vac).includes(r.id));
         const preset = this._currentPreset(vac);
         await this._applyPreset(vac, preset);
-        await this._clean(vac, regions, preset);
+        if (regions.length)
+            await this._clean(vac, regions, preset);
+        else
+            await this._svc("vacuum", "start", {}, { entity_id: vac.entity });
     }
     _pause(vac) { void this._svc("vacuum", "pause", {}, { entity_id: vac.entity }); }
-    _stop(vac) { void this._svc("vacuum", "stop", {}, { entity_id: vac.entity }); }
+    _resume(vac) { void this._svc("vacuum", "start", {}, { entity_id: vac.entity }); }
     _dock(vac) { void this._svc("vacuum", "return_to_base", {}, { entity_id: vac.entity }); }
     _locate(vac) { void this._svc("vacuum", "locate", {}, { entity_id: vac.entity }); }
     // ── derived state ─────────────────────────────────────────────────────────
@@ -293,8 +322,10 @@ let AnyVacCard = class AnyVacCard extends i$2 {
         return m ? [m[0], m[1]] : [s, ACCENT];
     }
     _isCleaning(vac) {
-        const s = this.hass?.states[vac.entity]?.state ?? "";
-        return normalizeActivity(s) === "cleaning";
+        return normalizeActivity(this.hass?.states[vac.entity]?.state ?? "") === "cleaning";
+    }
+    _isPaused(vac) {
+        return (this.hass?.states[vac.entity]?.state ?? "") === "paused";
     }
     _battery(vac) {
         if (vac.battery_entity) {
@@ -304,6 +335,13 @@ let AnyVacCard = class AnyVacCard extends i$2 {
         const lvl = this.hass?.states[vac.entity]?.attributes["battery_level"];
         const n = Number(lvl);
         return lvl != null && lvl !== "" && !isNaN(n) ? n : null;
+    }
+    _batColor(b) {
+        if (b <= 20)
+            return "#ff4d4f";
+        if (b <= 50)
+            return "#faad14";
+        return "#52c41a";
     }
     _batIcon(b) {
         const r = Math.round(b / 10) * 10;
@@ -338,24 +376,15 @@ let AnyVacCard = class AnyVacCard extends i$2 {
         const ms = vac.map_source;
         if (!ms)
             return undefined;
-        const st = this.hass?.states[ms.entity];
-        const ep = st?.attributes["entity_picture"];
+        const ep = this.hass?.states[ms.entity]?.attributes["entity_picture"];
         return typeof ep === "string" ? ep : undefined;
     }
-    /** In-flow image-base transform (rotate / scale / offset). */
     _imgTransform(t) {
-        const r = t?.rotation ?? 0;
-        const s = t?.scale ?? 100;
-        const ox = t?.offset_x ?? 0;
-        const oy = t?.offset_y ?? 0;
+        const r = t?.rotation ?? 0, s = t?.scale ?? 100, ox = t?.offset_x ?? 0, oy = t?.offset_y ?? 0;
         return `translate(${ox}%, ${oy}%) rotate(${r}deg) scale(${s / 100})`;
     }
-    /** Absolutely-positioned map: rotate and seat (offset + scale) within the stage. */
     _mapStyle(ms) {
-        const r = ms?.rotation ?? 0;
-        const s = ms?.scale ?? 100;
-        const ox = ms?.offset_x ?? 0;
-        const oy = ms?.offset_y ?? 0;
+        const r = ms?.rotation ?? 0, s = ms?.scale ?? 100, ox = ms?.offset_x ?? 0, oy = ms?.offset_y ?? 0;
         return {
             left: 50 + ox + "%",
             top: 50 + oy + "%",
@@ -368,27 +397,45 @@ let AnyVacCard = class AnyVacCard extends i$2 {
         if (!this._config || !this.hass)
             return A;
         const vacuums = this._config.vacuums ?? [];
+        if (!vacuums.length) {
+            return b `<ha-card><div class="empty">${CARD_NAME}: add a vacuum in the editor.</div></ha-card>`;
+        }
+        const shownIdx = Math.min(this._shown, vacuums.length - 1);
+        const vac = vacuums[shownIdx];
         return b `
       <ha-card>
-        ${vacuums.length
-            ? vacuums.map((v) => this._renderVacuum(v))
-            : b `<div class="empty">${CARD_NAME}: add a vacuum in the editor.</div>`}
+        ${vacuums.length > 1
+            ? b `<div class="badges-row">${vacuums.map((v, i) => this._renderBadge(v, i, shownIdx))}</div>`
+            : A}
+        ${this._renderBase(vac)}
+        ${this._renderStatusCard(vac, shownIdx)}
       </ha-card>
     `;
     }
-    _renderVacuum(vac) {
+    _renderBadge(vac, i, shownIdx) {
+        const active = i === shownIdx;
         const cleaning = this._isCleaning(vac);
         const name = vac.name ?? vac.entity.split(".")[1] ?? vac.entity;
-        const border = cleaning ? `1px solid ${ACCENT}` : "1px solid rgba(127,127,127,0.18)";
-        const shadow = cleaning ? `0 0 18px ${ACCENT}33` : "none";
+        const bg = cleaning ? ACCENT_BG_ACTIVE : active ? ACCENT_BG : BADGE_BG;
+        const border = cleaning
+            ? `3px solid ${ACCENT}`
+            : active
+                ? `2px solid ${ACCENT}80`
+                : "2px solid rgba(255,255,255,0.18)";
+        const shadow = cleaning ? `0 0 18px ${ACCENT}B0` : active ? `0 0 8px ${ACCENT}50` : "none";
         return b `
-      <div class="vac" style=${o({ border, boxShadow: shadow })}>
-        <div class="vac-head">${name}</div>
-        ${this._renderBase(vac)}
-        ${this._renderPresets(vac)}
-        ${this._renderStatus(vac)}
-        ${this._renderActions(vac)}
-      </div>
+      <button
+        class="badge"
+        style=${o({ background: bg, border, boxShadow: shadow })}
+        @click=${() => (this._shown = i)}
+        aria-pressed=${active ? "true" : "false"}
+        aria-label=${name}
+      >
+        ${vac.image
+            ? b `<img class="badge-img" src=${vac.image} alt=${name} />`
+            : b `<ha-icon class="badge-icon" icon="mdi:robot-vacuum" style=${o({ color: ACCENT })}></ha-icon>`}
+        <span class="badge-name" style=${o({ color: active ? "white" : "rgba(255,255,255,0.55)" })}>${name}</span>
+      </button>
     `;
     }
     _renderBase(vac) {
@@ -398,39 +445,28 @@ let AnyVacCard = class AnyVacCard extends i$2 {
         const showImage = (base === "image" || base === "combined") && !!imgSrc;
         const showMap = (base === "map" || base === "combined") && !!mapUrl;
         if (!showImage && !showMap) {
-            return b `<div class="stage placeholder">
+            return b `<div class="map-wrap framed placeholder">
         <ha-icon icon="mdi:floor-plan"></ha-icon>
         <span>Set an image base or map source</span>
       </div>`;
         }
-        // When there is no in-flow image to size the stage, the map needs an aspect frame.
         const framed = !showImage;
         return b `
-      <div class="stage ${framed ? "framed" : ""}">
+      <div class="map-wrap ${framed ? "framed" : ""}">
         ${showImage
-            ? b `<img
-              class="layer primary"
-              src=${imgSrc}
-              alt="floorplan"
-              style=${o({ transform: this._imgTransform(vac.image_base) })}
-            />`
+            ? b `<img class="layer primary" src=${imgSrc} alt="floorplan"
+              style=${o({ transform: this._imgTransform(vac.image_base) })} />`
             : A}
         ${showMap
-            ? b `<img
-              class="layer map ${showImage ? "overlay" : "seat"}"
-              src=${mapUrl}
-              alt="vacuum map"
-              style=${o(this._mapStyle(vac.map_source))}
-            />`
+            ? b `<img class="layer map ${showImage ? "overlay" : "seat"}" src=${mapUrl} alt="vacuum map"
+              style=${o(this._mapStyle(vac.map_source))} />`
             : A}
-        <div class="regions">
-          ${(vac.regions ?? []).map((r) => this._renderRegion(vac, r))}
-        </div>
+        <div class="regions">${(vac.regions ?? []).map((r) => this._renderRegion(vac, r))}</div>
       </div>
     `;
     }
     _renderRegion(vac, region) {
-        const selected = this._selectedIds(vac).includes(region.id);
+        const selected = this._isRegionSelected(vac, region);
         const bn = this._config?.region_border_normal ?? 2;
         const bs = this._config?.region_border_selected ?? 4;
         const bw = (selected ? bs : bn) + "px";
@@ -439,20 +475,14 @@ let AnyVacCard = class AnyVacCard extends i$2 {
         const shape = region.shape;
         if (shape.kind === "rect") {
             return b `
-        <button
-          class="region rect"
-          style=${o({
-                left: shape.x + "%",
-                top: shape.y + "%",
-                width: shape.w + "%",
-                height: shape.h + "%",
+        <button class="room-overlay" style=${o({
+                left: shape.x + "%", top: shape.y + "%", width: shape.w + "%", height: shape.h + "%",
                 border: `${bw} solid ${bc}`,
                 background: selected ? ACCENT + "44" : "rgba(0,0,0,0.04)",
+                boxShadow: selected ? `0 0 16px ${ACCENT}60` : "none",
             })}
-          @click=${() => this._toggleRegion(vac, region)}
-          title=${region.name}
-          aria-pressed=${selected ? "true" : "false"}
-        >
+          @click=${() => this._toggleRegion(vac, region)} title=${region.name}
+          aria-pressed=${selected ? "true" : "false"}>
           ${!iconHidden && region.icon
                 ? b `<ha-icon icon=${region.icon} style=${o({ color: selected ? "#fff" : bc })}></ha-icon>`
                 : A}
@@ -460,22 +490,89 @@ let AnyVacCard = class AnyVacCard extends i$2 {
       `;
         }
         return b `
-      <button
-        class="region point"
-        style=${o({
-            left: shape.x + "%",
-            top: shape.y + "%",
+      <button class="room-btn" style=${o({
+            left: shape.x + "%", top: shape.y + "%",
             border: `${bw} solid ${bc}`,
-            background: selected ? ACCENT + "cc" : "rgba(0,0,0,0.5)",
+            background: selected ? ACCENT + "cc" : "rgba(0,0,0,0.55)",
+            boxShadow: selected ? `0 0 12px ${ACCENT}80` : "none",
         })}
-        @click=${() => this._toggleRegion(vac, region)}
-        title=${region.name}
-        aria-pressed=${selected ? "true" : "false"}
-      >
-        ${!iconHidden
-            ? b `<ha-icon icon=${region.icon ?? "mdi:map-marker"}></ha-icon>`
-            : A}
+        @click=${() => this._toggleRegion(vac, region)} title=${region.name}
+        aria-pressed=${selected ? "true" : "false"}>
+        ${!iconHidden ? b `<ha-icon icon=${region.icon ?? "mdi:map-marker"}></ha-icon>` : A}
       </button>
+    `;
+    }
+    _renderStatusCard(vac, idx) {
+        const cleaning = this._isCleaning(vac);
+        const name = vac.name ?? vac.entity.split(".")[1] ?? vac.entity;
+        const cardBorder = cleaning ? `2px solid ${ACCENT}` : "1px solid rgba(255,255,255,0.08)";
+        const cardShadow = cleaning ? `0 0 22px ${ACCENT}40` : "none";
+        const imgFilter = cleaning ? `drop-shadow(0 0 20px ${ACCENT}D8)` : `drop-shadow(0 4px 12px ${ACCENT}33)`;
+        return b `
+      <div class="status-card" style=${o({ border: cardBorder, boxShadow: cardShadow })}>
+        <div class="status-left" @click=${() => this._fireMoreInfo(vac.entity)} title="Open ${name}">
+          <div class="model-label">${name}</div>
+          ${vac.image
+            ? b `<img class="vac-img" src=${vac.image} alt=${name}
+                style=${o({ opacity: cleaning ? "0.9" : "0.6", filter: imgFilter })} />`
+            : b `<ha-icon class="vac-icon" icon="mdi:robot-vacuum"
+                style=${o({ color: ACCENT, opacity: cleaning ? "0.9" : "0.5" })}></ha-icon>`}
+        </div>
+        <div class="status-right">
+          ${this._renderStatusRow(vac)}
+          ${this._renderProgress(vac)}
+          ${this._renderPresets(vac)}
+          ${this._renderActions(vac, idx)}
+        </div>
+      </div>
+    `;
+    }
+    _fireMoreInfo(entity) {
+        this.dispatchEvent(new CustomEvent("hass-more-info", { detail: { entityId: entity }, bubbles: true, composed: true }));
+    }
+    _renderStatusRow(vac) {
+        const [label, labelColor] = this._statusInfo(vac);
+        const bat = this._battery(vac);
+        const room = this._currentRoom(vac);
+        const err = this._error(vac);
+        return b `
+      ${err
+            ? b `<div class="error-row">
+            <ha-icon icon="mdi:alert-circle" style="color:#ff4d4f"></ha-icon>
+            <span style="color:#ff4d4f;font-size:12px;font-weight:600">${err}</span>
+          </div>`
+            : A}
+      <div class="status-row">
+        <div class="status-main">
+          <span class="status-label" style=${o({ color: labelColor })}>${label}</span>
+          ${room
+            ? b `<span class="current-room">
+                <ha-icon icon="mdi:map-marker" style="--mdc-icon-size:13px;color:rgba(255,255,255,0.4)"></ha-icon>${room}
+              </span>`
+            : A}
+        </div>
+        <div class="status-meta">
+          ${bat !== null
+            ? b `<div class="battery">
+                <span style=${o({ color: this._batColor(bat) })}>${bat}&thinsp;%</span>
+                <ha-icon icon=${this._batIcon(bat)} style=${o({ color: this._batColor(bat) })}></ha-icon>
+              </div>`
+            : A}
+        </div>
+      </div>
+    `;
+    }
+    _renderProgress(vac) {
+        const prog = this._progress(vac);
+        if (prog === null)
+            return A;
+        return b `
+      <div class="progress">
+        <div class="progress-track">
+          <div class="progress-fill" style=${o({ width: prog + "%", background: ACCENT })}></div>
+        </div>
+        <span class="progress-label" style=${o({ color: ACCENT })}>${prog}&thinsp;%</span>
+      </div>
     `;
     }
     _renderPresets(vac) {
@@ -489,273 +586,233 @@ let AnyVacCard = class AnyVacCard extends i$2 {
             const on = p.id === activeId;
             const col = p.color ?? ACCENT;
             return b `
-            <button
-              class="chip ${on ? "active" : ""}"
-              style=${on ? o({ borderColor: col, color: col }) : A}
-              @click=${() => this._setPreset(vac, p.id)}
-              title=${p.name}
-            >
-              ${p.icon ? b `<ha-icon icon=${p.icon}></ha-icon>` : A}
-              <span>${p.name}</span>
+            <button class="chip ${on ? "active" : ""}"
+              style=${on ? o({ borderColor: col, color: "#fff", background: col + "33" }) : A}
+              @click=${() => this._setPreset(vac, p.id)} title=${p.name}>
+              ${p.icon ? b `<ha-icon icon=${p.icon}></ha-icon>` : A}<span>${p.name}</span>
             </button>
           `;
         })}
       </div>
     `;
     }
-    _renderStatus(vac) {
-        const [label, color] = this._statusInfo(vac);
-        const bat = this._battery(vac);
-        const room = this._currentRoom(vac);
-        const err = this._error(vac);
-        const prog = this._progress(vac);
-        return b `
-      <div class="status">
-        <div class="status-line">
-          <span class="dot" style=${o({ background: color })}></span>
-          <span class="label" style=${o({ color })}>${label}</span>
-          ${bat != null
-            ? b `<span class="bat"><ha-icon icon=${this._batIcon(bat)}></ha-icon>${bat}%</span>`
-            : A}
+    _renderActions(vac, idx) {
+        const holdMs = o({ "--hold-ms": HOLD_DURATION_MS + "ms" });
+        if (this._isPaused(vac)) {
+            const hId = "resume-" + idx;
+            return b `
+        <div class="actions">
+          <button class="action-btn ${this._holdId === hId ? "action-btn--holding" : ""}"
+            style=${o({ background: ACCENT_BG, border: `1px solid ${ACCENT}80`, "--hold-ms": HOLD_DURATION_MS + "ms" })}
+            @pointerdown=${this._holdStart(hId, () => this._resume(vac))}
+            @pointerup=${this._holdEnd} @pointerleave=${this._holdEnd} @pointercancel=${this._holdEnd}>
+            <div class="hold-ring"></div>
+            <ha-icon icon="mdi:play" style=${o({ color: ACCENT })}></ha-icon><span>Resume</span>
+          </button>
+          <button class="action-btn action-btn--secondary" @click=${() => this._dock(vac)}>
+            <ha-icon icon="mdi:home" style="color:rgba(64,169,255,0.6)"></ha-icon><span>Dock</span>
+          </button>
         </div>
-        ${room ? b `<div class="sub">Room: ${room}</div>` : A}
-        ${err
-            ? b `<div class="err"><ha-icon icon="mdi:alert-circle"></ha-icon><span>${err}</span></div>`
-            : A}
-        ${prog != null
-            ? b `<div class="progress"><div class="fill" style=${o({ width: prog + "%", background: color })}></div></div>`
-            : A}
-      </div>
-    `;
-    }
-    _renderActions(vac) {
-        const selCount = this._selectedIds(vac).length;
-        const hasRegions = (vac.regions ?? []).length > 0;
-        const startLabel = selCount ? `Clean ${selCount} room${selCount > 1 ? "s" : ""}` : "Start";
+      `;
+        }
+        if (this._isCleaning(vac)) {
+            const hId = "pause-" + idx;
+            return b `
+        <div class="actions">
+          <button class="action-btn action-btn--warn ${this._holdId === hId ? "action-btn--holding" : ""}"
+            style=${holdMs}
+            @pointerdown=${this._holdStart(hId, () => this._pause(vac))}
+            @pointerup=${this._holdEnd} @pointerleave=${this._holdEnd} @pointercancel=${this._holdEnd}>
+            <div class="hold-ring"></div>
+            <ha-icon icon="mdi:pause" style="color:#faad14"></ha-icon><span>Pause</span>
+          </button>
+          <button class="action-btn action-btn--secondary" @click=${() => this._dock(vac)}>
+            <ha-icon icon="mdi:home" style="color:rgba(64,169,255,0.6)"></ha-icon><span>Dock</span>
+          </button>
+        </div>
+      `;
+        }
+        // idle / docked
+        const hId = "start-" + idx;
+        const regions = vac.regions ?? [];
+        const hasRegions = regions.length > 0;
+        const hasSel = this._hasSelection(vac);
+        const enabled = hasRegions ? hasSel : true;
+        const startBg = enabled ? ACCENT_BG : "rgba(60,60,60,0.4)";
+        const startBorder = enabled ? `1px solid ${ACCENT}80` : "1px solid rgba(255,255,255,0.1)";
+        const startIconColor = enabled ? ACCENT : "rgba(255,255,255,0.2)";
+        const startTextColor = enabled ? "white" : "rgba(255,255,255,0.25)";
         return b `
       <div class="actions">
-        <button class="act primary" style=${o({ background: ACCENT })} @click=${() => this._start(vac)}>
-          <ha-icon icon="mdi:play"></ha-icon><span>${startLabel}</span>
-        </button>
-        <button class="act" @click=${() => this._pause(vac)} title="Pause"><ha-icon icon="mdi:pause"></ha-icon></button>
-        <button class="act" @click=${() => this._stop(vac)} title="Stop"><ha-icon icon="mdi:stop"></ha-icon></button>
-        <button class="act" @click=${() => this._dock(vac)} title="Dock"><ha-icon icon="mdi:home-import-outline"></ha-icon></button>
-        <button class="act" @click=${() => this._locate(vac)} title="Locate"><ha-icon icon="mdi:map-marker"></ha-icon></button>
-        ${hasRegions
-            ? b `<button class="act ghost" @click=${() => (selCount ? this._clearSel(vac) : this._selectAll(vac))}>
-              ${selCount ? "Clear" : "All"}
-            </button>`
+        <button class="action-btn ${enabled && this._holdId === hId ? "action-btn--holding" : ""}"
+          style=${o({ background: startBg, border: startBorder, "--hold-ms": HOLD_DURATION_MS + "ms" })}
+          ?disabled=${!enabled}
+          @pointerdown=${enabled ? this._holdStart(hId, () => this._startClean(vac)) : A}
+          @pointerup=${this._holdEnd} @pointerleave=${this._holdEnd} @pointercancel=${this._holdEnd}>
+          <div class="hold-ring"></div>
+          <ha-icon icon="mdi:rocket-launch" style=${o({ color: startIconColor })}></ha-icon>
+          <div class="start-body">
+            <span style=${o({ color: startTextColor })}>START</span>
+            ${hasRegions
+            ? b `<div class="room-icons">
+                  ${regions.map((r) => b `<ha-icon icon=${r.icon || "mdi:square"}
+                    style=${o({ color: this._isRegionSelected(vac, r) ? ACCENT : "rgba(255,255,255,0.15)" })}></ha-icon>`)}
+                </div>`
             : A}
+            ${regions.length > 1
+            ? b `<div class="sel-all-row">
+                  <button class="sel-link" @click=${(e) => { e.stopPropagation(); this._selectAll(vac); }}>all</button>
+                  <span style="color:rgba(255,255,255,0.2)">·</span>
+                  <button class="sel-link" @click=${(e) => { e.stopPropagation(); this._clearSel(vac); }}>none</button>
+                </div>`
+            : A}
+          </div>
+        </button>
+        <button class="action-btn action-btn--secondary" @click=${() => this._locate(vac)} title="Locate">
+          <ha-icon icon="mdi:map-marker" style="color:rgba(64,169,255,0.6)"></ha-icon>
+        </button>
+        <button class="action-btn action-btn--secondary" @click=${() => this._dock(vac)} title="Dock">
+          <ha-icon icon="mdi:home" style="color:rgba(64,169,255,0.6)"></ha-icon>
+        </button>
       </div>
     `;
     }
 };
 AnyVacCard.styles = i$5 `
+    :host { --hold-ms: 500ms; }
     ha-card {
-      padding: 10px;
-      display: flex;
-      flex-direction: column;
-      gap: 12px;
+      position: relative;
       background: transparent;
       border: none;
       box-shadow: none;
-    }
-    .empty {
-      padding: 24px;
-      text-align: center;
-      opacity: 0.7;
-    }
-    .vac {
-      border-radius: 14px;
-      padding: 12px;
+      padding: 8px;
       display: flex;
       flex-direction: column;
-      gap: 10px;
-      transition: border 0.3s, box-shadow 0.3s;
-    }
-    .vac-head {
-      font-weight: 700;
-      font-size: 1.05rem;
-    }
-    .stage {
-      position: relative;
-      width: 100%;
-      border-radius: 10px;
-      overflow: hidden;
-      background: rgba(127, 127, 127, 0.06);
-    }
-    /* Aspect frame used when the map is shown without an in-flow image base. */
-    .stage.framed {
-      padding-top: 60%;
-    }
-    .stage.placeholder {
-      display: flex;
-      flex-direction: column;
-      align-items: center;
-      justify-content: center;
-      gap: 6px;
-      min-height: 140px;
-      opacity: 0.6;
-    }
-    .stage.placeholder ha-icon {
-      --mdc-icon-size: 40px;
-    }
-    .layer {
-      transform-origin: center center;
-    }
-    /* In-flow image base — sizes the stage. */
-    .layer.primary {
-      position: relative;
-      display: block;
-      width: 100%;
-      height: auto;
-    }
-    /* Map: absolutely positioned, seated via inline left/top/width/transform. */
-    .layer.map {
-      position: absolute;
-    }
-    .layer.map.overlay {
-      opacity: 0.55;
-      pointer-events: none;
-    }
-    .regions {
-      position: absolute;
-      inset: 0;
-    }
-    .region {
-      position: absolute;
-      cursor: pointer;
-      padding: 0;
-      display: flex;
-      align-items: center;
-      justify-content: center;
-      transition: background 0.2s, border 0.2s, box-shadow 0.2s;
-    }
-    .region.rect {
-      border-radius: 8px;
-    }
-    .region.point {
-      width: 34px;
-      height: 34px;
-      border-radius: 50%;
-      transform: translate(-50%, -50%);
-    }
-    .region ha-icon {
-      --mdc-icon-size: 18px;
-      color: #fff;
-    }
-    .presets {
-      display: flex;
-      flex-wrap: wrap;
-      gap: 6px;
-    }
-    .chip {
-      display: inline-flex;
-      align-items: center;
-      gap: 4px;
-      padding: 5px 10px;
-      border-radius: 999px;
-      border: 1px solid rgba(127, 127, 127, 0.4);
-      background: rgba(127, 127, 127, 0.08);
-      color: var(--primary-text-color, inherit);
-      font-size: 13px;
-      font-weight: 600;
-      cursor: pointer;
-    }
-    .chip.active {
-      background: rgba(59, 130, 246, 0.12);
-      border-width: 2px;
-    }
-    .chip ha-icon {
-      --mdc-icon-size: 16px;
-    }
-    .status {
-      display: flex;
-      flex-direction: column;
-      gap: 4px;
-    }
-    .status-line {
-      display: flex;
-      align-items: center;
       gap: 8px;
-      font-weight: 600;
     }
-    .dot {
-      width: 9px;
-      height: 9px;
-      border-radius: 50%;
-      flex-shrink: 0;
+    .empty { padding: 24px; text-align: center; opacity: 0.7; }
+
+    /* ── Badges ─────────────────────────────────────────────────────────── */
+    .badges-row { display: flex; flex-wrap: wrap; gap: 8px; }
+    .badge {
+      position: relative; overflow: hidden; display: flex; align-items: center; gap: 10px;
+      padding: 6px 18px 6px 6px; border-radius: 99px; cursor: pointer;
+      backdrop-filter: blur(10px); -webkit-backdrop-filter: blur(10px);
+      transition: background 0.3s, border 0.3s, box-shadow 0.3s;
     }
-    .bat {
-      margin-left: auto;
-      display: inline-flex;
-      align-items: center;
-      gap: 3px;
-      font-size: 13px;
-      opacity: 0.85;
+    .badge-img { width: 44px; height: 44px; border-radius: 50%; object-fit: cover; flex-shrink: 0; }
+    .badge-icon { width: 44px; height: 44px; display: flex; align-items: center; justify-content: center; }
+    .badge-name { font-size: 15px; font-weight: 700; white-space: nowrap; transition: color 0.3s; }
+
+    /* ── Map / base ─────────────────────────────────────────────────────── */
+    .map-wrap {
+      position: relative; width: 100%; overflow: hidden; border-radius: 12px;
+      background: rgba(127,127,127,0.06);
     }
-    .bat ha-icon {
-      --mdc-icon-size: 18px;
+    .map-wrap.framed { padding-top: 60%; }
+    .map-wrap.placeholder {
+      display: flex; flex-direction: column; align-items: center; justify-content: center;
+      gap: 6px; opacity: 0.55;
     }
-    .sub {
-      font-size: 12px;
-      opacity: 0.7;
+    .map-wrap.placeholder.framed { padding-top: 0; min-height: 150px; }
+    .map-wrap.placeholder ha-icon { --mdc-icon-size: 40px; }
+    .layer { transform-origin: center center; }
+    .layer.primary { position: relative; display: block; width: 100%; height: auto; }
+    .layer.map { position: absolute; }
+    .layer.map.overlay { opacity: 0.55; pointer-events: none; }
+    .regions { position: absolute; inset: 0; }
+
+    .room-overlay {
+      position: absolute; border-radius: 8px; cursor: pointer;
+      display: flex; align-items: center; justify-content: center; padding: 0;
+      transition: background 0.2s, border 0.3s, box-shadow 0.3s;
     }
-    .err {
-      display: flex;
-      align-items: center;
-      gap: 4px;
-      color: #ff4d4f;
-      font-size: 12px;
-      font-weight: 600;
+    .room-overlay ha-icon { --mdc-icon-size: 18px; }
+    .room-btn {
+      position: absolute; width: 40px; height: 40px; border-radius: 50%; cursor: pointer;
+      display: flex; align-items: center; justify-content: center; padding: 0;
+      transform: translate(-50%, -50%);
+      transition: background 0.2s, box-shadow 0.2s;
     }
-    .err ha-icon {
-      --mdc-icon-size: 16px;
+    .room-btn ha-icon { --mdc-icon-size: 20px; color: #fff; }
+
+    /* ── Status card ────────────────────────────────────────────────────── */
+    .status-card {
+      display: grid; grid-template-columns: 140px 1fr;
+      background: rgba(0,0,0,0.6);
+      backdrop-filter: blur(12px); -webkit-backdrop-filter: blur(12px);
+      border-radius: 20px; overflow: hidden;
+      transition: border 0.4s, box-shadow 0.4s;
     }
-    .progress {
-      height: 5px;
-      border-radius: 3px;
-      background: rgba(127, 127, 127, 0.18);
-      overflow: hidden;
+    .status-left {
+      display: flex; flex-direction: column; align-items: center; justify-content: flex-start;
+      padding: 6px 0 8px; cursor: pointer;
     }
-    .progress .fill {
-      height: 100%;
-      transition: width 0.4s;
+    .model-label {
+      font-size: 10px; letter-spacing: 3px; color: rgba(255,255,255,0.3);
+      text-transform: uppercase; text-align: center;
     }
-    .actions {
-      display: flex;
-      flex-wrap: wrap;
-      gap: 6px;
-      align-items: center;
+    .vac-img { width: 105%; object-fit: contain; display: block; transition: opacity 0.5s, filter 0.5s; }
+    .vac-icon { --mdc-icon-size: 76px; margin-top: 10px; }
+    .status-right { display: flex; flex-direction: column; gap: 4px; padding-top: 4px; }
+
+    .status-row { display: flex; align-items: flex-start; justify-content: space-between; padding: 8px 12px 4px 16px; }
+    .error-row { display: flex; align-items: center; gap: 6px; padding: 4px 12px 0 16px; animation: pulse-error 2s ease-in-out infinite; }
+    @keyframes pulse-error { 0%,100% { opacity:1; } 50% { opacity:0.6; } }
+    .status-main { display: flex; flex-direction: column; gap: 2px; }
+    .status-label { font-size: 20px; font-weight: 700; }
+    .current-room { display: flex; align-items: center; gap: 3px; font-size: 11px; color: rgba(255,255,255,0.45); }
+    .status-meta { display: flex; flex-direction: column; align-items: flex-end; gap: 3px; flex-shrink: 0; }
+    .battery { display: flex; align-items: center; gap: 3px; font-size: 11px; font-weight: 600; }
+    .battery ha-icon { --mdc-icon-size: 15px; }
+
+    /* ── Progress ───────────────────────────────────────────────────────── */
+    .progress { display: flex; align-items: center; gap: 8px; padding: 0 16px 4px; }
+    .progress-track { flex: 1; height: 3px; background: rgba(255,255,255,0.08); border-radius: 2px; overflow: hidden; }
+    .progress-fill { height: 100%; border-radius: 2px; transition: width 0.5s ease; }
+    .progress-label { font-size: 11px; font-weight: 600; flex-shrink: 0; }
+
+    /* ── Presets ────────────────────────────────────────────────────────── */
+    .presets { display: flex; flex-wrap: wrap; gap: 6px; padding: 2px 12px 4px; }
+    .chip {
+      display: inline-flex; align-items: center; gap: 4px; padding: 5px 10px; border-radius: 999px;
+      border: 1px solid rgba(255,255,255,0.18); background: rgba(255,255,255,0.06);
+      color: rgba(255,255,255,0.7); font-size: 12px; font-weight: 600; cursor: pointer;
+      transition: background 0.2s, border 0.2s, color 0.2s;
     }
-    .act {
-      display: inline-flex;
-      align-items: center;
-      justify-content: center;
-      gap: 6px;
-      height: 38px;
-      min-width: 38px;
-      padding: 0 10px;
-      border: none;
-      border-radius: 10px;
-      background: rgba(127, 127, 127, 0.14);
-      color: var(--primary-text-color, inherit);
-      cursor: pointer;
-      font-weight: 700;
-      font-size: 14px;
+    .chip ha-icon { --mdc-icon-size: 15px; }
+
+    /* ── Hold ring ──────────────────────────────────────────────────────── */
+    .hold-ring {
+      position: absolute; inset: 0; border-radius: inherit; background: rgba(255,255,255,0.18);
+      transform: scaleX(0); transform-origin: left; pointer-events: none; z-index: 0;
     }
-    .act.primary {
-      color: #fff;
-      flex: 1 1 auto;
+    .action-btn--holding .hold-ring { animation: hold-fill var(--hold-ms) linear forwards; }
+    @keyframes hold-fill { from { transform: scaleX(0); } to { transform: scaleX(1); } }
+
+    /* ── Actions ────────────────────────────────────────────────────────── */
+    .actions { display: flex; gap: 8px; padding: 0 12px 14px; }
+    .action-btn {
+      position: relative; overflow: hidden; flex: 1;
+      display: flex; align-items: center; justify-content: center; gap: 8px;
+      padding: 10px 14px; border-radius: 14px; cursor: pointer; transition: opacity 0.2s;
+      font-family: inherit; background: rgba(127,127,127,0.14); border: 1px solid rgba(255,255,255,0.08);
     }
-    .act.ghost {
-      background: transparent;
-      border: 1px solid rgba(127, 127, 127, 0.4);
-      margin-left: auto;
+    .action-btn:disabled { cursor: default; opacity: 0.7; }
+    .action-btn ha-icon { --mdc-icon-size: 22px; flex-shrink: 0; position: relative; z-index: 1; }
+    .action-btn span { font-size: 14px; font-weight: 700; color: white; position: relative; z-index: 1; }
+    .action-btn--secondary { flex: 0 0 auto; background: rgba(64,169,255,0.08); border: 1px solid rgba(64,169,255,0.2); }
+    .action-btn--warn { background: rgba(250,173,20,0.18); border: 1px solid rgba(250,173,20,0.5); }
+
+    .start-body { display: flex; flex-direction: column; align-items: flex-start; gap: 2px; position: relative; z-index: 1; }
+    .sel-all-row { display: flex; align-items: center; gap: 4px; margin-top: 1px; }
+    .sel-link {
+      background: none; border: none; cursor: pointer; padding: 0; font-size: 10px; font-family: inherit;
+      color: rgba(255,255,255,0.3); transition: color .15s;
     }
-    .act ha-icon {
-      --mdc-icon-size: 20px;
-    }
+    .sel-link:hover { color: rgba(255,255,255,0.7); }
+    .room-icons { display: flex; align-items: center; gap: 4px; margin-top: 1px; }
+    .room-icons ha-icon { --mdc-icon-size: 14px; }
   `;
 __decorate([
     n$1({ attribute: false })
@@ -769,6 +826,12 @@ __decorate([
 __decorate([
     r()
 ], AnyVacCard.prototype, "_preset", void 0);
+__decorate([
+    r()
+], AnyVacCard.prototype, "_shown", void 0);
+__decorate([
+    r()
+], AnyVacCard.prototype, "_holdId", void 0);
 AnyVacCard = __decorate([
     t$1(CARD_TAG)
 ], AnyVacCard);
