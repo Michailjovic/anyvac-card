@@ -17,6 +17,8 @@ import type {
   VacuumCardConfig,
   RegionConfig,
   CleanPreset,
+  ImageBaseConfig,
+  MapSourceConfig,
 } from "./types";
 
 console.info(
@@ -222,10 +224,27 @@ export class AnyVacCard extends LitElement {
     return typeof ep === "string" ? ep : undefined;
   }
 
-  private _transform(t?: { rotation?: number; scale?: number }): string {
+  /** In-flow image-base transform (rotate / scale / offset). */
+  private _imgTransform(t?: ImageBaseConfig): string {
     const r = t?.rotation ?? 0;
     const s = t?.scale ?? 100;
-    return `rotate(${r}deg) scale(${s / 100})`;
+    const ox = t?.offset_x ?? 0;
+    const oy = t?.offset_y ?? 0;
+    return `translate(${ox}%, ${oy}%) rotate(${r}deg) scale(${s / 100})`;
+  }
+
+  /** Absolutely-positioned map: rotate and seat (offset + scale) within the stage. */
+  private _mapStyle(ms?: MapSourceConfig): Record<string, string> {
+    const r = ms?.rotation ?? 0;
+    const s = ms?.scale ?? 100;
+    const ox = ms?.offset_x ?? 0;
+    const oy = ms?.offset_y ?? 0;
+    return {
+      left: 50 + ox + "%",
+      top: 50 + oy + "%",
+      width: s + "%",
+      transform: `translate(-50%, -50%) rotate(${r}deg)`,
+    };
   }
 
   // ── render ────────────────────────────────────────────────────────────────
@@ -272,23 +291,24 @@ export class AnyVacCard extends LitElement {
       </div>`;
     }
 
-    const primaryIsImage = showImage;
+    // When there is no in-flow image to size the stage, the map needs an aspect frame.
+    const framed = !showImage;
     return html`
-      <div class="stage">
+      <div class="stage ${framed ? "framed" : ""}">
         ${showImage
           ? html`<img
-              class="layer ${primaryIsImage ? "primary" : "overlay"}"
+              class="layer primary"
               src=${imgSrc as string}
               alt="floorplan"
-              style=${styleMap({ transform: this._transform(vac.image_base) })}
+              style=${styleMap({ transform: this._imgTransform(vac.image_base) })}
             />`
           : nothing}
         ${showMap
           ? html`<img
-              class="layer ${primaryIsImage ? "overlay map" : "primary"}"
+              class="layer map ${showImage ? "overlay" : "seat"}"
               src=${mapUrl as string}
               alt="vacuum map"
-              style=${styleMap({ transform: this._transform(vac.map_source) })}
+              style=${styleMap(this._mapStyle(vac.map_source))}
             />`
           : nothing}
         <div class="regions">
@@ -456,6 +476,10 @@ export class AnyVacCard extends LitElement {
       overflow: hidden;
       background: rgba(127, 127, 127, 0.06);
     }
+    /* Aspect frame used when the map is shown without an in-flow image base. */
+    .stage.framed {
+      padding-top: 60%;
+    }
     .stage.placeholder {
       display: flex;
       flex-direction: column;
@@ -471,20 +495,18 @@ export class AnyVacCard extends LitElement {
     .layer {
       transform-origin: center center;
     }
+    /* In-flow image base — sizes the stage. */
     .layer.primary {
       position: relative;
       display: block;
       width: 100%;
       height: auto;
     }
-    .layer.overlay {
+    /* Map: absolutely positioned, seated via inline left/top/width/transform. */
+    .layer.map {
       position: absolute;
-      inset: 0;
-      width: 100%;
-      height: 100%;
-      object-fit: contain;
     }
-    .layer.overlay.map {
+    .layer.map.overlay {
       opacity: 0.55;
       pointer-events: none;
     }

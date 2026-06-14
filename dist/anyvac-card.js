@@ -342,10 +342,26 @@ let AnyVacCard = class AnyVacCard extends i$2 {
         const ep = st?.attributes["entity_picture"];
         return typeof ep === "string" ? ep : undefined;
     }
-    _transform(t) {
+    /** In-flow image-base transform (rotate / scale / offset). */
+    _imgTransform(t) {
         const r = t?.rotation ?? 0;
         const s = t?.scale ?? 100;
-        return `rotate(${r}deg) scale(${s / 100})`;
+        const ox = t?.offset_x ?? 0;
+        const oy = t?.offset_y ?? 0;
+        return `translate(${ox}%, ${oy}%) rotate(${r}deg) scale(${s / 100})`;
+    }
+    /** Absolutely-positioned map: rotate and seat (offset + scale) within the stage. */
+    _mapStyle(ms) {
+        const r = ms?.rotation ?? 0;
+        const s = ms?.scale ?? 100;
+        const ox = ms?.offset_x ?? 0;
+        const oy = ms?.offset_y ?? 0;
+        return {
+            left: 50 + ox + "%",
+            top: 50 + oy + "%",
+            width: s + "%",
+            transform: `translate(-50%, -50%) rotate(${r}deg)`,
+        };
     }
     // ── render ────────────────────────────────────────────────────────────────
     render() {
@@ -387,23 +403,24 @@ let AnyVacCard = class AnyVacCard extends i$2 {
         <span>Set an image base or map source</span>
       </div>`;
         }
-        const primaryIsImage = showImage;
+        // When there is no in-flow image to size the stage, the map needs an aspect frame.
+        const framed = !showImage;
         return b `
-      <div class="stage">
+      <div class="stage ${framed ? "framed" : ""}">
         ${showImage
             ? b `<img
-              class="layer ${primaryIsImage ? "primary" : "overlay"}"
+              class="layer primary"
               src=${imgSrc}
               alt="floorplan"
-              style=${o({ transform: this._transform(vac.image_base) })}
+              style=${o({ transform: this._imgTransform(vac.image_base) })}
             />`
             : A}
         ${showMap
             ? b `<img
-              class="layer ${primaryIsImage ? "overlay map" : "primary"}"
+              class="layer map ${showImage ? "overlay" : "seat"}"
               src=${mapUrl}
               alt="vacuum map"
-              style=${o({ transform: this._transform(vac.map_source) })}
+              style=${o(this._mapStyle(vac.map_source))}
             />`
             : A}
         <div class="regions">
@@ -567,6 +584,10 @@ AnyVacCard.styles = i$5 `
       overflow: hidden;
       background: rgba(127, 127, 127, 0.06);
     }
+    /* Aspect frame used when the map is shown without an in-flow image base. */
+    .stage.framed {
+      padding-top: 60%;
+    }
     .stage.placeholder {
       display: flex;
       flex-direction: column;
@@ -582,20 +603,18 @@ AnyVacCard.styles = i$5 `
     .layer {
       transform-origin: center center;
     }
+    /* In-flow image base — sizes the stage. */
     .layer.primary {
       position: relative;
       display: block;
       width: 100%;
       height: auto;
     }
-    .layer.overlay {
+    /* Map: absolutely positioned, seated via inline left/top/width/transform. */
+    .layer.map {
       position: absolute;
-      inset: 0;
-      width: 100%;
-      height: 100%;
-      object-fit: contain;
     }
-    .layer.overlay.map {
+    .layer.map.overlay {
       opacity: 0.55;
       pointer-events: none;
     }
@@ -955,10 +974,25 @@ let AnyVacCardEditor = class AnyVacCardEditor extends i$2 {
         if (!this._vacs().length)
             return b `<p class="hint">Add a vacuum first.</p>`;
         const vi = this._vacIndex;
+        const ms = this._cfgVac(vi)?.map_source;
         const regs = this._regions(vi);
         return b `
       ${this._vacPicker()}
-      <p class="hint">Place clickable rooms on the image (percent of width/height). Map each to a HA Area for calibration-free cleaning.</p>
+      <div class="block">
+        <div class="block-head"><strong>Map transform — rotate &amp; seat</strong></div>
+        <p class="hint">Live preview on the right updates as you change these.</p>
+        <div class="grid4">
+          <label><span>rotation°</span><input type="number" .value=${String(ms?.rotation ?? 0)}
+            @input=${(e) => this._updateMapSource(vi, { rotation: this._num(e) })} /></label>
+          <label><span>scale %</span><input type="number" .value=${String(ms?.scale ?? 100)}
+            @input=${(e) => this._updateMapSource(vi, { scale: this._num(e) })} /></label>
+          <label><span>offset x %</span><input type="number" .value=${String(ms?.offset_x ?? 0)}
+            @input=${(e) => this._updateMapSource(vi, { offset_x: this._num(e) })} /></label>
+          <label><span>offset y %</span><input type="number" .value=${String(ms?.offset_y ?? 0)}
+            @input=${(e) => this._updateMapSource(vi, { offset_y: this._num(e) })} /></label>
+        </div>
+      </div>
+      <p class="hint">Place clickable rooms on the base (percent of width/height). Map each to a HA Area for calibration-free cleaning.</p>
       ${regs.map((r, ri) => b `
           <div class="block">
             <div class="block-head">

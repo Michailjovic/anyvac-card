@@ -12,6 +12,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   (capabilities / state / map / commands). Map source is format-agnostic and multi-source;
   calibration is optional (advanced map only).
 - **Configurable image base** — custom photo / SVG floorplan, vacuum map, or `combined`.
+- **Map transform** — rotate, scale and offset (seat) the vacuum map within its frame, edited from
+  the editor's Map tab with live preview (parity with the original card's map placement tools).
 - **Calibration-free clickable rooms** — percentage rectangles / points placed over the base,
   each mapped to a Home Assistant Area.
 - **Presets** — 1–3 named presets per vacuum (suction, mop mode/intensity, water, repeats),

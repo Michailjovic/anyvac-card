@@ -235,10 +235,25 @@ export class AnyVacCardEditor extends LitElement {
   private _renderMap() {
     if (!this._vacs().length) return html`<p class="hint">Add a vacuum first.</p>`;
     const vi = this._vacIndex;
+    const ms = this._cfgVac(vi)?.map_source;
     const regs = this._regions(vi);
     return html`
       ${this._vacPicker()}
-      <p class="hint">Place clickable rooms on the image (percent of width/height). Map each to a HA Area for calibration-free cleaning.</p>
+      <div class="block">
+        <div class="block-head"><strong>Map transform — rotate &amp; seat</strong></div>
+        <p class="hint">Live preview on the right updates as you change these.</p>
+        <div class="grid4">
+          <label><span>rotation°</span><input type="number" .value=${String(ms?.rotation ?? 0)}
+            @input=${(e: Event) => this._updateMapSource(vi, { rotation: this._num(e) })} /></label>
+          <label><span>scale %</span><input type="number" .value=${String(ms?.scale ?? 100)}
+            @input=${(e: Event) => this._updateMapSource(vi, { scale: this._num(e) })} /></label>
+          <label><span>offset x %</span><input type="number" .value=${String(ms?.offset_x ?? 0)}
+            @input=${(e: Event) => this._updateMapSource(vi, { offset_x: this._num(e) })} /></label>
+          <label><span>offset y %</span><input type="number" .value=${String(ms?.offset_y ?? 0)}
+            @input=${(e: Event) => this._updateMapSource(vi, { offset_y: this._num(e) })} /></label>
+        </div>
+      </div>
+      <p class="hint">Place clickable rooms on the base (percent of width/height). Map each to a HA Area for calibration-free cleaning.</p>
       ${regs.map(
         (r, ri) => html`
           <div class="block">
