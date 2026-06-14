@@ -1076,10 +1076,14 @@ let AnyVacCard = class AnyVacCard extends i$2 {
         if (!showImage && !showMap)
             return A;
         const m = vac.map;
+        const fixedH = typeof vac.base_height === "number" && vac.base_height > 0;
+        const wrapClass = fixedH ? "map-wrap--fixed" : (showImage ? "map-wrap--image" : "");
+        const wrapStyle = o(fixedH ? { height: (vac.base_height ?? 0) + "px" } : {});
+        const imgClass = "image-base-img" + (fixedH ? " image-base-img--fit" : "");
         return b `
-      <div class="map-wrap ${showImage ? "map-wrap--image" : ""}">
+      <div class="map-wrap ${wrapClass}" style=${wrapStyle}>
         ${showImage ? b `
-          <img class="image-base-img" src=${imgSrc} alt="Floorplan"
+          <img class="${imgClass}" src=${imgSrc} alt="Floorplan"
             style=${o({
             transform: "translate(" + (ib?.offset_x ?? 0) + "%," + (ib?.offset_y ?? 0) + "%) rotate(" + (ib?.rotation ?? 0) + "deg) scale(" + ((ib?.scale ?? 100) / 100) + ")",
         })} />
@@ -1487,6 +1491,8 @@ AnyVacCard.styles = i$5 `
     .map-wrap--image { padding-top: 0; }
     .image-base-img { position: relative; display: block; width: 100%; height: auto; transform-origin: center center; }
     .map-img--overlay { opacity: 0.55; pointer-events: none; }
+    .map-wrap--fixed { padding-top: 0; }
+    .image-base-img--fit { position: absolute; inset: 0; width: 100%; height: 100%; object-fit: contain; }
 
     /* ── Room buttons ────────────────────────────────────────────────── */
     .room-btn {
@@ -2651,6 +2657,8 @@ let AnyVacCardEditor = class AnyVacCardEditor extends i$2 {
         ` : A}
 
         ${this._selectField("Base layer", (vac.base ?? "map"), [{ value: "map", label: "Vacuum map" }, { value: "image", label: "Custom image" }, { value: "combined", label: "Image + map" }], v => this._setVacuum(mapVac, { base: v }))}
+
+        ${this._numberSlider("Card height (0=auto)", vac.base_height ?? 0, 0, 700, 10, v => this._setVacuum(mapVac, { base_height: v > 0 ? v : undefined }), "px")}
 
         ${vac.base === "image" || vac.base === "combined" ? b `
           ${this._textField("Image src (URL)", vac.image_base?.src, v => this._setImageBase(mapVac, { src: v }), "/local/anyvac/flat.svg")}

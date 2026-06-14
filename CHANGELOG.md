@@ -35,6 +35,10 @@ on top from here.
   combined`). Set an `image src` (URL to SVG / WebP / PNG / JPG) with its own rotation / scale /
   offset sliders. In `combined` mode the vacuum map overlays the image. Room overlays work on any
   base. Editor: Maps tab → *Base layer* selector + image fields.
+- **Card height control** (`base_height`) — fix the card/stage height independent of the image's
+  natural size; the image is fitted inside (`object-fit: contain`) and `scale`/offset seat it.
+  Editor: Maps tab → *Card height* slider (0 = auto).
+- The editor's click-to-place preview now shows the **custom image** when the base is image/combined.
 
 ### Planned next
 

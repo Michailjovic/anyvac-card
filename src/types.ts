@@ -175,6 +175,8 @@ export interface VacuumConfig {
   progress_entity?: string;
   base?: "image" | "map" | "combined";
   image_base?: ImageBaseConfig;
+  /** Fixed base/stage height in px (controls card size). 0/undefined = auto. */
+  base_height?: number;
   map?: MapConfig;
   rooms?: RoomConfig[];
   clean_action?: CleanAction;
