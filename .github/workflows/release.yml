@@ -1,0 +1,23 @@
+name: Release
+
+# Triggers when you manually create a release on GitHub.
+# The built dist/anyvac-card.js is committed in the repo, so this workflow
+# just attaches it to the release — no build step needed.
+on:
+  release:
+    types: [created]
+
+permissions:
+  contents: write
+
+jobs:
+  attach:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Attach JS to release
+        uses: softprops/action-gh-release@v2
+        with:
+          files: dist/anyvac-card.js
+          fail_on_unmatched_files: true

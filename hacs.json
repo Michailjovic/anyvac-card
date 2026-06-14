@@ -1,0 +1,7 @@
+{
+  "name": "AnyVac Card",
+  "description": "Modern, universal Lovelace card for robot vacuums — configurable image base, clickable rooms via HA Areas (calibration-free), and per-vacuum presets.",
+  "render_readme": true,
+  "homeassistant": "2024.1.0",
+  "filename": "anyvac-card.js"
+}

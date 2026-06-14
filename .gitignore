@@ -1,0 +1,14 @@
+# Node
+node_modules/
+*.tsbuildinfo
+.rollup.cache/
+
+# NOTE: dist/ is intentionally NOT ignored — the built anyvac-card.js is
+# committed to the repo so HACS can install it (and the release workflow
+# attaches it to releases).
+
+# Editor / OS
+.DS_Store
+.idea/
+.vscode/
+*.log
