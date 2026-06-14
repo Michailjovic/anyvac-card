@@ -85,119 +85,467 @@ const t={ATTRIBUTE:1},e=t=>(...e)=>({_$litDirective$:t,values:e});let i$1 = clas
  * SPDX-License-Identifier: BSD-3-Clause
  */const n="important",i=" !"+n,o=e(class extends i$1{constructor(t$1){if(super(t$1),t$1.type!==t.ATTRIBUTE||"style"!==t$1.name||t$1.strings?.length>2)throw Error("The `styleMap` directive must be used in the `style` attribute and must be the only part in the attribute.")}render(t){return Object.keys(t).reduce((e,r)=>{const s=t[r];return null==s?e:e+`${r=r.includes("-")?r:r.replace(/(?:^(webkit|moz|ms|o)|)(?=[A-Z])/g,"-$&").toLowerCase()}:${s};`},"")}update(e,[r]){const{style:s}=e.element;if(void 0===this.ft)return this.ft=new Set(Object.keys(r)),this.render(r);for(const t of this.ft)null==r[t]&&(this.ft.delete(t),t.includes("-")?s.removeProperty(t):s[t]=null);for(const t in r){const e=r[t];if(null!=e){this.ft.add(t);const r="string"==typeof e&&e.endsWith(i);t.includes("-")||r?s.setProperty(t,r?e.slice(0,-11):e,r?n:""):s[t]=e;}}return E}});
 
-/** Card build version — must match card/package.json. */
+const CARD_NAME = "anyvac-card";
+const EDITOR_NAME = "anyvac-card-editor";
 const CARD_VERSION = "0.1.0";
-/** Custom element tags. */
-const CARD_TAG = "anyvac-card";
-const EDITOR_TAG = "anyvac-card-editor";
-/** Human-friendly name shown in the card picker. */
-const CARD_NAME = "AnyVac Card";
-const CARD_DESCRIPTION = "Modern, universal card for robot vacuums — configurable image base, interactive map, value-add insights.";
-/** Default accent colour. */
-const ACCENT = "#3b82f6";
-/** Hold duration (ms) reserved for hold-to-confirm actions. */
-const HOLD_DURATION_MS = 500;
+/** Server-side tracking blueprint */
+const BLUEPRINT_VERSION = "1.0.0";
+const BLUEPRINT_PATH = "anyvac_card/cleaning_tracker.yaml";
+const TRACKER_AUTOMATION_ID = "roborock_card_cleaning_tracker";
+/** Hold duration in ms required to trigger START / PAUSE actions */
+const HOLD_DURATION_MS = 600;
 /**
- * Raw vendor status string -> [label, accent colour].
- * Roborock-centric for the MVP (S6 / S7 / S8). Unknown statuses fall back to
- * the raw string + default accent.
+ * Maps Roborock status strings to [human-readable label, accent colour].
+ * This unified map covers S6 / S7 / S8 MaxV Ultra.
  */
 const STATUS_MAP = {
-    cleaning: ["Cleaning", "#52c41a"],
-    segment_cleaning: ["Cleaning rooms", "#52c41a"],
-    zoned_cleaning: ["Zone cleaning", "#52c41a"],
-    spot_cleaning: ["Spot cleaning", "#52c41a"],
-    starting: ["Starting", "#52c41a"],
-    segment_mopping: ["Mopping rooms", "#40a9ff"],
-    zoned_mopping: ["Zone mopping", "#40a9ff"],
-    robot_status_mopping: ["Mopping", "#40a9ff"],
-    clean_mop_cleaning: ["Vacuuming + mopping", "#52c41a"],
-    clean_mop_mopping: ["Vacuuming + mopping", "#52c41a"],
-    washing_the_mop: ["Washing mop", "#9254de"],
-    going_to_wash_the_mop: ["Going to wash mop", "#9254de"],
-    air_drying_stopping: ["Drying mop", "#9254de"],
-    returning_home: ["Returning home", "#faad14"],
-    docking: ["Docking", "#faad14"],
-    going_to_target: ["Going to target", "#40a9ff"],
-    charging: ["Charging", "rgba(160,160,160,0.9)"],
-    charging_complete: ["Fully charged", "#52c41a"],
-    docked: ["Docked", "rgba(160,160,160,0.9)"],
-    emptying_the_bin: ["Emptying bin", "#faad14"],
-    idle: ["Idle", "rgba(160,160,160,0.7)"],
-    paused: ["Paused", "#faad14"],
-    mapping: ["Mapping", "#40a9ff"],
-    updating: ["Updating", "#faad14"],
-    error: ["Error", "#ff4d4f"],
-    charging_problem: ["Charging problem", "#ff4d4f"],
-    locked: ["Locked", "#ff4d4f"],
-    device_offline: ["Offline", "#ff4d4f"],
+    // ── Dry cleaning ──────────────────────────────────────────────────────
+    cleaning: ["🧹 Cleaning", "#52c41a"],
+    segment_cleaning: ["🧹 Cleaning rooms", "#52c41a"],
+    zoned_cleaning: ["🧹 Zone cleaning", "#52c41a"],
+    spot_cleaning: ["🎯 Spot cleaning", "#52c41a"],
+    starting: ["▶️ Starting", "#52c41a"],
+    // ── Wet / mop ────────────────────────────────────────────────────────
+    segment_mopping: ["🫧 Mopping rooms", "#40a9ff"],
+    zoned_mopping: ["🫧 Zone mopping", "#40a9ff"],
+    robot_status_mopping: ["🫧 Mopping", "#40a9ff"],
+    // ── Combined dry + wet ───────────────────────────────────────────────
+    clean_mop_cleaning: ["🧹🫧 Vacuuming+mopping", "#52c41a"],
+    clean_mop_mopping: ["🧹🫧 Vacuuming+mopping", "#52c41a"],
+    segment_clean_mop_cleaning: ["🧹🫧 Rooms (vac)", "#52c41a"],
+    segment_clean_mop_mopping: ["🧹🫧 Rooms (mop)", "#52c41a"],
+    zoned_clean_mop_cleaning: ["🧹🫧 Zones (vac)", "#52c41a"],
+    zoned_clean_mop_mopping: ["🧹🫧 Zones (mop)", "#52c41a"],
+    // ── Mop washing ──────────────────────────────────────────────────────
+    washing_the_mop: ["🚿 Washing mop", "#9254de"],
+    washing_the_mop_2: ["🚿 Washing mop", "#9254de"],
+    going_to_wash_the_mop: ["🚿 Going to wash mop", "#9254de"],
+    air_drying_stopping: ["💨 Drying mop", "#9254de"],
+    back_to_dock_washing_duster: ["🏠 Dock + washing", "#faad14"],
+    // ── Navigation ───────────────────────────────────────────────────────
+    returning_home: ["🏠 Returning home", "#faad14"],
+    docking: ["🏠 Docking", "#faad14"],
+    going_to_target: ["🎯 Going to target", "#40a9ff"],
+    // ── Docked / idle ────────────────────────────────────────────────────
+    charging: ["⚡ Charging", "rgba(255,255,255,0.75)"],
+    charging_complete: ["✅ Fully charged", "#52c41a"],
+    docked: ["✅ Docked", "rgba(255,255,255,0.75)"],
+    charger_disconnected: ["🔌 Charger disconnected", "#faad14"],
+    emptying_the_bin: ["🗑️ Emptying bin", "#faad14"],
+    idle: ["💤 Idle", "rgba(255,255,255,0.45)"],
+    paused: ["⏸️ Paused", "#faad14"],
+    // ── Special ──────────────────────────────────────────────────────────
+    mapping: ["🗺️ Mapping", "#40a9ff"],
+    remote_control_active: ["🕹️ Remote control", "#40a9ff"],
+    manual_mode: ["🕹️ Manual mode", "#40a9ff"],
+    updating: ["⬆️ Updating", "#faad14"],
+    in_call: ["📞 In call", "#faad14"],
+    shutting_down: ["⏹️ Shutting down", "rgba(255,255,255,0.4)"],
+    // ── Error states ─────────────────────────────────────────────────────
+    error: ["❌ Error", "#ff4d4f"],
+    charging_problem: ["⚠️ Charging problem", "#ff4d4f"],
+    locked: ["🔒 Locked", "#ff4d4f"],
+    device_offline: ["📴 Offline", "#ff4d4f"],
 };
-/** Vendor states that count as "actively cleaning". */
+/** Colour hex values for VacuumColor variants */
+const COLOR_HEX = {
+    green: "#52c41a",
+    blue: "#2196F3",
+    orange: "#faad14",
+};
+/** rgba versions with reduced opacity for backgrounds */
+const COLOR_BG = {
+    green: "rgba(46,204,113,0.18)",
+    blue: "rgba(33,150,243,0.18)",
+    orange: "rgba(250,173,20,0.18)",
+};
+const COLOR_BG_ACTIVE = {
+    green: "rgba(46,204,113,0.30)",
+    blue: "rgba(33,150,243,0.30)",
+    orange: "rgba(250,173,20,0.30)",
+};
+/** Vacuum entity states that count as "actively cleaning" */
 const CLEANING_STATES = new Set([
-    "cleaning", "segment_cleaning", "zoned_cleaning", "spot_cleaning",
-    "segment_mopping", "zoned_mopping", "robot_status_mopping",
-    "clean_mop_cleaning", "clean_mop_mopping", "starting",
+    "cleaning",
+    "segment_cleaning",
+    "zoned_cleaning",
+    "spot_cleaning",
+    "segment_mopping",
+    "zoned_mopping",
+    "robot_status_mopping",
+    "clean_mop_cleaning",
+    "clean_mop_mopping",
+    "segment_clean_mop_cleaning",
+    "segment_clean_mop_mopping",
+    "zoned_clean_mop_cleaning",
+    "zoned_clean_mop_mopping",
 ]);
-/** Map a raw vendor status onto the normalized VacuumActivity. */
-function normalizeActivity(status) {
-    if (CLEANING_STATES.has(status))
-        return "cleaning";
-    switch (status) {
-        case "paused":
-            return "paused";
-        case "returning_home":
-        case "docking":
-        case "going_to_wash_the_mop":
-            return "returning";
-        case "charging":
-        case "charging_complete":
-            return "charging";
-        case "docked":
-            return "docked";
-        case "idle":
-            return "idle";
-        case "error":
-        case "charging_problem":
-        case "locked":
-        case "device_offline":
-            return "error";
-        default:
-            return "unknown";
-    }
-}
 
-const BADGE_BG = "rgba(30,30,30,0.85)";
-const ACCENT_BG = "rgba(59,130,246,0.18)";
-const ACCENT_BG_ACTIVE = "rgba(59,130,246,0.30)";
-console.info(`%c ${CARD_NAME} %c v${CARD_VERSION} `, "color:#fff;background:#3b82f6;font-weight:700;border-radius:3px 0 0 3px;padding:2px 4px;", "color:#3b82f6;background:#0f172a;border-radius:0 3px 3px 0;padding:2px 4px;");
+var _a;
+console.info(`%c ROBOROCK-VACUUM-CARD %c v${CARD_VERSION} `, "background:#2196F3;color:#fff;font-weight:700;padding:2px 4px;border-radius:3px 0 0 3px", "background:#1a1a1a;color:#fff;font-weight:400;padding:2px 4px;border-radius:0 3px 3px 0");
 let AnyVacCard = class AnyVacCard extends i$2 {
     constructor() {
         super(...arguments);
-        this._selected = {};
-        this._preset = {};
-        this._shown = 0;
+        /** Set by Lovelace when the dashboard is in edit mode */
+        this.editMode = false;
+        this._shownSet = new Set([0]);
+        /** ID of the button currently being held — drives the fill animation */
         this._holdId = null;
+        /** Výběr místností — drží se lokálně v kartě (bez potřeby input_boolean helper entity) */
+        this._localRoomSel = new Map();
+        /** Aktivní úklidy — sledování průběhu pro vyhodnocení úspěchu */
+        this._inFlight = new Map();
+        this._prevVacStates = new Map();
+        this._prevRoomStates = new Map();
+        /** Auto-calibration: timestamp when vacuum entered each room (key = vacEntity:roomName) */
+        this._roomEnterTimes = new Map();
         this._holdTimer = null;
+        this._initialized = false;
+        /** Entities whose state changes should trigger a re-render */
+        this._watched = null;
+        /** roborock_card_event subscription (blueprint → card sync) */
+        this._unsubEvents = null;
         this._holdEnd = () => {
             this._cancelHold();
-            this._holdId = null;
         };
     }
+    // ── Lovelace card API ───────────────────────────────────────────────────
     static getConfigElement() {
-        return document.createElement(EDITOR_TAG);
+        return document.createElement(EDITOR_NAME);
     }
     static getStubConfig() {
-        return { type: `custom:${CARD_TAG}`, base: "image", vacuums: [] };
+        return {
+            type: `custom:${CARD_NAME}`,
+            vacuums: [
+                {
+                    entity: "vacuum.my_roborock",
+                    name: "Roborock",
+                    color: "green",
+                    rooms: [],
+                    clean_action: { type: "native" },
+                },
+            ],
+        };
     }
     setConfig(config) {
-        if (!config)
-            throw new Error("Invalid configuration");
+        if (!config.vacuums || !Array.isArray(config.vacuums) || config.vacuums.length === 0) {
+            throw new Error("[anyvac-card] 'vacuums' must be a non-empty array");
+        }
         this._config = config;
+        this._watched = null;
+        if (!this._initialized) {
+            this._initialized = true;
+            this._shownSet = this._loadShown();
+            this._localRoomSel = this._loadRoomSel();
+        }
+        else {
+            const valid = new Set();
+            for (const i of this._shownSet) {
+                if (i < config.vacuums.length)
+                    valid.add(i);
+            }
+            this._shownSet = valid.size > 0 ? valid : new Set(config.vacuums.map((_, i) => i));
+        }
     }
     getCardSize() {
-        return 7;
+        return 6;
     }
-    // ── hold-to-activate ────────────────────────────────────────────────────────
+    // ── Lifecycle ───────────────────────────────────────────────────────────
+    connectedCallback() {
+        super.connectedCallback();
+        this.style.setProperty("--hold-ms", HOLD_DURATION_MS + "ms");
+        this._ensureSubscribed();
+    }
+    disconnectedCallback() {
+        super.disconnectedCallback();
+        this._cancelHold();
+        if (this._unsubEvents) {
+            this._unsubEvents.then((unsub) => unsub()).catch(() => { });
+            this._unsubEvents = null;
+        }
+    }
+    /**
+     * Re-render only when a relevant entity changed — the hass object is
+     * replaced on every state change anywhere in HA.
+     */
+    shouldUpdate(changed) {
+        if (!changed.has("hass") || changed.size > 1)
+            return true;
+        const old = changed.get("hass");
+        if (!old || !this._config)
+            return true;
+        for (const id of this._watchedEntities()) {
+            if (old.states[id] !== this.hass.states[id])
+                return true;
+        }
+        return false;
+    }
+    _watchedEntities() {
+        if (this._watched)
+            return this._watched;
+        const s = new Set();
+        for (const vac of this._config?.vacuums ?? []) {
+            for (const id of [vac.entity, vac.status_entity, vac.battery_entity,
+                vac.last_clean_entity, vac.progress_entity, vac.current_room_entity,
+                vac.error_entity, vac.map?.entity]) {
+                if (id)
+                    s.add(id);
+            }
+            for (const r of vac.rooms ?? []) {
+                if (r.last_clean_entity)
+                    s.add(r.last_clean_entity);
+                if (r.clean_time_entity)
+                    s.add(r.clean_time_entity);
+            }
+        }
+        for (const ga of this._config?.global_actions ?? []) {
+            for (const e of ga.watch_entities ?? [])
+                if (e)
+                    s.add(e);
+        }
+        this._watched = s;
+        return s;
+    }
+    _ensureSubscribed() {
+        if (this._unsubEvents || !this.hass?.connection?.subscribeEvents)
+            return;
+        try {
+            this._unsubEvents = this.hass.connection.subscribeEvents((ev) => this._onCardEvent(ev.data ?? {}), "roborock_card_event");
+        }
+        catch {
+            this._unsubEvents = null;
+        }
+    }
+    /**
+     * Blueprint fired cleaning_finished — clear the room selection for that
+     * vacuum on every device with an open dashboard, and drop any stale
+     * in-flight record (e.g. when this tab missed the docked transition).
+     */
+    _onCardEvent(data) {
+        if (data["action"] !== "cleaning_finished" || data["source"] !== "blueprint")
+            return;
+        const vacEntity = String(data["vacuum_entity"] ?? "");
+        if (!this._config?.vacuums.some((v) => v.entity === vacEntity))
+            return;
+        this._inFlight.delete(vacEntity);
+        const keys = Array.isArray(data["rooms"]) ? data["rooms"].map(String) : [];
+        if (!keys.length)
+            return;
+        const next = new Map(this._localRoomSel);
+        for (const k of keys)
+            next.delete(vacEntity + ":" + k);
+        this._localRoomSel = next;
+        this._saveRoomSel(vacEntity);
+    }
+    updated(changed) {
+        this._ensureSubscribed();
+        if (!changed.has("hass") || !this.hass || !this._config)
+            return;
+        for (const vac of this._config.vacuums) {
+            const newState = this.hass.states[vac.entity]?.state ?? "";
+            const prevState = this._prevVacStates.get(vac.entity) ?? newState;
+            // Přechod do docked/charging při aktivním úklidu → vyhodnoť
+            if (prevState !== newState &&
+                (newState === "docked" || newState === "charging") &&
+                this._inFlight.has(vac.entity)) {
+                const flight = this._inFlight.get(vac.entity);
+                this._inFlight.delete(vac.entity);
+                this._evalCleaningComplete(vac.entity, flight);
+            }
+            this._prevVacStates.set(vac.entity, newState);
+            // room_entered event + auto-calibration tracking
+            if (vac.current_room_entity && this._inFlight.has(vac.entity)) {
+                const newRoom = this.hass.states[vac.current_room_entity]?.state ?? "";
+                const prevRoom = this._prevRoomStates.get(vac.entity) ?? "";
+                if (newRoom && newRoom !== prevRoom &&
+                    newRoom !== "unknown" && newRoom !== "unavailable") {
+                    if (prevRoom) {
+                        const enterKey = vac.entity + ":" + prevRoom;
+                        const enterTime = this._roomEnterTimes.get(enterKey);
+                        if (enterTime) {
+                            const elapsedMins = (Date.now() - enterTime) / 60000;
+                            this._updateRoomCleanTime(vac, prevRoom, elapsedMins);
+                            this._roomEnterTimes.delete(enterKey);
+                        }
+                    }
+                    this._roomEnterTimes.set(vac.entity + ":" + newRoom, Date.now());
+                    this._fireHAEvent({
+                        action: "room_entered",
+                        vacuum_entity: vac.entity,
+                        vacuum_label: vac.name ?? vac.entity,
+                        clean_type: this._deriveCleanType(vac),
+                        room_name: newRoom,
+                    });
+                }
+                this._prevRoomStates.set(vac.entity, newRoom);
+            }
+        }
+    }
+    // ── Helpers ─────────────────────────────────────────────────────────────
+    _color(vac) {
+        return COLOR_HEX[vac.color ?? "green"] ?? COLOR_HEX["green"];
+    }
+    _colorKey(vac) {
+        return vac.color ?? "green";
+    }
+    _statusInfo(vac) {
+        const raw = vac.status_entity
+            ? (this.hass.states[vac.status_entity]?.state ?? "unknown")
+            : (this.hass.states[vac.entity]?.state ?? "unknown");
+        return STATUS_MAP[raw] ?? [raw, "rgba(255,255,255,0.5)"];
+    }
+    _isCleaning(vac) {
+        return CLEANING_STATES.has(this.hass.states[vac.entity]?.state ?? "");
+    }
+    _isPaused(vac) {
+        return this.hass.states[vac.entity]?.state === "paused";
+    }
+    _battery(vac) {
+        if (!vac.battery_entity)
+            return null;
+        const n = parseInt(this.hass.states[vac.battery_entity]?.state ?? "");
+        return isNaN(n) ? null : n;
+    }
+    _lastCleanStr(vac) {
+        const raw = vac.last_clean_entity
+            ? this.hass.states[vac.last_clean_entity]?.state
+            : undefined;
+        if (!raw || raw === "unavailable" || raw === "unknown")
+            return "—";
+        const d = new Date(raw);
+        const diff = Math.floor((Date.now() - d.getTime()) / 86400000);
+        const t = d.toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" });
+        if (diff === 0)
+            return "Today · " + t;
+        if (diff === 1)
+            return "Yesterday · " + t;
+        return d.toLocaleDateString([], { day: "2-digit", month: "2-digit" }) + " · " + t;
+    }
+    _progress(vac) {
+        if (!vac.progress_entity)
+            return null;
+        const n = parseInt(this.hass.states[vac.progress_entity]?.state ?? "");
+        return isNaN(n) || n === 0 ? null : n;
+    }
+    _isRoomSelected(room, vac) {
+        return this._localRoomSel.get(vac.entity + ":" + room.key) ?? false;
+    }
+    _hasSelectedRooms(vac) {
+        return (vac.rooms ?? []).some((r) => this._isRoomSelected(r, vac));
+    }
+    _roomCleanMins(room) {
+        if (room.clean_time_entity) {
+            const val = parseFloat(this.hass.states[room.clean_time_entity]?.state ?? "");
+            if (!isNaN(val) && val > 0)
+                return val;
+        }
+        return room.clean_time_mins ?? 0;
+    }
+    _totalCleanMins(vac) {
+        return (vac.rooms ?? []).reduce((sum, r) => {
+            if (!this._isRoomSelected(r, vac))
+                return sum;
+            return sum + this._roomCleanMins(r);
+        }, 0);
+    }
+    _roomAgeDays(room) {
+        if (!room.last_clean_entity)
+            return null;
+        const raw = this.hass.states[room.last_clean_entity]?.state;
+        if (!raw || raw === "unavailable" || raw === "unknown")
+            return null;
+        return (Date.now() - new Date(raw).getTime()) / 86400000;
+    }
+    _roomBorderColor(room, vac) {
+        const d = this._roomAgeDays(room);
+        if (d === null)
+            return "rgba(255,77,77,0.85)";
+        const ths = this._config.room_thresholds ?? [
+            { days: 2, color: "rgba(46,204,113,0.85)" },
+            { days: 5, color: "rgba(250,173,20,0.85)" },
+            { days: 10, color: "rgba(255,152,0,0.85)" },
+        ];
+        const sorted = [...ths].sort((a, b) => a.days - b.days);
+        for (const th of sorted) {
+            if (d <= th.days)
+                return th.color;
+        }
+        return "rgba(255,77,77,0.85)";
+    }
+    _batIcon(pct) {
+        if (pct > 80)
+            return "mdi:battery";
+        if (pct > 50)
+            return "mdi:battery-60";
+        if (pct > 20)
+            return "mdi:battery-30";
+        return "mdi:battery-10";
+    }
+    _batColor(pct) {
+        if (pct > 50)
+            return "#52c41a";
+        if (pct > 20)
+            return "#faad14";
+        return "#ff4d4f";
+    }
+    _mapUrl(entity) {
+        const state = this.hass.states[entity];
+        if (!state)
+            return "";
+        const pic = state.attributes["entity_picture"];
+        if (!pic)
+            return "";
+        const ts = new Date(state.last_updated).getTime();
+        const sep = pic.includes("?") ? "&" : "?";
+        return this.hass.hassUrl(pic + sep + "_t=" + ts);
+    }
+    _timeStr(mins) {
+        const total = Math.round(mins);
+        if (total <= 0)
+            return "";
+        if (total >= 60) {
+            const h = Math.floor(total / 60);
+            const m = total % 60;
+            return m > 0 ? "~" + h + " h " + m + " min" : "~" + h + " h";
+        }
+        return "~" + total + " min";
+    }
+    // ── Global action helpers ───────────────────────────────────────────────
+    /** True if any watched entity is in a cleaning state */
+    _isGlobalActive(ga) {
+        return (ga.watch_entities ?? []).some((e) => CLEANING_STATES.has(this.hass.states[e]?.state ?? ""));
+    }
+    async _triggerGlobal(ga) {
+        const action = ga.action;
+        try {
+            if (action.type === "script") {
+                await this.hass.callService("script", "turn_on", {
+                    entity_id: action.entity_id,
+                    variables: action.variables ?? {},
+                });
+            }
+            else {
+                const [domain, svc] = action.service.split(".");
+                await this.hass.callService(domain, svc, action.data ?? {});
+            }
+        }
+        catch (err) {
+            console.error("[anyvac-card] global action failed:", err);
+        }
+    }
+    // ── Hold-action helpers ─────────────────────────────────────────────────
+    _cancelHold() {
+        if (this._holdTimer !== null) {
+            clearTimeout(this._holdTimer);
+            this._holdTimer = null;
+        }
+        this._holdId = null;
+    }
+    /**
+     * Returns a pointerdown handler that:
+     *  1. Sets _holdId to `id` (triggers fill animation)
+     *  2. Fires `action` after HOLD_DURATION_MS
+     */
     _holdStart(id, action) {
         return (e) => {
             e.preventDefault();
@@ -210,354 +558,646 @@ let AnyVacCard = class AnyVacCard extends i$2 {
             }, HOLD_DURATION_MS);
         };
     }
-    _cancelHold() {
-        if (this._holdTimer !== null) {
-            clearTimeout(this._holdTimer);
-            this._holdTimer = null;
+    _toggleShown(index) {
+        const next = new Set(this._shownSet);
+        if (next.has(index)) {
+            if (next.size > 1)
+                next.delete(index);
         }
+        else {
+            next.add(index);
+        }
+        this._shownSet = next;
+        this._saveShown();
     }
-    // ── selection / preset state ───────────────────────────────────────────────
-    _selectedIds(vac) {
-        return this._selected[vac.entity] ?? [];
-    }
-    _hasSelection(vac) {
-        return this._selectedIds(vac).length > 0;
-    }
-    _toggleRegion(vac, region) {
-        const cur = new Set(this._selectedIds(vac));
-        if (cur.has(region.id))
-            cur.delete(region.id);
-        else
-            cur.add(region.id);
-        this._selected = { ...this._selected, [vac.entity]: [...cur] };
-    }
-    _selectAll(vac) {
-        this._selected = { ...this._selected, [vac.entity]: (vac.regions ?? []).map((r) => r.id) };
-    }
-    _clearSel(vac) {
-        this._selected = { ...this._selected, [vac.entity]: [] };
-    }
-    _isRegionSelected(vac, region) {
-        return this._selectedIds(vac).includes(region.id);
-    }
-    _activePresetId(vac) {
-        const explicit = this._preset[vac.entity];
-        if (explicit)
-            return explicit;
-        const ps = vac.presets ?? [];
-        return (ps.find((p) => p.default) ?? ps[0])?.id ?? "";
-    }
-    _setPreset(vac, id) {
-        this._preset = { ...this._preset, [vac.entity]: id };
-    }
-    _currentPreset(vac) {
-        const ps = vac.presets ?? [];
-        const id = this._activePresetId(vac);
-        return ps.find((p) => p.id === id) ?? ps.find((p) => p.default) ?? ps[0];
-    }
-    // ── commands ────────────────────────────────────────────────────────────────
-    async _svc(domain, service, data, target) {
-        if (!this.hass)
-            return;
+    // ── Service calls ───────────────────────────────────────────────────────
+    async _call(domain, service, data) {
         try {
-            await this.hass.callService(domain, service, data, target);
+            await this.hass.callService(domain, service, data);
         }
         catch (err) {
-            console.error(`[anyvac-card] ${domain}.${service} failed:`, err);
+            console.error("[anyvac-card] " + domain + "." + service + " failed:", err);
         }
     }
-    async _applyPreset(vac, preset) {
-        if (!preset)
-            return;
-        if (preset.suction)
-            await this._svc("vacuum", "set_fan_speed", { entity_id: vac.entity, fan_speed: preset.suction });
-        if (preset.mop_mode && preset.mop_mode_entity)
-            await this._svc("select", "select_option", { entity_id: preset.mop_mode_entity, option: preset.mop_mode });
-        if (preset.mop_intensity && preset.mop_intensity_entity)
-            await this._svc("select", "select_option", { entity_id: preset.mop_intensity_entity, option: preset.mop_intensity });
-        if (preset.water && preset.water_entity)
-            await this._svc("select", "select_option", { entity_id: preset.water_entity, option: preset.water });
+    _fireMoreInfo(entityId) {
+        this.dispatchEvent(new CustomEvent("hass-more-info", {
+            bubbles: true, composed: true, detail: { entityId },
+        }));
     }
-    async _clean(vac, regions, preset) {
-        const strategy = vac.clean_strategy ?? "area";
-        const repeat = preset?.repeats ?? 1;
-        if (strategy === "script" && vac.clean_script) {
-            await this._svc("script", "turn_on", {}, { entity_id: vac.clean_script });
-            return;
+    _deriveCleanType(vac) {
+        if (vac.clean_action?.type === "native" ||
+            vac.clean_action?.type === "native-area" ||
+            vac.clean_action?.type === "native-auto") {
+            const na = vac.clean_action;
+            if (na.mop_mode_entity || na.mop_intensity_entity)
+                return "wet";
         }
-        if (strategy === "segment") {
-            const segments = regions.map((r) => r.segment_id).filter((n) => typeof n === "number");
-            if (!segments.length)
-                return;
-            await this._svc("vacuum", "send_command", {
-                entity_id: vac.entity,
-                command: "app_segment_clean",
-                params: [{ segments, repeat }],
+        return "dry";
+    }
+    _fireHAEvent(data) {
+        try {
+            this.hass.connection.sendMessage({
+                type: "fire_event",
+                event_type: "roborock_card_event",
+                event_data: data,
             });
-            return;
         }
-        const areaIds = regions.map((r) => r.area_id ?? r.id);
-        if (!areaIds.length)
+        catch (err) {
+            console.error("[anyvac-card] fire_event failed:", err);
+        }
+    }
+    async _updateRoomCleanTime(vac, roomName, elapsedMins) {
+        if (elapsedMins < 0.5 || elapsedMins > 120)
             return;
-        await this._svc("vacuum", "clean_area", { cleaning_area_id: areaIds }, { entity_id: vac.entity });
+        const room = (vac.rooms ?? []).find(r => r.name === roomName || r.key === roomName);
+        if (!room?.clean_time_entity)
+            return;
+        const currentVal = parseFloat(this.hass.states[room.clean_time_entity]?.state ?? "0");
+        const newAvg = currentVal > 0
+            ? Math.round(0.7 * currentVal + 0.3 * elapsedMins)
+            : Math.round(elapsedMins);
+        await this._call("input_number", "set_value", {
+            entity_id: room.clean_time_entity,
+            value: newAvg,
+        });
+    }
+    async _evalCleaningComplete(vacEntity, flight) {
+        const actualMs = Date.now() - flight.startTime;
+        const success = flight.expectedMs === 0 || actualMs >= flight.expectedMs * 0.5;
+        // Software repeat — restart if more passes remaining
+        if (success && flight.repeatRemaining > 0 && flight.areaIds) {
+            try {
+                await this.hass.callService("vacuum", "clean_area", { cleaning_area_id: flight.areaIds }, { entity_id: vacEntity });
+            }
+            catch (err) {
+                console.error("[anyvac-card] repeat restart failed:", err);
+                return;
+            }
+            this._inFlight.set(vacEntity, {
+                ...flight,
+                startTime: Date.now(),
+                repeatRemaining: flight.repeatRemaining - 1,
+            });
+            return; // timestamps + notification fire only after last pass
+        }
+        // Auto-calibration: handle last room (no room_entered transition at session end)
+        const lastRoom = this._prevRoomStates.get(vacEntity) ?? "";
+        if (lastRoom) {
+            const enterKey = vacEntity + ":" + lastRoom;
+            const enterTime = this._roomEnterTimes.get(enterKey);
+            if (enterTime) {
+                const vacConf = this._config.vacuums.find(v => v.entity === vacEntity);
+                if (vacConf) {
+                    const elapsedMins = (Date.now() - enterTime) / 60000;
+                    await this._updateRoomCleanTime(vacConf, lastRoom, elapsedMins);
+                }
+                this._roomEnterTimes.delete(enterKey);
+            }
+        }
+        const totalActualMins = Math.round((Date.now() - flight.originalStartTime) / 60000);
+        if (success) {
+            const dt = new Date().toISOString().replace("T", " ").slice(0, 19);
+            for (const room of flight.rooms) {
+                if (room.last_clean_entity) {
+                    await this._call("input_datetime", "set_datetime", {
+                        entity_id: room.last_clean_entity,
+                        datetime: dt,
+                    });
+                }
+            }
+            // Single-room time calibration: a run with exactly one room measures
+            // that room's real total duration (incl. repeat passes) — store it
+            // directly as the new estimate when the option is enabled.
+            if (this._config.single_room_time && flight.rooms.length === 1) {
+                const only = flight.rooms[0];
+                if (only.clean_time_entity && totalActualMins >= 1 && totalActualMins <= 180) {
+                    await this._call("input_number", "set_value", {
+                        entity_id: only.clean_time_entity,
+                        value: totalActualMins,
+                    });
+                }
+            }
+            // Clear room selection for this vacuum after successful clean
+            const nextSel = new Map(this._localRoomSel);
+            for (const room of flight.rooms)
+                nextSel.delete(vacEntity + ":" + room.key);
+            this._localRoomSel = nextSel;
+            this._saveRoomSel(vacEntity);
+        }
+        this._fireHAEvent({
+            action: "cleaning_finished",
+            vacuum_entity: vacEntity,
+            vacuum_label: flight.vacLabel,
+            clean_type: flight.cleanType,
+            rooms: flight.rooms.map(r => r.key),
+            room_labels: flight.rooms.map(r => r.name).join(", "),
+            estimated_mins: Math.round(flight.expectedMs / 60000),
+            actual_mins: totalActualMins,
+            success,
+        });
+        await this._sendNotify(this._config.notify?.on_finish, {
+            vacuum_label: flight.vacLabel,
+            vacuum_entity: vacEntity,
+            room_labels: flight.rooms.map(r => r.name).join(", "),
+            room_keys: flight.rooms.map(r => r.key).join(", "),
+            estimated_mins: Math.round(flight.expectedMs / 60000),
+            actual_mins: totalActualMins,
+            clean_type: flight.cleanType,
+            success: String(success),
+        });
+    }
+    // ── localStorage persistence ──────────────────────────────────────────────
+    _saveShown() {
+        try {
+            const ids = [...this._shownSet].map(i => this._config.vacuums[i]?.entity).filter(Boolean);
+            localStorage.setItem("roborock-card:shown", JSON.stringify(ids));
+        }
+        catch { /* storage unavailable */ }
+    }
+    _loadShown() {
+        try {
+            const raw = localStorage.getItem("roborock-card:shown");
+            if (raw) {
+                const ids = JSON.parse(raw);
+                const indices = ids
+                    .map(id => this._config.vacuums.findIndex(v => v.entity === id))
+                    .filter(i => i >= 0);
+                if (indices.length > 0)
+                    return new Set(indices);
+            }
+        }
+        catch { /* ignore */ }
+        return new Set(this._config.vacuums.map((_, i) => i));
+    }
+    _saveRoomSel(vacEntity) {
+        try {
+            const prefix = vacEntity + ":";
+            const sel = {};
+            for (const [k, v] of this._localRoomSel.entries()) {
+                if (k.startsWith(prefix))
+                    sel[k.slice(prefix.length)] = v;
+            }
+            localStorage.setItem("roborock-card:sel:" + vacEntity, JSON.stringify(sel));
+        }
+        catch { /* ignore */ }
+    }
+    _loadRoomSel() {
+        const map = new Map();
+        try {
+            for (const vac of this._config.vacuums) {
+                const raw = localStorage.getItem("roborock-card:sel:" + vac.entity);
+                if (raw) {
+                    const sel = JSON.parse(raw);
+                    for (const [k, v] of Object.entries(sel)) {
+                        if (v)
+                            map.set(vac.entity + ":" + k, true);
+                    }
+                }
+            }
+        }
+        catch { /* ignore */ }
+        return map;
+    }
+    // ── Notifications ──────────────────────────────────────────────────────
+    _resolveTemplate(tmpl, tokens) {
+        return tmpl.replace(/\{\{\s*(\w+)\s*\}\}/g, (_, k) => String(tokens[k] ?? ""));
+    }
+    async _sendNotify(template, tokens) {
+        const cfg = this._config.notify;
+        if (!cfg || !template)
+            return;
+        const isWet = tokens["clean_type"] === "wet";
+        const color = isWet ? (cfg.color_wet ?? "#2196F3") : (cfg.color_dry ?? "#4CAF50");
+        const icon = isWet ? "mdi:mop" : "mdi:robot-vacuum";
+        const tag = (cfg.tag_prefix ?? "roborock") + "-" + String(tokens["vacuum_entity"] ?? "");
+        try {
+            await this.hass.callService("ticker", "notify", {
+                category: cfg.category,
+                title: template.title ? this._resolveTemplate(template.title, tokens) : undefined,
+                message: template.message ? this._resolveTemplate(template.message, tokens) : undefined,
+                data: { data: { notification_icon: icon, color, priority: "high", tag } },
+            });
+        }
+        catch (err) {
+            console.error("[anyvac-card] notify failed:", err);
+        }
+    }
+    _pause(vac) {
+        this._call("vacuum", "pause", { entity_id: vac.entity });
+    }
+    _resume(vac) {
+        this._call("vacuum", "start", { entity_id: vac.entity });
+    }
+    _dock(vac) {
+        // Manual dock = user cancelled — never restart remaining software-repeat passes
+        const flight = this._inFlight.get(vac.entity);
+        if (flight && flight.repeatRemaining > 0) {
+            this._inFlight.set(vac.entity, { ...flight, repeatRemaining: 0 });
+        }
+        this._call("vacuum", "return_to_base", { entity_id: vac.entity });
+    }
+    _toggleRoom(room, vac) {
+        const k = vac.entity + ":" + room.key;
+        const next = new Map(this._localRoomSel);
+        next.set(k, !(next.get(k) ?? false));
+        this._localRoomSel = next;
+        this._saveRoomSel(vac.entity);
+    }
+    _selectAll(vac) {
+        const next = new Map(this._localRoomSel);
+        for (const r of vac.rooms ?? [])
+            next.set(vac.entity + ":" + r.key, true);
+        this._localRoomSel = next;
+        this._saveRoomSel(vac.entity);
+    }
+    _deselectAll(vac) {
+        const next = new Map(this._localRoomSel);
+        for (const r of vac.rooms ?? [])
+            next.delete(vac.entity + ":" + r.key);
+        this._localRoomSel = next;
+        this._saveRoomSel(vac.entity);
     }
     async _startClean(vac) {
-        const regions = (vac.regions ?? []).filter((r) => this._selectedIds(vac).includes(r.id));
-        const preset = this._currentPreset(vac);
-        await this._applyPreset(vac, preset);
-        if (regions.length)
-            await this._clean(vac, regions, preset);
-        else
-            await this._svc("vacuum", "start", {}, { entity_id: vac.entity });
-    }
-    _pause(vac) { void this._svc("vacuum", "pause", {}, { entity_id: vac.entity }); }
-    _resume(vac) { void this._svc("vacuum", "start", {}, { entity_id: vac.entity }); }
-    _dock(vac) { void this._svc("vacuum", "return_to_base", {}, { entity_id: vac.entity }); }
-    _locate(vac) { void this._svc("vacuum", "locate", {}, { entity_id: vac.entity }); }
-    // ── derived state ─────────────────────────────────────────────────────────
-    _statusInfo(vac) {
-        const ent = vac.status_entity ?? vac.entity;
-        const s = this.hass?.states[ent]?.state ?? "unknown";
-        const m = STATUS_MAP[s];
-        return m ? [m[0], m[1]] : [s, ACCENT];
-    }
-    _isCleaning(vac) {
-        return normalizeActivity(this.hass?.states[vac.entity]?.state ?? "") === "cleaning";
-    }
-    _isPaused(vac) {
-        return (this.hass?.states[vac.entity]?.state ?? "") === "paused";
-    }
-    _battery(vac) {
-        if (vac.battery_entity) {
-            const v = Number(this.hass?.states[vac.battery_entity]?.state);
-            return isNaN(v) ? null : v;
+        if (!vac.clean_action)
+            return;
+        const selected = (vac.rooms ?? []).filter((r) => this._isRoomSelected(r, vac));
+        if (selected.length === 0)
+            return;
+        // Script strategy -- no in-flight tracking
+        if (vac.clean_action.type === "script") {
+            const action = vac.clean_action;
+            const variables = {};
+            for (const [key, template] of Object.entries(action.variables ?? {})) {
+                variables[key] = template
+                    .replace("{{ entity }}", vac.entity)
+                    .replace("{{ selected_segments }}", JSON.stringify(selected.map((r) => r.segment_id).filter(Boolean)))
+                    .replace("{{ selected_room_keys }}", JSON.stringify(selected.map((r) => r.key)))
+                    .replace("{{ selected_area_ids }}", JSON.stringify(selected.map((r) => r.area_id).filter(Boolean)));
+            }
+            await this._call("script", "turn_on", { entity_id: action.entity_id, variables });
+            return;
         }
-        const lvl = this.hass?.states[vac.entity]?.attributes["battery_level"];
-        const n = Number(lvl);
-        return lvl != null && lvl !== "" && !isNaN(n) ? n : null;
-    }
-    _batColor(b) {
-        if (b <= 20)
-            return "#ff4d4f";
-        if (b <= 50)
-            return "#faad14";
-        return "#52c41a";
-    }
-    _batIcon(b) {
-        const r = Math.round(b / 10) * 10;
-        if (r <= 0)
-            return "mdi:battery-outline";
-        if (r >= 100)
-            return "mdi:battery";
-        return `mdi:battery-${r}`;
-    }
-    _currentRoom(vac) {
-        if (!vac.current_room_entity)
-            return null;
-        const s = this.hass?.states[vac.current_room_entity]?.state;
-        return s && s !== "unknown" && s !== "unavailable" ? s : null;
-    }
-    _error(vac) {
-        if (!vac.error_entity)
-            return null;
-        const s = this.hass?.states[vac.error_entity]?.state;
-        return s && !["none", "unknown", "unavailable", ""].includes(s) ? s : null;
-    }
-    _progress(vac) {
-        if (!vac.progress_entity)
-            return null;
-        const v = Number(this.hass?.states[vac.progress_entity]?.state);
-        return isNaN(v) ? null : Math.max(0, Math.min(100, v));
-    }
-    _imageBaseSrc(vac) {
-        return vac.image_base?.src;
-    }
-    _mapUrl(vac) {
-        const ms = vac.map_source;
-        if (!ms)
-            return undefined;
-        const ep = this.hass?.states[ms.entity]?.attributes["entity_picture"];
-        return typeof ep === "string" ? ep : undefined;
-    }
-    _imgTransform(t) {
-        const r = t?.rotation ?? 0, s = t?.scale ?? 100, ox = t?.offset_x ?? 0, oy = t?.offset_y ?? 0;
-        return `translate(${ox}%, ${oy}%) rotate(${r}deg) scale(${s / 100})`;
-    }
-    _mapStyle(ms) {
-        const r = ms?.rotation ?? 0, s = ms?.scale ?? 100, ox = ms?.offset_x ?? 0, oy = ms?.offset_y ?? 0;
-        return {
-            left: 50 + ox + "%",
-            top: 50 + oy + "%",
-            width: s + "%",
-            transform: `translate(-50%, -50%) rotate(${r}deg)`,
-        };
-    }
-    // ── render ────────────────────────────────────────────────────────────────
-    render() {
-        if (!this._config || !this.hass)
-            return A;
-        const vacuums = this._config.vacuums ?? [];
-        if (!vacuums.length) {
-            return b `<ha-card><div class="empty">${CARD_NAME}: add a vacuum in the editor.</div></ha-card>`;
+        // Native variants: pre-set fan / mop, then call vacuum
+        const nativeAction = vac.clean_action;
+        if (nativeAction.mop_mode_entity && nativeAction.mop_mode) {
+            await this._call("select", "select_option", { entity_id: nativeAction.mop_mode_entity, option: nativeAction.mop_mode });
         }
-        const shownIdx = Math.min(this._shown, vacuums.length - 1);
-        const vac = vacuums[shownIdx];
-        return b `
-      <ha-card>
-        ${vacuums.length > 1
-            ? b `<div class="badges-row">${vacuums.map((v, i) => this._renderBadge(v, i, shownIdx))}</div>`
-            : A}
-        ${this._renderBase(vac)}
-        ${this._renderStatusCard(vac, shownIdx)}
-      </ha-card>
-    `;
+        if (nativeAction.mop_intensity_entity && nativeAction.mop_intensity) {
+            await this._call("select", "select_option", { entity_id: nativeAction.mop_intensity_entity, option: nativeAction.mop_intensity });
+        }
+        if (nativeAction.suction_level) {
+            await this._call("vacuum", "set_fan_speed", { entity_id: vac.entity, fan_speed: nativeAction.suction_level });
+        }
+        if (vac.clean_action.type === "native-area") {
+            // Uses HA vacuum.clean_area — area_id resolved via area_mappings
+            try {
+                await this.hass.callService("vacuum", "clean_area", { cleaning_area_id: selected.map((r) => r.area_id ?? this._config.area_mappings?.[r.key] ?? r.key) }, { entity_id: vac.entity });
+            }
+            catch (err) {
+                console.error("[anyvac-card] vacuum.clean_area failed:", err);
+                return; // don't register in-flight for a clean that never started
+            }
+        }
+        else if (vac.clean_action.type === "native-auto") {
+            // Dynamically resolve segment IDs from roborock.get_maps, then send_command
+            const autoAction = vac.clean_action;
+            let autoSegments = [];
+            try {
+                const mapResult = await this.hass.callService("roborock", "get_maps", {}, { entity_id: vac.entity }, false, true);
+                const maps = mapResult?.response?.[vac.entity]?.maps;
+                const roomsMap = {};
+                if (maps) {
+                    for (const m of maps) {
+                        if (m.rooms && Object.keys(m.rooms).length > 0) {
+                            Object.assign(roomsMap, m.rooms);
+                            break;
+                        }
+                    }
+                }
+                const slugify = (s) => s.toLowerCase().replace(/\s+/g, "_").replace(/[^a-z0-9_]/g, "");
+                const slugMap = {};
+                for (const [sid, name] of Object.entries(roomsMap))
+                    slugMap[slugify(name)] = Number(sid);
+                for (const room of selected) {
+                    const areaId = room.area_id ?? this._config.area_mappings?.[room.key] ?? room.key;
+                    const sid = slugMap[areaId];
+                    if (sid !== undefined) {
+                        autoSegments.push(sid);
+                    }
+                    else if (room.segment_id !== undefined) {
+                        autoSegments.push(room.segment_id); // fallback to manual segment_id
+                    }
+                    else {
+                        console.warn("[anyvac-card] no segment for", room.key, "(area:", areaId + ")");
+                    }
+                }
+            }
+            catch (err) {
+                console.error("[anyvac-card] get_maps failed:", err);
+                autoSegments = selected.map(r => r.segment_id).filter((id) => id !== undefined);
+            }
+            if (autoSegments.length === 0) {
+                console.error("[anyvac-card] native-auto: no segments resolved, aborting");
+                return;
+            }
+            await this._call("vacuum", "send_command", {
+                entity_id: vac.entity,
+                command: "app_segment_clean",
+                params: [{ segments: autoSegments, repeat: autoAction.repeat ?? 1 }],
+            });
+        }
+        else {
+            // type === "native" — segment IDs from room config
+            const action = vac.clean_action;
+            const segments = selected.map((r) => r.segment_id).filter((id) => id !== undefined);
+            await this._call("vacuum", "send_command", {
+                entity_id: vac.entity,
+                command: "app_segment_clean",
+                params: [{ segments, repeat: action.repeat ?? 1 }],
+            });
+        }
+        // Register in-flight + fire event (shared for both native variants)
+        const totalMins = this._totalCleanMins(vac);
+        const vacLabel = vac.name ?? vac.entity.split(".")[1] ?? vac.entity;
+        const isNativeArea = vac.clean_action.type === "native-area";
+        const nativeAreaAct = isNativeArea ? vac.clean_action : null;
+        const areaIds = isNativeArea
+            ? selected.map(r => r.area_id ?? this._config.area_mappings?.[r.key] ?? r.key)
+            : undefined;
+        const repeatRemaining = (nativeAreaAct?.repeat ?? 1) > 1
+            ? (nativeAreaAct.repeat) - 1
+            : 0;
+        const now = Date.now();
+        this._inFlight.set(vac.entity, {
+            rooms: selected.map(r => ({ key: r.key, name: r.name, last_clean_entity: r.last_clean_entity, clean_time_entity: r.clean_time_entity })),
+            expectedMs: totalMins * 60000,
+            startTime: now,
+            originalStartTime: now,
+            vacLabel,
+            cleanType: this._deriveCleanType(vac),
+            repeatRemaining,
+            areaIds,
+        });
+        // Call notify_script if configured
+        const nsCfg = this._config.notify_script;
+        if (nsCfg?.entity) {
+            const nsv = nsCfg.vars ?? {};
+            const scriptVars = { vacuum_entity: vac.entity };
+            if (nsv.vacuum_label !== false)
+                scriptVars.vacuum_label = vacLabel;
+            if (nsv.room_labels !== false)
+                scriptVars.room_labels = selected.map(r => r.name).join(", ");
+            if (nsv.room_keys === true)
+                scriptVars.room_keys = selected.map(r => r.key).join(", ");
+            if (nsv.estimated_mins !== false)
+                scriptVars.estimated_mins = Math.round(totalMins);
+            if (nsv.clean_type !== false)
+                scriptVars.clean_type = this._deriveCleanType(vac);
+            await this._call("script", "turn_on", { entity_id: nsCfg.entity, variables: scriptVars });
+        }
+        this._fireHAEvent({
+            action: "cleaning_started",
+            vacuum_entity: vac.entity,
+            vacuum_label: vacLabel,
+            clean_type: this._deriveCleanType(vac),
+            rooms: selected.map(r => r.key),
+            room_labels: selected.map(r => r.name).join(", "),
+            estimated_mins: Math.round(totalMins),
+            // Helper entity IDs — consumed by the cleaning-tracker blueprint
+            last_clean_entities: selected.map(r => r.last_clean_entity).filter((e) => !!e),
+            clean_time_entities: selected.map(r => r.clean_time_entity).filter((e) => !!e),
+        });
+        await this._sendNotify(this._config.notify?.on_start, {
+            vacuum_label: vacLabel,
+            vacuum_entity: vac.entity,
+            room_labels: selected.map(r => r.name).join(", "),
+            room_keys: selected.map(r => r.key).join(", "),
+            estimated_mins: Math.round(totalMins),
+            clean_type: this._deriveCleanType(vac),
+        });
     }
-    _renderBadge(vac, i, shownIdx) {
-        const active = i === shownIdx;
+    // ── Render: badges ──────────────────────────────────────────────────────
+    _renderBadge(vac, index) {
+        const active = this._shownSet.has(index);
         const cleaning = this._isCleaning(vac);
+        const color = this._color(vac);
+        const ck = this._colorKey(vac);
         const name = vac.name ?? vac.entity.split(".")[1] ?? vac.entity;
-        const bg = cleaning ? ACCENT_BG_ACTIVE : active ? ACCENT_BG : BADGE_BG;
+        const holding = this._holdId === "badge-" + index;
+        const bg = cleaning ? COLOR_BG_ACTIVE[ck] : active ? COLOR_BG[ck] : "rgba(30,30,30,0.85)";
         const border = cleaning
-            ? `3px solid ${ACCENT}`
+            ? "3px solid " + color
             : active
-                ? `2px solid ${ACCENT}80`
+                ? "2px solid " + color + "80"
                 : "2px solid rgba(255,255,255,0.18)";
-        const shadow = cleaning ? `0 0 18px ${ACCENT}B0` : active ? `0 0 8px ${ACCENT}50` : "none";
+        const shadow = cleaning
+            ? "0 0 18px " + color + "B0"
+            : active
+                ? "0 0 8px " + color + "50"
+                : "none";
         return b `
       <button
-        class="badge"
+        class="badge ${holding ? "badge--holding" : ""}"
         style=${o({ background: bg, border, boxShadow: shadow })}
-        @click=${() => (this._shown = i)}
+        @pointerdown=${(e) => {
+            e.preventDefault();
+            this._cancelHold();
+            this._holdId = "badge-" + index;
+            this._holdTimer = setTimeout(() => {
+                this._holdTimer = null;
+                this._holdId = null;
+                this._toggleShown(index);
+            }, HOLD_DURATION_MS);
+        }}
+        @pointerup=${() => {
+            if (this._holdTimer !== null) {
+                this._cancelHold();
+                this._shownSet = new Set([index]);
+                this._saveShown();
+            }
+            else {
+                this._holdId = null;
+            }
+        }}
+        @pointerleave=${this._holdEnd}
+        @pointercancel=${this._holdEnd}
         aria-pressed=${active ? "true" : "false"}
         aria-label=${name}
       >
+        <div class="hold-ring"></div>
         ${vac.image
             ? b `<img class="badge-img" src=${vac.image} alt=${name} />`
-            : b `<ha-icon class="badge-icon" icon="mdi:robot-vacuum" style=${o({ color: ACCENT })}></ha-icon>`}
-        <span class="badge-name" style=${o({ color: active ? "white" : "rgba(255,255,255,0.55)" })}>${name}</span>
+            : b `<ha-icon class="badge-icon" icon="mdi:robot-vacuum" style=${o({ color })}></ha-icon>`}
+        <span class="badge-name" style=${o({ color: active ? "white" : "rgba(255,255,255,0.55)" })}>
+          ${name}
+        </span>
       </button>
     `;
     }
-    _renderBase(vac) {
-        const base = vac.base ?? this._config?.base ?? "image";
-        const imgSrc = this._imageBaseSrc(vac);
-        const mapUrl = this._mapUrl(vac);
-        const showImage = (base === "image" || base === "combined") && !!imgSrc;
-        const showMap = (base === "map" || base === "combined") && !!mapUrl;
-        if (!showImage && !showMap) {
-            return b `<div class="map-wrap framed placeholder">
-        <ha-icon icon="mdi:floor-plan"></ha-icon>
-        <span>Set an image base or map source</span>
-      </div>`;
-        }
-        const framed = !showImage;
+    _renderGlobalBadge(ga, idx) {
+        const active = this._isGlobalActive(ga);
+        const color = COLOR_HEX[ga.color ?? "orange"];
+        const ck = ga.color ?? "orange";
+        const holdId = "global-" + idx;
+        const holding = this._holdId === holdId;
+        const bg = active ? COLOR_BG_ACTIVE[ck] : "rgba(30,30,30,0.85)";
+        const border = active ? "3px solid " + color : "2px solid rgba(255,255,255,0.18)";
+        const shadow = active ? "0 0 18px " + color + "B0" : "none";
         return b `
-      <div class="map-wrap ${framed ? "framed" : ""}">
-        ${showImage
-            ? b `<img class="layer primary" src=${imgSrc} alt="floorplan"
-              style=${o({ transform: this._imgTransform(vac.image_base) })} />`
-            : A}
-        ${showMap
-            ? b `<img class="layer map ${showImage ? "overlay" : "seat"}" src=${mapUrl} alt="vacuum map"
-              style=${o(this._mapStyle(vac.map_source))} />`
-            : A}
-        <div class="regions">${(vac.regions ?? []).map((r) => this._renderRegion(vac, r))}</div>
+      <button
+        class="badge badge--global ${holding ? "badge--holding" : ""}"
+        style=${o({ background: bg, border, boxShadow: shadow })}
+        @pointerdown=${this._holdStart(holdId, () => this._triggerGlobal(ga))}
+        @pointerup=${this._holdEnd}
+        @pointerleave=${this._holdEnd}
+        @pointercancel=${this._holdEnd}
+        aria-label=${ga.name}
+        title=${"Hold to trigger: " + ga.name}
+      >
+        <div class="hold-ring"></div>
+        ${ga.image
+            ? b `<img class="badge-img" src=${ga.image} alt=${ga.name} />`
+            : b `<ha-icon class="badge-icon" icon="mdi:home-floor-a" style=${o({ color })}></ha-icon>`}
+        <span class="badge-name" style=${o({ color: active ? "white" : "rgba(255,255,255,0.55)" })}>
+          ${ga.name}
+        </span>
+      </button>
+    `;
+    }
+    // ── Render: map ─────────────────────────────────────────────────────────
+    _renderMap(vac) {
+        if (!vac.map)
+            return A;
+        const { entity, rotation = 0, scale = 100, offset_x = 0, offset_y = 0 } = vac.map;
+        const url = this._mapUrl(entity);
+        if (!url)
+            return A;
+        return b `
+      <div class="map-wrap">
+        <img
+          class="map-img"
+          src=${url}
+          alt="Vacuum map"
+          style=${o({
+            left: (50 + offset_x) + "%",
+            top: (50 + offset_y) + "%",
+            width: scale + "%",
+            transform: "translate(-50%,-50%) rotate(" + rotation + "deg)",
+        })}
+        />
+        ${(vac.rooms ?? []).map((r) => this._renderRoomOverlay(r, vac))}
       </div>
     `;
     }
-    _renderRegion(vac, region) {
-        const selected = this._isRegionSelected(vac, region);
-        const bn = this._config?.region_border_normal ?? 2;
-        const bs = this._config?.region_border_selected ?? 4;
-        const bw = (selected ? bs : bn) + "px";
-        const bc = selected ? ACCENT : "rgba(255,255,255,0.5)";
-        const iconHidden = this._config?.region_icon_hidden ?? false;
-        const shape = region.shape;
-        if (shape.kind === "rect") {
+    _renderRoomOverlay(room, vac) {
+        const selected = this._isRoomSelected(room, vac);
+        const color = this._color(vac);
+        const ageColor = this._roomBorderColor(room, vac);
+        const anchor = room.icon_anchor ?? "c";
+        if (room.map_w !== undefined && room.map_h !== undefined) {
+            // ── Rectangle mód ──────────────────────────────────────────
+            const ANCHOR = {
+                tl: ["flex-start", "flex-start"], t: ["center", "flex-start"], tr: ["flex-end", "flex-start"],
+                l: ["flex-start", "center"], c: ["center", "center"], r: ["flex-end", "center"],
+                bl: ["flex-start", "flex-end"], b: ["center", "flex-end"], br: ["flex-end", "flex-end"],
+            };
+            const [jc, ai] = ANCHOR[anchor] ?? ["center", "center"];
+            const borderW = (selected
+                ? (this._config.room_border_selected ?? 4)
+                : (this._config.room_border_normal ?? 2)) + "px";
+            const borderC = selected ? color + "E0" : ageColor;
+            const bg = selected ? color + "44" : "rgba(0,0,0,0.06)";
+            const shadow = selected ? "0 0 18px " + color + "60" : "none";
             return b `
-        <button class="room-overlay" style=${o({
-                left: shape.x + "%", top: shape.y + "%", width: shape.w + "%", height: shape.h + "%",
-                border: `${bw} solid ${bc}`,
-                background: selected ? ACCENT + "44" : "rgba(0,0,0,0.04)",
-                boxShadow: selected ? `0 0 16px ${ACCENT}60` : "none",
+        <button
+          class="room-overlay"
+          style=${o({
+                left: room.map_x + "%", top: room.map_y + "%",
+                width: room.map_w + "%", height: room.map_h + "%",
+                border: borderW + " solid " + borderC,
+                background: bg, boxShadow: shadow,
+                justifyContent: jc, alignItems: ai,
             })}
-          @click=${() => this._toggleRegion(vac, region)} title=${region.name}
-          aria-pressed=${selected ? "true" : "false"}>
-          ${!iconHidden && region.icon
-                ? b `<ha-icon icon=${region.icon} style=${o({ color: selected ? "#fff" : bc })}></ha-icon>`
-                : A}
+          @click=${() => this._toggleRoom(room, vac)}
+          title=${room.name} aria-label=${room.name}
+          aria-pressed=${selected ? "true" : "false"}
+        >
+          ${!this._config.room_icon_hidden && anchor !== "none" && room.icon ? b `
+            <ha-icon icon=${room.icon}
+              style=${o({ color: selected ? "white" : ageColor, "--mdc-icon-size": "16px" })}>
+            </ha-icon>
+          ` : A}
         </button>
       `;
         }
+        // ── Point mód (legacy) ──────────────────────────────────────
+        const bg = selected ? color + "A8" : "rgba(0,0,0,0.55)";
+        const shadow = selected ? "0 0 12px " + color + "80" : "none";
         return b `
-      <button class="room-btn" style=${o({
-            left: shape.x + "%", top: shape.y + "%",
-            border: `${bw} solid ${bc}`,
-            background: selected ? ACCENT + "cc" : "rgba(0,0,0,0.55)",
-            boxShadow: selected ? `0 0 12px ${ACCENT}80` : "none",
+      <button
+        class="room-btn"
+        style=${o({
+            left: room.map_x + "%", top: room.map_y + "%",
+            background: bg,
+            border: "4px solid " + ageColor,
+            boxShadow: shadow,
         })}
-        @click=${() => this._toggleRegion(vac, region)} title=${region.name}
-        aria-pressed=${selected ? "true" : "false"}>
-        ${!iconHidden ? b `<ha-icon icon=${region.icon ?? "mdi:map-marker"}></ha-icon>` : A}
+        @click=${() => this._toggleRoom(room, vac)}
+        title=${room.name} aria-label=${room.name}
+        aria-pressed=${selected ? "true" : "false"}
+      >
+        ${!this._config.room_icon_hidden ? b `
+          <ha-icon icon=${room.icon || "mdi:square"}
+            style=${o({ color: selected ? "white" : "rgba(255,255,255,0.5)" })}>
+          </ha-icon>
+        ` : A}
       </button>
     `;
     }
-    _renderStatusCard(vac, idx) {
-        const cleaning = this._isCleaning(vac);
-        const name = vac.name ?? vac.entity.split(".")[1] ?? vac.entity;
-        const cardBorder = cleaning ? `2px solid ${ACCENT}` : "1px solid rgba(255,255,255,0.08)";
-        const cardShadow = cleaning ? `0 0 22px ${ACCENT}40` : "none";
-        const imgFilter = cleaning ? `drop-shadow(0 0 20px ${ACCENT}D8)` : `drop-shadow(0 4px 12px ${ACCENT}33)`;
-        return b `
-      <div class="status-card" style=${o({ border: cardBorder, boxShadow: cardShadow })}>
-        <div class="status-left" @click=${() => this._fireMoreInfo(vac.entity)} title="Open ${name}">
-          <div class="model-label">${name}</div>
-          ${vac.image
-            ? b `<img class="vac-img" src=${vac.image} alt=${name}
-                style=${o({ opacity: cleaning ? "0.9" : "0.6", filter: imgFilter })} />`
-            : b `<ha-icon class="vac-icon" icon="mdi:robot-vacuum"
-                style=${o({ color: ACCENT, opacity: cleaning ? "0.9" : "0.5" })}></ha-icon>`}
-        </div>
-        <div class="status-right">
-          ${this._renderStatusRow(vac)}
-          ${this._renderProgress(vac)}
-          ${this._renderPresets(vac)}
-          ${this._renderActions(vac, idx)}
-        </div>
-      </div>
-    `;
-    }
-    _fireMoreInfo(entity) {
-        this.dispatchEvent(new CustomEvent("hass-more-info", { detail: { entityId: entity }, bubbles: true, composed: true }));
-    }
+    // ── Render: status card ─────────────────────────────────────────────────
     _renderStatusRow(vac) {
         const [label, labelColor] = this._statusInfo(vac);
         const bat = this._battery(vac);
-        const room = this._currentRoom(vac);
-        const err = this._error(vac);
+        const lastClean = this._lastCleanStr(vac);
+        // Current room
+        const roomState = vac.current_room_entity
+            ? this.hass.states[vac.current_room_entity]?.state
+            : null;
+        const currentRoom = roomState && roomState !== "unknown" && roomState !== "unavailable"
+            ? roomState : null;
+        // Error
+        const errState = vac.error_entity
+            ? this.hass.states[vac.error_entity]?.state
+            : null;
+        const hasError = errState && errState !== "none" && errState !== "unknown" && errState !== "unavailable";
         return b `
-      ${err
-            ? b `<div class="error-row">
-            <ha-icon icon="mdi:alert-circle" style="color:#ff4d4f"></ha-icon>
-            <span style="color:#ff4d4f;font-size:12px;font-weight:600">${err}</span>
-          </div>`
-            : A}
+      ${hasError ? b `
+        <div class="error-row">
+          <ha-icon icon="mdi:alert-circle" style="color:#ff4d4f"></ha-icon>
+          <span style="color:#ff4d4f;font-size:12px;font-weight:600">${errState}</span>
+        </div>
+      ` : A}
       <div class="status-row">
         <div class="status-main">
           <span class="status-label" style=${o({ color: labelColor })}>${label}</span>
-          ${room
-            ? b `<span class="current-room">
-                <ha-icon icon="mdi:map-marker" style="--mdc-icon-size:13px;color:rgba(255,255,255,0.4)"></ha-icon>${room}
-              </span>`
-            : A}
+          ${currentRoom ? b `
+            <span class="current-room">
+              <ha-icon icon="mdi:map-marker" style="--mdc-icon-size:13px;color:rgba(255,255,255,0.4)"></ha-icon>
+              ${currentRoom}
+            </span>
+          ` : A}
         </div>
         <div class="status-meta">
-          ${bat !== null
-            ? b `<div class="battery">
-                <span style=${o({ color: this._batColor(bat) })}>${bat}&thinsp;%</span>
-                <ha-icon icon=${this._batIcon(bat)} style=${o({ color: this._batColor(bat) })}></ha-icon>
-              </div>`
-            : A}
+          ${bat !== null ? b `
+            <div class="battery">
+              <span style=${o({ color: this._batColor(bat) })}>${bat}&thinsp;%</span>
+              <ha-icon icon=${this._batIcon(bat)} style=${o({ color: this._batColor(bat) })}></ha-icon>
+            </div>
+          ` : A}
+          <div class="last-clean">
+            <span>${lastClean}</span>
+            <ha-icon icon="mdi:history"></ha-icon>
+          </div>
         </div>
       </div>
     `;
@@ -566,120 +1206,167 @@ let AnyVacCard = class AnyVacCard extends i$2 {
         const prog = this._progress(vac);
         if (prog === null)
             return A;
+        const color = this._color(vac);
         return b `
       <div class="progress">
         <div class="progress-track">
-          <div class="progress-fill" style=${o({ width: prog + "%", background: ACCENT })}></div>
+          <div class="progress-fill" style=${o({ width: prog + "%", background: color })}></div>
         </div>
-        <span class="progress-label" style=${o({ color: ACCENT })}>${prog}&thinsp;%</span>
+        <span class="progress-label" style=${o({ color })}>${prog}&thinsp;%</span>
       </div>
     `;
     }
-    _renderPresets(vac) {
-        const ps = vac.presets ?? [];
-        if (!ps.length)
-            return A;
-        const activeId = this._activePresetId(vac);
-        return b `
-      <div class="presets">
-        ${ps.map((p) => {
-            const on = p.id === activeId;
-            const col = p.color ?? ACCENT;
-            return b `
-            <button class="chip ${on ? "active" : ""}"
-              style=${on ? o({ borderColor: col, color: "#fff", background: col + "33" }) : A}
-              @click=${() => this._setPreset(vac, p.id)} title=${p.name}>
-              ${p.icon ? b `<ha-icon icon=${p.icon}></ha-icon>` : A}<span>${p.name}</span>
-            </button>
-          `;
-        })}
-      </div>
-    `;
-    }
-    _renderActions(vac, idx) {
-        const holdMs = o({ "--hold-ms": HOLD_DURATION_MS + "ms" });
-        if (this._isPaused(vac)) {
-            const hId = "resume-" + idx;
+    _renderActions(vac, vacIdx) {
+        const cleaning = this._isCleaning(vac);
+        const paused = this._isPaused(vac);
+        const hasRooms = this._hasSelectedRooms(vac);
+        const color = this._color(vac);
+        const ck = this._colorKey(vac);
+        const mins = this._totalCleanMins(vac);
+        const timeStr = this._timeStr(mins);
+        if (paused) {
+            const hId = "resume-" + vacIdx;
             return b `
         <div class="actions">
-          <button class="action-btn ${this._holdId === hId ? "action-btn--holding" : ""}"
-            style=${o({ background: ACCENT_BG, border: `1px solid ${ACCENT}80`, "--hold-ms": HOLD_DURATION_MS + "ms" })}
+          <button
+            class="action-btn ${this._holdId === hId ? "action-btn--holding" : ""}"
+            style=${o({ background: COLOR_BG[ck], border: "1px solid " + color + "80" })}
             @pointerdown=${this._holdStart(hId, () => this._resume(vac))}
-            @pointerup=${this._holdEnd} @pointerleave=${this._holdEnd} @pointercancel=${this._holdEnd}>
+            @pointerup=${this._holdEnd}
+            @pointerleave=${this._holdEnd}
+            @pointercancel=${this._holdEnd}
+          >
             <div class="hold-ring"></div>
-            <ha-icon icon="mdi:play" style=${o({ color: ACCENT })}></ha-icon><span>Resume</span>
+            <ha-icon icon="mdi:play" style=${o({ color })}></ha-icon>
+            <span>Resume</span>
           </button>
-          <button class="action-btn action-btn--secondary" @click=${() => this._dock(vac)}>
-            <ha-icon icon="mdi:home" style="color:rgba(64,169,255,0.6)"></ha-icon><span>Dock</span>
+          <button
+            class="action-btn action-btn--secondary"
+            @click=${() => this._dock(vac)}
+          >
+            <ha-icon icon="mdi:home" style="color:rgba(64,169,255,0.6)"></ha-icon>
+            <span>Dock</span>
           </button>
         </div>
       `;
         }
-        if (this._isCleaning(vac)) {
-            const hId = "pause-" + idx;
+        if (cleaning) {
+            const hId = "pause-" + vacIdx;
             return b `
         <div class="actions">
-          <button class="action-btn action-btn--warn ${this._holdId === hId ? "action-btn--holding" : ""}"
-            style=${holdMs}
+          <button
+            class="action-btn action-btn--warn ${this._holdId === hId ? "action-btn--holding" : ""}"
             @pointerdown=${this._holdStart(hId, () => this._pause(vac))}
-            @pointerup=${this._holdEnd} @pointerleave=${this._holdEnd} @pointercancel=${this._holdEnd}>
+            @pointerup=${this._holdEnd}
+            @pointerleave=${this._holdEnd}
+            @pointercancel=${this._holdEnd}
+          >
             <div class="hold-ring"></div>
-            <ha-icon icon="mdi:pause" style="color:#faad14"></ha-icon><span>Pause</span>
-          </button>
-          <button class="action-btn action-btn--secondary" @click=${() => this._dock(vac)}>
-            <ha-icon icon="mdi:home" style="color:rgba(64,169,255,0.6)"></ha-icon><span>Dock</span>
+            <ha-icon icon="mdi:pause" style="color:#faad14"></ha-icon>
+            <span>Pause</span>
           </button>
         </div>
       `;
         }
-        // idle / docked
-        const hId = "start-" + idx;
-        const regions = vac.regions ?? [];
-        const hasRegions = regions.length > 0;
-        const hasSel = this._hasSelection(vac);
-        const enabled = hasRegions ? hasSel : true;
-        const startBg = enabled ? ACCENT_BG : "rgba(60,60,60,0.4)";
-        const startBorder = enabled ? `1px solid ${ACCENT}80` : "1px solid rgba(255,255,255,0.1)";
-        const startIconColor = enabled ? ACCENT : "rgba(255,255,255,0.2)";
-        const startTextColor = enabled ? "white" : "rgba(255,255,255,0.25)";
+        const hId = "start-" + vacIdx;
+        const startBg = hasRooms ? COLOR_BG[ck] : "rgba(60,60,60,0.4)";
+        const startBorder = hasRooms ? "1px solid " + color + "80" : "1px solid rgba(255,255,255,0.1)";
+        const startIconColor = hasRooms ? color : "rgba(255,255,255,0.2)";
+        const startTextColor = hasRooms ? "white" : "rgba(255,255,255,0.25)";
         return b `
       <div class="actions">
-        <button class="action-btn ${enabled && this._holdId === hId ? "action-btn--holding" : ""}"
-          style=${o({ background: startBg, border: startBorder, "--hold-ms": HOLD_DURATION_MS + "ms" })}
-          ?disabled=${!enabled}
-          @pointerdown=${enabled ? this._holdStart(hId, () => this._startClean(vac)) : A}
-          @pointerup=${this._holdEnd} @pointerleave=${this._holdEnd} @pointercancel=${this._holdEnd}>
+        <button
+          class="action-btn ${hasRooms && this._holdId === hId ? "action-btn--holding" : ""}"
+          style=${o({ background: startBg, border: startBorder })}
+          ?disabled=${!hasRooms}
+          @pointerdown=${hasRooms ? this._holdStart(hId, () => this._startClean(vac)) : A}
+          @pointerup=${this._holdEnd}
+          @pointerleave=${this._holdEnd}
+          @pointercancel=${this._holdEnd}
+        >
           <div class="hold-ring"></div>
           <ha-icon icon="mdi:rocket-launch" style=${o({ color: startIconColor })}></ha-icon>
           <div class="start-body">
             <span style=${o({ color: startTextColor })}>START</span>
-            ${hasRegions
-            ? b `<div class="room-icons">
-                  ${regions.map((r) => b `<ha-icon icon=${r.icon || "mdi:square"}
-                    style=${o({ color: this._isRegionSelected(vac, r) ? ACCENT : "rgba(255,255,255,0.15)" })}></ha-icon>`)}
-                </div>`
-            : A}
-            ${regions.length > 1
-            ? b `<div class="sel-all-row">
-                  <button class="sel-link" @click=${(e) => { e.stopPropagation(); this._selectAll(vac); }}>all</button>
-                  <span style="color:rgba(255,255,255,0.2)">·</span>
-                  <button class="sel-link" @click=${(e) => { e.stopPropagation(); this._clearSel(vac); }}>none</button>
-                </div>`
-            : A}
+            ${(vac.rooms ?? []).length > 0 ? b `
+              <div class="room-icons">
+                ${(vac.rooms ?? []).map(r => b `
+                  <ha-icon
+                    icon=${r.icon || "mdi:square"}
+                    style=${o({ color: this._isRoomSelected(r, vac) ? color : "rgba(255,255,255,0.15)" })}
+                  ></ha-icon>
+                `)}
+              </div>
+            ` : A}
+            ${timeStr ? b `<small style="color:rgba(255,255,255,0.4)">${timeStr}</small>` : A}
+            ${(vac.rooms ?? []).length > 1 ? b `
+              <div class="sel-all-row">
+                <button class="sel-link" @click=${(e) => { e.stopPropagation(); this._selectAll(vac); }}>all</button>
+                <span style="color:rgba(255,255,255,0.2)">·</span>
+                <button class="sel-link" @click=${(e) => { e.stopPropagation(); this._deselectAll(vac); }}>none</button>
+              </div>
+            ` : A}
           </div>
-        </button>
-        <button class="action-btn action-btn--secondary" @click=${() => this._locate(vac)} title="Locate">
-          <ha-icon icon="mdi:map-marker" style="color:rgba(64,169,255,0.6)"></ha-icon>
-        </button>
-        <button class="action-btn action-btn--secondary" @click=${() => this._dock(vac)} title="Dock">
-          <ha-icon icon="mdi:home" style="color:rgba(64,169,255,0.6)"></ha-icon>
         </button>
       </div>
     `;
     }
+    _renderStatusCard(vac, vacIdx) {
+        const cleaning = this._isCleaning(vac);
+        const color = this._color(vac);
+        const name = vac.name ?? vac.entity.split(".")[1] ?? vac.entity;
+        const cardBorder = cleaning ? "2px solid " + color : "1px solid rgba(255,255,255,0.08)";
+        const cardShadow = cleaning ? "0 0 22px " + color + "40" : "none";
+        const imgFilter = cleaning
+            ? "drop-shadow(0 0 20px " + color + "D8)"
+            : "drop-shadow(0 4px 12px " + color + "33)";
+        return b `
+      <div class="status-card" style=${o({ border: cardBorder, boxShadow: cardShadow })}>
+        <div class="status-left" style="cursor:pointer"
+          @click=${() => this._fireMoreInfo(vac.entity)}
+          title="Open ${name} info">
+          <div class="model-label">${name}</div>
+          ${vac.image ? b `
+            <img class="vac-img" src=${vac.image} alt=${name}
+              style=${o({ opacity: cleaning ? "0.9" : "0.6", filter: imgFilter })}
+            />
+          ` : b `
+            <ha-icon icon="mdi:robot-vacuum"
+              style=${o({ color, fontSize: "80px", opacity: cleaning ? "0.9" : "0.5" })}
+            ></ha-icon>
+          `}
+        </div>
+        <div class="status-right">
+          ${this._renderStatusRow(vac)}
+          ${this._renderProgress(vac)}
+          ${this._renderActions(vac, vacIdx)}
+        </div>
+      </div>
+    `;
+    }
+    // ── Main render ─────────────────────────────────────────────────────────
+    render() {
+        if (!this._config || !this.hass)
+            return A;
+        return b `
+      <ha-card>
+        ${this.editMode ? b `<div class="version-chip">v${CARD_VERSION}</div>` : A}
+        <div class="badges-row">
+          ${this._config.vacuums.map((v, i) => this._renderBadge(v, i))}
+          ${(this._config.global_actions ?? []).map((ga, i) => this._renderGlobalBadge(ga, i))}
+        </div>
+        ${[...this._shownSet]
+            .filter(i => i < this._config.vacuums.length)
+            .map(i => b `
+            ${this._renderMap(this._config.vacuums[i])}
+            ${this._renderStatusCard(this._config.vacuums[i], i)}
+          `)}
+      </ha-card>
+    `;
+    }
 };
+// ── Styles ──────────────────────────────────────────────────────────────
 AnyVacCard.styles = i$5 `
-    :host { --hold-ms: 500ms; }
     ha-card {
       position: relative;
       background: transparent;
@@ -690,498 +1377,2183 @@ AnyVacCard.styles = i$5 `
       flex-direction: column;
       gap: 8px;
     }
-    .empty { padding: 24px; text-align: center; opacity: 0.7; }
 
-    /* ── Badges ─────────────────────────────────────────────────────────── */
-    .badges-row { display: flex; flex-wrap: wrap; gap: 8px; }
+    .version-chip {
+      position: absolute;
+      top: 0;
+      right: 8px;
+      font-size: 10px;
+      font-weight: 600;
+      color: rgba(255, 255, 255, 0.35);
+      pointer-events: none;
+      z-index: 2;
+    }
+
+    /* ── Badges ──────────────────────────────────────────────────────── */
+    .badges-row {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 8px;
+    }
+
     .badge {
-      position: relative; overflow: hidden; display: flex; align-items: center; gap: 10px;
-      padding: 6px 18px 6px 6px; border-radius: 99px; cursor: pointer;
-      backdrop-filter: blur(10px); -webkit-backdrop-filter: blur(10px);
+      position: relative;
+      overflow: hidden;
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      padding: 6px 18px 6px 6px;
+      border-radius: 99px;
+      cursor: pointer;
+      backdrop-filter: blur(10px);
+      -webkit-backdrop-filter: blur(10px);
       transition: background 0.3s, border 0.3s, box-shadow 0.3s;
     }
-    .badge-img { width: 44px; height: 44px; border-radius: 50%; object-fit: cover; flex-shrink: 0; }
-    .badge-icon { width: 44px; height: 44px; display: flex; align-items: center; justify-content: center; }
-    .badge-name { font-size: 15px; font-weight: 700; white-space: nowrap; transition: color 0.3s; }
 
-    /* ── Map / base ─────────────────────────────────────────────────────── */
+    .badge-img {
+      width: 44px;
+      height: 44px;
+      border-radius: 50%;
+      object-fit: cover;
+      flex-shrink: 0;
+      position: relative;
+      z-index: 1;
+    }
+
+    .badge-icon {
+      width: 44px;
+      height: 44px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      position: relative;
+      z-index: 1;
+    }
+
+    .badge-name {
+      font-size: 15px;
+      font-weight: 700;
+      white-space: nowrap;
+      transition: color 0.3s;
+      position: relative;
+      z-index: 1;
+    }
+
+    /* ── Hold ring (shared by badges and action buttons) ─────────────── */
+    .hold-ring {
+      position: absolute;
+      inset: 0;
+      border-radius: inherit;
+      background: rgba(255, 255, 255, 0.18);
+      transform: scaleX(0);
+      transform-origin: left;
+      pointer-events: none;
+      z-index: 0;
+    }
+
+    .action-btn--holding .hold-ring,
+    .badge--holding .hold-ring {
+      animation: hold-fill var(--hold-ms) linear forwards;
+    }
+
+    @keyframes hold-fill {
+      from { transform: scaleX(0); }
+      to   { transform: scaleX(1); }
+    }
+
+    /* ── Map ─────────────────────────────────────────────────────────── */
     .map-wrap {
-      position: relative; width: 100%; overflow: hidden; border-radius: 12px;
-      background: rgba(127,127,127,0.06);
+      position: relative;
+      width: 100%;
+      padding-top: 27.5%;
+      overflow: hidden;
+      border-radius: 12px;
     }
-    .map-wrap.framed { padding-top: 60%; }
-    .map-wrap.placeholder {
-      display: flex; flex-direction: column; align-items: center; justify-content: center;
-      gap: 6px; opacity: 0.55;
-    }
-    .map-wrap.placeholder.framed { padding-top: 0; min-height: 150px; }
-    .map-wrap.placeholder ha-icon { --mdc-icon-size: 40px; }
-    .layer { transform-origin: center center; }
-    .layer.primary { position: relative; display: block; width: 100%; height: auto; }
-    .layer.map { position: absolute; }
-    .layer.map.overlay { opacity: 0.55; pointer-events: none; }
-    .regions { position: absolute; inset: 0; }
 
-    .room-overlay {
-      position: absolute; border-radius: 8px; cursor: pointer;
-      display: flex; align-items: center; justify-content: center; padding: 0;
-      transition: background 0.2s, border 0.3s, box-shadow 0.3s;
+    .map-img {
+      position: absolute;
+      transform-origin: center center;
+      object-fit: cover;
     }
-    .room-overlay ha-icon { --mdc-icon-size: 18px; }
+
+    /* ── Room buttons ────────────────────────────────────────────────── */
     .room-btn {
-      position: absolute; width: 40px; height: 40px; border-radius: 50%; cursor: pointer;
-      display: flex; align-items: center; justify-content: center; padding: 0;
+      position: absolute;
+      width: 46px;
+      height: 46px;
+      border-radius: 12px;
+      cursor: pointer;
+      display: flex;
+      align-items: center;
+      justify-content: center;
       transform: translate(-50%, -50%);
       transition: background 0.2s, box-shadow 0.2s;
     }
-    .room-btn ha-icon { --mdc-icon-size: 20px; color: #fff; }
 
-    /* ── Status card ────────────────────────────────────────────────────── */
+    .room-btn ha-icon {
+      --mdc-icon-size: 22px;
+    }
+
+    .room-overlay {
+      position: absolute;
+      transform: translate(-50%, -50%);
+      border-radius: 6px;
+      cursor: pointer;
+      display: flex;
+      padding: 3px;
+      transition: background 0.2s, border 0.3s, box-shadow 0.3s;
+    }
+
+    /* ── Status card ─────────────────────────────────────────────────── */
     .status-card {
-      display: grid; grid-template-columns: 140px 1fr;
-      background: rgba(0,0,0,0.6);
-      backdrop-filter: blur(12px); -webkit-backdrop-filter: blur(12px);
-      border-radius: 20px; overflow: hidden;
+      display: grid;
+      grid-template-columns: 150px 1fr;
+      background: rgba(0, 0, 0, 0.6);
+      backdrop-filter: blur(12px);
+      -webkit-backdrop-filter: blur(12px);
+      border-radius: 20px;
+      overflow: hidden;
       transition: border 0.4s, box-shadow 0.4s;
     }
-    .status-left {
-      display: flex; flex-direction: column; align-items: center; justify-content: flex-start;
-      padding: 6px 0 8px; cursor: pointer;
-    }
-    .model-label {
-      font-size: 10px; letter-spacing: 3px; color: rgba(255,255,255,0.3);
-      text-transform: uppercase; text-align: center;
-    }
-    .vac-img { width: 105%; object-fit: contain; display: block; transition: opacity 0.5s, filter 0.5s; }
-    .vac-icon { --mdc-icon-size: 76px; margin-top: 10px; }
-    .status-right { display: flex; flex-direction: column; gap: 4px; padding-top: 4px; }
 
-    .status-row { display: flex; align-items: flex-start; justify-content: space-between; padding: 8px 12px 4px 16px; }
-    .error-row { display: flex; align-items: center; gap: 6px; padding: 4px 12px 0 16px; animation: pulse-error 2s ease-in-out infinite; }
+    .status-left {
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: flex-start;
+      padding: 4px 0 0;
+    }
+
+    .model-label {
+      font-size: 10px;
+      letter-spacing: 3px;
+      color: rgba(255, 255, 255, 0.3);
+      text-transform: uppercase;
+      text-align: center;
+      margin-bottom: -10px;
+    }
+
+    .vac-img {
+      width: 110%;
+      margin-bottom: -15px;
+      object-fit: contain;
+      display: block;
+      transition: opacity 0.5s, filter 0.5s;
+    }
+
+    .status-right {
+      display: flex;
+      flex-direction: column;
+      gap: 4px;
+    }
+
+    /* ── Status row ──────────────────────────────────────────────────── */
+    .status-row {
+      display: flex;
+      align-items: flex-start;
+      justify-content: space-between;
+      padding: 8px 12px 4px 16px;
+    }
+
+    .error-row {
+      display: flex; align-items: center; gap: 6px;
+      padding: 4px 12px 0 16px; animation: pulse-error 2s ease-in-out infinite;
+    }
     @keyframes pulse-error { 0%,100% { opacity:1; } 50% { opacity:0.6; } }
+
     .status-main { display: flex; flex-direction: column; gap: 2px; }
     .status-label { font-size: 20px; font-weight: 700; }
     .current-room { display: flex; align-items: center; gap: 3px; font-size: 11px; color: rgba(255,255,255,0.45); }
-    .status-meta { display: flex; flex-direction: column; align-items: flex-end; gap: 3px; flex-shrink: 0; }
+
+    .status-meta {
+      display: flex;
+      flex-direction: column;
+      align-items: flex-end;
+      gap: 3px;
+      flex-shrink: 0;
+    }
+
     .battery { display: flex; align-items: center; gap: 3px; font-size: 11px; font-weight: 600; }
     .battery ha-icon { --mdc-icon-size: 15px; }
 
-    /* ── Progress ───────────────────────────────────────────────────────── */
+    .last-clean {
+      display: flex; align-items: center; gap: 4px;
+      font-size: 11px; color: rgba(255, 255, 255, 0.45);
+    }
+    .last-clean ha-icon { --mdc-icon-size: 12px; color: rgba(255, 255, 255, 0.25); }
+
+    /* ── Progress bar ────────────────────────────────────────────────── */
     .progress { display: flex; align-items: center; gap: 8px; padding: 0 16px 4px; }
-    .progress-track { flex: 1; height: 3px; background: rgba(255,255,255,0.08); border-radius: 2px; overflow: hidden; }
+    .progress-track {
+      flex: 1; height: 3px;
+      background: rgba(255, 255, 255, 0.08); border-radius: 2px; overflow: hidden;
+    }
     .progress-fill { height: 100%; border-radius: 2px; transition: width 0.5s ease; }
     .progress-label { font-size: 11px; font-weight: 600; flex-shrink: 0; }
 
-    /* ── Presets ────────────────────────────────────────────────────────── */
-    .presets { display: flex; flex-wrap: wrap; gap: 6px; padding: 2px 12px 4px; }
-    .chip {
-      display: inline-flex; align-items: center; gap: 4px; padding: 5px 10px; border-radius: 999px;
-      border: 1px solid rgba(255,255,255,0.18); background: rgba(255,255,255,0.06);
-      color: rgba(255,255,255,0.7); font-size: 12px; font-weight: 600; cursor: pointer;
-      transition: background 0.2s, border 0.2s, color 0.2s;
-    }
-    .chip ha-icon { --mdc-icon-size: 15px; }
-
-    /* ── Hold ring ──────────────────────────────────────────────────────── */
-    .hold-ring {
-      position: absolute; inset: 0; border-radius: inherit; background: rgba(255,255,255,0.18);
-      transform: scaleX(0); transform-origin: left; pointer-events: none; z-index: 0;
-    }
-    .action-btn--holding .hold-ring { animation: hold-fill var(--hold-ms) linear forwards; }
-    @keyframes hold-fill { from { transform: scaleX(0); } to { transform: scaleX(1); } }
-
-    /* ── Actions ────────────────────────────────────────────────────────── */
+    /* ── Action buttons ──────────────────────────────────────────────── */
     .actions { display: flex; gap: 8px; padding: 0 12px 14px; }
+
     .action-btn {
-      position: relative; overflow: hidden; flex: 1;
-      display: flex; align-items: center; justify-content: center; gap: 8px;
-      padding: 10px 14px; border-radius: 14px; cursor: pointer; transition: opacity 0.2s;
-      font-family: inherit; background: rgba(127,127,127,0.14); border: 1px solid rgba(255,255,255,0.08);
+      position: relative;
+      overflow: hidden;
+      flex: 1;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      gap: 8px;
+      padding: 10px 14px;
+      border-radius: 14px;
+      cursor: pointer;
+      transition: opacity 0.2s;
+      font-family: inherit;
     }
+
     .action-btn:disabled { cursor: default; opacity: 0.7; }
+
     .action-btn ha-icon { --mdc-icon-size: 22px; flex-shrink: 0; position: relative; z-index: 1; }
     .action-btn span { font-size: 14px; font-weight: 700; color: white; position: relative; z-index: 1; }
-    .action-btn--secondary { flex: 0 0 auto; background: rgba(64,169,255,0.08); border: 1px solid rgba(64,169,255,0.2); }
-    .action-btn--warn { background: rgba(250,173,20,0.18); border: 1px solid rgba(250,173,20,0.5); }
 
-    .start-body { display: flex; flex-direction: column; align-items: flex-start; gap: 2px; position: relative; z-index: 1; }
-    .sel-all-row { display: flex; align-items: center; gap: 4px; margin-top: 1px; }
+    .action-btn--secondary {
+      background: rgba(64, 169, 255, 0.08);
+      border: 1px solid rgba(64, 169, 255, 0.2) !important;
+    }
+
+    .action-btn--warn {
+      background: rgba(250, 173, 20, 0.18);
+      border: 1px solid rgba(250, 173, 20, 0.5) !important;
+    }
+
+    /* ── Start button body ───────────────────────────────────────────── */
+    .start-body {
+      display: flex;
+      flex-direction: column;
+      align-items: flex-start;
+      gap: 2px;
+      position: relative;
+      z-index: 1;
+    }
+
+    .start-body small { font-size: 10px; }
+
+    .sel-all-row {
+      display: flex; align-items: center; gap: 4px; margin-top: 1px;
+    }
     .sel-link {
-      background: none; border: none; cursor: pointer; padding: 0; font-size: 10px; font-family: inherit;
+      background: none; border: none; cursor: pointer; padding: 0;
+      font-size: 10px; font-family: inherit;
       color: rgba(255,255,255,0.3); transition: color .15s;
     }
     .sel-link:hover { color: rgba(255,255,255,0.7); }
-    .room-icons { display: flex; align-items: center; gap: 4px; margin-top: 1px; }
+
+    .room-icons {
+      display: flex;
+      align-items: center;
+      gap: 4px;
+      margin-top: 1px;
+    }
+
     .room-icons ha-icon { --mdc-icon-size: 14px; }
   `;
 __decorate([
     n$1({ attribute: false })
 ], AnyVacCard.prototype, "hass", void 0);
 __decorate([
+    n$1({ attribute: false })
+], AnyVacCard.prototype, "editMode", void 0);
+__decorate([
     r()
 ], AnyVacCard.prototype, "_config", void 0);
 __decorate([
     r()
-], AnyVacCard.prototype, "_selected", void 0);
-__decorate([
-    r()
-], AnyVacCard.prototype, "_preset", void 0);
-__decorate([
-    r()
-], AnyVacCard.prototype, "_shown", void 0);
+], AnyVacCard.prototype, "_shownSet", void 0);
 __decorate([
     r()
 ], AnyVacCard.prototype, "_holdId", void 0);
+__decorate([
+    r()
+], AnyVacCard.prototype, "_localRoomSel", void 0);
 AnyVacCard = __decorate([
-    t$1(CARD_TAG)
+    t$1(CARD_NAME)
 ], AnyVacCard);
-window.customCards = window.customCards || [];
-if (!window.customCards.some((c) => c.type === CARD_TAG)) {
-    window.customCards.push({
-        type: CARD_TAG,
-        name: CARD_NAME,
-        description: CARD_DESCRIPTION,
-        preview: true,
+const customCards = ((_a = window).customCards ?? (_a.customCards = []));
+if (!customCards.some((c) => c["type"] === CARD_NAME)) {
+    customCards.push({
+        type: CARD_NAME,
+        name: "AnyVac Card",
+        description: "Feature-rich card for Roborock vacuums — map, room selection, multi-vacuum tabs, global actions.",
+        preview: false,
         documentationURL: "https://github.com/Michailjovic/anyvac-card",
     });
 }
 
+/**
+ * Server-side cleaning tracker blueprint.
+ *
+ * The card fires `roborock_card_event` (action: cleaning_started) with the
+ * full context — including the helper entity IDs of the selected rooms — so
+ * this blueprint is fully generic: one static blueprint works for every
+ * configuration, no per-user YAML generation needed.
+ *
+ * Flow:
+ *  1. (optional) start notification
+ *  2. wait until the vacuum leaves the dock (guards against the race where
+ *     the event arrives while the state still reads docked/charging)
+ *  3. wait until it returns to docked/charging (1-min debounce so brief dock
+ *     visits between software-repeat passes don't end the session) or errors
+ *  4. write per-room last-clean timestamps (input_datetime)
+ *  5. (optional) single-room time calibration (input_number)
+ *  6. (optional) finish notification
+ *  7. fire cleaning_finished event (source: blueprint) — open cards listen
+ *     for it and clear their room selection on every device
+ */
+const BLUEPRINT_YAML = `blueprint:
+  name: "AnyVac Card — Cleaning Tracker (v${BLUEPRINT_VERSION})"
+  description: >-
+    Companion automation for anyvac-card. Triggered by the
+    cleaning_started event fired by the card; waits for the vacuum to finish,
+    writes per-room last-clean timestamps, optionally calibrates single-room
+    clean times and sends notifications. Runs server-side, so it works even
+    when no dashboard is open. Managed by the card editor (Global tab).
+  domain: automation
+  source_url: https://github.com/Michailjovic/anyvac-card
+  input:
+    notify_service:
+      name: Notify action
+      description: "e.g. notify.mobile_app_phone — leave empty to disable notifications"
+      default: ""
+      selector:
+        text: {}
+    notify_on_start:
+      name: Notify on start
+      default: true
+      selector:
+        boolean: {}
+    notify_on_finish:
+      name: Notify on finish
+      default: true
+      selector:
+        boolean: {}
+    notify_on_error:
+      name: Notify on error
+      default: true
+      selector:
+        boolean: {}
+    single_room_time:
+      name: Single-room time calibration
+      description: >-
+        When a run cleaned exactly one room, store the measured duration into
+        that room's clean-time helper (input_number).
+      default: false
+      selector:
+        boolean: {}
+mode: parallel
+max: 5
+triggers:
+  - trigger: event
+    event_type: roborock_card_event
+    event_data:
+      action: cleaning_started
+variables:
+  notify_service: !input notify_service
+  notify_on_start: !input notify_on_start
+  notify_on_finish: !input notify_on_finish
+  notify_on_error: !input notify_on_error
+  single_room_time: !input single_room_time
+  vacuum_entity: "{{ trigger.event.data.vacuum_entity }}"
+  vacuum_label: "{{ trigger.event.data.vacuum_label | default(vacuum_entity) }}"
+  room_keys: "{{ trigger.event.data.rooms | default([]) }}"
+  room_labels: "{{ trigger.event.data.room_labels | default('') }}"
+  estimated_mins: "{{ trigger.event.data.estimated_mins | default(0) }}"
+  clean_type: "{{ trigger.event.data.clean_type | default('dry') }}"
+  last_clean_entities: "{{ trigger.event.data.last_clean_entities | default([]) }}"
+  clean_time_entities: "{{ trigger.event.data.clean_time_entities | default([]) }}"
+  emoji: "{{ '\u{1FAE7}' if clean_type == 'wet' else '\u{1F9F9}' }}"
+  started_ts: "{{ now().timestamp() }}"
+actions:
+  - if:
+      - condition: template
+        value_template: "{{ notify_on_start and notify_service != '' }}"
+    then:
+      - action: "{{ notify_service }}"
+        continue_on_error: true
+        data:
+          title: "{{ emoji }} {{ vacuum_label }} — cleaning started"
+          message: "{{ room_labels }} (~{{ estimated_mins }} min)"
+  # Wait until the vacuum actually leaves the dock (max 3 min)
+  - wait_template: "{{ states(vacuum_entity) not in ['docked', 'charging'] }}"
+    timeout: "00:03:00"
+    continue_on_timeout: false
+  # Wait for the vacuum to return; 1-min debounce covers dock visits
+  # between software-repeat passes (native-area strategy)
+  - repeat:
+      sequence:
+        - wait_template: "{{ states(vacuum_entity) in ['docked', 'charging', 'error'] }}"
+          timeout: "04:00:00"
+          continue_on_timeout: false
+        - if:
+            - condition: template
+              value_template: "{{ states(vacuum_entity) == 'error' }}"
+          then:
+            - if:
+                - condition: template
+                  value_template: "{{ notify_on_error and notify_service != '' }}"
+              then:
+                - action: "{{ notify_service }}"
+                  continue_on_error: true
+                  data:
+                    title: "⚠️ {{ vacuum_label }} — problem"
+                    message: "The vacuum reported an error. Please check it."
+            - stop: "Vacuum reported an error"
+        - delay: "00:01:00"
+      until:
+        - condition: template
+          value_template: "{{ states(vacuum_entity) in ['docked', 'charging'] }}"
+  - variables:
+      actual_mins: "{{ ((now().timestamp() - started_ts) / 60) | round(0) | int }}"
+  - repeat:
+      for_each: "{{ last_clean_entities }}"
+      sequence:
+        - action: input_datetime.set_datetime
+          continue_on_error: true
+          target:
+            entity_id: "{{ repeat.item }}"
+          data:
+            datetime: "{{ now().strftime('%Y-%m-%d %H:%M:%S') }}"
+  - if:
+      - condition: template
+        value_template: >-
+          {{ single_room_time and room_keys | length == 1
+             and clean_time_entities | length == 1
+             and actual_mins | int >= 1 }}
+    then:
+      - action: input_number.set_value
+        continue_on_error: true
+        target:
+          entity_id: "{{ clean_time_entities[0] }}"
+        data:
+          value: "{{ [actual_mins | int, 180] | min }}"
+  - if:
+      - condition: template
+        value_template: "{{ notify_on_finish and notify_service != '' }}"
+    then:
+      - action: "{{ notify_service }}"
+        continue_on_error: true
+        data:
+          title: "{{ emoji }} {{ vacuum_label }} — cleaning finished"
+          message: "{{ room_labels }} · took {{ actual_mins }} min"
+  - event: roborock_card_event
+    event_data:
+      action: cleaning_finished
+      source: blueprint
+      vacuum_entity: "{{ vacuum_entity }}"
+      vacuum_label: "{{ vacuum_label }}"
+      rooms: "{{ room_keys }}"
+      room_labels: "{{ room_labels }}"
+      clean_type: "{{ clean_type }}"
+      estimated_mins: "{{ estimated_mins }}"
+      actual_mins: "{{ actual_mins }}"
+      success: true
+`;
+
+// ── Defaults ─────────────────────────────────────────────────────────────────
+const DEFAULT_VACUUM = {
+    entity: "", name: "", color: "green", rooms: [],
+    clean_action: { type: "native" },
+};
+const DEFAULT_ROOM = {
+    key: "", name: "", icon: "mdi:square", map_x: 50, map_y: 50,
+};
+const DEFAULT_MAP = {
+    entity: "", rotation: 0, scale: 100, offset_x: 0, offset_y: 0,
+};
+const DEFAULT_GLOBAL = {
+    name: "Whole flat", color: "orange",
+    watch_entities: [],
+    action: { type: "script", entity_id: "" },
+};
+/** Must match the card's built-in defaults in _roomBorderColor() */
+const DEFAULT_THRESHOLDS = [
+    { days: 2, color: "#2ecc71" },
+    { days: 5, color: "#faad14" },
+    { days: 10, color: "#ff9800" },
+];
+// ── Editor ───────────────────────────────────────────────────────────────────
 let AnyVacCardEditor = class AnyVacCardEditor extends i$2 {
     constructor() {
         super(...arguments);
+        // ── Navigation state ──────────────────────────────────────────────────────
         this._tab = "vacuums";
-        this._vacIndex = 0;
+        // Accordion open state — always create new instances to trigger Lit reactivity
+        this._openVac = new Set();
+        this._openSensors = new Set();
+        this._openAction = new Set();
+        this._openGlobal = new Set();
+        // Per-vacuum: which roomIdx is open (null = none)
+        this._openRoom = new Map();
+        // Script preview state
+        this._scriptPreviewOpen = false;
+        // Maps tab state
+        this._mapVac = 0;
+        this._mapRoom = null;
+        // Backend (blueprint) deploy state
+        this._bpStatus = "unknown";
+        this._bpBusy = null;
+        this._bpMsg = null;
+        this._bpYamlOpen = false;
+        this._initialized = false;
+        this._bpFetching = false;
     }
     setConfig(config) {
         this._config = config;
+        if (!this._initialized) {
+            this._initialized = true;
+            this._openVac = new Set((config.vacuums ?? []).map((_, i) => i));
+        }
     }
-    // ── config mutation ─────────────────────────────────────────────────────────
-    _emit(config) {
-        this._config = config;
-        this.dispatchEvent(new CustomEvent("config-changed", { detail: { config }, bubbles: true, composed: true }));
+    updated(changed) {
+        if (changed.has("hass") && this.hass) {
+            const dl = this.shadowRoot?.getElementById("ha-entities");
+            if (dl && !dl.options.length) {
+                dl.innerHTML = Object.keys(this.hass.states).sort()
+                    .map(id => "<option value=\"" + id + "\">")
+                    .join("");
+            }
+        }
+        // Lazy blueprint status fetch when the Global tab is visible
+        if (this.hass && this._tab === "global" && this._bpStatus === "unknown") {
+            this._refreshBlueprintStatus();
+        }
     }
-    _update(patch) {
-        this._emit({ ...this._config, ...patch });
+    // ── Config helpers ────────────────────────────────────────────────────────
+    _logCleanNow(entityId) {
+        const dt = new Date().toISOString().replace("T", " ").slice(0, 19);
+        this.hass.callService("input_datetime", "set_datetime", {
+            entity_id: entityId,
+            datetime: dt,
+        }).catch((e) => console.error("[editor] log clean now failed:", e));
     }
-    _vacs() {
-        return this._config?.vacuums ?? [];
+    _fire(config) {
+        this.dispatchEvent(new CustomEvent("config-changed", {
+            detail: { config }, bubbles: true, composed: true,
+        }));
     }
-    _cfgVac(i) {
-        return this._vacs()[i];
+    _setConfig(updates) {
+        const next = { ...this._config, ...updates };
+        this._config = next;
+        this._fire(next);
     }
-    _updateVac(i, patch) {
-        const vacs = [...this._vacs()];
-        vacs[i] = { ...vacs[i], ...patch };
-        this._update({ vacuums: vacs });
+    _setVacuum(idx, updates) {
+        const vacuums = [...this._config.vacuums];
+        vacuums[idx] = { ...vacuums[idx], ...updates };
+        const next = { ...this._config, vacuums };
+        this._config = next;
+        this._fire(next);
     }
-    _addVac() {
-        const vacs = [...this._vacs(), { entity: "" }];
-        this._update({ vacuums: vacs });
-        this._vacIndex = vacs.length - 1;
+    _setMap(vacIdx, updates) {
+        const existing = this._config.vacuums[vacIdx].map ?? { ...DEFAULT_MAP };
+        this._setVacuum(vacIdx, { map: { ...existing, ...updates } });
     }
-    _removeVac(i) {
-        const vacs = [...this._vacs()];
-        vacs.splice(i, 1);
-        this._update({ vacuums: vacs });
-        if (this._vacIndex >= vacs.length)
-            this._vacIndex = Math.max(0, vacs.length - 1);
+    _setRoom(vacIdx, roomIdx, updates) {
+        const rooms = [...(this._config.vacuums[vacIdx].rooms ?? [])];
+        rooms[roomIdx] = { ...rooms[roomIdx], ...updates };
+        this._setVacuum(vacIdx, { rooms });
     }
-    _updateMapSource(i, patch) {
-        const v = this._cfgVac(i);
-        const ms = { kind: "roborock_image", entity: "", ...(v.map_source ?? {}), ...patch };
-        this._updateVac(i, { map_source: ms });
+    _setCleanAction(vacIdx, updates) {
+        const existing = this._config.vacuums[vacIdx].clean_action ?? { type: "native" };
+        this._setVacuum(vacIdx, { clean_action: { ...existing, ...updates } });
     }
-    _updateImageBase(i, patch) {
-        const v = this._cfgVac(i);
-        const ib = { src: "", ...(v.image_base ?? {}), ...patch };
-        this._updateVac(i, { image_base: ib });
+    _setGlobal(idx, updates) {
+        const global_actions = [...(this._config.global_actions ?? [])];
+        global_actions[idx] = { ...global_actions[idx], ...updates };
+        const next = { ...this._config, global_actions };
+        this._config = next;
+        this._fire(next);
     }
-    // regions
-    _regions(vi) {
-        return this._cfgVac(vi)?.regions ?? [];
+    _setGlobalAction(idx, updates) {
+        const existing = this._config.global_actions?.[idx]?.action ?? { type: "script", entity_id: "" };
+        this._setGlobal(idx, { action: { ...existing, ...updates } });
     }
-    _updateRegion(vi, ri, patch) {
-        const regs = [...this._regions(vi)];
-        regs[ri] = { ...regs[ri], ...patch };
-        this._updateVac(vi, { regions: regs });
+    _setNotify(updates) {
+        const existing = this._config.notify ?? { category: "Cleaning" };
+        const next = { ...existing, ...updates };
+        this._setConfig({ notify: next });
     }
-    _setShapeKind(vi, ri, kind) {
-        const cur = this._regions(vi)[ri].shape;
-        const shape = kind === "rect"
-            ? { kind: "rect", x: cur.x, y: cur.y, w: cur.kind === "rect" ? cur.w : 20, h: cur.kind === "rect" ? cur.h : 20 }
-            : { kind: "point", x: cur.x, y: cur.y };
-        this._updateRegion(vi, ri, { shape });
+    _setNotifyTemplate(event, updates) {
+        const existing = this._config.notify?.[event] ?? {};
+        this._setNotify({ [event]: { ...existing, ...updates } });
     }
-    _setShapeCoord(vi, ri, key, val) {
-        // eslint-disable-next-line @typescript-eslint/no-explicit-any
-        const sh = { ...this._regions(vi)[ri].shape };
-        sh[key] = val;
-        this._updateRegion(vi, ri, { shape: sh });
+    _setNotifyScript(updates) {
+        const existing = this._config.notify_script ?? { entity: "" };
+        this._setConfig({ notify_script: { ...existing, ...updates } });
     }
-    _addRegion(vi) {
-        const regs = [...this._regions(vi)];
-        const n = regs.length + 1;
-        regs.push({ id: `room_${n}`, name: `Room ${n}`, shape: { kind: "rect", x: 10, y: 10, w: 25, h: 25 } });
-        this._updateVac(vi, { regions: regs });
+    _setBackend(updates) {
+        const existing = this._config.backend ?? {};
+        this._setConfig({ backend: { ...existing, ...updates } });
     }
-    _removeRegion(vi, ri) {
-        const regs = [...this._regions(vi)];
-        regs.splice(ri, 1);
-        this._updateVac(vi, { regions: regs });
+    // ── Backend (blueprint) deploy ────────────────────────────────────────────
+    /** Entity ID of the deployed tracker automation, or null */
+    _trackerAutomation() {
+        for (const [id, st] of Object.entries(this.hass?.states ?? {})) {
+            if (id.startsWith("automation.") && st.attributes["id"] === TRACKER_AUTOMATION_ID) {
+                return id;
+            }
+        }
+        return null;
     }
-    // presets
-    _presets(vi) {
-        return this._cfgVac(vi)?.presets ?? [];
+    async _refreshBlueprintStatus() {
+        if (this._bpFetching)
+            return;
+        this._bpFetching = true;
+        try {
+            const res = await this.hass.callWS({
+                type: "blueprint/list", domain: "automation",
+            });
+            const bp = res?.[BLUEPRINT_PATH];
+            if (!bp) {
+                this._bpStatus = "missing";
+                return;
+            }
+            const name = bp?.metadata?.name ?? bp?.name ?? "";
+            this._bpStatus = name.includes("v" + BLUEPRINT_VERSION) ? "current" : "outdated";
+        }
+        catch (err) {
+            console.error("[editor] blueprint/list failed:", err);
+            this._bpStatus = "missing";
+        }
+        finally {
+            this._bpFetching = false;
+        }
     }
-    _updatePreset(vi, pi, patch) {
-        const ps = [...this._presets(vi)];
-        ps[pi] = { ...ps[pi], ...patch };
-        this._updateVac(vi, { presets: ps });
+    async _installBlueprint() {
+        this._bpBusy = "blueprint";
+        this._bpMsg = null;
+        try {
+            await this.hass.callWS({
+                type: "blueprint/save",
+                domain: "automation",
+                path: BLUEPRINT_PATH,
+                yaml: BLUEPRINT_YAML,
+                allow_override: true,
+            });
+            this._bpStatus = "current";
+            this._bpMsg = "✅ Blueprint installed (v" + BLUEPRINT_VERSION + ")";
+        }
+        catch (err) {
+            console.error("[editor] blueprint/save failed:", err);
+            this._bpMsg = "❌ Blueprint install failed (admin required?): " + (err?.message ?? err);
+        }
+        finally {
+            this._bpBusy = null;
+        }
     }
-    _addPreset(vi) {
-        const ps = [...this._presets(vi)];
-        const n = ps.length + 1;
-        ps.push({ id: `preset_${n}`, name: `Preset ${n}`, default: ps.length === 0 });
-        this._updateVac(vi, { presets: ps });
+    async _deployAutomation() {
+        this._bpBusy = "automation";
+        this._bpMsg = null;
+        const b = this._config.backend ?? {};
+        const automation = {
+            alias: "AnyVac Card — Cleaning Tracker",
+            description: "Managed by anyvac-card v" + CARD_VERSION + ". Recreate from the card editor (Global tab) after changes.",
+            use_blueprint: {
+                path: BLUEPRINT_PATH,
+                input: {
+                    notify_service: b.notify_service ?? "",
+                    notify_on_start: b.notify_on_start !== false,
+                    notify_on_finish: b.notify_on_finish !== false,
+                    notify_on_error: b.notify_on_error !== false,
+                    single_room_time: this._config.single_room_time === true,
+                },
+            },
+        };
+        try {
+            await this.hass.callApi("post", "config/automation/config/" + TRACKER_AUTOMATION_ID, automation);
+            this._bpMsg = "✅ Automation deployed";
+        }
+        catch (err) {
+            console.error("[editor] automation deploy failed:", err);
+            this._bpMsg = "❌ Automation deploy failed (admin required?): " + (err?.message ?? err);
+        }
+        finally {
+            this._bpBusy = null;
+        }
     }
-    _removePreset(vi, pi) {
-        const ps = [...this._presets(vi)];
-        ps.splice(pi, 1);
-        this._updateVac(vi, { presets: ps });
+    // ── Helper auto-creation ──────────────────────────────────────────────────
+    async _createHelper(vacIdx, roomIdx, kind) {
+        const vac = this._config.vacuums[vacIdx];
+        const room = vac?.rooms?.[roomIdx];
+        if (!vac || !room)
+            return;
+        const vacLabel = vac.name || vac.entity.split(".")[1] || "vacuum";
+        const roomLabel = room.name || room.key || "room " + (roomIdx + 1);
+        try {
+            if (kind === "last_clean") {
+                const res = await this.hass.callWS({
+                    type: "input_datetime/create",
+                    name: vacLabel + " " + roomLabel + " last clean",
+                    has_date: true,
+                    has_time: true,
+                    icon: "mdi:broom",
+                });
+                this._setRoom(vacIdx, roomIdx, { last_clean_entity: "input_datetime." + res.id });
+            }
+            else {
+                const res = await this.hass.callWS({
+                    type: "input_number/create",
+                    name: vacLabel + " " + roomLabel + " clean time",
+                    min: 0, max: 180, step: 1,
+                    unit_of_measurement: "min",
+                    mode: "box",
+                    icon: "mdi:timer-outline",
+                });
+                this._setRoom(vacIdx, roomIdx, { clean_time_entity: "input_number." + res.id });
+            }
+        }
+        catch (err) {
+            console.error("[editor] helper create failed:", err);
+            this._bpMsg = "❌ Helper creation failed (admin required?): " + (err?.message ?? err);
+        }
     }
-    // ── input helpers ───────────────────────────────────────────────────────────
-    _val(e) {
-        return e.target.value;
+    async _createMissingHelpers(vacIdx) {
+        const count = this._config.vacuums[vacIdx]?.rooms?.length ?? 0;
+        for (let i = 0; i < count; i++) {
+            // re-read on every pass — _setRoom replaces the rooms array
+            let r = this._config.vacuums[vacIdx]?.rooms?.[i];
+            if (r && !r.last_clean_entity)
+                await this._createHelper(vacIdx, i, "last_clean");
+            r = this._config.vacuums[vacIdx]?.rooms?.[i];
+            if (r && !r.clean_time_entity)
+                await this._createHelper(vacIdx, i, "clean_time");
+        }
     }
-    _checked(e) {
-        return e.target.checked;
+    // ── List mutations ────────────────────────────────────────────────────────
+    _moveVacuum(idx, dir) {
+        const target = idx + dir;
+        const vacuums = [...this._config.vacuums];
+        if (target < 0 || target >= vacuums.length)
+            return;
+        [vacuums[idx], vacuums[target]] = [vacuums[target], vacuums[idx]];
+        const next = { ...this._config, vacuums };
+        this._config = next;
+        this._fire(next);
     }
-    _num(e) {
-        const n = Number(e.target.value);
-        return isNaN(n) ? 0 : n;
+    _addVacuum() {
+        const vacuums = [...this._config.vacuums, { ...DEFAULT_VACUUM }];
+        const next = { ...this._config, vacuums };
+        this._config = next;
+        this._fire(next);
+        const newIdx = vacuums.length - 1;
+        this._openVac = new Set([...this._openVac, newIdx]);
     }
-    // ── render ──────────────────────────────────────────────────────────────────
+    _deleteVacuum(idx) {
+        const vacuums = this._config.vacuums.filter((_, i) => i !== idx);
+        const next = { ...this._config, vacuums };
+        this._config = next;
+        this._fire(next);
+        const s = new Set(this._openVac);
+        s.delete(idx);
+        this._openVac = s;
+    }
+    _addRoom(vacIdx) {
+        const rooms = [...(this._config.vacuums[vacIdx].rooms ?? []), { ...DEFAULT_ROOM }];
+        this._setVacuum(vacIdx, { rooms });
+        const m = new Map(this._openRoom);
+        m.set(vacIdx, rooms.length - 1);
+        this._openRoom = m;
+    }
+    _deleteRoom(vacIdx, roomIdx) {
+        const rooms = (this._config.vacuums[vacIdx].rooms ?? []).filter((_, i) => i !== roomIdx);
+        this._setVacuum(vacIdx, { rooms });
+        const openIdx = this._openRoom.get(vacIdx);
+        if (openIdx === roomIdx) {
+            const m = new Map(this._openRoom);
+            m.set(vacIdx, null);
+            this._openRoom = m;
+        }
+        if (this._mapRoom === roomIdx)
+            this._mapRoom = null;
+    }
+    _addGlobal() {
+        const global_actions = [...(this._config.global_actions ?? []), { ...DEFAULT_GLOBAL }];
+        const next = { ...this._config, global_actions };
+        this._config = next;
+        this._fire(next);
+        const newIdx = global_actions.length - 1;
+        this._openGlobal = new Set([...this._openGlobal, newIdx]);
+    }
+    _deleteGlobal(idx) {
+        const global_actions = (this._config.global_actions ?? []).filter((_, i) => i !== idx);
+        const next = { ...this._config, global_actions };
+        this._config = next;
+        this._fire(next);
+        const s = new Set(this._openGlobal);
+        s.delete(idx);
+        this._openGlobal = s;
+    }
+    // ── Accordion toggle helpers ──────────────────────────────────────────────
+    _toggleVac(idx) {
+        const s = new Set(this._openVac);
+        if (s.has(idx))
+            s.delete(idx);
+        else
+            s.add(idx);
+        this._openVac = s;
+    }
+    _toggleRoom(vacIdx, roomIdx) {
+        const m = new Map(this._openRoom);
+        const cur = m.get(vacIdx) ?? null;
+        m.set(vacIdx, cur === roomIdx ? null : roomIdx);
+        this._openRoom = m;
+    }
+    _toggleSensors(vacIdx) {
+        const s = new Set(this._openSensors);
+        if (s.has(vacIdx))
+            s.delete(vacIdx);
+        else
+            s.add(vacIdx);
+        this._openSensors = s;
+    }
+    _toggleAction(vacIdx) {
+        const s = new Set(this._openAction);
+        if (s.has(vacIdx))
+            s.delete(vacIdx);
+        else
+            s.add(vacIdx);
+        this._openAction = s;
+    }
+    _toggleGlobal(idx) {
+        const s = new Set(this._openGlobal);
+        if (s.has(idx))
+            s.delete(idx);
+        else
+            s.add(idx);
+        this._openGlobal = s;
+    }
+    // ── Shared field helpers ──────────────────────────────────────────────────
+    _entityPicker(label, value, domains, onChange, required = false) {
+        const ph = domains.length ? domains.join(" / ") : "entity_id";
+        const isSingle = domains.length === 1;
+        const listId = isSingle ? "ha-ents-" + domains[0] : "ha-entities";
+        const filtered = isSingle
+            ? Object.keys(this.hass?.states ?? {}).filter(id => id.startsWith(domains[0] + ".")).sort()
+            : null;
+        return b `
+      ${filtered ? b `<datalist id=${listId}>${filtered.map(id => b `<option value=${id}>`)}</datalist>` : A}
+      <div class="field">
+        <label>${label}${required ? b `<span class="required"> *</span>` : A}</label>
+        <input class="text-input" type="text" list=${listId}
+          .value=${value ?? ""} placeholder=${ph}
+          @input=${(e) => {
+            const v = e.target.value;
+            if (v === "" || this.hass.states[v])
+                onChange(v);
+        }}
+          @change=${(e) => onChange(e.target.value)} />
+      </div>`;
+    }
+    _textField(label, value, onChange, placeholder = "") {
+        return b `
+      <div class="field">
+        <label>${label}</label>
+        <input class="text-input" type="text" .value=${value ?? ""} placeholder=${placeholder}
+          @change=${(e) => onChange(e.target.value)} />
+      </div>`;
+    }
+    _numberSlider(label, value, min, max, step, onChange, suffix = "") {
+        const cur = value ?? 0;
+        return b `
+      <div class="field field--row">
+        <label>${label}</label>
+        <div class="slider-wrap">
+          <input type="range" class="slider" min=${min} max=${max} step=${step} .value=${String(cur)}
+            @input=${(e) => onChange(Number(e.target.value))} />
+          <span class="slider-val">${cur}${suffix}</span>
+        </div>
+      </div>`;
+    }
+    _selectField(label, value, options, onChange) {
+        return b `
+      <div class="field field--row">
+        <label>${label}</label>
+        <select class="select-input" @change=${(e) => onChange(e.target.value)}>
+          ${options.map(o => b `<option value=${o.value} ?selected=${o.value === value}>${o.label}</option>`)}
+        </select>
+      </div>`;
+    }
+    _optionSelectFromList(label, opts, value, onChange) {
+        return b `
+      <div class="field field--row">
+        <label>${label}</label>
+        <select class="select-input"
+          @change=${(e) => onChange(e.target.value)}>
+          <option value="">— none —</option>
+          ${opts.map(o => b `<option value=${o} ?selected=${o === value}>${o}</option>`)}
+        </select>
+      </div>`;
+    }
+    _optionSelect(label, entity, value, onChange) {
+        const opts = entity
+            ? (this.hass.states[entity]?.attributes["options"] ?? [])
+            : [];
+        if (!opts.length)
+            return this._textField(label, value, onChange, "e.g. balanced");
+        return b `
+      <div class="field field--row">
+        <label>${label}</label>
+        <select class="select-input"
+          @change=${(e) => onChange(e.target.value)}>
+          <option value="">— none —</option>
+          ${opts.map(o => b `<option value=${o} ?selected=${o === value}>${o}</option>`)}
+        </select>
+      </div>`;
+    }
+    _iconPickerField(value, onChange) {
+        return b `
+      <div class="field">
+        <label>Icon</label>
+        <ha-icon-picker .value=${value ?? "mdi:square"}
+          @value-changed=${(e) => onChange(e.detail.value)}
+        ></ha-icon-picker>
+      </div>`;
+    }
+    _areaPicker(label, value, onChange) {
+        const areas = Object.values(this.hass?.areas ?? {});
+        if (!areas.length)
+            return this._textField(label, value, onChange, "e.g. living_room");
+        return b `
+      <div class="field field--row">
+        <label>${label}</label>
+        <select class="select-input"
+          @change=${(e) => onChange(e.target.value)}>
+          <option value="">— not mapped —</option>
+          ${[...areas].sort((a, b) => a.name.localeCompare(b.name)).map(a => b `<option value=${a.area_id} ?selected=${a.area_id === value}>${a.name}</option>`)}
+        </select>
+      </div>`;
+    }
+    // ── Tab: Vacuums ──────────────────────────────────────────────────────────
+    _renderVacuumsTab() {
+        return b `
+      <div class="tab-body">
+        ${this._config.vacuums.length === 0
+            ? b `<p class="hint">No vacuums yet. Add one below.</p>`
+            : this._config.vacuums.map((vac, i) => this._renderVacuumAccordion(vac, i))}
+        <button class="btn btn--add" @click=${() => this._addVacuum()}>
+          <ha-icon icon="mdi:plus"></ha-icon> Add vacuum
+        </button>
+      </div>`;
+    }
+    _renderVacuumAccordion(vac, idx) {
+        const color = COLOR_HEX[vac.color ?? "green"];
+        const isOpen = this._openVac.has(idx);
+        return b `
+      <div class="acc-row" style=${o({ borderLeft: "3px solid " + color })}>
+        <div class="acc-header" @click=${() => this._toggleVac(idx)}>
+          ${vac.image
+            ? b `<img class="acc-img" src=${vac.image} alt=${vac.name ?? ""} />`
+            : b `<ha-icon icon="mdi:robot-vacuum" style=${o({ color, width: "36px", height: "36px" })}></ha-icon>`}
+          <div class="acc-info">
+            <span class="acc-name">${vac.name || vac.entity || "Unnamed vacuum"}</span>
+            <span class="acc-sub">${vac.entity}</span>
+          </div>
+          <button class="icon-btn" ?disabled=${idx === 0}
+            @click=${(e) => { e.stopPropagation(); this._moveVacuum(idx, -1); }}>
+            <ha-icon icon="mdi:arrow-up"></ha-icon>
+          </button>
+          <button class="icon-btn" ?disabled=${idx === this._config.vacuums.length - 1}
+            @click=${(e) => { e.stopPropagation(); this._moveVacuum(idx, 1); }}>
+            <ha-icon icon="mdi:arrow-down"></ha-icon>
+          </button>
+          <button class="icon-btn icon-btn--danger"
+            @click=${(e) => { e.stopPropagation(); this._deleteVacuum(idx); }}>
+            <ha-icon icon="mdi:delete"></ha-icon>
+          </button>
+          <ha-icon icon=${isOpen ? "mdi:chevron-up" : "mdi:chevron-down"} class="acc-chevron"></ha-icon>
+        </div>
+
+        ${isOpen ? b `
+          <div class="acc-body">
+
+            <div class="section-title">Basic</div>
+            ${this._entityPicker("Vacuum entity", vac.entity, ["vacuum"], v => this._setVacuum(idx, { entity: v }), true)}
+            ${this._textField("Display name", vac.name, v => this._setVacuum(idx, { name: v }), "e.g. S8")}
+            ${this._textField("Image path", vac.image, v => this._setVacuum(idx, { image: v }), "/local/...")}
+            ${this._selectField("Accent colour", vac.color ?? "green", [{ value: "green", label: "Green" }, { value: "blue", label: "Blue" }, { value: "orange", label: "Orange" }], v => this._setVacuum(idx, { color: v }))}
+
+            ${this._renderSensorsSection(idx, vac)}
+            ${this._renderCleanActionSection(idx, vac)}
+
+            <div class="section-title">Rooms (${(vac.rooms ?? []).length})</div>
+            ${(vac.rooms ?? []).map((r, ri) => this._renderRoomAccordion(r, idx, ri))}
+            <button class="btn btn--add" @click=${() => this._addRoom(idx)}>
+              <ha-icon icon="mdi:plus"></ha-icon> Add room
+            </button>
+            ${(vac.rooms ?? []).some(r => !r.last_clean_entity || !r.clean_time_entity) ? b `
+              <button class="btn btn--sm" style="align-self:flex-start"
+                @click=${() => this._createMissingHelpers(idx)}>
+                <ha-icon icon="mdi:auto-fix"></ha-icon> Create missing helpers for all rooms
+              </button>
+            ` : A}
+
+          </div>
+        ` : A}
+      </div>`;
+    }
+    _renderSensorsSection(vacIdx, vac) {
+        const isOpen = this._openSensors.has(vacIdx);
+        const configured = [vac.status_entity, vac.battery_entity, vac.last_clean_entity,
+            vac.progress_entity, vac.current_room_entity, vac.error_entity].filter(Boolean).length;
+        return b `
+      <div class="collapsible">
+        <div class="collapsible-header" @click=${() => this._toggleSensors(vacIdx)}>
+          <span class="collapsible-title">Sensors</span>
+          ${configured ? b `<span class="badge">${configured} configured</span>` : A}
+          <ha-icon icon=${isOpen ? "mdi:chevron-up" : "mdi:chevron-down"} class="acc-chevron"></ha-icon>
+        </div>
+        ${isOpen ? b `
+          <div class="collapsible-body">
+            ${this._entityPicker("Status", vac.status_entity, ["sensor"], v => this._setVacuum(vacIdx, { status_entity: v || undefined }))}
+            ${this._entityPicker("Battery", vac.battery_entity, ["sensor"], v => this._setVacuum(vacIdx, { battery_entity: v || undefined }))}
+            ${this._entityPicker("Last clean end", vac.last_clean_entity, ["sensor"], v => this._setVacuum(vacIdx, { last_clean_entity: v || undefined }))}
+            ${this._entityPicker("Progress", vac.progress_entity, ["sensor"], v => this._setVacuum(vacIdx, { progress_entity: v || undefined }))}
+            ${this._entityPicker("Current room", vac.current_room_entity, ["sensor"], v => this._setVacuum(vacIdx, { current_room_entity: v || undefined }))}
+            ${this._entityPicker("Error", vac.error_entity, ["sensor"], v => this._setVacuum(vacIdx, { error_entity: v || undefined }))}
+          </div>
+        ` : A}
+      </div>`;
+    }
+    _renderCleanActionSection(vacIdx, vac) {
+        const isOpen = this._openAction.has(vacIdx);
+        const action = vac.clean_action ?? { type: "native" };
+        return b `
+      <div class="collapsible">
+        <div class="collapsible-header" @click=${() => this._toggleAction(vacIdx)}>
+          <span class="collapsible-title">Clean action</span>
+          <span class="badge">${action.type}</span>
+          <ha-icon icon=${isOpen ? "mdi:chevron-up" : "mdi:chevron-down"} class="acc-chevron"></ha-icon>
+        </div>
+        ${isOpen ? b `
+          <div class="collapsible-body">
+            ${this._renderCleanActionEditor(vacIdx, vac)}
+          </div>
+        ` : A}
+      </div>`;
+    }
+    _renderCleanActionEditor(vacIdx, vac) {
+        const action = vac.clean_action ?? { type: "native" };
+        return b `
+      ${this._selectField("Strategy", action.type, [{ value: "native", label: "Native (vacuum.send_command + segment IDs)" },
+            { value: "native-auto", label: "Native auto (auto-resolve IDs from roborock.get_maps)" },
+            { value: "native-area", label: "Native area (vacuum.clean_area)" },
+            { value: "script", label: "Custom script" }], v => {
+            if (v === "script") {
+                this._setVacuum(vacIdx, { clean_action: { type: "script", entity_id: "" } });
+                return;
+            }
+            // Carry shared settings over when switching between native variants
+            const prev = this._config.vacuums[vacIdx]?.clean_action;
+            const carry = {};
+            if (prev && prev.type !== "script") {
+                for (const k of ["repeat", "suction_level", "mop_mode_entity", "mop_mode",
+                    "mop_intensity_entity", "mop_intensity"]) {
+                    const val = prev[k];
+                    if (val !== undefined)
+                        carry[k] = val;
+                }
+            }
+            this._setVacuum(vacIdx, { clean_action: { type: v, ...carry } });
+        })}
+      ${action.type === "script"
+            ? this._renderScriptAction(vacIdx, action)
+            : this._renderNativeOptions(vacIdx, action)}`;
+    }
+    /** Shared editor for all three native strategies — only the hint differs */
+    _renderNativeOptions(vacIdx, action) {
+        const hint = action.type === "native-area"
+            ? b `<p class="hint">Calls <code>vacuum.clean_area</code>. Repeat is implemented in software — the card restarts cleaning after each pass (robot docks between passes).</p>`
+            : action.type === "native-auto"
+                ? b `<p class="hint">Calls <code>roborock.get_maps</code> at clean time, matches rooms via Area mappings (Global tab), then sends <code>vacuum.send_command</code> with <code>app_segment_clean</code>. Supports native repeat. Falls back to <code>segment_id</code> if auto-resolve fails.</p>`
+                : A;
+        return b `
+      <div class="sub-section">
+        ${hint}
+        ${this._numberSlider("Repeat passes", action.repeat ?? 1, 1, 3, 1, v => this._setCleanAction(vacIdx, { repeat: v }))}
+        <div class="sub-title">Suction level (optional)</div>
+        ${(() => {
+            const speeds = this.hass.states[this._config.vacuums[vacIdx]?.entity]
+                ?.attributes["fan_speed_list"] ?? [];
+            return speeds.length
+                ? this._optionSelectFromList("Suction option", speeds, action.suction_level, v => this._setCleanAction(vacIdx, { suction_level: v || undefined }))
+                : this._textField("Suction option", action.suction_level, v => this._setCleanAction(vacIdx, { suction_level: v || undefined }), "e.g. balanced");
+        })()}
+        <div class="sub-title">Mop mode (optional)</div>
+        ${this._entityPicker("Mop mode entity", action.mop_mode_entity, ["select"], v => this._setCleanAction(vacIdx, { mop_mode_entity: v || undefined }))}
+        ${action.mop_mode_entity ? this._optionSelect("Mop mode option", action.mop_mode_entity, action.mop_mode, v => this._setCleanAction(vacIdx, { mop_mode: v || undefined })) : A}
+        <div class="sub-title">Mop intensity (optional)</div>
+        ${this._entityPicker("Mop intensity entity", action.mop_intensity_entity, ["select"], v => this._setCleanAction(vacIdx, { mop_intensity_entity: v || undefined }))}
+        ${action.mop_intensity_entity ? this._optionSelect("Mop intensity option", action.mop_intensity_entity, action.mop_intensity, v => this._setCleanAction(vacIdx, { mop_intensity: v || undefined })) : A}
+      </div>`;
+    }
+    _renderScriptAction(vacIdx, action) {
+        const vars = action.variables ?? {};
+        const entries = Object.entries(vars);
+        return b `
+      <div class="sub-section">
+        ${this._entityPicker("Script entity", action.entity_id, ["script"], v => this._setCleanAction(vacIdx, { entity_id: v }))}
+        <p class="hint">Tokens: {{ entity }}, {{ selected_segments }}, {{ selected_room_keys }}, {{ selected_area_ids }}</p>
+        ${entries.map(([key, val], vi) => b `
+          <div class="var-row">
+            <input class="text-input text-input--half" .value=${key} placeholder="name"
+              @change=${(e) => {
+            const newKey = e.target.value;
+            const newVars = Object.fromEntries(entries.map(([k, v], i) => [i === vi ? newKey : k, v]));
+            this._setCleanAction(vacIdx, { variables: newVars });
+        }} />
+            <span class="var-sep">&#8594;</span>
+            <input class="text-input text-input--half" .value=${val} placeholder="{{ entity }}"
+              @change=${(e) => {
+            const newVars = { ...vars, [key]: e.target.value };
+            this._setCleanAction(vacIdx, { variables: newVars });
+        }} />
+            <button class="icon-btn icon-btn--danger icon-btn--sm"
+              @click=${() => {
+            const newVars = Object.fromEntries(entries.filter((_, i) => i !== vi));
+            this._setCleanAction(vacIdx, { variables: newVars });
+        }}>
+              <ha-icon icon="mdi:close"></ha-icon>
+            </button>
+          </div>`)}
+        <button class="btn btn--add btn--sm"
+          @click=${() => this._setCleanAction(vacIdx, { variables: { ...vars, "": "" } })}>
+          <ha-icon icon="mdi:plus"></ha-icon> Add variable
+        </button>
+      </div>`;
+    }
+    _renderRoomAccordion(room, vacIdx, roomIdx) {
+        const isOpen = (this._openRoom.get(vacIdx) ?? null) === roomIdx;
+        return b `
+      <div class="room-acc">
+        <div class="room-acc-header" @click=${() => this._toggleRoom(vacIdx, roomIdx)}>
+          <ha-icon class="room-acc-icon" icon=${room.icon || "mdi:square"}></ha-icon>
+          <div class="room-acc-info">
+            <span class="room-acc-name">${room.name || room.key || "Unnamed room"}</span>
+            ${room.segment_id !== undefined
+            ? b `<span class="room-acc-meta">seg ${room.segment_id}</span>` : A}
+          </div>
+          <button class="icon-btn icon-btn--danger icon-btn--sm"
+            @click=${(e) => { e.stopPropagation(); this._deleteRoom(vacIdx, roomIdx); }}>
+            <ha-icon icon="mdi:delete"></ha-icon>
+          </button>
+          <ha-icon icon=${isOpen ? "mdi:chevron-up" : "mdi:chevron-down"} class="acc-chevron"></ha-icon>
+        </div>
+        ${isOpen ? b `
+          <div class="room-acc-body">
+            ${this._textField("Key (unique ID)", room.key, v => this._setRoom(vacIdx, roomIdx, { key: v }), "e.g. bedroom")}
+            ${this._textField("Display name", room.name, v => this._setRoom(vacIdx, roomIdx, { name: v }), "e.g. Bedroom")}
+            ${(this._config.vacuums[vacIdx]?.clean_action?.type === "native-area" ||
+            this._config.vacuums[vacIdx]?.clean_action?.type === "native-auto")
+            ? b `
+                <div class="field field--row">
+                  <label>Effective area</label>
+                  <strong style="font-size:13px">${
+            /* must mirror the card's resolution order */
+            room.area_id ?? this._config.area_mappings?.[room.key] ?? room.key}</strong>
+                </div>
+                <p class="hint map-hint" @click=${() => { this._tab = "global"; }}>
+                  Set in <strong>Global tab → Area mappings</strong> →
+                </p>`
+            : b `
+                <div class="field field--row">
+                  <label>Segment ID</label>
+                  <input class="text-input text-input--sm" type="number"
+                    .value=${String(room.segment_id ?? "")} placeholder="e.g. 16"
+                    @change=${(e) => {
+                const v = parseInt(e.target.value);
+                this._setRoom(vacIdx, roomIdx, { segment_id: isNaN(v) ? undefined : v });
+            }} />
+                </div>
+                <p class="hint">Find IDs: Developer Tools → Actions → roborock.get_maps</p>`}
+            ${this._numberSlider("Est. clean time (fallback)", room.clean_time_mins ?? 0, 0, 120, 1, v => this._setRoom(vacIdx, roomIdx, { clean_time_mins: v > 0 ? v : undefined }), " min")}
+            ${this._entityPicker("Auto-calibration (input_number)", room.clean_time_entity, ["input_number"], v => this._setRoom(vacIdx, roomIdx, { clean_time_entity: v || undefined }))}
+            ${room.clean_time_entity ? b `
+              <p class="hint">Card measures actual room time and writes rolling average here automatically.</p>
+            ` : b `
+              <button class="btn btn--add btn--sm" style="align-self:flex-start"
+                @click=${() => this._createHelper(vacIdx, roomIdx, "clean_time")}>
+                <ha-icon icon="mdi:plus"></ha-icon> Create input_number helper
+              </button>
+            `}
+            ${this._entityPicker("Last clean (input_datetime)", room.last_clean_entity, ["input_datetime"], v => this._setRoom(vacIdx, roomIdx, { last_clean_entity: v || undefined }))}
+            ${!room.last_clean_entity ? b `
+              <button class="btn btn--add btn--sm" style="align-self:flex-start"
+                @click=${() => this._createHelper(vacIdx, roomIdx, "last_clean")}>
+                <ha-icon icon="mdi:plus"></ha-icon> Create input_datetime helper
+              </button>
+            ` : A}
+            ${room.last_clean_entity ? b `
+              <button class="btn btn--sm" style="align-self:flex-start"
+                @click=${() => this._logCleanNow(room.last_clean_entity)}>
+                ✓ Log clean now
+              </button>
+            ` : A}
+            <p class="hint map-hint" @click=${() => { this._tab = "maps"; this._mapVac = vacIdx; this._mapRoom = roomIdx; }}>
+              📍 Set position &amp; icon in the <strong>Maps tab</strong> →
+            </p>
+          </div>
+        ` : A}
+      </div>`;
+    }
+    // ── Tab: Maps ─────────────────────────────────────────────────────────────
+    _renderMapsTab() {
+        const vacuums = this._config.vacuums;
+        if (!vacuums.length) {
+            return b `<div class="tab-body"><p class="hint">No vacuums configured. Add one in the Vacuums tab.</p></div>`;
+        }
+        const mapVac = Math.min(this._mapVac, vacuums.length - 1);
+        const vac = vacuums[mapVac];
+        const map = vac.map ?? { ...DEFAULT_MAP };
+        const mapUrl = map.entity
+            ? (this.hass.states[map.entity]?.attributes["entity_picture"] ?? "") : "";
+        const rooms = vac.rooms ?? [];
+        return b `
+      <div class="tab-body">
+
+        ${vacuums.length > 1 ? b `
+          <div class="pill-row">
+            ${vacuums.map((v, i) => b `
+              <button class="vac-pill ${i === mapVac ? "vac-pill--active" : ""}"
+                @click=${() => { this._mapVac = i; this._mapRoom = null; }}>
+                ${v.name || v.entity || "Vacuum " + (i + 1)}
+              </button>`)}
+          </div>
+        ` : A}
+
+        ${this._entityPicker("Map image entity", map.entity, ["image"], v => this._setMap(mapVac, { entity: v }))}
+
+        ${mapUrl ? b `
+          <div class="map-pos-container ${this._mapRoom !== null ? "map-pos-container--active" : ""}"
+            @click=${(e) => {
+            if (this._mapRoom === null)
+                return;
+            const rect = e.currentTarget.getBoundingClientRect();
+            const x = Math.round(((e.clientX - rect.left) / rect.width) * 100);
+            const y = Math.round(((e.clientY - rect.top) / rect.height) * 100);
+            this._setRoom(mapVac, this._mapRoom, { map_x: x, map_y: y });
+        }}>
+            <div class="map-preview-wrap">
+              <img class="map-preview-img" src=${mapUrl} alt="Map preview"
+                style=${o({
+            left: (50 + (map.offset_x ?? 0)) + "%",
+            top: (50 + (map.offset_y ?? 0)) + "%",
+            width: (map.scale ?? 100) + "%",
+            transform: "translate(-50%,-50%) rotate(" + (map.rotation ?? 0) + "deg)",
+        })} />
+              ${rooms.map((r, ri) => b `
+                <div class="pos-dot ${ri === this._mapRoom ? "pos-dot--active" : ""}"
+                  style=${o({ left: r.map_x + "%", top: r.map_y + "%" })}
+                  @click=${(e) => { e.stopPropagation(); this._mapRoom = ri === this._mapRoom ? null : ri; }}>
+                  <ha-icon icon=${r.icon || "mdi:square"} style="--mdc-icon-size:14px"></ha-icon>
+                </div>`)}
+            </div>
+          </div>
+
+          <div class="section-title">Calibration</div>
+          ${this._numberSlider("Rotation", map.rotation ?? 0, 0, 360, 90, v => this._setMap(mapVac, { rotation: v }), "°")}
+          ${this._numberSlider("Scale", map.scale ?? 100, 50, 200, 5, v => this._setMap(mapVac, { scale: v }), "%")}
+          ${this._numberSlider("Offset X", map.offset_x ?? 0, -50, 50, 1, v => this._setMap(mapVac, { offset_x: v }), "%")}
+          ${this._numberSlider("Offset Y", map.offset_y ?? 0, -50, 50, 1, v => this._setMap(mapVac, { offset_y: v }), "%")}
+
+          ${rooms.length ? b `
+            <div class="section-title">Room positions</div>
+            <p class="hint">${this._mapRoom !== null
+            ? "Click the map to move the selected room. Click the dot to deselect."
+            : "Select a room below, then click the map to set its position."}</p>
+            <div class="pill-row">
+              ${rooms.map((r, ri) => b `
+                <button class="room-pill ${ri === this._mapRoom ? "room-pill--active" : ""}"
+                  @click=${() => { this._mapRoom = ri === this._mapRoom ? null : ri; }}>
+                  <ha-icon icon=${r.icon || "mdi:square"} style="--mdc-icon-size:13px"></ha-icon>
+                  ${r.name || r.key || "Room " + (ri + 1)}
+                </button>`)}
+            </div>
+
+            ${this._mapRoom !== null ? b `
+              <div class="section-title" style="margin-top:4px">Position</div>
+              ${this._numberSlider("X", rooms[this._mapRoom]?.map_x ?? 50, 0, 100, 1, v => this._setRoom(mapVac, this._mapRoom, { map_x: v }), "%")}
+              ${this._numberSlider("Y", rooms[this._mapRoom]?.map_y ?? 50, 0, 100, 1, v => this._setRoom(mapVac, this._mapRoom, { map_y: v }), "%")}
+
+              <div class="section-title" style="margin-top:4px">Overlay mode</div>
+              ${(() => {
+            const room = rooms[this._mapRoom];
+            return room?.map_w !== undefined ? b `
+                  ${this._numberSlider("Width", room.map_w, 1, 100, 1, v => this._setRoom(mapVac, this._mapRoom, { map_w: v }), "%")}
+                  ${this._numberSlider("Height", room.map_h ?? 15, 1, 100, 1, v => this._setRoom(mapVac, this._mapRoom, { map_h: v }), "%")}
+                  <button class="btn btn--sm" style="align-self:flex-start"
+                    @click=${() => this._setRoom(mapVac, this._mapRoom, { map_w: undefined, map_h: undefined })}>
+                    Switch to point mode
+                  </button>
+                ` : b `
+                  <button class="btn btn--add btn--sm" style="align-self:flex-start"
+                    @click=${() => this._setRoom(mapVac, this._mapRoom, { map_w: 20, map_h: 15 })}>
+                    <ha-icon icon="mdi:rectangle-outline"></ha-icon> Enable rectangle overlay
+                  </button>
+                `;
+        })()}
+
+              <div class="section-title" style="margin-top:4px">Icon</div>
+              ${this._iconPickerField(rooms[this._mapRoom]?.icon, v => this._setRoom(mapVac, this._mapRoom, { icon: v }))}
+              ${rooms[this._mapRoom]?.icon ? b `
+                <div class="field">
+                  <label>Icon position</label>
+                  <div class="anchor-picker">
+                    ${["tl", "t", "tr", "l", "c", "r", "bl", "b", "br"].map(pos => {
+            const lbl = { tl: "↖", t: "↑", tr: "↗", l: "←", c: "·", r: "→", bl: "↙", b: "↓", br: "↘" };
+            return b `<button
+                        class="anchor-cell ${(rooms[this._mapRoom]?.icon_anchor ?? "c") === pos ? "anchor-cell--active" : ""}"
+                        title=${pos}
+                        @click=${() => this._setRoom(mapVac, this._mapRoom, { icon_anchor: pos })}>
+                        ${lbl[pos]}
+                      </button>`;
+        })}
+                  </div>
+                  <button class="btn btn--sm" style="margin-top:4px;align-self:flex-start"
+                    @click=${() => this._setRoom(mapVac, this._mapRoom, { icon_anchor: "none" })}>
+                    Hide icon in overlay
+                  </button>
+                </div>
+              ` : A}
+            ` : A}
+          ` : b `<p class="hint">Add rooms in the Vacuums tab to position them here.</p>`}
+        ` : b `<p class="hint">Select a map entity above to enable the calibration preview.</p>`}
+
+      </div>`;
+    }
+    // ── Script YAML generator ───────────────────────────────────────────────────
+    _generateNotifyScriptYaml() {
+        const cfg = this._config.notify_script;
+        if (!cfg?.entity)
+            return "";
+        const v = cfg.vars ?? {};
+        const e = cfg.gen_events ?? {};
+        const hasStart = e.on_start !== false;
+        const hasFinish = e.on_finish !== false;
+        const hasError = e.on_error !== false;
+        const inclLabel = v.vacuum_label !== false;
+        const inclRooms = v.room_labels !== false;
+        const inclKeys = v.room_keys === true;
+        const inclMins = v.estimated_mins !== false;
+        const inclType = v.clean_type !== false;
+        const lines = [];
+        const L = (s) => lines.push(s);
+        const scriptName = cfg.entity.startsWith("script.") ? cfg.entity.slice(7) : cfg.entity;
+        L(`alias: ${scriptName}`);
+        L(`description: Generováno z anyvac-card`);
+        L(`mode: parallel`);
+        L(`max: 3`);
+        L(`fields:`);
+        L(`  vacuum_entity:`);
+        L(`    required: true`);
+        L(`    description: "Vysavač entity ID"`);
+        if (inclLabel) {
+            L(`  vacuum_label:`);
+            L(`    required: true`);
+        }
+        if (inclRooms) {
+            L(`  room_labels:`);
+            L(`    required: true`);
+        }
+        if (inclKeys) {
+            L(`  room_keys:`);
+            L(`    required: false`);
+        }
+        if (inclMins) {
+            L(`  estimated_mins:`);
+            L(`    required: true`);
+        }
+        if (inclType) {
+            L(`  clean_type:`);
+            L(`    required: true`);
+        }
+        L(`sequence:`);
+        L(`  - variables:`);
+        L(`      vac_id: "{{ vacuum_entity.split('.')[1] }}"`);
+        if (inclType) {
+            L(`      is_wet: "{{ clean_type == 'wet' }}"`);
+            L(`      emoji: "{{ '\u{1FAE7}' if is_wet else '\u{1F9F9}' }}"`);
+            L(`      clean_word: "{{ 'mopování' if is_wet else 'úklid' }}"`);
+        }
+        if (hasStart) {
+            const title = (inclType ? "{{ emoji }} " : "") +
+                (inclLabel ? "{{ vacuum_label }}" : "Vysavač") +
+                (inclType ? " – {{ clean_word }} zahájen" : " – úklid zahájen");
+            const msgParts = [
+                ...(inclRooms ? ["{{ room_labels }}"] : []),
+                ...(inclMins ? ["(~{{ estimated_mins }} min)"] : []),
+            ];
+            L(``);
+            L(`  # --- Zahájení ---`);
+            L(`  - action: notify.notify  # TODO: nahraď svým notify service`);
+            L(`    data:`);
+            L(`      title: "${title}"`);
+            L(`      message: "${msgParts.join(" ")}"`);
+        }
+        if (hasFinish || hasError) {
+            L(``);
+            L(`  # --- Čekání na výsledek ---`);
+            L(`  - wait_for_trigger:`);
+            if (hasFinish) {
+                L(`      - trigger: state`);
+                L(`        entity_id: "{{ vacuum_entity }}"`);
+                L(`        to:`);
+                L(`          - docked`);
+                L(`          - charging`);
+                L(`        for:`);
+                L(`          minutes: 1`);
+            }
+            if (hasError) {
+                L(`      - trigger: state`);
+                L(`        entity_id: "{{ vacuum_entity }}"`);
+                L(`        to: error`);
+            }
+            L(`    timeout:`);
+            L(`      hours: 4`);
+            L(`    continue_on_timeout: false`);
+            L(``);
+            L(`  - variables:`);
+            L(`      final_state: "{{ wait.trigger.to_state.state if wait.trigger is not none else 'timeout' }}"`);
+            if (hasFinish) {
+                L(`      begin_ts: "{{ states('sensor.' ~ vac_id ~ '_last_clean_begin') }}"`);
+                L(`      end_ts: "{{ states('sensor.' ~ vac_id ~ '_last_clean_end') }}"`);
+                L(`      actual_minutes: >-`);
+                L(`        {% if begin_ts not in ['unknown','unavailable'] and end_ts not in ['unknown','unavailable'] %}`);
+                L(`          {{ (((end_ts | as_datetime) - (begin_ts | as_datetime)).total_seconds() / 60) | round(0) }}`);
+                L(`        {% else %}`);
+                L(`          0`);
+                L(`        {% endif %}`);
+            }
+            const labelPart = inclLabel ? "{{ vacuum_label }}" : "Vysavač";
+            const finishTitle = (inclType ? "{{ emoji }} " : "") + labelPart +
+                (inclType ? " – {{ clean_word }} dokončen" : " – úklid dokončen");
+            const finishMsg = [
+                ...(inclRooms ? ["{{ room_labels }}"] : []),
+                "Trvalo to {{ actual_minutes }} min.",
+            ].join(" ");
+            if (hasFinish && hasError) {
+                L(``);
+                L(`  - choose:`);
+                L(`      - conditions:`);
+                L(`          - condition: template`);
+                L(`            value_template: "{{ final_state == 'error' }}"`);
+                L(`        sequence:`);
+                L(`          - variables:`);
+                L(`              current_room: "{{ states('sensor.' ~ vac_id ~ '_current_room') }}"`);
+                L(`          - action: notify.notify  # TODO`);
+                L(`            data:`);
+                L(`              title: "⚠️ ${labelPart} – problém"`);
+                L(`              message: "Místnost: {{ current_room }}. Zkontroluj vysavač."`);
+                L(`      - conditions:`);
+                L(`          - condition: template`);
+                L(`            value_template: "{{ final_state in ['docked', 'charging'] }}"`);
+                L(`        sequence:`);
+                L(`          - action: notify.notify  # TODO`);
+                L(`            data:`);
+                L(`              title: "${finishTitle}"`);
+                L(`              message: "${finishMsg}"`);
+            }
+            else if (hasError) {
+                L(``);
+                L(`  - condition: template`);
+                L(`    value_template: "{{ final_state == 'error' }}"`);
+                L(`  - variables:`);
+                L(`      current_room: "{{ states('sensor.' ~ vac_id ~ '_current_room') }}"`);
+                L(`  - action: notify.notify  # TODO`);
+                L(`    data:`);
+                L(`      title: "⚠️ ${labelPart} – problém"`);
+                L(`      message: "Místnost: {{ current_room }}. Zkontroluj vysavač."`);
+            }
+            else if (hasFinish) {
+                L(``);
+                L(`  - condition: template`);
+                L(`    value_template: "{{ final_state in ['docked', 'charging'] }}"`);
+                L(`  - action: notify.notify  # TODO`);
+                L(`    data:`);
+                L(`      title: "${finishTitle}"`);
+                L(`      message: "${finishMsg}"`);
+            }
+        }
+        return lines.join("\n");
+    }
+    // ── Tab: Global ───────────────────────────────────────────────────────────
+    _renderGlobalTab() {
+        const globals = this._config.global_actions ?? [];
+        const ths = this._config.room_thresholds ?? DEFAULT_THRESHOLDS;
+        return b `
+      <div class="tab-body">
+
+        <div class="section-title">Global actions</div>
+        <p class="hint">Badges that trigger a script across all vacuums (e.g. "Clean whole flat").</p>
+        ${globals.length === 0
+            ? b `<p class="hint">None configured.</p>`
+            : globals.map((ga, i) => this._renderGlobalAccordion(ga, i))}
+        <button class="btn btn--add" @click=${() => this._addGlobal()}>
+          <ha-icon icon="mdi:plus"></ha-icon> Add global action
+        </button>
+
+        <div class="section-title" style="margin-top:4px">Room appearance</div>
+        <p class="hint">Applies to all vacuums.</p>
+        <div class="field field--row">
+          <label>Hide room icons</label>
+          <label class="toggle-wrap">
+            <input type="checkbox" class="toggle-input"
+              .checked=${this._config.room_icon_hidden ?? false}
+              @change=${(e) => this._setConfig({ room_icon_hidden: e.target.checked || undefined })} />
+            <span class="toggle-track"></span>
+          </label>
+        </div>
+        ${this._numberSlider("Border (idle)", this._config.room_border_normal ?? 2, 0, 12, 1, v => this._setConfig({ room_border_normal: v }), "px")}
+        ${this._numberSlider("Border (selected)", this._config.room_border_selected ?? 4, 0, 12, 1, v => this._setConfig({ room_border_selected: v }), "px")}
+
+        <div class="section-title" style="margin-top:4px">Thresholds (border colour by last clean age)</div>
+        <p class="hint">Rules ascending — first match wins. Beyond the last = red.</p>
+        ${ths.map((th, ti) => b `
+          <div class="var-row threshold-row">
+            <span class="threshold-label">≤</span>
+            <input type="number" class="text-input text-input--sm threshold-days"
+              min="0" max="365" .value=${String(th.days)}
+              @change=${(e) => {
+            const days = parseInt(e.target.value);
+            const next = ths.map((t, i) => i === ti ? { ...t, days: isNaN(days) ? t.days : days } : t);
+            this._setConfig({ room_thresholds: next });
+        }} />
+            <span class="threshold-label">days</span>
+            <input type="color" class="threshold-color" .value=${th.color}
+              @input=${(e) => {
+            const color = e.target.value;
+            const next = ths.map((t, i) => i === ti ? { ...t, color } : t);
+            this._setConfig({ room_thresholds: next });
+        }} />
+            <button class="icon-btn icon-btn--danger icon-btn--sm"
+              @click=${() => {
+            const next = ths.filter((_, i) => i !== ti);
+            this._setConfig({ room_thresholds: next.length ? next : undefined });
+        }}>
+              <ha-icon icon="mdi:close"></ha-icon>
+            </button>
+          </div>`)}
+        <div style="display:flex;gap:8px;flex-wrap:wrap">
+          <button class="btn btn--add btn--sm" @click=${() => this._setConfig({ room_thresholds: [...ths, { days: 14, color: "#ff4d4f" }] })}>
+            <ha-icon icon="mdi:plus"></ha-icon> Add threshold
+          </button>
+          ${this._config.room_thresholds ? b `
+            <button class="btn btn--sm" @click=${() => this._setConfig({ room_thresholds: undefined })}>
+              Reset to defaults
+            </button>
+          ` : A}
+        </div>
+
+        ${(() => {
+            const notify = this._config.notify;
+            const START_TOKENS = '{{ vacuum_label }}, {{ room_labels }}, {{ room_keys }}, {{ estimated_mins }}, {{ clean_type }}';
+            const FINISH_TOKENS = START_TOKENS + ', {{ actual_mins }}, {{ success }}';
+            return b `
+            <div class="section-title" style="margin-top:4px">Notifications (Ticker) — legacy</div>
+            <p class="hint">Browser-side; consider the blueprint tracker below instead.</p>
+            <div class="field field--row">
+              <label>Enable</label>
+              <label class="toggle-wrap">
+                <input type="checkbox" class="toggle-input"
+                  .checked=${!!notify}
+                  @change=${(e) => {
+                if (e.target.checked) {
+                    this._setConfig({ notify: { category: 'Cleaning' } });
+                }
+                else {
+                    this._setConfig({ notify: undefined });
+                }
+            }} />
+                <span class="toggle-track"></span>
+              </label>
+            </div>
+            ${notify ? b `
+              ${this._textField('Category', notify.category, v => this._setNotify({ category: v }), 'e.g. Cleaning')}
+              <div class="field field--row">
+                <label>Color (dry)</label>
+                <input type="color" class="threshold-color" .value=${notify.color_dry ?? '#4CAF50'}
+                  @input=${(e) => this._setNotify({ color_dry: e.target.value })} />
+              </div>
+              <div class="field field--row">
+                <label>Color (wet)</label>
+                <input type="color" class="threshold-color" .value=${notify.color_wet ?? '#2196F3'}
+                  @input=${(e) => this._setNotify({ color_wet: e.target.value })} />
+              </div>
+              ${this._textField('Tag prefix', notify.tag_prefix, v => this._setNotify({ tag_prefix: v || undefined }), 'e.g. roborock')}
+              <div class="sub-title">On clean start</div>
+              ${this._textField('Title', notify.on_start?.title, v => this._setNotifyTemplate('on_start', { title: v || undefined }), '🧹 {{ vacuum_label }}')}
+              ${this._textField('Message', notify.on_start?.message, v => this._setNotifyTemplate('on_start', { message: v || undefined }), '{{ room_labels }} · ~{{ estimated_mins }} min')}
+              <p class="hint">Tokens: ${START_TOKENS}</p>
+              <div class="sub-title">On clean finish</div>
+              ${this._textField('Title', notify.on_finish?.title, v => this._setNotifyTemplate('on_finish', { title: v || undefined }), '✅ {{ vacuum_label }} hotovo')}
+              ${this._textField('Message', notify.on_finish?.message, v => this._setNotifyTemplate('on_finish', { message: v || undefined }), '{{ room_labels }} · {{ actual_mins }} min')}
+              <p class="hint">Tokens: ${FINISH_TOKENS}</p>
+            ` : A}
+          `;
+        })()}
+
+        ${(() => {
+            const nsCfg = this._config.notify_script;
+            const nsVars = nsCfg?.vars ?? {};
+            const nsEvts = nsCfg?.gen_events ?? {};
+            const VAR_DEFS = [
+                ["vacuum_label", "Název vysavače", true],
+                ["room_labels", "Místnosti (text)", true],
+                ["room_keys", "Místnosti (klíče)", false],
+                ["estimated_mins", "Odhadovaný čas", true],
+                ["clean_type", "Typ úklidu (wet/dry)", true],
+            ];
+            const EVT_DEFS = [
+                ["on_start", "Zahájení úklidu"],
+                ["on_finish", "Dokončení úklidu"],
+                ["on_error", "Chyba / problém"],
+            ];
+            return b `
+            <div class="section-title" style="margin-top:4px">Script notifikací</div>
+            <p class="hint">
+              Karta při startu úklidu zavolá HA skript a předá mu vybraný kontext.
+              Skript pak běží server-side &mdash; nezávisle na otevřeném dashboardu.
+            </p>
+            <div class="field field--row">
+              <label>Povolit</label>
+              <label class="toggle-wrap">
+                <input type="checkbox" class="toggle-input"
+                  .checked=${!!nsCfg}
+                  @change=${(e) => {
+                if (e.target.checked) {
+                    this._setConfig({ notify_script: { entity: "script.vakuum_notifikace_uklid" } });
+                }
+                else {
+                    this._setConfig({ notify_script: undefined });
+                    this._scriptPreviewOpen = false;
+                }
+            }} />
+                <span class="toggle-track"></span>
+              </label>
+            </div>
+            ${nsCfg ? b `
+              ${this._textField("Script entity", nsCfg.entity, v => this._setNotifyScript({ entity: v }), "script.vakuum_notifikace_uklid")}
+
+              <div class="sub-title">Události v generovaném skriptu</div>
+              ${EVT_DEFS.map(([key, label]) => {
+                const checked = nsEvts[key] !== false;
+                return b `
+                  <div class="field field--row">
+                    <label>${label}</label>
+                    <label class="toggle-wrap">
+                      <input type="checkbox" class="toggle-input"
+                        .checked=${checked}
+                        @change=${(e) => {
+                    const val = e.target.checked;
+                    this._setNotifyScript({ gen_events: { ...nsEvts, [key]: val } });
+                }} />
+                      <span class="toggle-track"></span>
+                    </label>
+                  </div>`;
+            })}
+
+              <div class="sub-title">Proměnné předávané skriptu</div>
+              ${VAR_DEFS.map(([key, label, defaultOn]) => {
+                const checked = defaultOn ? nsVars[key] !== false : nsVars[key] === true;
+                return b `
+                  <div class="field field--row">
+                    <label>${label} <code style="font-size:10px">${key}</code></label>
+                    <label class="toggle-wrap">
+                      <input type="checkbox" class="toggle-input"
+                        .checked=${checked}
+                        @change=${(e) => {
+                    const val = e.target.checked;
+                    this._setNotifyScript({ vars: { ...nsVars, [key]: val } });
+                }} />
+                      <span class="toggle-track"></span>
+                    </label>
+                  </div>`;
+            })}
+
+              <button class="btn btn--sm" style="align-self:flex-start"
+                @click=${() => { this._scriptPreviewOpen = !this._scriptPreviewOpen; }}>
+                <ha-icon icon=${this._scriptPreviewOpen ? "mdi:code-tags-check" : "mdi:code-tags"}></ha-icon>
+                ${this._scriptPreviewOpen ? "Skrýt generovaný skript" : "Zobrazit generovaný skript"}
+              </button>
+              ${this._scriptPreviewOpen ? b `
+                <div style="position:relative">
+                  <pre class="yaml-preview">${this._generateNotifyScriptYaml()}</pre>
+                  <button class="btn btn--sm" style="position:absolute;top:6px;right:6px"
+                    @click=${async () => {
+                try {
+                    await navigator.clipboard.writeText(this._generateNotifyScriptYaml());
+                }
+                catch { /* clipboard unavailable */ }
+            }}>
+                    <ha-icon icon="mdi:content-copy"></ha-icon> Kopírovat
+                  </button>
+                </div>
+              ` : A}
+            ` : A}
+          `;
+        })()}
+
+        ${this._renderBackendSection()}
+
+        ${(() => {
+            const usesAreaMappings = this._config.vacuums.some(v => v.clean_action?.type === "native-area" || v.clean_action?.type === "native-auto");
+            if (!usesAreaMappings)
+                return A;
+            const allKeys = [...new Set(this._config.vacuums.flatMap(v => (v.rooms ?? []).map(r => r.key)).filter(Boolean))].sort();
+            const mappings = this._config.area_mappings ?? {};
+            return b `
+            <div class="section-title" style="margin-top:4px">Area mappings</div>
+            <p class="hint">Maps room keys to HA areas for the <strong>native-area</strong> and <strong>native-auto</strong> strategies. Set once here — applies to all vacuums.</p>
+            ${allKeys.length === 0
+                ? b `<p class="hint">No rooms configured yet.</p>`
+                : allKeys.map(key => this._areaPicker(key, mappings[key], v => {
+                    const next = { ...mappings };
+                    if (v)
+                        next[key] = v;
+                    else
+                        delete next[key];
+                    this._setConfig({ area_mappings: Object.keys(next).length ? next : undefined });
+                }))}
+          `;
+        })()}
+
+      </div>`;
+    }
+    // ── Backend tracking section ──────────────────────────────────────────────
+    _renderBackendSection() {
+        const b$1 = this._config.backend ?? {};
+        const automationEntity = this._trackerAutomation();
+        const bpLabel = this._bpStatus === "unknown" ? "⏳ checking…" :
+            this._bpStatus === "current" ? "✅ installed (v" + BLUEPRINT_VERSION + ")" :
+                this._bpStatus === "outdated" ? "⚠️ installed — update available (v" + BLUEPRINT_VERSION + ")" :
+                    "❌ not installed";
+        return b `
+      <div class="section-title" style="margin-top:4px">Backend tracking (blueprint)</div>
+      <p class="hint">
+        Server-side cleaning tracker: a blueprint automation listens for the card's
+        <code>cleaning_started</code> event, waits for the vacuum to dock, writes per-room
+        last-clean timestamps and sends notifications — it works even when no dashboard
+        is open. Recommended over the Ticker/script notifications above.
+      </p>
+
+      <div class="field field--row">
+        <label>Blueprint</label>
+        <span style="font-size:13px">${bpLabel}</span>
+      </div>
+      <div class="field field--row">
+        <label>Automation</label>
+        <span style="font-size:13px">${automationEntity
+            ? b `✅ <code>${automationEntity}</code>`
+            : "❌ not created"}</span>
+      </div>
+
+      ${this._textField("Notify action", b$1.notify_service, v => this._setBackend({ notify_service: v || undefined }), "notify.mobile_app_phone")}
+      ${[
+            ["notify_on_start", "Notify on start"],
+            ["notify_on_finish", "Notify on finish"],
+            ["notify_on_error", "Notify on error"],
+        ].map(([key, label]) => b `
+        <div class="field field--row">
+          <label>${label}</label>
+          <label class="toggle-wrap">
+            <input type="checkbox" class="toggle-input"
+              .checked=${b$1[key] !== false}
+              @change=${(e) => this._setBackend({ [key]: e.target.checked })} />
+            <span class="toggle-track"></span>
+          </label>
+        </div>`)}
+      <div class="field field--row">
+        <label>Single-room calibration</label>
+        <label class="toggle-wrap">
+          <input type="checkbox" class="toggle-input"
+            .checked=${this._config.single_room_time ?? false}
+            @change=${(e) => this._setConfig({
+            single_room_time: e.target.checked || undefined
+        })} />
+          <span class="toggle-track"></span>
+        </label>
+      </div>
+      <p class="hint">
+        Single-room calibration: when a run cleaned exactly one room, the measured duration
+        is written into that room's clean-time helper. Applied by the card and by the
+        blueprint (re-deploy the automation after changing).
+      </p>
+
+      <div style="display:flex;gap:8px;flex-wrap:wrap">
+        <button class="btn btn--add btn--sm" ?disabled=${this._bpBusy !== null}
+          @click=${() => this._installBlueprint()}>
+          <ha-icon icon="mdi:download"></ha-icon>
+          ${this._bpBusy === "blueprint" ? "Installing…"
+            : this._bpStatus === "current" ? "Reinstall blueprint"
+                : this._bpStatus === "outdated" ? "Update blueprint"
+                    : "Install blueprint"}
+        </button>
+        <button class="btn btn--add btn--sm"
+          ?disabled=${this._bpBusy !== null || this._bpStatus === "missing"}
+          @click=${() => this._deployAutomation()}>
+          <ha-icon icon="mdi:robot"></ha-icon>
+          ${this._bpBusy === "automation" ? "Deploying…"
+            : automationEntity ? "Update automation" : "Create automation"}
+        </button>
+        <button class="btn btn--sm" ?disabled=${this._bpBusy !== null}
+          @click=${() => { this._bpStatus = "unknown"; this._bpMsg = null; }}>
+          <ha-icon icon="mdi:refresh"></ha-icon> Refresh
+        </button>
+      </div>
+      ${this._bpMsg ? b `<p class="hint">${this._bpMsg}</p>` : A}
+
+      <button class="btn btn--sm" style="align-self:flex-start"
+        @click=${() => { this._bpYamlOpen = !this._bpYamlOpen; }}>
+        <ha-icon icon=${this._bpYamlOpen ? "mdi:code-tags-check" : "mdi:code-tags"}></ha-icon>
+        ${this._bpYamlOpen ? "Hide blueprint YAML" : "Show blueprint YAML (manual install)"}
+      </button>
+      ${this._bpYamlOpen ? b `
+        <div style="position:relative">
+          <pre class="yaml-preview">${BLUEPRINT_YAML}</pre>
+          <button class="btn btn--sm" style="position:absolute;top:6px;right:6px"
+            @click=${async () => {
+            try {
+                await navigator.clipboard.writeText(BLUEPRINT_YAML);
+            }
+            catch { /* clipboard unavailable */ }
+        }}>
+            <ha-icon icon="mdi:content-copy"></ha-icon> Copy
+          </button>
+        </div>
+      ` : A}
+    `;
+    }
+    _renderGlobalAccordion(ga, idx) {
+        const color = COLOR_HEX[ga.color ?? "orange"];
+        const isOpen = this._openGlobal.has(idx);
+        const action = ga.action;
+        const watches = ga.watch_entities ?? [];
+        return b `
+      <div class="acc-row" style=${o({ borderLeft: "3px solid " + color })}>
+        <div class="acc-header" @click=${() => this._toggleGlobal(idx)}>
+          ${ga.image
+            ? b `<img class="acc-img" src=${ga.image} alt=${ga.name} />`
+            : b `<ha-icon icon="mdi:home-floor-a" style=${o({ color, width: "36px", height: "36px" })}></ha-icon>`}
+          <div class="acc-info">
+            <span class="acc-name">${ga.name || "Unnamed action"}</span>
+            <span class="acc-sub">${action.type === "script" ? action.entity_id : action.service}</span>
+          </div>
+          <button class="icon-btn icon-btn--danger"
+            @click=${(e) => { e.stopPropagation(); this._deleteGlobal(idx); }}>
+            <ha-icon icon="mdi:delete"></ha-icon>
+          </button>
+          <ha-icon icon=${isOpen ? "mdi:chevron-up" : "mdi:chevron-down"} class="acc-chevron"></ha-icon>
+        </div>
+        ${isOpen ? b `
+          <div class="acc-body">
+            ${this._textField("Display name", ga.name, v => this._setGlobal(idx, { name: v }), "e.g. Whole flat")}
+            ${this._textField("Image path", ga.image, v => this._setGlobal(idx, { image: v || undefined }), "/local/...")}
+            ${this._selectField("Accent colour", ga.color ?? "orange", [{ value: "green", label: "Green" }, { value: "blue", label: "Blue" }, { value: "orange", label: "Orange" }], v => this._setGlobal(idx, { color: v }))}
+
+            <div class="sub-title">Watch entities (badge glows when any is cleaning)</div>
+            ${watches.map((e, wi) => b `
+              <div class="var-row">
+                <ha-entity-picker .hass=${this.hass} .value=${e} .includeDomains=${["vacuum"]}
+                  allow-custom-entity style="flex:1"
+                  @value-changed=${(ev) => {
+            const updated = [...watches];
+            updated[wi] = ev.detail.value;
+            this._setGlobal(idx, { watch_entities: updated.filter(Boolean) });
+        }}></ha-entity-picker>
+                <button class="icon-btn icon-btn--danger icon-btn--sm"
+                  @click=${() => this._setGlobal(idx, { watch_entities: watches.filter((_, i) => i !== wi) })}>
+                  <ha-icon icon="mdi:close"></ha-icon>
+                </button>
+              </div>`)}
+            <button class="btn btn--add btn--sm"
+              @click=${() => this._setGlobal(idx, { watch_entities: [...watches, ""] })}>
+              <ha-icon icon="mdi:plus"></ha-icon> Add entity
+            </button>
+
+            <div class="sub-title">Action (hold-to-activate)</div>
+            ${this._selectField("Type", action.type, [{ value: "script", label: "Script" }, { value: "service", label: "Service call" }], v => this._setGlobal(idx, { action: v === "script"
+                ? { type: "script", entity_id: "" }
+                : { type: "service", service: "" } }))}
+            ${action.type === "script"
+            ? this._entityPicker("Script entity", action.entity_id, ["script"], v => this._setGlobalAction(idx, { entity_id: v }))
+            : this._textField("Service", action.service, v => this._setGlobalAction(idx, { service: v }), "e.g. script.celkovy_uklid_bytu")}
+          </div>
+        ` : A}
+      </div>`;
+    }
+    // ── Main render ───────────────────────────────────────────────────────────
     render() {
         if (!this._config)
             return A;
         return b `
-      <div class="editor">
-        <div class="tabs">
-          ${["vacuums", "map", "presets", "global"].map((t) => b `<button class="tab ${this._tab === t ? "on" : ""}" @click=${() => (this._tab = t)}>${t}</button>`)}
-          <span class="ver">v${CARD_VERSION}</span>
+      <datalist id="ha-entities"></datalist>
+      <div class="editor-root">
+        <div class="tabs-bar">
+          ${["vacuums", "maps", "global"].map(t => b `
+            <button class="tab-btn ${this._tab === t ? "tab-btn--active" : ""}"
+              @click=${() => { this._tab = t; }}>
+              ${{ vacuums: "🤖 Vacuums", maps: "🗺 Maps", global: "⚙ Global" }[t]}
+            </button>`)}
         </div>
-        ${this._tab === "vacuums" ? this._renderVacuums() : A}
-        ${this._tab === "map" ? this._renderMap() : A}
-        ${this._tab === "presets" ? this._renderPresets() : A}
-        ${this._tab === "global" ? this._renderGlobal() : A}
-      </div>
-    `;
-    }
-    _vacPicker() {
-        const vacs = this._vacs();
-        if (vacs.length <= 1)
-            return A;
-        return b `
-      <label class="row">
-        <span>Vacuum</span>
-        <select @change=${(e) => (this._vacIndex = Number(this._val(e)))}>
-          ${vacs.map((v, i) => b `<option value=${i} ?selected=${i === this._vacIndex}>${v.name ?? v.entity}</option>`)}
-        </select>
-      </label>
-    `;
-    }
-    _renderVacuums() {
-        const vacs = this._vacs();
-        return b `
-      ${vacs.map((v, i) => b `
-          <div class="block">
-            <div class="block-head">
-              <strong>${v.name ?? (v.entity || `Vacuum ${i + 1}`)}</strong>
-              <button class="mini danger" @click=${() => this._removeVac(i)}>Remove</button>
-            </div>
-            <label class="row"><span>Entity</span>
-              <input type="text" .value=${v.entity ?? ""} placeholder="vacuum.s8"
-                @input=${(e) => this._updateVac(i, { entity: this._val(e) })} /></label>
-            <label class="row"><span>Name</span>
-              <input type="text" .value=${v.name ?? ""}
-                @input=${(e) => this._updateVac(i, { name: this._val(e) })} /></label>
-            <label class="row"><span>Base</span>
-              <select @change=${(e) => this._updateVac(i, { base: this._val(e) })}>
-                ${["image", "map", "combined"].map((b$1) => b `<option value=${b$1} ?selected=${(v.base ?? "image") === b$1}>${b$1}</option>`)}
-              </select></label>
-            <label class="row"><span>Image src</span>
-              <input type="text" .value=${v.image_base?.src ?? ""} placeholder="/local/anyvac/flat.svg"
-                @input=${(e) => this._updateImageBase(i, { src: this._val(e) })} /></label>
-            <label class="row"><span>Map entity</span>
-              <input type="text" .value=${v.map_source?.entity ?? ""} placeholder="camera.s8_map"
-                @input=${(e) => this._updateMapSource(i, { entity: this._val(e) })} /></label>
-            <label class="row"><span>Map kind</span>
-              <select @change=${(e) => this._updateMapSource(i, { kind: this._val(e) })}>
-                ${["roborock_image", "camera", "image_entity", "cloud_extractor", "valetudo"].map((k) => b `<option value=${k} ?selected=${(v.map_source?.kind ?? "roborock_image") === k}>${k}</option>`)}
-              </select></label>
-            <label class="row"><span>Clean strategy</span>
-              <select @change=${(e) => this._updateVac(i, { clean_strategy: this._val(e) })}>
-                ${["area", "segment", "script"].map((s) => b `<option value=${s} ?selected=${(v.clean_strategy ?? "area") === s}>${s}</option>`)}
-              </select></label>
-            ${(v.clean_strategy ?? "area") === "script"
-            ? b `<label class="row"><span>Clean script</span>
-                  <input type="text" .value=${v.clean_script ?? ""} placeholder="script.clean_s8"
-                    @input=${(e) => this._updateVac(i, { clean_script: this._val(e) })} /></label>`
-            : A}
-          </div>
-        `)}
-      <button class="add" @click=${() => this._addVac()}>+ Add vacuum</button>
-    `;
-    }
-    _renderMap() {
-        if (!this._vacs().length)
-            return b `<p class="hint">Add a vacuum first.</p>`;
-        const vi = this._vacIndex;
-        const ms = this._cfgVac(vi)?.map_source;
-        const regs = this._regions(vi);
-        return b `
-      ${this._vacPicker()}
-      <div class="block">
-        <div class="block-head"><strong>Map transform — rotate &amp; seat</strong></div>
-        <p class="hint">Live preview on the right updates as you change these.</p>
-        <div class="grid4">
-          <label><span>rotation°</span><input type="number" .value=${String(ms?.rotation ?? 0)}
-            @input=${(e) => this._updateMapSource(vi, { rotation: this._num(e) })} /></label>
-          <label><span>scale %</span><input type="number" .value=${String(ms?.scale ?? 100)}
-            @input=${(e) => this._updateMapSource(vi, { scale: this._num(e) })} /></label>
-          <label><span>offset x %</span><input type="number" .value=${String(ms?.offset_x ?? 0)}
-            @input=${(e) => this._updateMapSource(vi, { offset_x: this._num(e) })} /></label>
-          <label><span>offset y %</span><input type="number" .value=${String(ms?.offset_y ?? 0)}
-            @input=${(e) => this._updateMapSource(vi, { offset_y: this._num(e) })} /></label>
-        </div>
-      </div>
-      <p class="hint">Place clickable rooms on the base (percent of width/height). Map each to a HA Area for calibration-free cleaning.</p>
-      ${regs.map((r, ri) => b `
-          <div class="block">
-            <div class="block-head">
-              <strong>${r.name || r.id}</strong>
-              <button class="mini danger" @click=${() => this._removeRegion(vi, ri)}>Remove</button>
-            </div>
-            <label class="row"><span>Id</span>
-              <input type="text" .value=${r.id}
-                @input=${(e) => this._updateRegion(vi, ri, { id: this._val(e) })} /></label>
-            <label class="row"><span>Name</span>
-              <input type="text" .value=${r.name}
-                @input=${(e) => this._updateRegion(vi, ri, { name: this._val(e) })} /></label>
-            <label class="row"><span>HA Area id</span>
-              <input type="text" .value=${r.area_id ?? ""} placeholder="kitchen"
-                @input=${(e) => this._updateRegion(vi, ri, { area_id: this._val(e) })} /></label>
-            <label class="row"><span>Segment id</span>
-              <input type="number" .value=${r.segment_id ?? ""} placeholder="(fallback)"
-                @input=${(e) => this._updateRegion(vi, ri, { segment_id: this._num(e) })} /></label>
-            <label class="row"><span>Icon</span>
-              <input type="text" .value=${r.icon ?? ""} placeholder="mdi:silverware-fork-knife"
-                @input=${(e) => this._updateRegion(vi, ri, { icon: this._val(e) })} /></label>
-            <label class="row"><span>Shape</span>
-              <select @change=${(e) => this._setShapeKind(vi, ri, this._val(e))}>
-                <option value="rect" ?selected=${r.shape.kind === "rect"}>rect</option>
-                <option value="point" ?selected=${r.shape.kind === "point"}>point</option>
-              </select></label>
-            <div class="grid4">
-              <label><span>x%</span><input type="number" .value=${String(r.shape.x)}
-                @input=${(e) => this._setShapeCoord(vi, ri, "x", this._num(e))} /></label>
-              <label><span>y%</span><input type="number" .value=${String(r.shape.y)}
-                @input=${(e) => this._setShapeCoord(vi, ri, "y", this._num(e))} /></label>
-              ${r.shape.kind === "rect"
-            ? b `
-                    <label><span>w%</span><input type="number" .value=${String(r.shape.w)}
-                      @input=${(e) => this._setShapeCoord(vi, ri, "w", this._num(e))} /></label>
-                    <label><span>h%</span><input type="number" .value=${String(r.shape.h)}
-                      @input=${(e) => this._setShapeCoord(vi, ri, "h", this._num(e))} /></label>
-                  `
-            : A}
-            </div>
-          </div>
-        `)}
-      <button class="add" @click=${() => this._addRegion(vi)}>+ Add room</button>
-    `;
-    }
-    _renderPresets() {
-        if (!this._vacs().length)
-            return b `<p class="hint">Add a vacuum first.</p>`;
-        const vi = this._vacIndex;
-        const ps = this._presets(vi);
-        return b `
-      ${this._vacPicker()}
-      <p class="hint">1–3 presets per vacuum. "How" to clean, prepared once. Mark one as default.</p>
-      ${ps.map((p, pi) => b `
-          <div class="block">
-            <div class="block-head">
-              <strong>${p.name || p.id}</strong>
-              <button class="mini danger" @click=${() => this._removePreset(vi, pi)}>Remove</button>
-            </div>
-            <label class="row"><span>Name</span>
-              <input type="text" .value=${p.name}
-                @input=${(e) => this._updatePreset(vi, pi, { name: this._val(e) })} /></label>
-            <label class="row"><span>Icon</span>
-              <input type="text" .value=${p.icon ?? ""} placeholder="mdi:water"
-                @input=${(e) => this._updatePreset(vi, pi, { icon: this._val(e) })} /></label>
-            <label class="row"><span>Suction (fan_speed)</span>
-              <input type="text" .value=${p.suction ?? ""} placeholder="max"
-                @input=${(e) => this._updatePreset(vi, pi, { suction: this._val(e) })} /></label>
-            <label class="row"><span>Mop mode</span>
-              <input type="text" .value=${p.mop_mode ?? ""}
-                @input=${(e) => this._updatePreset(vi, pi, { mop_mode: this._val(e) })} /></label>
-            <label class="row"><span>Mop mode entity</span>
-              <input type="text" .value=${p.mop_mode_entity ?? ""} placeholder="select.s8_mop_mode"
-                @input=${(e) => this._updatePreset(vi, pi, { mop_mode_entity: this._val(e) })} /></label>
-            <label class="row"><span>Water</span>
-              <input type="text" .value=${p.water ?? ""}
-                @input=${(e) => this._updatePreset(vi, pi, { water: this._val(e) })} /></label>
-            <label class="row"><span>Water entity</span>
-              <input type="text" .value=${p.water_entity ?? ""} placeholder="select.s8_water"
-                @input=${(e) => this._updatePreset(vi, pi, { water_entity: this._val(e) })} /></label>
-            <label class="row"><span>Repeats</span>
-              <input type="number" min="1" .value=${String(p.repeats ?? 1)}
-                @input=${(e) => this._updatePreset(vi, pi, { repeats: this._num(e) })} /></label>
-            <label class="row check"><span>Default</span>
-              <input type="checkbox" .checked=${p.default ?? false}
-                @change=${(e) => this._updatePreset(vi, pi, { default: this._checked(e) })} /></label>
-          </div>
-        `)}
-      <button class="add" @click=${() => this._addPreset(vi)}>+ Add preset</button>
-    `;
-    }
-    _renderGlobal() {
-        const c = this._config;
-        return b `
-      <label class="row"><span>Region border (normal)</span>
-        <input type="number" .value=${String(c.region_border_normal ?? 2)}
-          @input=${(e) => this._update({ region_border_normal: this._num(e) })} /></label>
-      <label class="row"><span>Region border (selected)</span>
-        <input type="number" .value=${String(c.region_border_selected ?? 4)}
-          @input=${(e) => this._update({ region_border_selected: this._num(e) })} /></label>
-      <label class="row check"><span>Hide region icons</span>
-        <input type="checkbox" .checked=${c.region_icon_hidden ?? false}
-          @change=${(e) => this._update({ region_icon_hidden: this._checked(e) })} /></label>
-    `;
+        ${this._tab === "vacuums" ? this._renderVacuumsTab()
+            : this._tab === "maps" ? this._renderMapsTab()
+                : this._renderGlobalTab()}
+        <div class="editor-footer">anyvac-card v${CARD_VERSION}</div>
+      </div>`;
     }
 };
+// ── Styles ────────────────────────────────────────────────────────────────
 AnyVacCardEditor.styles = i$5 `
-    .editor { display: flex; flex-direction: column; gap: 10px; padding: 4px; }
-    .tabs { display: flex; gap: 4px; align-items: center; border-bottom: 1px solid rgba(127,127,127,0.25); padding-bottom: 6px; }
-    .tab { text-transform: capitalize; background: transparent; border: none; padding: 6px 10px; border-radius: 8px; cursor: pointer; font-weight: 600; color: inherit; opacity: 0.6; }
-    .tab.on { opacity: 1; background: rgba(59,130,246,0.12); }
-    .ver { margin-left: auto; font-size: 11px; opacity: 0.5; }
-    .block { border: 1px solid rgba(127,127,127,0.22); border-radius: 10px; padding: 10px; display: flex; flex-direction: column; gap: 6px; }
-    .block-head { display: flex; align-items: center; justify-content: space-between; }
-    .row { display: flex; align-items: center; gap: 8px; }
-    .row > span { flex: 0 0 130px; font-size: 13px; opacity: 0.85; }
-    .row.check { justify-content: flex-start; }
-    input, select { flex: 1 1 auto; padding: 6px 8px; border-radius: 7px; border: 1px solid rgba(127,127,127,0.35); background: var(--card-background-color, #fff); color: inherit; font: inherit; }
-    input[type="checkbox"] { flex: 0 0 auto; }
-    .grid4 { display: grid; grid-template-columns: repeat(4, 1fr); gap: 6px; }
-    .grid4 label { display: flex; flex-direction: column; gap: 2px; font-size: 12px; }
-    .grid4 span { opacity: 0.7; }
-    .add { align-self: flex-start; padding: 7px 12px; border-radius: 8px; border: 1px dashed rgba(127,127,127,0.5); background: transparent; color: inherit; cursor: pointer; font-weight: 600; }
-    .mini { padding: 3px 8px; border-radius: 6px; border: none; cursor: pointer; font-size: 12px; }
-    .mini.danger { background: rgba(255,77,79,0.15); color: #ff4d4f; }
-    .hint { margin: 0; font-size: 12px; opacity: 0.7; }
+    .editor-root { display:flex; flex-direction:column; }
+
+    /* ── Tabs ── */
+    .tabs-bar {
+      display:flex;
+      border-bottom:1px solid var(--divider-color,rgba(0,0,0,.12));
+      margin-bottom:2px;
+    }
+    .tab-btn {
+      flex:1; padding:10px 4px; background:none; border:none; cursor:pointer;
+      font-size:12px; font-weight:600; font-family:inherit;
+      color:var(--secondary-text-color);
+      border-bottom:2px solid transparent;
+      transition:color .15s, border-color .15s;
+    }
+    .tab-btn--active { color:var(--primary-color); border-bottom-color:var(--primary-color); }
+
+    /* ── Tab body ── */
+    .tab-body { display:flex; flex-direction:column; gap:8px; padding:10px 0 4px; }
+
+    /* ── YAML preview ── */
+    .yaml-preview {
+      background:var(--code-editor-background-color,#1e1e1e);
+      color:var(--code-editor-foreground-color,#d4d4d4);
+      padding:12px;
+      border-radius:6px;
+      font-size:11px;
+      line-height:1.6;
+      overflow-x:auto;
+      white-space:pre;
+      margin:0;
+      font-family:monospace;
+    }
+
+    /* ── Vacuum accordion ── */
+    .acc-row {
+      border-radius:10px;
+      border:1px solid var(--divider-color,rgba(0,0,0,.12));
+      background:var(--secondary-background-color);
+      overflow:hidden;
+    }
+    .acc-header {
+      display:flex; align-items:center; gap:8px;
+      padding:10px 10px 10px 12px; cursor:pointer;
+    }
+    .acc-header:hover { background:rgba(0,0,0,.03); }
+    .acc-img  { width:36px; height:36px; border-radius:50%; object-fit:cover; flex-shrink:0; }
+    .acc-info { flex:1; display:flex; flex-direction:column; min-width:0; }
+    .acc-name { font-weight:600; font-size:14px; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
+    .acc-sub  { font-size:11px; color:var(--secondary-text-color); white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
+    .acc-chevron { color:var(--secondary-text-color); flex-shrink:0; }
+    .acc-body {
+      padding:12px; display:flex; flex-direction:column; gap:8px;
+      border-top:1px solid var(--divider-color,rgba(0,0,0,.12));
+    }
+
+    /* ── Collapsible (sensors / clean action) ── */
+    .collapsible {
+      border-radius:6px; border:1px solid var(--divider-color,rgba(0,0,0,.1)); overflow:hidden;
+    }
+    .collapsible-header {
+      display:flex; align-items:center; gap:8px; padding:8px 10px; cursor:pointer;
+      background:rgba(0,0,0,.02);
+    }
+    .collapsible-header:hover { background:rgba(0,0,0,.05); }
+    .collapsible-title {
+      flex:1; font-size:11px; font-weight:700; letter-spacing:.7px;
+      text-transform:uppercase; color:var(--primary-color);
+    }
+    .collapsible-body { padding:10px; display:flex; flex-direction:column; gap:8px; }
+
+    .badge {
+      font-size:10px; font-weight:600; padding:2px 7px; border-radius:10px;
+      background:rgba(0,0,0,.07); color:var(--secondary-text-color);
+    }
+
+    /* ── Room accordion ── */
+    .room-acc {
+      border-radius:6px; border:1px solid var(--divider-color,rgba(0,0,0,.1));
+      background:rgba(0,0,0,.015); overflow:hidden;
+    }
+    .room-acc-header { display:flex; align-items:center; gap:8px; padding:8px 10px; cursor:pointer; }
+    .room-acc-header:hover { background:rgba(0,0,0,.04); }
+    .room-acc-icon { flex-shrink:0; }
+    .room-acc-info { flex:1; display:flex; flex-direction:column; }
+    .room-acc-name { font-weight:600; font-size:13px; }
+    .room-acc-meta { font-size:11px; color:var(--secondary-text-color); }
+    .room-acc-body {
+      padding:10px; display:flex; flex-direction:column; gap:8px;
+      border-top:1px solid var(--divider-color,rgba(0,0,0,.1));
+    }
+
+    /* ── Toggle switch ── */
+    .toggle-wrap { position:relative; display:inline-flex; align-items:center; cursor:pointer; }
+    .toggle-input { position:absolute; opacity:0; width:0; height:0; }
+    .toggle-track {
+      width:36px; height:20px; border-radius:10px;
+      background:var(--divider-color,rgba(0,0,0,.2)); transition:background .2s; position:relative;
+    }
+    .toggle-track::after {
+      content:""; position:absolute; top:2px; left:2px;
+      width:16px; height:16px; border-radius:50%; background:white; transition:transform .2s;
+    }
+    .toggle-input:checked + .toggle-track { background:var(--primary-color); }
+    .toggle-input:checked + .toggle-track::after { transform:translateX(16px); }
+
+    /* ── Map hint link ── */
+    .map-hint {
+      cursor:pointer; color:var(--primary-color) !important;
+      text-decoration:underline; text-underline-offset:2px;
+    }
+    .map-hint:hover { opacity:.8; }
+
+    /* ── Pill rows (Maps tab vacuum/room selectors) ── */
+    .pill-row { display:flex; gap:6px; flex-wrap:wrap; }
+    .vac-pill {
+      padding:5px 12px; border-radius:20px; font-size:12px; font-weight:600; cursor:pointer;
+      border:1px solid var(--divider-color,rgba(0,0,0,.15));
+      background:var(--secondary-background-color); color:var(--secondary-text-color);
+      font-family:inherit;
+    }
+    .vac-pill--active { background:var(--primary-color); color:white; border-color:var(--primary-color); }
+    .room-pill {
+      display:flex; align-items:center; gap:4px;
+      padding:4px 10px; border-radius:16px; font-size:12px; font-weight:500; cursor:pointer;
+      border:1px solid var(--divider-color,rgba(0,0,0,.15));
+      background:var(--secondary-background-color); color:var(--secondary-text-color);
+      font-family:inherit;
+    }
+    .room-pill--active { background:rgba(33,150,243,.12); color:var(--primary-color); border-color:var(--primary-color); }
+
+    /* ── Map preview ── */
+    .map-pos-container { border-radius:8px; overflow:hidden; }
+    .map-pos-container--active { cursor:crosshair; }
+    .map-preview-wrap {
+      position:relative; width:100%; padding-top:27.5%;
+      overflow:hidden; border-radius:8px; background:rgba(0,0,0,.06);
+    }
+    .map-preview-img { position:absolute; transform-origin:center center; object-fit:cover; }
+
+    .pos-dot {
+      position:absolute; transform:translate(-50%,-50%);
+      width:26px; height:26px; border-radius:6px;
+      background:rgba(0,0,0,.55); border:2px solid rgba(255,255,255,.4);
+      display:flex; align-items:center; justify-content:center;
+      color:rgba(255,255,255,.7); cursor:pointer;
+    }
+    .pos-dot--active { background:rgba(33,150,243,.75); border-color:#2196F3; color:white; }
+
+    .two-col { display:flex; gap:8px; }
+    .two-col > * { flex:1; min-width:0; }
+
+    /* ── Section title ── */
+    .section-title {
+      font-size:12px; font-weight:700; letter-spacing:.8px;
+      text-transform:uppercase; color:var(--primary-color);
+      border-bottom:1px solid var(--divider-color,rgba(0,0,0,.12));
+      padding-bottom:4px; margin-bottom:2px;
+    }
+    .sub-section {
+      display:flex; flex-direction:column; gap:8px;
+      padding-left:8px; border-left:3px solid var(--divider-color,rgba(0,0,0,.1));
+    }
+    .sub-title { font-size:11px; font-weight:600; color:var(--secondary-text-color); margin-top:4px; }
+
+    /* ── Fields ── */
+    .field { display:flex; flex-direction:column; gap:4px; }
+    .field--row { flex-direction:row; align-items:center; }
+    .field--row label { width:130px; flex-shrink:0; }
+    label { font-size:13px; color:var(--secondary-text-color); }
+    .required { color:var(--error-color,#f44336); }
+
+    .text-input {
+      width:100%; box-sizing:border-box; padding:8px 10px;
+      border:1px solid var(--divider-color,rgba(0,0,0,.2)); border-radius:6px;
+      background:var(--card-background-color); color:var(--primary-text-color);
+      font-size:13px; font-family:inherit;
+    }
+    .text-input--sm   { width:auto; flex:1; }
+    .text-input--half { flex:1; min-width:0; }
+
+    .select-input {
+      flex:1; padding:6px 8px;
+      border:1px solid var(--divider-color,rgba(0,0,0,.2)); border-radius:6px;
+      background:var(--card-background-color); color:var(--primary-text-color);
+      font-size:13px; font-family:inherit; cursor:pointer;
+    }
+
+    .slider-wrap { display:flex; align-items:center; gap:8px; flex:1; }
+    .slider { flex:1; accent-color:var(--primary-color); }
+    .slider-val { width:52px; text-align:right; font-size:13px; font-weight:600; color:var(--primary-color); flex-shrink:0; }
+
+    /* ── Buttons ── */
+    .btn {
+      display:flex; align-items:center; gap:6px;
+      padding:8px 14px; border-radius:8px;
+      cursor:pointer; font-size:13px; font-weight:600; font-family:inherit; border:none;
+    }
+    .btn--add {
+      background:rgba(33,150,243,.1); color:var(--primary-color);
+      border:1px dashed var(--primary-color) !important;
+    }
+    .btn--sm { padding:4px 10px; font-size:12px; }
+
+    .icon-btn {
+      display:flex; align-items:center; justify-content:center;
+      width:32px; height:32px; border-radius:6px;
+      cursor:pointer; background:transparent; border:none; color:var(--secondary-text-color);
+      flex-shrink:0;
+    }
+    .icon-btn:hover { background:rgba(0,0,0,.08); }
+    .icon-btn:disabled { opacity:.35; cursor:default; }
+    .icon-btn--danger { color:var(--error-color,#f44336); }
+    .icon-btn--sm { width:24px; height:24px; }
+
+    /* ── Misc ── */
+    .hint { font-size:12px; color:var(--secondary-text-color); margin:0; }
+
+    .editor-footer {
+      margin-top:8px; padding-top:6px;
+      border-top:1px solid var(--divider-color,rgba(0,0,0,.12));
+      font-size:11px; text-align:right;
+      color:var(--secondary-text-color); opacity:.7;
+    }
+
+    .var-row { display:flex; align-items:center; gap:6px; }
+    .var-sep { color:var(--secondary-text-color); flex-shrink:0; }
+
+    .anchor-picker { display:grid; grid-template-columns:repeat(3, 32px); gap:3px; }
+    .anchor-cell {
+      width:32px; height:32px; border-radius:6px; cursor:pointer;
+      background:var(--secondary-background-color);
+      border:1px solid var(--divider-color,rgba(0,0,0,.2));
+      font-size:15px; display:flex; align-items:center; justify-content:center;
+    }
+    .anchor-cell--active { background:var(--primary-color); color:white; border-color:var(--primary-color); }
+
+    .threshold-row { align-items:center; gap:6px; }
+    .threshold-label { font-size:12px; color:var(--secondary-text-color); flex-shrink:0; }
+    .threshold-days { width:56px !important; flex:none; padding:6px 8px; }
+    .threshold-color {
+      width:36px; height:28px; padding:2px; border-radius:6px;
+      border:1px solid var(--divider-color,rgba(0,0,0,.2));
+      background:var(--card-background-color); cursor:pointer;
+    }
   `;
 __decorate([
     n$1({ attribute: false })
@@ -1194,7 +3566,42 @@ __decorate([
 ], AnyVacCardEditor.prototype, "_tab", void 0);
 __decorate([
     r()
-], AnyVacCardEditor.prototype, "_vacIndex", void 0);
+], AnyVacCardEditor.prototype, "_openVac", void 0);
+__decorate([
+    r()
+], AnyVacCardEditor.prototype, "_openSensors", void 0);
+__decorate([
+    r()
+], AnyVacCardEditor.prototype, "_openAction", void 0);
+__decorate([
+    r()
+], AnyVacCardEditor.prototype, "_openGlobal", void 0);
+__decorate([
+    r()
+], AnyVacCardEditor.prototype, "_openRoom", void 0);
+__decorate([
+    r()
+], AnyVacCardEditor.prototype, "_scriptPreviewOpen", void 0);
+__decorate([
+    r()
+], AnyVacCardEditor.prototype, "_mapVac", void 0);
+__decorate([
+    r()
+], AnyVacCardEditor.prototype, "_mapRoom", void 0);
+__decorate([
+    r()
+], AnyVacCardEditor.prototype, "_bpStatus", void 0);
+__decorate([
+    r()
+], AnyVacCardEditor.prototype, "_bpBusy", void 0);
+__decorate([
+    r()
+], AnyVacCardEditor.prototype, "_bpMsg", void 0);
+__decorate([
+    r()
+], AnyVacCardEditor.prototype, "_bpYamlOpen", void 0);
 AnyVacCardEditor = __decorate([
-    t$1(EDITOR_TAG)
+    t$1(EDITOR_NAME)
 ], AnyVacCardEditor);
+
+export { AnyVacCard, AnyVacCardEditor };

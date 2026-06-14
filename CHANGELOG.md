@@ -6,24 +6,33 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
-### Added
+AnyVac Card is rebased on the proven `roborock-vacuum-card` codebase (renamed and re-homed),
+keeping its polished UI and editor as the foundation. New, vendor-agnostic functionality is layered
+on top from here.
 
-- **Universal contract (`types.ts`)** — vendor-agnostic card config and runtime `VacuumModel`
-  (capabilities / state / map / commands). Map source is format-agnostic and multi-source;
-  calibration is optional (advanced map only).
-- **Configurable image base** — custom photo / SVG floorplan, vacuum map, or `combined`.
-- **Map transform** — rotate, scale and offset (seat) the vacuum map within its frame, edited from
-  the editor's Map tab with live preview (parity with the original card's map placement tools).
-- **Calibration-free clickable rooms** — percentage rectangles / points placed over the base,
-  each mapped to a Home Assistant Area.
-- **Presets** — 1–3 named presets per vacuum (suction, mop mode/intensity, water, repeats),
-  decoupled from room selection; a per-vacuum default preset.
-- **Room cleaning** — defaults to native `vacuum.clean_area` (HA Areas, calibration-free),
-  with `app_segment_clean` and script strategies as alternatives.
-- **Basic control** — start / pause / stop / dock / locate, room selection and select-all.
-- **Status panel** — mapped status label + colour, battery, current room, error, progress.
-- **GUI editor** — tabbed (Vacuums / Map / Presets / Global).
-- **Full visual design** ported from the original card — pill vacuum badges (multi-vacuum switch),
-  dark glassy status card with the robot image, large status label, battery, progress bar, preset
-  chips, and hold-to-activate action buttons (START with per-room icons + all/none, Pause / Resume /
-  Dock / Locate) with the hold-ring fill animation.
+### Added (inherited from the original card)
+
+- **Multi-vacuum pill badges** — switch between vacuums; active/cleaning glow.
+- **Configurable map** — camera/image map entity with rotation / scale / offset **seating**
+  (slider-based in the editor, live preview).
+- **Clickable rooms** — rectangle and point overlays, click to select; editor "select a room,
+  click the map to place it" workflow.
+- **Per-room "last cleaned" thresholds** — colour by age (reads existing helper entities for now;
+  to be superseded by the companion integration).
+- **Clean strategies** — `native` (`app_segment_clean`), `native-area` (`vacuum.clean_area`),
+  `native-auto` (resolve segments via `roborock.get_maps`), `script`.
+- **Glassy status card** — robot image, status label + colour, battery, last-clean, current room,
+  error, progress.
+- **Hold-to-activate actions** — START (with per-room icons, time estimate, all/none), Pause /
+  Resume / Dock, with the hold-ring fill animation.
+- **Global actions** — whole-flat / cross-vacuum action badges.
+- **GUI editor** — three tabs (Vacuums / Maps / Global): sensors, clean-action editor, room
+  placement, map seating sliders, notifications and server-side tracker deploy.
+
+### Planned next
+
+- Graft the configurable **image base** (custom photo / SVG / WebP floorplan as the base layer,
+  alongside or instead of the vacuum map).
+- Milestone 2: calibrated interactive map (zones, pin & go, live robot position).
+- Milestone 3: companion `anyvac` integration (clean-history, statistics) replacing the
+  helper/blueprint backend.

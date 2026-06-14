@@ -1,2 +1,2 @@
-import "./anyvac-card";
-import "./editor";
+export { AnyVacCard } from "./anyvac-card";
+export { AnyVacCardEditor } from "./editor";

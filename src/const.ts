@@ -1,89 +1,102 @@
-import type { VacuumActivity } from "./types";
-
-/** Card build version — must match card/package.json. */
+export const CARD_NAME = "anyvac-card";
+export const EDITOR_NAME = "anyvac-card-editor";
 export const CARD_VERSION = "0.1.0";
 
-/** Custom element tags. */
-export const CARD_TAG = "anyvac-card";
-export const EDITOR_TAG = "anyvac-card-editor";
+/** Server-side tracking blueprint */
+export const BLUEPRINT_VERSION = "1.0.0";
+export const BLUEPRINT_PATH = "anyvac_card/cleaning_tracker.yaml";
+export const TRACKER_AUTOMATION_ID = "roborock_card_cleaning_tracker";
 
-/** Human-friendly name shown in the card picker. */
-export const CARD_NAME = "AnyVac Card";
-export const CARD_DESCRIPTION =
-  "Modern, universal card for robot vacuums — configurable image base, interactive map, value-add insights.";
-
-/** Default accent colour. */
-export const ACCENT = "#3b82f6";
-
-/** Hold duration (ms) reserved for hold-to-confirm actions. */
-export const HOLD_DURATION_MS = 500;
+/** Hold duration in ms required to trigger START / PAUSE actions */
+export const HOLD_DURATION_MS = 600;
 
 /**
- * Raw vendor status string -> [label, accent colour].
- * Roborock-centric for the MVP (S6 / S7 / S8). Unknown statuses fall back to
- * the raw string + default accent.
+ * Maps Roborock status strings to [human-readable label, accent colour].
+ * This unified map covers S6 / S7 / S8 MaxV Ultra.
  */
 export const STATUS_MAP: Readonly<Record<string, readonly [string, string]>> = {
-  cleaning:                    ["Cleaning", "#52c41a"],
-  segment_cleaning:            ["Cleaning rooms", "#52c41a"],
-  zoned_cleaning:              ["Zone cleaning", "#52c41a"],
-  spot_cleaning:               ["Spot cleaning", "#52c41a"],
-  starting:                    ["Starting", "#52c41a"],
-  segment_mopping:             ["Mopping rooms", "#40a9ff"],
-  zoned_mopping:               ["Zone mopping", "#40a9ff"],
-  robot_status_mopping:        ["Mopping", "#40a9ff"],
-  clean_mop_cleaning:          ["Vacuuming + mopping", "#52c41a"],
-  clean_mop_mopping:           ["Vacuuming + mopping", "#52c41a"],
-  washing_the_mop:             ["Washing mop", "#9254de"],
-  going_to_wash_the_mop:       ["Going to wash mop", "#9254de"],
-  air_drying_stopping:         ["Drying mop", "#9254de"],
-  returning_home:              ["Returning home", "#faad14"],
-  docking:                     ["Docking", "#faad14"],
-  going_to_target:             ["Going to target", "#40a9ff"],
-  charging:                    ["Charging", "rgba(160,160,160,0.9)"],
-  charging_complete:           ["Fully charged", "#52c41a"],
-  docked:                      ["Docked", "rgba(160,160,160,0.9)"],
-  emptying_the_bin:            ["Emptying bin", "#faad14"],
-  idle:                        ["Idle", "rgba(160,160,160,0.7)"],
-  paused:                      ["Paused", "#faad14"],
-  mapping:                     ["Mapping", "#40a9ff"],
-  updating:                    ["Updating", "#faad14"],
-  error:                       ["Error", "#ff4d4f"],
-  charging_problem:            ["Charging problem", "#ff4d4f"],
-  locked:                      ["Locked", "#ff4d4f"],
-  device_offline:              ["Offline", "#ff4d4f"],
+  // ── Dry cleaning ──────────────────────────────────────────────────────
+  cleaning:                         ["🧹 Cleaning",              "#52c41a"],
+  segment_cleaning:                 ["🧹 Cleaning rooms",        "#52c41a"],
+  zoned_cleaning:                   ["🧹 Zone cleaning",         "#52c41a"],
+  spot_cleaning:                    ["🎯 Spot cleaning",         "#52c41a"],
+  starting:                         ["▶️ Starting",              "#52c41a"],
+  // ── Wet / mop ────────────────────────────────────────────────────────
+  segment_mopping:                  ["🫧 Mopping rooms",         "#40a9ff"],
+  zoned_mopping:                    ["🫧 Zone mopping",          "#40a9ff"],
+  robot_status_mopping:             ["🫧 Mopping",               "#40a9ff"],
+  // ── Combined dry + wet ───────────────────────────────────────────────
+  clean_mop_cleaning:               ["🧹🫧 Vacuuming+mopping",  "#52c41a"],
+  clean_mop_mopping:                ["🧹🫧 Vacuuming+mopping",  "#52c41a"],
+  segment_clean_mop_cleaning:       ["🧹🫧 Rooms (vac)",        "#52c41a"],
+  segment_clean_mop_mopping:        ["🧹🫧 Rooms (mop)",        "#52c41a"],
+  zoned_clean_mop_cleaning:         ["🧹🫧 Zones (vac)",        "#52c41a"],
+  zoned_clean_mop_mopping:          ["🧹🫧 Zones (mop)",        "#52c41a"],
+  // ── Mop washing ──────────────────────────────────────────────────────
+  washing_the_mop:                  ["🚿 Washing mop",           "#9254de"],
+  washing_the_mop_2:                ["🚿 Washing mop",           "#9254de"],
+  going_to_wash_the_mop:            ["🚿 Going to wash mop",    "#9254de"],
+  air_drying_stopping:              ["💨 Drying mop",            "#9254de"],
+  back_to_dock_washing_duster:      ["🏠 Dock + washing",       "#faad14"],
+  // ── Navigation ───────────────────────────────────────────────────────
+  returning_home:                   ["🏠 Returning home",        "#faad14"],
+  docking:                          ["🏠 Docking",               "#faad14"],
+  going_to_target:                  ["🎯 Going to target",       "#40a9ff"],
+  // ── Docked / idle ────────────────────────────────────────────────────
+  charging:                         ["⚡ Charging",              "rgba(255,255,255,0.75)"],
+  charging_complete:                ["✅ Fully charged",          "#52c41a"],
+  docked:                           ["✅ Docked",                "rgba(255,255,255,0.75)"],
+  charger_disconnected:             ["🔌 Charger disconnected",  "#faad14"],
+  emptying_the_bin:                 ["🗑️ Emptying bin",          "#faad14"],
+  idle:                             ["💤 Idle",                  "rgba(255,255,255,0.45)"],
+  paused:                           ["⏸️ Paused",                "#faad14"],
+  // ── Special ──────────────────────────────────────────────────────────
+  mapping:                          ["🗺️ Mapping",               "#40a9ff"],
+  remote_control_active:            ["🕹️ Remote control",       "#40a9ff"],
+  manual_mode:                      ["🕹️ Manual mode",          "#40a9ff"],
+  updating:                         ["⬆️ Updating",              "#faad14"],
+  in_call:                          ["📞 In call",               "#faad14"],
+  shutting_down:                    ["⏹️ Shutting down",        "rgba(255,255,255,0.4)"],
+  // ── Error states ─────────────────────────────────────────────────────
+  error:                            ["❌ Error",                 "#ff4d4f"],
+  charging_problem:                 ["⚠️ Charging problem",     "#ff4d4f"],
+  locked:                           ["🔒 Locked",                "#ff4d4f"],
+  device_offline:                   ["📴 Offline",               "#ff4d4f"],
 };
 
-/** Vendor states that count as "actively cleaning". */
-export const CLEANING_STATES: ReadonlySet<string> = new Set([
-  "cleaning", "segment_cleaning", "zoned_cleaning", "spot_cleaning",
-  "segment_mopping", "zoned_mopping", "robot_status_mopping",
-  "clean_mop_cleaning", "clean_mop_mopping", "starting",
-]);
+/** Colour hex values for VacuumColor variants */
+export const COLOR_HEX: Record<string, string> = {
+  green:  "#52c41a",
+  blue:   "#2196F3",
+  orange: "#faad14",
+};
 
-/** Map a raw vendor status onto the normalized VacuumActivity. */
-export function normalizeActivity(status: string): VacuumActivity {
-  if (CLEANING_STATES.has(status)) return "cleaning";
-  switch (status) {
-    case "paused":
-      return "paused";
-    case "returning_home":
-    case "docking":
-    case "going_to_wash_the_mop":
-      return "returning";
-    case "charging":
-    case "charging_complete":
-      return "charging";
-    case "docked":
-      return "docked";
-    case "idle":
-      return "idle";
-    case "error":
-    case "charging_problem":
-    case "locked":
-    case "device_offline":
-      return "error";
-    default:
-      return "unknown";
-  }
-}
+/** rgba versions with reduced opacity for backgrounds */
+export const COLOR_BG: Record<string, string> = {
+  green:  "rgba(46,204,113,0.18)",
+  blue:   "rgba(33,150,243,0.18)",
+  orange: "rgba(250,173,20,0.18)",
+};
+
+export const COLOR_BG_ACTIVE: Record<string, string> = {
+  green:  "rgba(46,204,113,0.30)",
+  blue:   "rgba(33,150,243,0.30)",
+  orange: "rgba(250,173,20,0.30)",
+};
+
+/** Vacuum entity states that count as "actively cleaning" */
+export const CLEANING_STATES = new Set([
+  "cleaning",
+  "segment_cleaning",
+  "zoned_cleaning",
+  "spot_cleaning",
+  "segment_mopping",
+  "zoned_mopping",
+  "robot_status_mopping",
+  "clean_mop_cleaning",
+  "clean_mop_mopping",
+  "segment_clean_mop_cleaning",
+  "segment_clean_mop_mopping",
+  "zoned_clean_mop_cleaning",
+  "zoned_clean_mop_mopping",
+]);
