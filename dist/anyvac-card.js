@@ -202,6 +202,7 @@ let AnyVacCard = class AnyVacCard extends i$2 {
         ];
         this._calibMsg = "";
         this._calibCur = { x: 25500, y: 25500 };
+        this._calibCandIdx = 0;
         /** Výběr místností — drží se lokálně v kartě (bez potřeby input_boolean helper entity) */
         this._localRoomSel = new Map();
         /** Aktivní úklidy — sledování průběhu pro vyhodnocení úspěchu */
@@ -1144,6 +1145,7 @@ let AnyVacCard = class AnyVacCard extends i$2 {
         this._calibPts = [];
         this._calibStep = 0;
         this._calibMsg = "";
+        this._calibCandIdx = 0;
         this._calibCur = { ...this._calibTargets[0] };
         this._mapMode = "calib";
         this._modeEntity = vac.entity;
@@ -1153,11 +1155,24 @@ let AnyVacCard = class AnyVacCard extends i$2 {
         if (ent)
             void this.hass.callService("homeassistant", "update_entity", { entity_id: ent });
     }
-    _calibCloser(vac) {
+    _calibCandidate() {
         const dock = this._calibTargets[0];
-        this._calibCur = { x: dock.x + (this._calibCur.x - dock.x) * 0.6, y: dock.y + (this._calibCur.y - dock.y) * 0.6 };
+        const dirs = [[1, 0], [0, 1], [-1, 0], [0, -1], [0.71, 0.71], [-0.71, 0.71], [0.71, -0.71], [-0.71, -0.71]];
+        const radii = [2200, 1500, 900];
+        const total = dirs.length * radii.length;
+        const i = ((this._calibCandIdx % total) + total) % total;
+        const r = radii[Math.floor(i / dirs.length)];
+        const d = dirs[i % dirs.length];
+        return { x: Math.round(dock.x + d[0] * r), y: Math.round(dock.y + d[1] * r) };
+    }
+    _calibProbe(vac) {
+        this._calibCur = this._calibCandidate();
         void this._gotoMm(vac.entity, this._calibCur);
         window.setTimeout(() => this._refreshMap(vac), 4000);
+    }
+    _calibAnother(vac) {
+        this._calibCandIdx += 1;
+        this._calibProbe(vac);
     }
     _onMapClick(vac, e) {
         const el = e.currentTarget;
@@ -1175,15 +1190,14 @@ let AnyVacCard = class AnyVacCard extends i$2 {
             this._calibPts = [...this._calibPts, { map: { x, y }, vacuum: { ...this._calibCur } }];
             this._calibStep += 1;
             this._calibMsg = "";
-            if (this._calibStep >= this._calibTargets.length) {
+            if (this._calibStep >= 3) {
                 this._saveCalib(vac.entity, this._calibPts);
                 this._mapMode = "normal";
                 this._modeEntity = null;
             }
             else {
-                this._calibCur = { ...this._calibTargets[this._calibStep] };
-                void this._gotoMm(vac.entity, this._calibCur);
-                window.setTimeout(() => this._refreshMap(vac), 4000);
+                this._calibCandIdx = this._calibStep - 1;
+                this._calibProbe(vac);
             }
         }
     }
@@ -1194,6 +1208,9 @@ let AnyVacCard = class AnyVacCard extends i$2 {
         const mode = this._modeEntity === vac.entity ? this._mapMode : "normal";
         return b `
       <div class="map-tools">
+        ${vac.map?.entity ? b `<button class="mtbtn" @click=${() => this._refreshMap(vac)} title="Refresh map">
+          <ha-icon icon="mdi:refresh"></ha-icon><span>Refresh</span>
+        </button>` : A}
         <button class="mtbtn ${mode === "pin" ? "on" : ""}" ?disabled=${!hasCalib}
           @click=${() => this._toggleMode(vac.entity, "pin")} title="Pin & Go">
           <ha-icon icon="mdi:map-marker-radius"></ha-icon><span>Pin &amp; Go</span>
@@ -1209,7 +1226,7 @@ let AnyVacCard = class AnyVacCard extends i$2 {
                 : "Step " + (this._calibStep + 1) + "/3: tap the robot on the map when you can see it."}</div>
             ${this._calibStep > 0 ? b `<div class="calib-actions">
               <button class="mtbtn" @click=${() => this._refreshMap(vac)}>Refresh map</button>
-              <button class="mtbtn" @click=${() => this._calibCloser(vac)}>Didn't reach - try closer</button>
+              <button class="mtbtn" @click=${() => this._calibAnother(vac)}>Didn't reach - try another spot</button>
             </div>` : A}
           </div>`
             : A}
