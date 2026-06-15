@@ -69,8 +69,10 @@ export class AnyVacCard extends LitElement {
   private readonly _calibTargets = [
     { x: 25500, y: 25500 },
     { x: 27000, y: 25500 },
-    { x: 25500, y: 27000 },
+    { x: 25500, y: 26500 },
   ];
+  @state() private _calibMsg = "";
+  private _calibCur = { x: 25500, y: 25500 };
   /** Výběr místností — drží se lokálně v kartě (bez potřeby input_boolean helper entity) */
   @state() private _localRoomSel = new Map<string, boolean>();
   /** Aktivní úklidy — sledování průběhu pro vyhodnocení úspěchu */
@@ -1004,7 +1006,19 @@ export class AnyVacCard extends LitElement {
     else { this._mapMode = mode; this._modeEntity = entity; }
   }
   private _startCalib(vac: VacuumConfig): void {
-    this._calibPts = []; this._calibStep = 0; this._mapMode = "calib"; this._modeEntity = vac.entity;
+    this._calibPts = []; this._calibStep = 0; this._calibMsg = "";
+    this._calibCur = { ...this._calibTargets[0] };
+    this._mapMode = "calib"; this._modeEntity = vac.entity;
+  }
+  private _refreshMap(vac: VacuumConfig): void {
+    const ent = vac.map?.entity;
+    if (ent) void this.hass.callService("homeassistant", "update_entity", { entity_id: ent });
+  }
+  private _calibCloser(vac: VacuumConfig): void {
+    const dock = this._calibTargets[0];
+    this._calibCur = { x: dock.x + (this._calibCur.x - dock.x) * 0.6, y: dock.y + (this._calibCur.y - dock.y) * 0.6 };
+    void this._gotoMm(vac.entity, this._calibCur);
+    window.setTimeout(() => this._refreshMap(vac), 4000);
   }
   private _onMapClick(vac: VacuumConfig, e: MouseEvent): void {
     const el = e.currentTarget as HTMLElement; const r = el.getBoundingClientRect();
@@ -1015,14 +1029,16 @@ export class AnyVacCard extends LitElement {
       if (mm) void this._gotoMm(vac.entity, mm);
       this._mapMode = "normal"; this._modeEntity = null;
     } else if (this._mapMode === "calib") {
-      const target = this._calibTargets[this._calibStep];
-      this._calibPts = [...this._calibPts, { map: { x, y }, vacuum: target }];
+      this._calibPts = [...this._calibPts, { map: { x, y }, vacuum: { ...this._calibCur } }];
       this._calibStep += 1;
+      this._calibMsg = "";
       if (this._calibStep >= this._calibTargets.length) {
         this._saveCalib(vac.entity, this._calibPts);
         this._mapMode = "normal"; this._modeEntity = null;
       } else {
-        void this._gotoMm(vac.entity, this._calibTargets[this._calibStep]);
+        this._calibCur = { ...this._calibTargets[this._calibStep] };
+        void this._gotoMm(vac.entity, this._calibCur);
+        window.setTimeout(() => this._refreshMap(vac), 4000);
       }
     }
   }
@@ -1041,9 +1057,15 @@ export class AnyVacCard extends LitElement {
         </button>
       </div>
       ${mode === "calib"
-        ? html`<div class="calib-panel">${this._calibStep === 0
-            ? "Step 1/3: tap the DOCK on the map."
-            : "Step " + (this._calibStep + 1) + "/3: robot is driving \u2014 tap it on the map when it stops."}</div>`
+        ? html`<div class="calib-panel">
+            <div>${this._calibStep === 0
+              ? "Step 1/3: tap the DOCK on the map."
+              : "Step " + (this._calibStep + 1) + "/3: tap the robot on the map when you can see it."}</div>
+            ${this._calibStep > 0 ? html`<div class="calib-actions">
+              <button class="mtbtn" @click=${() => this._refreshMap(vac)}>Refresh map</button>
+              <button class="mtbtn" @click=${() => this._calibCloser(vac)}>Didn't reach - try closer</button>
+            </div>` : nothing}
+          </div>`
         : nothing}
       ${mode === "pin" ? html`<div class="calib-panel">Tap the map to send the robot there.</div>` : nothing}
     `;
@@ -1688,6 +1710,8 @@ export class AnyVacCard extends LitElement {
     .mtbtn:disabled { opacity: 0.4; cursor: default; }
     .mtbtn ha-icon { --mdc-icon-size: 16px; }
     .calib-panel { margin-top: 4px; font-size: 12px; opacity: 0.9; padding: 6px 8px; background: rgba(59,130,246,0.12); border-radius: 8px; }
+    .calib-panel > div { margin-bottom: 4px; }
+    .calib-actions { display: flex; gap: 6px; flex-wrap: wrap; }
   `;
 }
 

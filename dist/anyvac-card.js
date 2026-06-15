@@ -198,8 +198,10 @@ let AnyVacCard = class AnyVacCard extends i$2 {
         this._calibTargets = [
             { x: 25500, y: 25500 },
             { x: 27000, y: 25500 },
-            { x: 25500, y: 27000 },
+            { x: 25500, y: 26500 },
         ];
+        this._calibMsg = "";
+        this._calibCur = { x: 25500, y: 25500 };
         /** Výběr místností — drží se lokálně v kartě (bez potřeby input_boolean helper entity) */
         this._localRoomSel = new Map();
         /** Aktivní úklidy — sledování průběhu pro vyhodnocení úspěchu */
@@ -1141,8 +1143,21 @@ let AnyVacCard = class AnyVacCard extends i$2 {
     _startCalib(vac) {
         this._calibPts = [];
         this._calibStep = 0;
+        this._calibMsg = "";
+        this._calibCur = { ...this._calibTargets[0] };
         this._mapMode = "calib";
         this._modeEntity = vac.entity;
+    }
+    _refreshMap(vac) {
+        const ent = vac.map?.entity;
+        if (ent)
+            void this.hass.callService("homeassistant", "update_entity", { entity_id: ent });
+    }
+    _calibCloser(vac) {
+        const dock = this._calibTargets[0];
+        this._calibCur = { x: dock.x + (this._calibCur.x - dock.x) * 0.6, y: dock.y + (this._calibCur.y - dock.y) * 0.6 };
+        void this._gotoMm(vac.entity, this._calibCur);
+        window.setTimeout(() => this._refreshMap(vac), 4000);
     }
     _onMapClick(vac, e) {
         const el = e.currentTarget;
@@ -1157,16 +1172,18 @@ let AnyVacCard = class AnyVacCard extends i$2 {
             this._modeEntity = null;
         }
         else if (this._mapMode === "calib") {
-            const target = this._calibTargets[this._calibStep];
-            this._calibPts = [...this._calibPts, { map: { x, y }, vacuum: target }];
+            this._calibPts = [...this._calibPts, { map: { x, y }, vacuum: { ...this._calibCur } }];
             this._calibStep += 1;
+            this._calibMsg = "";
             if (this._calibStep >= this._calibTargets.length) {
                 this._saveCalib(vac.entity, this._calibPts);
                 this._mapMode = "normal";
                 this._modeEntity = null;
             }
             else {
-                void this._gotoMm(vac.entity, this._calibTargets[this._calibStep]);
+                this._calibCur = { ...this._calibTargets[this._calibStep] };
+                void this._gotoMm(vac.entity, this._calibCur);
+                window.setTimeout(() => this._refreshMap(vac), 4000);
             }
         }
     }
@@ -1186,9 +1203,15 @@ let AnyVacCard = class AnyVacCard extends i$2 {
         </button>
       </div>
       ${mode === "calib"
-            ? b `<div class="calib-panel">${this._calibStep === 0
+            ? b `<div class="calib-panel">
+            <div>${this._calibStep === 0
                 ? "Step 1/3: tap the DOCK on the map."
-                : "Step " + (this._calibStep + 1) + "/3: robot is driving \u2014 tap it on the map when it stops."}</div>`
+                : "Step " + (this._calibStep + 1) + "/3: tap the robot on the map when you can see it."}</div>
+            ${this._calibStep > 0 ? b `<div class="calib-actions">
+              <button class="mtbtn" @click=${() => this._refreshMap(vac)}>Refresh map</button>
+              <button class="mtbtn" @click=${() => this._calibCloser(vac)}>Didn't reach - try closer</button>
+            </div>` : A}
+          </div>`
             : A}
       ${mode === "pin" ? b `<div class="calib-panel">Tap the map to send the robot there.</div>` : A}
     `;
@@ -1812,6 +1835,8 @@ AnyVacCard.styles = i$5 `
     .mtbtn:disabled { opacity: 0.4; cursor: default; }
     .mtbtn ha-icon { --mdc-icon-size: 16px; }
     .calib-panel { margin-top: 4px; font-size: 12px; opacity: 0.9; padding: 6px 8px; background: rgba(59,130,246,0.12); border-radius: 8px; }
+    .calib-panel > div { margin-bottom: 4px; }
+    .calib-actions { display: flex; gap: 6px; flex-wrap: wrap; }
   `;
 __decorate([
     n$1({ attribute: false })
@@ -1837,6 +1862,9 @@ __decorate([
 __decorate([
     r()
 ], AnyVacCard.prototype, "_calibStep", void 0);
+__decorate([
+    r()
+], AnyVacCard.prototype, "_calibMsg", void 0);
 __decorate([
     r()
 ], AnyVacCard.prototype, "_localRoomSel", void 0);
