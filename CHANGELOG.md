@@ -6,18 +6,38 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
-### Added (Milestone 2 — in progress)
-
-- **Map calibration + Pin & Go** — an in-card guided wizard establishes a pixel↔millimetre transform:
-  tap the dock, then the card auto-drives the robot to two points (`app_goto_target`) and you tap it
-  on the map. Calibration is stored per browser (localStorage). Once calibrated, a **Pin & Go** mode
-  sends the robot to any point you tap. (First version, to be tuned on real hardware.)
-
 ### Planned
 
 - Milestone 2 cont.: zone cleaning (drag a rectangle → `app_zoned_clean`), automatic robot detection
   (canvas frame-diff) so calibration needs no taps, live robot dot on the custom image.
 - Milestone 3: companion `anyvac` integration (clean-history, statistics).
+
+## [0.3.2] - 2026-06-14
+
+### Changed
+
+- **Calibration alignment circle** — during calibration you place a robot-sized circle (with a centre
+  dot) and press *Confirm*, instead of blind-tapping. Align the circle with the dock/robot edges for a
+  precise point.
+
+## [0.3.1] - 2026-06-14
+
+### Added / Changed
+
+- **Permanent "Refresh map" button** under the map (the official Roborock map refreshes mainly during
+  cleaning; this forces an update).
+- Calibration probing reworked — **"try another spot"** keeps a good baseline (~2.2 m) and rotates
+  through directions instead of shrinking toward the dock, so calibration points stay well-spread and
+  accurate; the map auto-refreshes after each move.
+
+## [0.3.0] - 2026-06-14
+
+### Added
+
+- **Map calibration + Pin & Go** (Milestone 2) — an in-card guided wizard establishes a pixel↔mm
+  transform (tap the dock; the card auto-drives the robot to two points; you mark it on the map).
+  Once calibrated, a **Pin & Go** mode sends the robot to any point you tap. Calibration is stored
+  per browser (localStorage).
 
 ## [0.2.0] - 2026-06-14
 

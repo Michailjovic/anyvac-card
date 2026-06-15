@@ -87,7 +87,7 @@ const t={ATTRIBUTE:1},e=t=>(...e)=>({_$litDirective$:t,values:e});let i$1 = clas
 
 const CARD_NAME = "anyvac-card";
 const EDITOR_NAME = "anyvac-card-editor";
-const CARD_VERSION = "0.2.0";
+const CARD_VERSION = "0.3.2";
 /** Server-side tracking blueprint */
 const BLUEPRINT_VERSION = "1.0.0";
 const BLUEPRINT_PATH = "anyvac_card/cleaning_tracker.yaml";
@@ -203,6 +203,7 @@ let AnyVacCard = class AnyVacCard extends i$2 {
         this._calibMsg = "";
         this._calibCur = { x: 25500, y: 25500 };
         this._calibCandIdx = 0;
+        this._calibCircle = { x: 50, y: 50 };
         /** Výběr místností — drží se lokálně v kartě (bez potřeby input_boolean helper entity) */
         this._localRoomSel = new Map();
         /** Aktivní úklidy — sledování průběhu pro vyhodnocení úspěchu */
@@ -1146,6 +1147,7 @@ let AnyVacCard = class AnyVacCard extends i$2 {
         this._calibStep = 0;
         this._calibMsg = "";
         this._calibCandIdx = 0;
+        this._calibCircle = { x: 50, y: 50 };
         this._calibCur = { ...this._calibTargets[0] };
         this._mapMode = "calib";
         this._modeEntity = vac.entity;
@@ -1174,6 +1176,21 @@ let AnyVacCard = class AnyVacCard extends i$2 {
         this._calibCandIdx += 1;
         this._calibProbe(vac);
     }
+    _calibConfirm(vac) {
+        this._calibPts = [...this._calibPts, { map: { ...this._calibCircle }, vacuum: { ...this._calibCur } }];
+        this._calibStep += 1;
+        this._calibMsg = "";
+        this._calibCircle = { x: 50, y: 50 };
+        if (this._calibStep >= 3) {
+            this._saveCalib(vac.entity, this._calibPts);
+            this._mapMode = "normal";
+            this._modeEntity = null;
+        }
+        else {
+            this._calibCandIdx = this._calibStep - 1;
+            this._calibProbe(vac);
+        }
+    }
     _onMapClick(vac, e) {
         const el = e.currentTarget;
         const r = el.getBoundingClientRect();
@@ -1187,18 +1204,7 @@ let AnyVacCard = class AnyVacCard extends i$2 {
             this._modeEntity = null;
         }
         else if (this._mapMode === "calib") {
-            this._calibPts = [...this._calibPts, { map: { x, y }, vacuum: { ...this._calibCur } }];
-            this._calibStep += 1;
-            this._calibMsg = "";
-            if (this._calibStep >= 3) {
-                this._saveCalib(vac.entity, this._calibPts);
-                this._mapMode = "normal";
-                this._modeEntity = null;
-            }
-            else {
-                this._calibCandIdx = this._calibStep - 1;
-                this._calibProbe(vac);
-            }
+            this._calibCircle = { x, y };
         }
     }
     _renderMapTools(vac) {
@@ -1222,12 +1228,15 @@ let AnyVacCard = class AnyVacCard extends i$2 {
       ${mode === "calib"
             ? b `<div class="calib-panel">
             <div>${this._calibStep === 0
-                ? "Step 1/3: tap the DOCK on the map."
-                : "Step " + (this._calibStep + 1) + "/3: tap the robot on the map when you can see it."}</div>
-            ${this._calibStep > 0 ? b `<div class="calib-actions">
-              <button class="mtbtn" @click=${() => this._refreshMap(vac)}>Refresh map</button>
-              <button class="mtbtn" @click=${() => this._calibAnother(vac)}>Didn't reach - try another spot</button>
-            </div>` : A}
+                ? "Step 1/3: tap to place the circle on the DOCK, align its edges, then Confirm."
+                : "Step " + (this._calibStep + 1) + "/3: tap to place the circle on the ROBOT, align its edges, then Confirm."}</div>
+            <div class="calib-actions">
+              <button class="mtbtn on" @click=${() => this._calibConfirm(vac)}>Confirm point</button>
+              ${this._calibStep > 0 ? b `
+                <button class="mtbtn" @click=${() => this._refreshMap(vac)}>Refresh map</button>
+                <button class="mtbtn" @click=${() => this._calibAnother(vac)}>Didn't reach - try another spot</button>
+              ` : A}
+            </div>
           </div>`
             : A}
       ${mode === "pin" ? b `<div class="calib-panel">Tap the map to send the robot there.</div>` : A}
@@ -1269,6 +1278,9 @@ let AnyVacCard = class AnyVacCard extends i$2 {
         ${(vac.rooms ?? []).map((r) => this._renderRoomOverlay(r, vac))}
         ${this._mapMode !== "normal" && this._modeEntity === vac.entity
             ? b `<div class="map-clickcatch" @click=${(e) => this._onMapClick(vac, e)}></div>`
+            : A}
+        ${this._mapMode === "calib" && this._modeEntity === vac.entity
+            ? b `<div class="calib-circle" style=${o({ left: this._calibCircle.x + "%", top: this._calibCircle.y + "%" })}></div>`
             : A}
       </div>
     `;
@@ -1854,6 +1866,8 @@ AnyVacCard.styles = i$5 `
     .calib-panel { margin-top: 4px; font-size: 12px; opacity: 0.9; padding: 6px 8px; background: rgba(59,130,246,0.12); border-radius: 8px; }
     .calib-panel > div { margin-bottom: 4px; }
     .calib-actions { display: flex; gap: 6px; flex-wrap: wrap; }
+    .calib-circle { position: absolute; width: 40px; height: 40px; border: 2px solid #00e5ff; border-radius: 50%; transform: translate(-50%, -50%); box-shadow: 0 0 8px #00e5ff, inset 0 0 6px rgba(0,229,255,0.5); pointer-events: none; z-index: 6; }
+    .calib-circle::after { content: ""; position: absolute; left: 50%; top: 50%; width: 3px; height: 3px; background: #00e5ff; border-radius: 50%; transform: translate(-50%, -50%); }
   `;
 __decorate([
     n$1({ attribute: false })
@@ -1882,6 +1896,9 @@ __decorate([
 __decorate([
     r()
 ], AnyVacCard.prototype, "_calibMsg", void 0);
+__decorate([
+    r()
+], AnyVacCard.prototype, "_calibCircle", void 0);
 __decorate([
     r()
 ], AnyVacCard.prototype, "_localRoomSel", void 0);
