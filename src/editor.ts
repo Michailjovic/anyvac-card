@@ -75,6 +75,7 @@ export class AnyVacCardEditor extends LitElement {
 
   // ── Navigation state ──────────────────────────────────────────────────────
   @state() private _tab: ActiveTab = "vacuums";
+  @state() private _dragRoom: { vac: number; idx: number } | null = null;
 
   // Accordion open state — always create new instances to trigger Lit reactivity
   @state() private _openVac     = new Set<number>();
@@ -367,6 +368,15 @@ export class AnyVacCardEditor extends LitElement {
     const m = new Map(this._openRoom);
     m.set(vacIdx, rooms.length - 1);
     this._openRoom = m;
+  }
+
+  private _moveRoom(vacIdx: number, from: number, to: number): void {
+    if (from === to) return;
+    const rooms = [...(this._config.vacuums[vacIdx].rooms ?? [])];
+    if (from < 0 || from >= rooms.length || to < 0 || to >= rooms.length) return;
+    const [moved] = rooms.splice(from, 1);
+    rooms.splice(to, 0, moved);
+    this._setVacuum(vacIdx, { rooms });
   }
 
   private _deleteRoom(vacIdx: number, roomIdx: number): void {
@@ -775,8 +785,17 @@ export class AnyVacCardEditor extends LitElement {
   private _renderRoomAccordion(room: RoomConfig, vacIdx: number, roomIdx: number) {
     const isOpen = (this._openRoom.get(vacIdx) ?? null) === roomIdx;
     return html`
-      <div class="room-acc">
+      <div class="room-acc"
+        style=${this._dragRoom && this._dragRoom.vac === vacIdx && this._dragRoom.idx !== roomIdx
+          ? styleMap({ outline: "2px dashed var(--primary-color,#3b82f6)", outlineOffset: "-2px" }) : nothing}
+        @dragover=${(e: DragEvent) => { if (this._dragRoom && this._dragRoom.vac === vacIdx) e.preventDefault(); }}
+        @drop=${(e: DragEvent) => { e.preventDefault(); if (this._dragRoom && this._dragRoom.vac === vacIdx) this._moveRoom(vacIdx, this._dragRoom.idx, roomIdx); this._dragRoom = null; }}>
         <div class="room-acc-header" @click=${() => this._toggleRoom(vacIdx, roomIdx)}>
+          <ha-icon icon="mdi:drag-horizontal-variant" title="Drag to reorder"
+            draggable="true" style="cursor:grab;opacity:0.5;--mdc-icon-size:18px;flex-shrink:0"
+            @click=${(e: Event) => e.stopPropagation()}
+            @dragstart=${(e: DragEvent) => { this._dragRoom = { vac: vacIdx, idx: roomIdx }; if (e.dataTransfer) e.dataTransfer.effectAllowed = "move"; }}
+            @dragend=${() => { this._dragRoom = null; }}></ha-icon>
           <ha-icon class="room-acc-icon" icon=${room.icon || "mdi:square"}></ha-icon>
           <div class="room-acc-info">
             <span class="room-acc-name">${room.name || room.key || "Unnamed room"}</span>

@@ -62,6 +62,15 @@ export class AnyVacCard extends LitElement {
   @state() private _shownSet = new Set<number>([0]);
   /** ID of the button currently being held — drives the fill animation */
   @state() private _holdId: string | null = null;
+  @state() private _mapMode: "normal" | "pin" | "calib" = "normal";
+  @state() private _modeEntity: string | null = null;
+  @state() private _calibStep = 0;
+  private _calibPts: Array<{ map: { x: number; y: number }; vacuum: { x: number; y: number } }> = [];
+  private readonly _calibTargets = [
+    { x: 25500, y: 25500 },
+    { x: 27000, y: 25500 },
+    { x: 25500, y: 27000 },
+  ];
   /** Výběr místností — drží se lokálně v kartě (bez potřeby input_boolean helper entity) */
   @state() private _localRoomSel = new Map<string, boolean>();
   /** Aktivní úklidy — sledování průběhu pro vyhodnocení úspěchu */
@@ -958,6 +967,88 @@ export class AnyVacCard extends LitElement {
 
   // ── Render: map ─────────────────────────────────────────────────────────
 
+  // ── Calibration + pin & go (Milestone 2, v1; localStorage) ───────────────────
+  private _calibKey(entity: string): string { return "anyvac_calib_" + entity; }
+  private _loadCalib(entity: string): Array<{ map: { x: number; y: number }; vacuum: { x: number; y: number } }> | null {
+    if (this._mapMode === "calib" && this._modeEntity === entity && this._calibPts.length >= 3) return this._calibPts;
+    try { const raw = window.localStorage.getItem(this._calibKey(entity)); return raw ? JSON.parse(raw) : null; } catch { return null; }
+  }
+  private _saveCalib(entity: string, pts: Array<{ map: { x: number; y: number }; vacuum: { x: number; y: number } }>): void {
+    try { window.localStorage.setItem(this._calibKey(entity), JSON.stringify(pts)); } catch { /* ignore */ }
+  }
+  private _solve3(m: number[][], r: number[]): number[] | null {
+    const d = (a: number[][]) => a[0][0]*(a[1][1]*a[2][2]-a[1][2]*a[2][1]) - a[0][1]*(a[1][0]*a[2][2]-a[1][2]*a[2][0]) + a[0][2]*(a[1][0]*a[2][1]-a[1][1]*a[2][0]);
+    const D = d(m); if (Math.abs(D) < 1e-9) return null;
+    const col = (i: number) => m.map((row, ri) => row.map((v, ci) => (ci === i ? r[ri] : v)));
+    return [d(col(0)) / D, d(col(1)) / D, d(col(2)) / D];
+  }
+  private _affine(pts: Array<{ map: { x: number; y: number }; vacuum: { x: number; y: number } }>) {
+    if (pts.length < 3) return null;
+    const M = pts.slice(0, 3).map((p) => [p.map.x, p.map.y, 1]);
+    const ab = this._solve3(M, pts.slice(0, 3).map((p) => p.vacuum.x));
+    const cd = this._solve3(M, pts.slice(0, 3).map((p) => p.vacuum.y));
+    if (!ab || !cd) return null;
+    return { a: ab[0], b: ab[1], e: ab[2], c: cd[0], d: cd[1], f: cd[2] };
+  }
+  private _mapToVac(entity: string, x: number, y: number): { x: number; y: number } | null {
+    const pts = this._loadCalib(entity); if (!pts) return null;
+    const t = this._affine(pts); if (!t) return null;
+    return { x: t.a * x + t.b * y + t.e, y: t.c * x + t.d * y + t.f };
+  }
+  private async _gotoMm(entity: string, mm: { x: number; y: number }): Promise<void> {
+    try { await this.hass.callService("vacuum", "send_command", { entity_id: entity, command: "app_goto_target", params: [Math.round(mm.x), Math.round(mm.y)] }); }
+    catch (e) { console.error("[anyvac-card] goto failed:", e); }
+  }
+  private _toggleMode(entity: string, mode: "pin" | "calib"): void {
+    if (this._mapMode === mode && this._modeEntity === entity) { this._mapMode = "normal"; this._modeEntity = null; }
+    else { this._mapMode = mode; this._modeEntity = entity; }
+  }
+  private _startCalib(vac: VacuumConfig): void {
+    this._calibPts = []; this._calibStep = 0; this._mapMode = "calib"; this._modeEntity = vac.entity;
+  }
+  private _onMapClick(vac: VacuumConfig, e: MouseEvent): void {
+    const el = e.currentTarget as HTMLElement; const r = el.getBoundingClientRect();
+    const x = ((e.clientX - r.left) / r.width) * 100;
+    const y = ((e.clientY - r.top) / r.height) * 100;
+    if (this._mapMode === "pin") {
+      const mm = this._mapToVac(vac.entity, x, y);
+      if (mm) void this._gotoMm(vac.entity, mm);
+      this._mapMode = "normal"; this._modeEntity = null;
+    } else if (this._mapMode === "calib") {
+      const target = this._calibTargets[this._calibStep];
+      this._calibPts = [...this._calibPts, { map: { x, y }, vacuum: target }];
+      this._calibStep += 1;
+      if (this._calibStep >= this._calibTargets.length) {
+        this._saveCalib(vac.entity, this._calibPts);
+        this._mapMode = "normal"; this._modeEntity = null;
+      } else {
+        void this._gotoMm(vac.entity, this._calibTargets[this._calibStep]);
+      }
+    }
+  }
+  private _renderMapTools(vac: VacuumConfig) {
+    if (!vac.map && !vac.image_base) return nothing;
+    const hasCalib = !!this._loadCalib(vac.entity);
+    const mode = this._modeEntity === vac.entity ? this._mapMode : "normal";
+    return html`
+      <div class="map-tools">
+        <button class="mtbtn ${mode === "pin" ? "on" : ""}" ?disabled=${!hasCalib}
+          @click=${() => this._toggleMode(vac.entity, "pin")} title="Pin & Go">
+          <ha-icon icon="mdi:map-marker-radius"></ha-icon><span>Pin &amp; Go</span>
+        </button>
+        <button class="mtbtn ${mode === "calib" ? "on" : ""}" @click=${() => this._startCalib(vac)}>
+          <ha-icon icon="mdi:crosshairs-gps"></ha-icon><span>${hasCalib ? "Recalibrate" : "Calibrate"}</span>
+        </button>
+      </div>
+      ${mode === "calib"
+        ? html`<div class="calib-panel">${this._calibStep === 0
+            ? "Step 1/3: tap the DOCK on the map."
+            : "Step " + (this._calibStep + 1) + "/3: robot is driving \u2014 tap it on the map when it stops."}</div>`
+        : nothing}
+      ${mode === "pin" ? html`<div class="calib-panel">Tap the map to send the robot there.</div>` : nothing}
+    `;
+  }
+
   private _renderMap(vac: VacuumConfig) {
     const base = vac.base ?? (vac.image_base?.src && !vac.map?.entity ? "image" : "map");
     const ib = vac.image_base;
@@ -992,6 +1083,9 @@ export class AnyVacCard extends LitElement {
             })} />
         ` : nothing}
         ${(vac.rooms ?? []).map((r) => this._renderRoomOverlay(r, vac))}
+        ${this._mapMode !== "normal" && this._modeEntity === vac.entity
+          ? html`<div class="map-clickcatch" @click=${(e: MouseEvent) => this._onMapClick(vac, e)}></div>`
+          : nothing}
       </div>
     `;
   }
@@ -1284,6 +1378,7 @@ export class AnyVacCard extends LitElement {
           .filter(i => i < this._config.vacuums.length)
           .map(i => html`
             ${this._renderMap(this._config.vacuums[i])}
+            ${this._renderMapTools(this._config.vacuums[i])}
             ${this._renderStatusCard(this._config.vacuums[i], i)}
           `)}
       </ha-card>
@@ -1586,6 +1681,13 @@ export class AnyVacCard extends LitElement {
     }
 
     .room-icons ha-icon { --mdc-icon-size: 14px; }
+    .map-clickcatch { position: absolute; inset: 0; cursor: crosshair; z-index: 5; }
+    .map-tools { display: flex; gap: 6px; margin: 6px 0 0; }
+    .mtbtn { display: inline-flex; align-items: center; gap: 4px; padding: 5px 10px; border-radius: 8px; border: 1px solid rgba(255,255,255,0.18); background: rgba(255,255,255,0.06); color: inherit; cursor: pointer; font-size: 12px; font-weight: 600; }
+    .mtbtn.on { background: rgba(59,130,246,0.25); border-color: #3b82f6; }
+    .mtbtn:disabled { opacity: 0.4; cursor: default; }
+    .mtbtn ha-icon { --mdc-icon-size: 16px; }
+    .calib-panel { margin-top: 4px; font-size: 12px; opacity: 0.9; padding: 6px 8px; background: rgba(59,130,246,0.12); border-radius: 8px; }
   `;
 }
 

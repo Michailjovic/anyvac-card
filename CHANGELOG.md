@@ -6,11 +6,18 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added (Milestone 2 — in progress)
+
+- **Map calibration + Pin & Go** — an in-card guided wizard establishes a pixel↔millimetre transform:
+  tap the dock, then the card auto-drives the robot to two points (`app_goto_target`) and you tap it
+  on the map. Calibration is stored per browser (localStorage). Once calibrated, a **Pin & Go** mode
+  sends the robot to any point you tap. (First version, to be tuned on real hardware.)
+
 ### Planned
 
-- Milestone 2: calibrated interactive map (zones, pin & go, live robot position).
-- Milestone 3: companion `anyvac` integration (clean-history, statistics) replacing the
-  helper/blueprint backend.
+- Milestone 2 cont.: zone cleaning (drag a rectangle → `app_zoned_clean`), automatic robot detection
+  (canvas frame-diff) so calibration needs no taps, live robot dot on the custom image.
+- Milestone 3: companion `anyvac` integration (clean-history, statistics).
 
 ## [0.2.0] - 2026-06-14
 
@@ -25,6 +32,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - **Editor improvements** — Maps tab gains a *Base layer* selector, *Card height* and *Overlay
   opacity* sliders, and image source + transform fields. The click-to-place preview now shows the
   custom image when the base is image/combined.
+- **Reorderable rooms** — drag the grip handle on a room in the Vacuums tab to reorder rooms
+  (order propagates everywhere, including the room chips on the Maps tab).
 
 ## [0.1.0] - 2026-06-14
 
