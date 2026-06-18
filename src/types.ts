@@ -179,6 +179,8 @@ export interface VacuumConfig {
   base_height?: number;
   /** Overlay map opacity in combined mode (0-100). */
   overlay_opacity?: number;
+  /** CSS mix-blend-mode for the map overlay in combined mode (e.g. 'lighten' to isolate the path). */
+  overlay_blend?: string;
   map?: MapConfig;
   rooms?: RoomConfig[];
   clean_action?: CleanAction;

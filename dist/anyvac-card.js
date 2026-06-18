@@ -87,7 +87,7 @@ const t={ATTRIBUTE:1},e=t=>(...e)=>({_$litDirective$:t,values:e});let i$1 = clas
 
 const CARD_NAME = "anyvac-card";
 const EDITOR_NAME = "anyvac-card-editor";
-const CARD_VERSION = "0.3.6";
+const CARD_VERSION = "0.3.7";
 /** Server-side tracking blueprint */
 const BLUEPRINT_VERSION = "1.0.0";
 const BLUEPRINT_PATH = "anyvac_card/cleaning_tracker.yaml";
@@ -1327,7 +1327,7 @@ let AnyVacCard = class AnyVacCard extends i$2 {
             top: (50 + (m?.offset_y ?? 0)) + "%",
             width: (m?.scale ?? 100) + "%",
             transform: "translate(-50%,-50%) rotate(" + (m?.rotation ?? 0) + "deg)",
-            ...(showImage ? { opacity: String((vac.overlay_opacity ?? 55) / 100) } : {}),
+            ...(showImage ? { opacity: String((vac.overlay_opacity ?? 55) / 100), mixBlendMode: vac.overlay_blend ?? "normal" } : {}),
         })} />
         ` : A}
         ${(vac.rooms ?? []).map((r) => this._renderRoomOverlay(r, vac))}
@@ -2954,6 +2954,7 @@ let AnyVacCardEditor = class AnyVacCardEditor extends i$2 {
 
         ${vac.base === "combined" ? b `
           ${this._numberSlider("Overlay opacity", vac.overlay_opacity ?? 55, 0, 100, 5, v => this._setVacuum(mapVac, { overlay_opacity: v }), "%")}
+          ${this._selectField("Overlay blend", (vac.overlay_blend ?? "normal"), [{ value: "normal", label: "normal" }, { value: "lighten", label: "lighten (isolate path)" }, { value: "screen", label: "screen" }, { value: "plus-lighter", label: "plus-lighter" }], v => this._setVacuum(mapVac, { overlay_blend: v }))}
         ` : A}
 
         ${vac.base === "image" || vac.base === "combined" ? b `

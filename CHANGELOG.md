@@ -12,6 +12,16 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   (canvas frame-diff) so calibration needs no taps, live robot dot on the custom image.
 - Milestone 3: companion `anyvac` integration (clean-history, statistics).
 
+## [0.3.7] - 2026-06-14
+
+### Added
+
+- **Overlay blend mode** (combined base) — a new *Overlay blend* option (`overlay_blend`:
+  normal / lighten / screen / plus-lighter). Because the Roborock map draws the robot and the cleaned
+  path as the *lightest* pixels, setting it to **lighten** makes the path and robot "punch through"
+  onto a custom floorplan while the room fills blend away — a free, theme-robust way to isolate the
+  trail without per-pixel colour keying.
+
 ## [0.3.6] - 2026-06-14
 
 ### Changed

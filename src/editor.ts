@@ -917,6 +917,9 @@ export class AnyVacCardEditor extends LitElement {
         ${vac.base === "combined" ? html`
           ${this._numberSlider("Overlay opacity", vac.overlay_opacity ?? 55, 0, 100, 5,
             v => this._setVacuum(mapVac, { overlay_opacity: v }), "%")}
+          ${this._selectField("Overlay blend", (vac.overlay_blend ?? "normal"),
+            [{ value: "normal", label: "normal" }, { value: "lighten", label: "lighten (isolate path)" }, { value: "screen", label: "screen" }, { value: "plus-lighter", label: "plus-lighter" }],
+            v => this._setVacuum(mapVac, { overlay_blend: v }))}
         ` : nothing}
 
         ${vac.base === "image" || vac.base === "combined" ? html`
