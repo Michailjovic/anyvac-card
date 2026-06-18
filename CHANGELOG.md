@@ -12,6 +12,17 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   (canvas frame-diff) so calibration needs no taps, live robot dot on the custom image.
 - Milestone 3: companion `anyvac` integration (clean-history, statistics).
 
+## [0.3.3] - 2026-06-14
+
+### Fixed
+
+- **Calibration accuracy in combined mode** — calibration and Pin & Go now anchor each click to the
+  clicked layer's own content space (undoing its rotation / scale / offset via the element transform)
+  instead of raw container coordinates. This removes the drift caused by the image base and the map
+  overlay having different seatings (e.g. different scale), which made Pin & Go land off on both axes,
+  worse toward the edges. **Re-calibrate after updating** — the stored calibration changes coordinate
+  space.
+
 ## [0.3.2] - 2026-06-14
 
 ### Changed

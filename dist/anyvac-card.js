@@ -87,7 +87,7 @@ const t={ATTRIBUTE:1},e=t=>(...e)=>({_$litDirective$:t,values:e});let i$1 = clas
 
 const CARD_NAME = "anyvac-card";
 const EDITOR_NAME = "anyvac-card-editor";
-const CARD_VERSION = "0.3.2";
+const CARD_VERSION = "0.3.3";
 /** Server-side tracking blueprint */
 const BLUEPRINT_VERSION = "1.0.0";
 const BLUEPRINT_PATH = "anyvac_card/cleaning_tracker.yaml";
@@ -204,6 +204,7 @@ let AnyVacCard = class AnyVacCard extends i$2 {
         this._calibCur = { x: 25500, y: 25500 };
         this._calibCandIdx = 0;
         this._calibCircle = { x: 50, y: 50 };
+        this._calibContent = { x: 50, y: 50 };
         /** Výběr místností — drží se lokálně v kartě (bez potřeby input_boolean helper entity) */
         this._localRoomSel = new Map();
         /** Aktivní úklidy — sledování průběhu pro vyhodnocení úspěchu */
@@ -1177,7 +1178,7 @@ let AnyVacCard = class AnyVacCard extends i$2 {
         this._calibProbe(vac);
     }
     _calibConfirm(vac) {
-        this._calibPts = [...this._calibPts, { map: { ...this._calibCircle }, vacuum: { ...this._calibCur } }];
+        this._calibPts = [...this._calibPts, { map: { ...this._calibContent }, vacuum: { ...this._calibCur } }];
         this._calibStep += 1;
         this._calibMsg = "";
         this._calibCircle = { x: 50, y: 50 };
@@ -1196,8 +1197,9 @@ let AnyVacCard = class AnyVacCard extends i$2 {
         const r = el.getBoundingClientRect();
         const x = ((e.clientX - r.left) / r.width) * 100;
         const y = ((e.clientY - r.top) / r.height) * 100;
+        const content = this._clickToContent(vac, e.clientX, e.clientY) ?? { x, y };
         if (this._mapMode === "pin") {
-            const mm = this._mapToVac(vac.entity, x, y);
+            const mm = this._mapToVac(vac.entity, content.x, content.y);
             if (mm)
                 void this._gotoMm(vac.entity, mm);
             this._mapMode = "normal";
@@ -1205,7 +1207,31 @@ let AnyVacCard = class AnyVacCard extends i$2 {
         }
         else if (this._mapMode === "calib") {
             this._calibCircle = { x, y };
+            this._calibContent = { ...content };
         }
+    }
+    // Map a viewport click into the clicked layer's own content space (undo its
+    // rotation/scale/offset) so calibration & pin&go are seating-independent and
+    // consistent across the image base and the map overlay (combined mode).
+    _clickToContent(vac, clientX, clientY) {
+        const base = vac.base ?? (vac.image_base?.src && !vac.map?.entity ? "image" : "map");
+        const useImg = (base === "image" || base === "combined") && !!vac.image_base?.src;
+        const sel = useImg ? ".image-base-img" : ".map-img";
+        const el = this.renderRoot?.querySelector(sel);
+        if (!el)
+            return null;
+        const r = el.getBoundingClientRect();
+        const cx = (r.left + r.right) / 2, cy = (r.top + r.bottom) / 2;
+        const tr = getComputedStyle(el).transform;
+        const m = new DOMMatrix(tr === "none" ? undefined : tr);
+        const det = m.a * m.d - m.b * m.c;
+        if (Math.abs(det) < 1e-9)
+            return null;
+        const dx = clientX - cx, dy = clientY - cy;
+        const lx = (m.d * dx - m.c * dy) / det;
+        const ly = (-m.b * dx + m.a * dy) / det;
+        const w = el.offsetWidth || 1, h = el.offsetHeight || 1;
+        return { x: (lx / w + 0.5) * 100, y: (ly / h + 0.5) * 100 };
     }
     _renderMapTools(vac) {
         if (!vac.map && !vac.image_base)

@@ -75,6 +75,7 @@ export class AnyVacCard extends LitElement {
   private _calibCur = { x: 25500, y: 25500 };
   private _calibCandIdx = 0;
   @state() private _calibCircle = { x: 50, y: 50 };
+  private _calibContent = { x: 50, y: 50 };
   /** Výběr místností — drží se lokálně v kartě (bez potřeby input_boolean helper entity) */
   @state() private _localRoomSel = new Map<string, boolean>();
   /** Aktivní úklidy — sledování průběhu pro vyhodnocení úspěchu */
@@ -1037,7 +1038,7 @@ export class AnyVacCard extends LitElement {
     this._calibProbe(vac);
   }
   private _calibConfirm(vac: VacuumConfig): void {
-    this._calibPts = [...this._calibPts, { map: { ...this._calibCircle }, vacuum: { ...this._calibCur } }];
+    this._calibPts = [...this._calibPts, { map: { ...this._calibContent }, vacuum: { ...this._calibCur } }];
     this._calibStep += 1;
     this._calibMsg = "";
     this._calibCircle = { x: 50, y: 50 };
@@ -1053,13 +1054,36 @@ export class AnyVacCard extends LitElement {
     const el = e.currentTarget as HTMLElement; const r = el.getBoundingClientRect();
     const x = ((e.clientX - r.left) / r.width) * 100;
     const y = ((e.clientY - r.top) / r.height) * 100;
+    const content = this._clickToContent(vac, e.clientX, e.clientY) ?? { x, y };
     if (this._mapMode === "pin") {
-      const mm = this._mapToVac(vac.entity, x, y);
+      const mm = this._mapToVac(vac.entity, content.x, content.y);
       if (mm) void this._gotoMm(vac.entity, mm);
       this._mapMode = "normal"; this._modeEntity = null;
     } else if (this._mapMode === "calib") {
       this._calibCircle = { x, y };
+      this._calibContent = { ...content };
     }
+  }
+  // Map a viewport click into the clicked layer's own content space (undo its
+  // rotation/scale/offset) so calibration & pin&go are seating-independent and
+  // consistent across the image base and the map overlay (combined mode).
+  private _clickToContent(vac: VacuumConfig, clientX: number, clientY: number): { x: number; y: number } | null {
+    const base = vac.base ?? (vac.image_base?.src && !vac.map?.entity ? "image" : "map");
+    const useImg = (base === "image" || base === "combined") && !!vac.image_base?.src;
+    const sel = useImg ? ".image-base-img" : ".map-img";
+    const el = this.renderRoot?.querySelector(sel) as HTMLElement | null;
+    if (!el) return null;
+    const r = el.getBoundingClientRect();
+    const cx = (r.left + r.right) / 2, cy = (r.top + r.bottom) / 2;
+    const tr = getComputedStyle(el).transform;
+    const m = new DOMMatrix(tr === "none" ? undefined : tr);
+    const det = m.a * m.d - m.b * m.c;
+    if (Math.abs(det) < 1e-9) return null;
+    const dx = clientX - cx, dy = clientY - cy;
+    const lx = (m.d * dx - m.c * dy) / det;
+    const ly = (-m.b * dx + m.a * dy) / det;
+    const w = el.offsetWidth || 1, h = el.offsetHeight || 1;
+    return { x: (lx / w + 0.5) * 100, y: (ly / h + 0.5) * 100 };
   }
   private _renderMapTools(vac: VacuumConfig) {
     if (!vac.map && !vac.image_base) return nothing;

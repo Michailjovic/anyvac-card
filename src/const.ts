@@ -1,6 +1,6 @@
 export const CARD_NAME = "anyvac-card";
 export const EDITOR_NAME = "anyvac-card-editor";
-export const CARD_VERSION = "0.3.2";
+export const CARD_VERSION = "0.3.3";
 
 /** Server-side tracking blueprint */
 export const BLUEPRINT_VERSION = "1.0.0";
