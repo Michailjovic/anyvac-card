@@ -1021,8 +1021,17 @@ export class AnyVacCard extends LitElement {
   }
   private _calibCandidate(): { x: number; y: number } {
     const dock = this._calibTargets[0];
-    const dirs = [[1, 0], [0, 1], [-1, 0], [0, -1], [0.71, 0.71], [-0.71, 0.71], [0.71, -0.71], [-0.71, -0.71]];
     const radii = [2200, 1500, 900];
+    let dirs: number[][];
+    if (this._calibStep >= 2) {
+      // Point 3: only PERPENDICULAR to point 2's actual direction -> never collinear.
+      const p2 = this._calibPts[1]?.vacuum ?? { x: dock.x + 2200, y: dock.y };
+      let vx = p2.x - dock.x, vy = p2.y - dock.y;
+      const len = Math.hypot(vx, vy) || 1; vx /= len; vy /= len;
+      dirs = [[-vy, vx], [vy, -vx]];
+    } else {
+      dirs = [[1, 0], [0, 1], [-1, 0], [0, -1], [0.71, 0.71], [-0.71, 0.71], [0.71, -0.71], [-0.71, -0.71]];
+    }
     const total = dirs.length * radii.length;
     const i = ((this._calibCandIdx % total) + total) % total;
     const r = radii[Math.floor(i / dirs.length)];
@@ -1039,15 +1048,25 @@ export class AnyVacCard extends LitElement {
     this._calibProbe(vac);
   }
   private _calibConfirm(vac: VacuumConfig): void {
-    this._calibPts = [...this._calibPts, { map: { ...this._calibContent }, vacuum: { ...this._calibCur } }];
-    this._calibStep += 1;
-    this._calibMsg = "";
-    this._calibCircle = { x: 50, y: 50 };
-    if (this._calibStep >= 3) {
-      this._saveCalib(vac.entity, this._calibPts);
+    const newPt = { map: { ...this._calibContent }, vacuum: { ...this._calibCur } };
+    if (this._calibStep >= 2) {
+      const pts = [...this._calibPts, newPt];
+      const [a, b, c] = pts.map((p) => p.vacuum);
+      const area = Math.abs((b.x - a.x) * (c.y - a.y) - (c.x - a.x) * (b.y - a.y)) / 2;
+      if (area < 400000) {
+        this._calibMsg = "Points too aligned - use 'try another spot', then Confirm.";
+        return;
+      }
+      this._calibPts = pts;
+      this._saveCalib(vac.entity, pts);
+      this._calibStep = 3; this._calibMsg = "";
       this._mapMode = "normal"; this._modeEntity = null;
     } else {
-      this._calibCandIdx = this._calibStep - 1;
+      this._calibPts = [...this._calibPts, newPt];
+      this._calibStep += 1;
+      this._calibMsg = "";
+      this._calibCircle = { x: 50, y: 50 };
+      this._calibCandIdx = 0;
       this._calibProbe(vac);
     }
   }

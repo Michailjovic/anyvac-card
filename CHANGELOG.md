@@ -12,6 +12,15 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   (canvas frame-diff) so calibration needs no taps, live robot dot on the custom image.
 - Milestone 3: companion `anyvac` integration (clean-history, statistics).
 
+## [0.3.5] - 2026-06-14
+
+### Fixed
+
+- **Calibration could be collinear** — the three calibration points could land on a single line
+  (e.g. dock + east + west), leaving the transform unable to resolve one axis (Pin & Go always
+  returned the dock's Y). Point 3 is now offered only perpendicular to point 2, and a guard rejects
+  nearly collinear points. **Re-calibrate after updating.**
+
 ## [0.3.4] - 2026-06-14
 
 ### Fixed
