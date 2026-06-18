@@ -87,7 +87,7 @@ const t={ATTRIBUTE:1},e=t=>(...e)=>({_$litDirective$:t,values:e});let i$1 = clas
 
 const CARD_NAME = "anyvac-card";
 const EDITOR_NAME = "anyvac-card-editor";
-const CARD_VERSION = "0.3.5";
+const CARD_VERSION = "0.3.6";
 /** Server-side tracking blueprint */
 const BLUEPRINT_VERSION = "1.0.0";
 const BLUEPRINT_PATH = "anyvac_card/cleaning_tracker.yaml";
@@ -1161,7 +1161,7 @@ let AnyVacCard = class AnyVacCard extends i$2 {
     }
     _calibCandidate() {
         const dock = this._calibTargets[0];
-        const radii = [2200, 1500, 900];
+        const radii = [1600, 1100, 2300];
         let dirs;
         if (this._calibStep >= 2) {
             // Point 3: only PERPENDICULAR to point 2's actual direction -> never collinear.
@@ -1184,7 +1184,11 @@ let AnyVacCard = class AnyVacCard extends i$2 {
     _calibProbe(vac) {
         this._calibCur = this._calibCandidate();
         void this._gotoMm(vac.entity, this._calibCur);
-        window.setTimeout(() => this._refreshMap(vac), 4000);
+        // Auto-refresh the map a few times while the robot drives (no manual Refresh needed).
+        [4000, 8000, 13000, 18000, 24000].forEach((t) => window.setTimeout(() => {
+            if (this._mapMode === "calib" && this._modeEntity === vac.entity)
+                this._refreshMap(vac);
+        }, t));
     }
     _calibAnother(vac) {
         this._calibCandIdx += 1;

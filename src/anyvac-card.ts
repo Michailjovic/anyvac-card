@@ -1021,7 +1021,7 @@ export class AnyVacCard extends LitElement {
   }
   private _calibCandidate(): { x: number; y: number } {
     const dock = this._calibTargets[0];
-    const radii = [2200, 1500, 900];
+    const radii = [1600, 1100, 2300];
     let dirs: number[][];
     if (this._calibStep >= 2) {
       // Point 3: only PERPENDICULAR to point 2's actual direction -> never collinear.
@@ -1041,7 +1041,11 @@ export class AnyVacCard extends LitElement {
   private _calibProbe(vac: VacuumConfig): void {
     this._calibCur = this._calibCandidate();
     void this._gotoMm(vac.entity, this._calibCur);
-    window.setTimeout(() => this._refreshMap(vac), 4000);
+    // Auto-refresh the map a few times while the robot drives (no manual Refresh needed).
+    [4000, 8000, 13000, 18000, 24000].forEach((t) =>
+      window.setTimeout(() => {
+        if (this._mapMode === "calib" && this._modeEntity === vac.entity) this._refreshMap(vac);
+      }, t));
   }
   private _calibAnother(vac: VacuumConfig): void {
     this._calibCandIdx += 1;

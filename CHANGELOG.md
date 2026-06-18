@@ -12,6 +12,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   (canvas frame-diff) so calibration needs no taps, live robot dot on the custom image.
 - Milestone 3: companion `anyvac` integration (clean-history, statistics).
 
+## [0.3.6] - 2026-06-14
+
+### Changed
+
+- **Calibration is more hands-off** — after sending the robot to a calibration point, the card
+  auto-refreshes the map several times while it drives (no need to press Refresh), and the third
+  point starts closer to the dock so it is reachable more often (fewer "try another spot" retries).
+
 ## [0.3.5] - 2026-06-14
 
 ### Fixed
