@@ -87,7 +87,7 @@ const t={ATTRIBUTE:1},e=t=>(...e)=>({_$litDirective$:t,values:e});let i$1 = clas
 
 const CARD_NAME = "anyvac-card";
 const EDITOR_NAME = "anyvac-card-editor";
-const CARD_VERSION = "0.3.3";
+const CARD_VERSION = "0.3.4";
 /** Server-side tracking blueprint */
 const BLUEPRINT_VERSION = "1.0.0";
 const BLUEPRINT_PATH = "anyvac_card/cleaning_tracker.yaml";
@@ -205,6 +205,7 @@ let AnyVacCard = class AnyVacCard extends i$2 {
         this._calibCandIdx = 0;
         this._calibCircle = { x: 50, y: 50 };
         this._calibContent = { x: 50, y: 50 };
+        this._dbg = "";
         /** Výběr místností — drží se lokálně v kartě (bez potřeby input_boolean helper entity) */
         this._localRoomSel = new Map();
         /** Aktivní úklidy — sledování průběhu pro vyhodnocení úspěchu */
@@ -1200,6 +1201,7 @@ let AnyVacCard = class AnyVacCard extends i$2 {
         const content = this._clickToContent(vac, e.clientX, e.clientY) ?? { x, y };
         if (this._mapMode === "pin") {
             const mm = this._mapToVac(vac.entity, content.x, content.y);
+            this._dbg = "px " + content.x.toFixed(1) + "%," + content.y.toFixed(1) + "% -> mm " + (mm ? Math.round(mm.x) + "," + Math.round(mm.y) : "(no calib)");
             if (mm)
                 void this._gotoMm(vac.entity, mm);
             this._mapMode = "normal";
@@ -1214,10 +1216,9 @@ let AnyVacCard = class AnyVacCard extends i$2 {
     // rotation/scale/offset) so calibration & pin&go are seating-independent and
     // consistent across the image base and the map overlay (combined mode).
     _clickToContent(vac, clientX, clientY) {
-        const base = vac.base ?? (vac.image_base?.src && !vac.map?.entity ? "image" : "map");
-        const useImg = (base === "image" || base === "combined") && !!vac.image_base?.src;
-        const sel = useImg ? ".image-base-img" : ".map-img";
-        const el = this.renderRoot?.querySelector(sel);
+        // The map is the coordinate authority (robot + mm live there); the floorplan is decoration.
+        const mapEl = vac.map?.entity ? this.renderRoot?.querySelector(".map-img") : null;
+        const el = mapEl ?? this.renderRoot?.querySelector(".image-base-img");
         if (!el)
             return null;
         const r = el.getBoundingClientRect();
@@ -1250,6 +1251,7 @@ let AnyVacCard = class AnyVacCard extends i$2 {
         <button class="mtbtn ${mode === "calib" ? "on" : ""}" @click=${() => this._startCalib(vac)}>
           <ha-icon icon="mdi:crosshairs-gps"></ha-icon><span>${hasCalib ? "Recalibrate" : "Calibrate"}</span>
         </button>
+        ${this._dbg ? b `<span style="font-size:11px;opacity:0.65;align-self:center;font-family:monospace">${this._dbg}</span>` : A}
       </div>
       ${mode === "calib"
             ? b `<div class="calib-panel">
@@ -1925,6 +1927,9 @@ __decorate([
 __decorate([
     r()
 ], AnyVacCard.prototype, "_calibCircle", void 0);
+__decorate([
+    r()
+], AnyVacCard.prototype, "_dbg", void 0);
 __decorate([
     r()
 ], AnyVacCard.prototype, "_localRoomSel", void 0);

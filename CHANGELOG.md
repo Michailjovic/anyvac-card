@@ -12,6 +12,16 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   (canvas frame-diff) so calibration needs no taps, live robot dot on the custom image.
 - Milestone 3: companion `anyvac` integration (clean-history, statistics).
 
+## [0.3.4] - 2026-06-14
+
+### Fixed
+
+- **Calibration anchored to the map layer** — in combined mode, calibration and Pin & Go now resolve
+  clicks against the vacuum-map layer (where the robot and the millimetre coordinates actually live),
+  undoing only the map's rotation/scale/offset, instead of the custom floorplan's. A small debug
+  readout under the map shows the clicked %→mm so issues can be pinpointed. **Re-calibrate after
+  updating.**
+
 ## [0.3.3] - 2026-06-14
 
 ### Fixed

@@ -76,6 +76,7 @@ export class AnyVacCard extends LitElement {
   private _calibCandIdx = 0;
   @state() private _calibCircle = { x: 50, y: 50 };
   private _calibContent = { x: 50, y: 50 };
+  @state() private _dbg = "";
   /** Výběr místností — drží se lokálně v kartě (bez potřeby input_boolean helper entity) */
   @state() private _localRoomSel = new Map<string, boolean>();
   /** Aktivní úklidy — sledování průběhu pro vyhodnocení úspěchu */
@@ -1057,6 +1058,7 @@ export class AnyVacCard extends LitElement {
     const content = this._clickToContent(vac, e.clientX, e.clientY) ?? { x, y };
     if (this._mapMode === "pin") {
       const mm = this._mapToVac(vac.entity, content.x, content.y);
+      this._dbg = "px " + content.x.toFixed(1) + "%," + content.y.toFixed(1) + "% -> mm " + (mm ? Math.round(mm.x) + "," + Math.round(mm.y) : "(no calib)");
       if (mm) void this._gotoMm(vac.entity, mm);
       this._mapMode = "normal"; this._modeEntity = null;
     } else if (this._mapMode === "calib") {
@@ -1068,10 +1070,9 @@ export class AnyVacCard extends LitElement {
   // rotation/scale/offset) so calibration & pin&go are seating-independent and
   // consistent across the image base and the map overlay (combined mode).
   private _clickToContent(vac: VacuumConfig, clientX: number, clientY: number): { x: number; y: number } | null {
-    const base = vac.base ?? (vac.image_base?.src && !vac.map?.entity ? "image" : "map");
-    const useImg = (base === "image" || base === "combined") && !!vac.image_base?.src;
-    const sel = useImg ? ".image-base-img" : ".map-img";
-    const el = this.renderRoot?.querySelector(sel) as HTMLElement | null;
+    // The map is the coordinate authority (robot + mm live there); the floorplan is decoration.
+    const mapEl = vac.map?.entity ? (this.renderRoot?.querySelector(".map-img") as HTMLElement | null) : null;
+    const el = mapEl ?? (this.renderRoot?.querySelector(".image-base-img") as HTMLElement | null);
     if (!el) return null;
     const r = el.getBoundingClientRect();
     const cx = (r.left + r.right) / 2, cy = (r.top + r.bottom) / 2;
@@ -1101,6 +1102,7 @@ export class AnyVacCard extends LitElement {
         <button class="mtbtn ${mode === "calib" ? "on" : ""}" @click=${() => this._startCalib(vac)}>
           <ha-icon icon="mdi:crosshairs-gps"></ha-icon><span>${hasCalib ? "Recalibrate" : "Calibrate"}</span>
         </button>
+        ${this._dbg ? html`<span style="font-size:11px;opacity:0.65;align-self:center;font-family:monospace">${this._dbg}</span>` : nothing}
       </div>
       ${mode === "calib"
         ? html`<div class="calib-panel">
