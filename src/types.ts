@@ -185,6 +185,14 @@ export interface VacuumConfig {
   integration_entity?: string;
   /** Integration mode: hide the Roborock map image, show only the floorplan + vector robot/path. */
   hide_map?: boolean;
+  /** Integration vector: path stroke colour (defaults to the vacuum colour). */
+  path_color?: string;
+  /** Integration vector: path stroke width, percent of default (default 100). */
+  path_width?: number;
+  /** Integration vector: draw the configured robot image (vac.image) as the map marker. */
+  robot_image_on_map?: boolean;
+  /** Integration vector: robot image size, percent of default (default 100). */
+  robot_size?: number;
   map?: MapConfig;
   rooms?: RoomConfig[];
   clean_action?: CleanAction;

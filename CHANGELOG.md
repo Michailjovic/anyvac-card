@@ -11,6 +11,21 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Rooms from the integration (real room polygons / names) for clickable cleaning on the floorplan.
 - Milestone 3b: companion `anyvac` integration data layers (clean-history, statistics).
 
+## [0.6.0] - 2026-06-19
+
+### Added
+
+- **Path styling** — *Path colour* and *Path width* options for the integration vector (the cleaning
+  trail), set from the GUI.
+- **Robot image on the map** — a *Robot image on map* toggle reuses the vacuum's configured status
+  image (`image`) as the map marker (rotated to the robot's heading), with a *Robot image size*
+  slider, instead of the default coloured dot.
+
+### Changed
+
+- **Editor hint on room Key** — the room *Key* field now notes it should match the room's name in the
+  Roborock app, which the `native-auto` strategy pairs rooms by.
+
 ## [0.5.0] - 2026-06-19
 
 ### Added

@@ -87,7 +87,7 @@ const t={ATTRIBUTE:1},e=t=>(...e)=>({_$litDirective$:t,values:e});let i$1 = clas
 
 const CARD_NAME = "anyvac-card";
 const EDITOR_NAME = "anyvac-card-editor";
-const CARD_VERSION = "0.5.0";
+const CARD_VERSION = "0.6.0";
 /** Server-side tracking blueprint */
 const BLUEPRINT_VERSION = "1.0.0";
 const BLUEPRINT_PATH = "anyvac_card/cleaning_tracker.yaml";
@@ -1454,10 +1454,15 @@ let AnyVacCard = class AnyVacCard extends i$2 {
             transform: "translate(-50%,-50%) rotate(" + (m?.rotation ?? 0) + "deg)",
         };
         const pathT = ptsStr
-            ? w `<polyline points=${ptsStr} fill="none" stroke=${color} stroke-width=${(rr * 0.35).toFixed(2)} stroke-linejoin="round" stroke-linecap="round" opacity="0.85"></polyline>`
+            ? w `<polyline points=${ptsStr} fill="none" stroke=${vac.path_color || color} stroke-width=${(rr * 0.35 * ((vac.path_width ?? 100) / 100)).toFixed(2)} stroke-linejoin="round" stroke-linecap="round" opacity="0.85"></polyline>`
             : A;
+        const useImg = !!(vac.robot_image_on_map && vac.image);
+        const robSize = rr * 2.6 * ((vac.robot_size ?? 100) / 100);
+        const robA = vp && vp.a != null ? vp.a : 0;
         const robotT = rob
-            ? w `${head ? w `<line x1=${rob.x.toFixed(1)} y1=${rob.y.toFixed(1)} x2=${head.x.toFixed(1)} y2=${head.y.toFixed(1)} stroke="#ffffff" stroke-width=${(rr * 0.3).toFixed(2)} stroke-linecap="round"></line>` : A}<circle cx=${rob.x.toFixed(1)} cy=${rob.y.toFixed(1)} r=${rr.toFixed(1)} fill=${color} stroke="#ffffff" stroke-width=${(rr * 0.18).toFixed(2)}></circle>`
+            ? (useImg
+                ? w `<image href=${vac.image} x=${(rob.x - robSize / 2).toFixed(1)} y=${(rob.y - robSize / 2).toFixed(1)} width=${robSize.toFixed(1)} height=${robSize.toFixed(1)} preserveAspectRatio="xMidYMid meet" transform=${"rotate(" + robA + " " + rob.x.toFixed(1) + " " + rob.y.toFixed(1) + ")"}></image>`
+                : w `${head ? w `<line x1=${rob.x.toFixed(1)} y1=${rob.y.toFixed(1)} x2=${head.x.toFixed(1)} y2=${head.y.toFixed(1)} stroke="#ffffff" stroke-width=${(rr * 0.3).toFixed(2)} stroke-linecap="round"></line>` : A}<circle cx=${rob.x.toFixed(1)} cy=${rob.y.toFixed(1)} r=${rr.toFixed(1)} fill=${color} stroke="#ffffff" stroke-width=${(rr * 0.18).toFixed(2)}></circle>`)
             : A;
         return b `<svg class="map-vector" viewBox="0 0 ${NW} ${NH}" preserveAspectRatio="none" style=${o(seat)}>${pathT}${robotT}</svg>`;
     }
@@ -3046,6 +3051,7 @@ let AnyVacCardEditor = class AnyVacCardEditor extends i$2 {
         ${isOpen ? b `
           <div class="room-acc-body">
             ${this._textField("Key (unique ID)", room.key, v => this._setRoom(vacIdx, roomIdx, { key: v }), "e.g. bedroom")}
+            <p class="hint">Tip: keep this identical to the room's name in the Roborock app — the <code>native-auto</code> strategy pairs rooms by this name.</p>
             ${this._textField("Display name", room.name, v => this._setRoom(vacIdx, roomIdx, { name: v }), "e.g. Bedroom")}
             ${(this._config.vacuums[vacIdx]?.clean_action?.type === "native-area" ||
             this._config.vacuums[vacIdx]?.clean_action?.type === "native-auto")
@@ -3138,6 +3144,13 @@ let AnyVacCardEditor = class AnyVacCardEditor extends i$2 {
         ${this._entityPicker("AnyVac integration sensor", vac.integration_entity, ["sensor"], v => this._setVacuum(mapVac, { integration_entity: v }))}
 
         ${vac.integration_entity ? this._selectField("Hide vacuum map (show only floorplan + robot/path)", vac.hide_map ? "yes" : "no", [{ value: "no", label: "no" }, { value: "yes", label: "yes" }], v => this._setVacuum(mapVac, { hide_map: v === "yes" })) : A}
+
+        ${vac.integration_entity ? b `
+          ${this._textField("Path colour (hex)", vac.path_color, v => this._setVacuum(mapVac, { path_color: v || undefined }), "#69d2ff")}
+          ${this._numberSlider("Path width", vac.path_width ?? 100, 20, 300, 10, v => this._setVacuum(mapVac, { path_width: v }), "%")}
+          ${vac.image ? this._selectField("Robot image on map (uses status image)", vac.robot_image_on_map ? "yes" : "no", [{ value: "no", label: "no" }, { value: "yes", label: "yes" }], v => this._setVacuum(mapVac, { robot_image_on_map: v === "yes" })) : A}
+          ${vac.robot_image_on_map ? this._numberSlider("Robot image size", vac.robot_size ?? 100, 40, 220, 10, v => this._setVacuum(mapVac, { robot_size: v }), "%") : A}
+        ` : A}
 
         ${this._numberSlider("Card height (0=auto)", vac.base_height ?? 0, 0, 700, 10, v => this._setVacuum(mapVac, { base_height: v > 0 ? v : undefined }), "px")}
 

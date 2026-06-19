@@ -1272,10 +1272,15 @@ export class AnyVacCard extends LitElement {
       transform: "translate(-50%,-50%) rotate(" + (m?.rotation ?? 0) + "deg)",
     };
     const pathT = ptsStr
-      ? svg`<polyline points=${ptsStr} fill="none" stroke=${color} stroke-width=${(rr * 0.35).toFixed(2)} stroke-linejoin="round" stroke-linecap="round" opacity="0.85"></polyline>`
+      ? svg`<polyline points=${ptsStr} fill="none" stroke=${vac.path_color || color} stroke-width=${(rr * 0.35 * ((vac.path_width ?? 100) / 100)).toFixed(2)} stroke-linejoin="round" stroke-linecap="round" opacity="0.85"></polyline>`
       : nothing;
+    const useImg = !!(vac.robot_image_on_map && vac.image);
+    const robSize = rr * 2.6 * ((vac.robot_size ?? 100) / 100);
+    const robA = vp && vp.a != null ? vp.a : 0;
     const robotT = rob
-      ? svg`${head ? svg`<line x1=${rob.x.toFixed(1)} y1=${rob.y.toFixed(1)} x2=${head.x.toFixed(1)} y2=${head.y.toFixed(1)} stroke="#ffffff" stroke-width=${(rr * 0.3).toFixed(2)} stroke-linecap="round"></line>` : nothing}<circle cx=${rob.x.toFixed(1)} cy=${rob.y.toFixed(1)} r=${rr.toFixed(1)} fill=${color} stroke="#ffffff" stroke-width=${(rr * 0.18).toFixed(2)}></circle>`
+      ? (useImg
+          ? svg`<image href=${vac.image!} x=${(rob.x - robSize / 2).toFixed(1)} y=${(rob.y - robSize / 2).toFixed(1)} width=${robSize.toFixed(1)} height=${robSize.toFixed(1)} preserveAspectRatio="xMidYMid meet" transform=${"rotate(" + robA + " " + rob.x.toFixed(1) + " " + rob.y.toFixed(1) + ")"}></image>`
+          : svg`${head ? svg`<line x1=${rob.x.toFixed(1)} y1=${rob.y.toFixed(1)} x2=${head.x.toFixed(1)} y2=${head.y.toFixed(1)} stroke="#ffffff" stroke-width=${(rr * 0.3).toFixed(2)} stroke-linecap="round"></line>` : nothing}<circle cx=${rob.x.toFixed(1)} cy=${rob.y.toFixed(1)} r=${rr.toFixed(1)} fill=${color} stroke="#ffffff" stroke-width=${(rr * 0.18).toFixed(2)}></circle>`)
       : nothing;
     return html`<svg class="map-vector" viewBox="0 0 ${NW} ${NH}" preserveAspectRatio="none" style=${styleMap(seat)}>${pathT}${robotT}</svg>`;
   }

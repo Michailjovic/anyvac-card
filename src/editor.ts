@@ -812,6 +812,7 @@ export class AnyVacCardEditor extends LitElement {
           <div class="room-acc-body">
             ${this._textField("Key (unique ID)", room.key,
               v => this._setRoom(vacIdx, roomIdx, { key: v }), "e.g. bedroom")}
+            <p class="hint">Tip: keep this identical to the room's name in the Roborock app — the <code>native-auto</code> strategy pairs rooms by this name.</p>
             ${this._textField("Display name", room.name,
               v => this._setRoom(vacIdx, roomIdx, { name: v }), "e.g. Bedroom")}
             ${(this._config.vacuums[vacIdx]?.clean_action?.type === "native-area" ||
@@ -917,6 +918,15 @@ export class AnyVacCardEditor extends LitElement {
         ${vac.integration_entity ? this._selectField("Hide vacuum map (show only floorplan + robot/path)", vac.hide_map ? "yes" : "no",
           [{ value: "no", label: "no" }, { value: "yes", label: "yes" }],
           v => this._setVacuum(mapVac, { hide_map: v === "yes" })) : nothing}
+
+        ${vac.integration_entity ? html`
+          ${this._textField("Path colour (hex)", vac.path_color, v => this._setVacuum(mapVac, { path_color: v || undefined }), "#69d2ff")}
+          ${this._numberSlider("Path width", vac.path_width ?? 100, 20, 300, 10, v => this._setVacuum(mapVac, { path_width: v }), "%")}
+          ${vac.image ? this._selectField("Robot image on map (uses status image)", vac.robot_image_on_map ? "yes" : "no",
+            [{ value: "no", label: "no" }, { value: "yes", label: "yes" }],
+            v => this._setVacuum(mapVac, { robot_image_on_map: v === "yes" })) : nothing}
+          ${vac.robot_image_on_map ? this._numberSlider("Robot image size", vac.robot_size ?? 100, 40, 220, 10, v => this._setVacuum(mapVac, { robot_size: v }), "%") : nothing}
+        ` : nothing}
 
         ${this._numberSlider("Card height (0=auto)", vac.base_height ?? 0, 0, 700, 10,
           v => this._setVacuum(mapVac, { base_height: v > 0 ? v : undefined }), "px")}
