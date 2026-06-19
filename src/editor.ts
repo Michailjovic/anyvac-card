@@ -914,13 +914,13 @@ export class AnyVacCardEditor extends LitElement {
           v => this._setConfig({ map_mode: v === "merged" ? "merged" : undefined }))}
 
         ${this._selectField("Base layer", (vac.base ?? "map"),
-          [{ value: "map", label: "Vacuum map" }, { value: "image", label: "Custom image" }, { value: "combined", label: "Image + map" }],
+          [{ value: "map", label: "Vacuum map" }, { value: "combined", label: "Image + map" }],
           v => this._setVacuum(mapVac, { base: v }))}
 
         ${this._entityPicker("AnyVac integration sensor", vac.integration_entity, ["sensor"],
           v => this._setVacuum(mapVac, { integration_entity: v }))}
 
-        ${vac.integration_entity ? this._selectField("Hide vacuum map (show only floorplan + robot/path)", vac.hide_map ? "yes" : "no",
+        ${(vac.integration_entity || this._config.map_mode === "merged") ? this._selectField("Hide vacuum map (show only floorplan + robot/path)", vac.hide_map ? "yes" : "no",
           [{ value: "no", label: "no" }, { value: "yes", label: "yes" }],
           v => this._setVacuum(mapVac, { hide_map: v === "yes" })) : nothing}
 
@@ -931,12 +931,13 @@ export class AnyVacCardEditor extends LitElement {
             [{ value: "no", label: "no" }, { value: "yes", label: "yes" }],
             v => this._setVacuum(mapVac, { robot_image_on_map: v === "yes" })) : nothing}
           ${vac.robot_image_on_map ? this._numberSlider("Robot image size", vac.robot_size ?? 100, 40, 220, 10, v => this._setVacuum(mapVac, { robot_size: v }), "%") : nothing}
+          ${vac.robot_image_on_map ? this._numberSlider("Robot image rotation", vac.robot_image_rotation ?? 0, -180, 180, 15, v => this._setVacuum(mapVac, { robot_image_rotation: v }), "°") : nothing}
         ` : nothing}
 
         ${this._numberSlider("Card height (0=auto)", vac.base_height ?? 0, 0, 700, 10,
           v => this._setVacuum(mapVac, { base_height: v > 0 ? v : undefined }), "px")}
 
-        ${vac.base === "combined" ? html`
+        ${(vac.base === "combined" || this._config.map_mode === "merged") ? html`
           ${this._numberSlider("Overlay opacity", vac.overlay_opacity ?? 55, 0, 100, 5,
             v => this._setVacuum(mapVac, { overlay_opacity: v }), "%")}
           ${this._selectField("Overlay blend", (vac.overlay_blend ?? "normal"),
@@ -944,7 +945,7 @@ export class AnyVacCardEditor extends LitElement {
             v => this._setVacuum(mapVac, { overlay_blend: v }))}
         ` : nothing}
 
-        ${vac.base === "image" || vac.base === "combined" ? html`
+        ${vac.base === "image" || vac.base === "combined" || this._config.map_mode === "merged" ? html`
           ${this._textField("Image src (URL)", vac.image_base?.src, v => this._setImageBase(mapVac, { src: v }), "/local/anyvac/flat.svg")}
           ${this._numberSlider("Image rotation", vac.image_base?.rotation ?? 0, 0, 360, 90, v => this._setImageBase(mapVac, { rotation: v }), "°")}
           ${this._numberSlider("Image scale", vac.image_base?.scale ?? 100, 50, 200, 5, v => this._setImageBase(mapVac, { scale: v }), "%")}

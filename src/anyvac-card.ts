@@ -1304,7 +1304,7 @@ export class AnyVacCard extends LitElement {
       : nothing;
     const useImg = !!(vac.robot_image_on_map && vac.image);
     const robSize = rr * 2.6 * ((vac.robot_size ?? 100) / 100);
-    const robA = vp && vp.a != null ? vp.a : 0;
+    const robA = (vp && vp.a != null ? vp.a : 0) + (vac.robot_image_rotation ?? 0);
     const robotT = rob
       ? (useImg
           ? svg`<image href=${vac.image!} x=${(rob.x - robSize / 2).toFixed(1)} y=${(rob.y - robSize / 2).toFixed(1)} width=${robSize.toFixed(1)} height=${robSize.toFixed(1)} preserveAspectRatio="xMidYMid meet" transform=${"rotate(" + robA + " " + rob.x.toFixed(1) + " " + rob.y.toFixed(1) + ")"}></image>`
@@ -1317,36 +1317,35 @@ export class AnyVacCard extends LitElement {
     const shown = [...this._shownSet].filter((i) => i < this._config.vacuums.length).map((i) => this._config.vacuums[i]);
     if (!shown.length) return nothing;
     const primary = shown.find((v) => v.image_base?.src) ?? shown[0];
-    const base = primary.base ?? (primary.image_base?.src && !primary.map?.entity ? "image" : "map");
     const ib = primary.image_base;
-    const imgSrc = ib?.src;
-    const mapUrl = primary.map?.entity ? this._mapUrl(primary.map.entity) : null;
-    const showImage = (base === "image" || base === "combined") && !!imgSrc;
-    const showMap = (base === "map" || base === "combined") && !!mapUrl;
-    if (!showImage && !showMap) return nothing;
-    const m0 = primary.map;
+    const hasImage = !!ib?.src;
     const fixedH = typeof primary.base_height === "number" && primary.base_height > 0;
-    const wrapClass = fixedH ? "map-wrap--fixed" : (showImage ? "map-wrap--image" : "");
+    const wrapClass = fixedH ? "map-wrap--fixed" : (hasImage ? "map-wrap--image" : "");
     const wrapStyle = styleMap(fixedH ? { height: (primary.base_height ?? 0) + "px" } : {});
     const imgClass = "image-base-img" + (fixedH ? " image-base-img--fit" : "");
     return html`
       <div class="map-wrap ${wrapClass}" style=${wrapStyle}>
-        ${showImage ? html`
-          <img class="${imgClass}" src=${imgSrc!} alt="Floorplan"
+        ${hasImage ? html`
+          <img class="${imgClass}" src=${ib!.src!} alt="Floorplan"
             style=${styleMap({
               transform: "translate(" + (ib?.offset_x ?? 0) + "%," + (ib?.offset_y ?? 0) + "%) rotate(" + (ib?.rotation ?? 0) + "deg) scale(" + ((ib?.scale ?? 100) / 100) + ")",
             })} />
         ` : nothing}
-        ${showMap ? html`
-          <img class="map-img ${showImage ? "map-img--overlay" : ""}" src=${mapUrl!} alt="Vacuum map"
+        ${shown.map((v, idx) => {
+          const mUrl = v.map?.entity ? this._mapUrl(v.map.entity) : null;
+          if (!mUrl || v.hide_map) return nothing;
+          const mm = v.map;
+          const overlay = hasImage || idx > 0;
+          return html`<img class="map-img ${overlay ? "map-img--overlay" : ""}" src=${mUrl} alt="Vacuum map"
             style=${styleMap({
-              left: (50 + (m0?.offset_x ?? 0)) + "%",
-              top: (50 + (m0?.offset_y ?? 0)) + "%",
-              width: (m0?.scale ?? 100) + "%",
-              transform: "translate(-50%,-50%) rotate(" + (m0?.rotation ?? 0) + "deg)",
-              ...(primary.hide_map ? { opacity: "0" } : (showImage ? { opacity: String((primary.overlay_opacity ?? 55) / 100), mixBlendMode: primary.overlay_blend ?? "normal" } : {})),
-            })} />
-        ` : nothing}
+              left: (50 + (mm?.offset_x ?? 0)) + "%",
+              top: (50 + (mm?.offset_y ?? 0)) + "%",
+              width: (mm?.scale ?? 100) + "%",
+              transform: "translate(-50%,-50%) rotate(" + (mm?.rotation ?? 0) + "deg)",
+              opacity: String((v.overlay_opacity ?? (overlay ? 55 : 100)) / 100),
+              mixBlendMode: v.overlay_blend ?? "normal",
+            })} />`;
+        })}
         ${shown.map((v) => (v.integration_entity ? this._renderIntegrationOverlay(v, v.map) : nothing))}
         ${shown.map((v) => (v.rooms ?? []).map((r) => this._renderRoomOverlay(r, v)))}
       </div>

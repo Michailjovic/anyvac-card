@@ -87,7 +87,7 @@ const t={ATTRIBUTE:1},e=t=>(...e)=>({_$litDirective$:t,values:e});let i$1 = clas
 
 const CARD_NAME = "anyvac-card";
 const EDITOR_NAME = "anyvac-card-editor";
-const CARD_VERSION = "0.7.0";
+const CARD_VERSION = "0.8.0";
 /** Server-side tracking blueprint */
 const BLUEPRINT_VERSION = "1.0.0";
 const BLUEPRINT_PATH = "anyvac_card/cleaning_tracker.yaml";
@@ -1488,7 +1488,7 @@ let AnyVacCard = class AnyVacCard extends i$2 {
             : A;
         const useImg = !!(vac.robot_image_on_map && vac.image);
         const robSize = rr * 2.6 * ((vac.robot_size ?? 100) / 100);
-        const robA = vp && vp.a != null ? vp.a : 0;
+        const robA = (vp && vp.a != null ? vp.a : 0) + (vac.robot_image_rotation ?? 0);
         const robotT = rob
             ? (useImg
                 ? w `<image href=${vac.image} x=${(rob.x - robSize / 2).toFixed(1)} y=${(rob.y - robSize / 2).toFixed(1)} width=${robSize.toFixed(1)} height=${robSize.toFixed(1)} preserveAspectRatio="xMidYMid meet" transform=${"rotate(" + robA + " " + rob.x.toFixed(1) + " " + rob.y.toFixed(1) + ")"}></image>`
@@ -1501,37 +1501,36 @@ let AnyVacCard = class AnyVacCard extends i$2 {
         if (!shown.length)
             return A;
         const primary = shown.find((v) => v.image_base?.src) ?? shown[0];
-        const base = primary.base ?? (primary.image_base?.src && !primary.map?.entity ? "image" : "map");
         const ib = primary.image_base;
-        const imgSrc = ib?.src;
-        const mapUrl = primary.map?.entity ? this._mapUrl(primary.map.entity) : null;
-        const showImage = (base === "image" || base === "combined") && !!imgSrc;
-        const showMap = (base === "map" || base === "combined") && !!mapUrl;
-        if (!showImage && !showMap)
-            return A;
-        const m0 = primary.map;
+        const hasImage = !!ib?.src;
         const fixedH = typeof primary.base_height === "number" && primary.base_height > 0;
-        const wrapClass = fixedH ? "map-wrap--fixed" : (showImage ? "map-wrap--image" : "");
+        const wrapClass = fixedH ? "map-wrap--fixed" : (hasImage ? "map-wrap--image" : "");
         const wrapStyle = o(fixedH ? { height: (primary.base_height ?? 0) + "px" } : {});
         const imgClass = "image-base-img" + (fixedH ? " image-base-img--fit" : "");
         return b `
       <div class="map-wrap ${wrapClass}" style=${wrapStyle}>
-        ${showImage ? b `
-          <img class="${imgClass}" src=${imgSrc} alt="Floorplan"
+        ${hasImage ? b `
+          <img class="${imgClass}" src=${ib.src} alt="Floorplan"
             style=${o({
             transform: "translate(" + (ib?.offset_x ?? 0) + "%," + (ib?.offset_y ?? 0) + "%) rotate(" + (ib?.rotation ?? 0) + "deg) scale(" + ((ib?.scale ?? 100) / 100) + ")",
         })} />
         ` : A}
-        ${showMap ? b `
-          <img class="map-img ${showImage ? "map-img--overlay" : ""}" src=${mapUrl} alt="Vacuum map"
+        ${shown.map((v, idx) => {
+            const mUrl = v.map?.entity ? this._mapUrl(v.map.entity) : null;
+            if (!mUrl || v.hide_map)
+                return A;
+            const mm = v.map;
+            const overlay = hasImage || idx > 0;
+            return b `<img class="map-img ${overlay ? "map-img--overlay" : ""}" src=${mUrl} alt="Vacuum map"
             style=${o({
-            left: (50 + (m0?.offset_x ?? 0)) + "%",
-            top: (50 + (m0?.offset_y ?? 0)) + "%",
-            width: (m0?.scale ?? 100) + "%",
-            transform: "translate(-50%,-50%) rotate(" + (m0?.rotation ?? 0) + "deg)",
-            ...(primary.hide_map ? { opacity: "0" } : (showImage ? { opacity: String((primary.overlay_opacity ?? 55) / 100), mixBlendMode: primary.overlay_blend ?? "normal" } : {})),
-        })} />
-        ` : A}
+                left: (50 + (mm?.offset_x ?? 0)) + "%",
+                top: (50 + (mm?.offset_y ?? 0)) + "%",
+                width: (mm?.scale ?? 100) + "%",
+                transform: "translate(-50%,-50%) rotate(" + (mm?.rotation ?? 0) + "deg)",
+                opacity: String((v.overlay_opacity ?? (overlay ? 55 : 100)) / 100),
+                mixBlendMode: v.overlay_blend ?? "normal",
+            })} />`;
+        })}
         ${shown.map((v) => (v.integration_entity ? this._renderIntegrationOverlay(v, v.map) : A))}
         ${shown.map((v) => (v.rooms ?? []).map((r) => this._renderRoomOverlay(r, v)))}
       </div>
@@ -3219,27 +3218,28 @@ let AnyVacCardEditor = class AnyVacCardEditor extends i$2 {
 
         ${this._selectField("Map mode (all vacuums)", this._config.map_mode ?? "split", [{ value: "split", label: "Split — one map per vacuum" }, { value: "merged", label: "Merged — all in one map" }], v => this._setConfig({ map_mode: v === "merged" ? "merged" : undefined }))}
 
-        ${this._selectField("Base layer", (vac.base ?? "map"), [{ value: "map", label: "Vacuum map" }, { value: "image", label: "Custom image" }, { value: "combined", label: "Image + map" }], v => this._setVacuum(mapVac, { base: v }))}
+        ${this._selectField("Base layer", (vac.base ?? "map"), [{ value: "map", label: "Vacuum map" }, { value: "combined", label: "Image + map" }], v => this._setVacuum(mapVac, { base: v }))}
 
         ${this._entityPicker("AnyVac integration sensor", vac.integration_entity, ["sensor"], v => this._setVacuum(mapVac, { integration_entity: v }))}
 
-        ${vac.integration_entity ? this._selectField("Hide vacuum map (show only floorplan + robot/path)", vac.hide_map ? "yes" : "no", [{ value: "no", label: "no" }, { value: "yes", label: "yes" }], v => this._setVacuum(mapVac, { hide_map: v === "yes" })) : A}
+        ${(vac.integration_entity || this._config.map_mode === "merged") ? this._selectField("Hide vacuum map (show only floorplan + robot/path)", vac.hide_map ? "yes" : "no", [{ value: "no", label: "no" }, { value: "yes", label: "yes" }], v => this._setVacuum(mapVac, { hide_map: v === "yes" })) : A}
 
         ${vac.integration_entity ? b `
           ${this._textField("Path colour (hex)", vac.path_color, v => this._setVacuum(mapVac, { path_color: v || undefined }), "#69d2ff")}
           ${this._numberSlider("Path width", vac.path_width ?? 100, 20, 300, 10, v => this._setVacuum(mapVac, { path_width: v }), "%")}
           ${vac.image ? this._selectField("Robot image on map (uses status image)", vac.robot_image_on_map ? "yes" : "no", [{ value: "no", label: "no" }, { value: "yes", label: "yes" }], v => this._setVacuum(mapVac, { robot_image_on_map: v === "yes" })) : A}
           ${vac.robot_image_on_map ? this._numberSlider("Robot image size", vac.robot_size ?? 100, 40, 220, 10, v => this._setVacuum(mapVac, { robot_size: v }), "%") : A}
+          ${vac.robot_image_on_map ? this._numberSlider("Robot image rotation", vac.robot_image_rotation ?? 0, -180, 180, 15, v => this._setVacuum(mapVac, { robot_image_rotation: v }), "°") : A}
         ` : A}
 
         ${this._numberSlider("Card height (0=auto)", vac.base_height ?? 0, 0, 700, 10, v => this._setVacuum(mapVac, { base_height: v > 0 ? v : undefined }), "px")}
 
-        ${vac.base === "combined" ? b `
+        ${(vac.base === "combined" || this._config.map_mode === "merged") ? b `
           ${this._numberSlider("Overlay opacity", vac.overlay_opacity ?? 55, 0, 100, 5, v => this._setVacuum(mapVac, { overlay_opacity: v }), "%")}
           ${this._selectField("Overlay blend", (vac.overlay_blend ?? "normal"), [{ value: "normal", label: "normal" }, { value: "lighten", label: "lighten (isolate path)" }, { value: "screen", label: "screen" }, { value: "plus-lighter", label: "plus-lighter" }], v => this._setVacuum(mapVac, { overlay_blend: v }))}
         ` : A}
 
-        ${vac.base === "image" || vac.base === "combined" ? b `
+        ${vac.base === "image" || vac.base === "combined" || this._config.map_mode === "merged" ? b `
           ${this._textField("Image src (URL)", vac.image_base?.src, v => this._setImageBase(mapVac, { src: v }), "/local/anyvac/flat.svg")}
           ${this._numberSlider("Image rotation", vac.image_base?.rotation ?? 0, 0, 360, 90, v => this._setImageBase(mapVac, { rotation: v }), "°")}
           ${this._numberSlider("Image scale", vac.image_base?.scale ?? 100, 50, 200, 5, v => this._setImageBase(mapVac, { scale: v }), "%")}

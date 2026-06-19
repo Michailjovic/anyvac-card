@@ -11,6 +11,22 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Rooms from the integration (real room polygons / names) for clickable cleaning on the floorplan.
 - Milestone 3b: companion `anyvac` integration data layers (clean-history, statistics).
 
+## [0.8.0] - 2026-06-19
+
+### Added
+
+- **Robot image rotation** — a *Robot image rotation* slider corrects the orientation of the robot
+  image on the map (added on top of the live heading).
+
+### Changed
+
+- **Merged map renders each robot's own map** — in `merged` mode every shown vacuum now draws its own
+  vacuum map over the shared floorplan, each with its **own opacity slider, blend, on/off (Hide map)
+  and seating**, so the maps can be stacked and aligned independently. Opacity / blend / image / Hide
+  map controls are now shown per vacuum in merged mode.
+- **Base layer** — the standalone *Custom image* option was removed from the selector; choices are now
+  *Vacuum map* and *Image + map* (a custom floorplan is the base in merged mode).
+
 ## [0.7.0] - 2026-06-19
 
 ### Added

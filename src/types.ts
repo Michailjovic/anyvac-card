@@ -193,6 +193,8 @@ export interface VacuumConfig {
   robot_image_on_map?: boolean;
   /** Integration vector: robot image size, percent of default (default 100). */
   robot_size?: number;
+  /** Integration vector: extra rotation (deg) added to the robot image to correct its orientation. */
+  robot_image_rotation?: number;
   map?: MapConfig;
   rooms?: RoomConfig[];
   clean_action?: CleanAction;
