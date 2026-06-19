@@ -914,6 +914,10 @@ export class AnyVacCardEditor extends LitElement {
         ${this._entityPicker("AnyVac integration sensor", vac.integration_entity, ["sensor"],
           v => this._setVacuum(mapVac, { integration_entity: v }))}
 
+        ${vac.integration_entity ? this._selectField("Hide vacuum map (show only floorplan + robot/path)", vac.hide_map ? "yes" : "no",
+          [{ value: "no", label: "no" }, { value: "yes", label: "yes" }],
+          v => this._setVacuum(mapVac, { hide_map: v === "yes" })) : nothing}
+
         ${this._numberSlider("Card height (0=auto)", vac.base_height ?? 0, 0, 700, 10,
           v => this._setVacuum(mapVac, { base_height: v > 0 ? v : undefined }), "px")}
 

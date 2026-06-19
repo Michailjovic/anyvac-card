@@ -87,7 +87,7 @@ const t={ATTRIBUTE:1},e=t=>(...e)=>({_$litDirective$:t,values:e});let i$1 = clas
 
 const CARD_NAME = "anyvac-card";
 const EDITOR_NAME = "anyvac-card-editor";
-const CARD_VERSION = "0.4.0";
+const CARD_VERSION = "0.5.0";
 /** Server-side tracking blueprint */
 const BLUEPRINT_VERSION = "1.0.0";
 const BLUEPRINT_PATH = "anyvac_card/cleaning_tracker.yaml";
@@ -206,6 +206,8 @@ let AnyVacCard = class AnyVacCard extends i$2 {
         this._calibCircle = { x: 50, y: 50 };
         this._calibContent = { x: 50, y: 50 };
         this._dbg = "";
+        this._zoneDrag = null;
+        this._zonePending = null;
         /** Výběr místností — drží se lokálně v kartě (bez potřeby input_boolean helper entity) */
         this._localRoomSel = new Map();
         /** Aktivní úklidy — sledování průběhu pro vyhodnocení úspěchu */
@@ -1227,7 +1229,7 @@ let AnyVacCard = class AnyVacCard extends i$2 {
         const y = ((e.clientY - r.top) / r.height) * 100;
         const content = this._clickToContent(vac, e.clientX, e.clientY) ?? { x, y };
         if (this._mapMode === "pin") {
-            const mm = this._mapToVac(vac.entity, content.x, content.y);
+            const mm = this._cmdMm(vac, content);
             this._dbg = "px " + content.x.toFixed(1) + "%," + content.y.toFixed(1) + "% -> mm " + (mm ? Math.round(mm.x) + "," + Math.round(mm.y) : "(no calib)");
             if (mm)
                 void this._gotoMm(vac.entity, mm);
@@ -1261,19 +1263,106 @@ let AnyVacCard = class AnyVacCard extends i$2 {
         const w = el.offsetWidth || 1, h = el.offsetHeight || 1;
         return { x: (lx / w + 0.5) * 100, y: (ly / h + 0.5) * 100 };
     }
+    _intMapToVac(vac, content) {
+        const at = this.hass?.states?.[vac.integration_entity ?? ""]?.attributes;
+        if (!at)
+            return null;
+        const t = this._affine(at.calibration_points);
+        const dims = at.image_dims;
+        if (!t || !dims)
+            return null;
+        let NW = (dims.width ?? 0) * (dims.scale ?? 1);
+        let NH = (dims.height ?? 0) * (dims.scale ?? 1);
+        const rot = dims.rotation ?? 0;
+        if (rot === 90 || rot === 270) {
+            const tmp = NW;
+            NW = NH;
+            NH = tmp;
+        }
+        if (!NW || !NH)
+            return null;
+        const px = (content.x / 100) * NW, py = (content.y / 100) * NH;
+        return { x: t.a * px + t.b * py + t.e, y: t.c * px + t.d * py + t.f };
+    }
+    /** mm for a click, preferring the accurate integration calibration over the manual one. */
+    _cmdMm(vac, content) {
+        if (vac.integration_entity) {
+            const m = this._intMapToVac(vac, content);
+            if (m)
+                return m;
+        }
+        return this._mapToVac(vac.entity, content.x, content.y);
+    }
+    _onZoneDown(vac, e) {
+        if (this._mapMode !== "zone" || this._modeEntity !== vac.entity)
+            return;
+        const el = e.currentTarget;
+        el.setPointerCapture?.(e.pointerId);
+        const r = el.getBoundingClientRect();
+        const x = ((e.clientX - r.left) / r.width) * 100;
+        const y = ((e.clientY - r.top) / r.height) * 100;
+        this._zonePending = null;
+        this._zoneDrag = { x0: x, y0: y, x1: x, y1: y };
+    }
+    _onZoneMove(vac, e) {
+        if (!this._zoneDrag || this._mapMode !== "zone" || this._modeEntity !== vac.entity)
+            return;
+        const el = e.currentTarget;
+        const r = el.getBoundingClientRect();
+        this._zoneDrag = { x0: this._zoneDrag.x0, y0: this._zoneDrag.y0,
+            x1: ((e.clientX - r.left) / r.width) * 100, y1: ((e.clientY - r.top) / r.height) * 100 };
+    }
+    _onZoneUp(vac, e) {
+        if (!this._zoneDrag || this._mapMode !== "zone" || this._modeEntity !== vac.entity)
+            return;
+        const el = e.currentTarget;
+        const r = el.getBoundingClientRect();
+        const ax = r.left + (this._zoneDrag.x0 / 100) * r.width;
+        const ay = r.top + (this._zoneDrag.y0 / 100) * r.height;
+        const ca = this._clickToContent(vac, ax, ay);
+        const cb = this._clickToContent(vac, e.clientX, e.clientY);
+        const ma = ca ? this._cmdMm(vac, ca) : null;
+        const mb = cb ? this._cmdMm(vac, cb) : null;
+        const big = Math.abs(this._zoneDrag.x1 - this._zoneDrag.x0) > 2 || Math.abs(this._zoneDrag.y1 - this._zoneDrag.y0) > 2;
+        if (ma && mb && big) {
+            this._zonePending = {
+                x1: Math.round(Math.min(ma.x, mb.x)), y1: Math.round(Math.min(ma.y, mb.y)),
+                x2: Math.round(Math.max(ma.x, mb.x)), y2: Math.round(Math.max(ma.y, mb.y)),
+            };
+        }
+        else {
+            this._zoneDrag = null;
+        }
+    }
+    _confirmZone(vac) {
+        const z = this._zonePending;
+        if (!z)
+            return;
+        void this.hass.callService("vacuum", "send_command", { entity_id: vac.entity, command: "app_zoned_clean", params: [[z.x1, z.y1, z.x2, z.y2, 1]] });
+        this._zonePending = null;
+        this._zoneDrag = null;
+        this._mapMode = "normal";
+        this._modeEntity = null;
+    }
+    _cancelZone() { this._zonePending = null; this._zoneDrag = null; }
     _renderMapTools(vac) {
         if (!vac.map && !vac.image_base)
             return A;
         const hasCalib = !!this._loadCalib(vac.entity);
+        const canCmd = hasCalib || !!vac.integration_entity;
         const mode = this._modeEntity === vac.entity ? this._mapMode : "normal";
         return b `
       <div class="map-tools">
         ${vac.map?.entity ? b `<button class="mtbtn" @click=${() => this._refreshMap(vac)} title="Refresh map">
           <ha-icon icon="mdi:refresh"></ha-icon><span>Refresh</span>
         </button>` : A}
-        <button class="mtbtn ${mode === "pin" ? "on" : ""}" ?disabled=${!hasCalib}
+        <button class="mtbtn ${mode === "pin" ? "on" : ""}" ?disabled=${!canCmd}
           @click=${() => this._toggleMode(vac.entity, "pin")} title="Pin & Go">
           <ha-icon icon="mdi:map-marker-radius"></ha-icon><span>Pin &amp; Go</span>
+        </button>
+        <button class="mtbtn ${mode === "zone" ? "on" : ""}" ?disabled=${!canCmd}
+          @click=${() => this._toggleMode(vac.entity, "zone")} title="Zone clean">
+          <ha-icon icon="mdi:select-drag"></ha-icon><span>Zone</span>
         </button>
         <button class="mtbtn ${mode === "calib" ? "on" : ""}" @click=${() => this._startCalib(vac)}>
           <ha-icon icon="mdi:crosshairs-gps"></ha-icon><span>${hasCalib ? "Recalibrate" : "Calibrate"}</span>
@@ -1295,6 +1384,15 @@ let AnyVacCard = class AnyVacCard extends i$2 {
           </div>`
             : A}
       ${mode === "pin" ? b `<div class="calib-panel">Tap the map to send the robot there.</div>` : A}
+      ${mode === "zone" ? b `<div class="calib-panel">
+        ${this._zonePending
+            ? b `<div>Clean this zone? (${this._zonePending.x2 - this._zonePending.x1}&times;${this._zonePending.y2 - this._zonePending.y1}&nbsp;mm)</div>
+              <div class="calib-actions">
+                <button class="mtbtn on" @click=${() => this._confirmZone(vac)}>Clean zone</button>
+                <button class="mtbtn" @click=${() => this._cancelZone()}>Cancel</button>
+              </div>`
+            : b `Drag a rectangle on the map to set a cleaning zone.`}
+      </div>` : A}
     `;
     }
     _intAffine(cal) {
@@ -1393,13 +1491,25 @@ let AnyVacCard = class AnyVacCard extends i$2 {
             top: (50 + (m?.offset_y ?? 0)) + "%",
             width: (m?.scale ?? 100) + "%",
             transform: "translate(-50%,-50%) rotate(" + (m?.rotation ?? 0) + "deg)",
-            ...(showImage ? { opacity: String((vac.overlay_opacity ?? 55) / 100), mixBlendMode: vac.overlay_blend ?? "normal" } : {}),
+            ...(vac.hide_map ? { opacity: "0" } : (showImage ? { opacity: String((vac.overlay_opacity ?? 55) / 100), mixBlendMode: vac.overlay_blend ?? "normal" } : {})),
         })} />
         ` : A}
         ${showMap ? this._renderIntegrationOverlay(vac, m) : A}
         ${(vac.rooms ?? []).map((r) => this._renderRoomOverlay(r, vac))}
         ${this._mapMode !== "normal" && this._modeEntity === vac.entity
-            ? b `<div class="map-clickcatch" @click=${(e) => this._onMapClick(vac, e)}></div>`
+            ? b `<div class="map-clickcatch" style="touch-action:none"
+              @click=${(e) => this._onMapClick(vac, e)}
+              @pointerdown=${(e) => this._onZoneDown(vac, e)}
+              @pointermove=${(e) => this._onZoneMove(vac, e)}
+              @pointerup=${(e) => this._onZoneUp(vac, e)}></div>`
+            : A}
+        ${this._mapMode === "zone" && this._modeEntity === vac.entity && this._zoneDrag
+            ? b `<div class="zone-rect" style=${o({
+                left: Math.min(this._zoneDrag.x0, this._zoneDrag.x1) + "%",
+                top: Math.min(this._zoneDrag.y0, this._zoneDrag.y1) + "%",
+                width: Math.abs(this._zoneDrag.x1 - this._zoneDrag.x0) + "%",
+                height: Math.abs(this._zoneDrag.y1 - this._zoneDrag.y0) + "%",
+            })}></div>`
             : A}
         ${this._mapMode === "calib" && this._modeEntity === vac.entity
             ? b `<div class="calib-circle" style=${o({ left: this._calibCircle.x + "%", top: this._calibCircle.y + "%" })}></div>`
@@ -1799,6 +1909,7 @@ AnyVacCard.styles = i$5 `
     .image-base-img { position: relative; display: block; width: 100%; height: auto; transform-origin: center center; }
     .map-img--overlay { opacity: 0.55; pointer-events: none; }
     .map-vector { position: absolute; transform-origin: center center; pointer-events: none; overflow: visible; }
+    .zone-rect { position: absolute; border: 2px solid #fff; background: rgba(255,255,255,0.15); border-radius: 4px; pointer-events: none; box-shadow: 0 0 0 1px rgba(0,0,0,0.45); }
     .map-wrap--fixed { padding-top: 0; }
     .image-base-img--fit { position: absolute; inset: 0; width: 100%; height: 100%; object-fit: contain; }
 
@@ -2025,6 +2136,12 @@ __decorate([
 __decorate([
     r()
 ], AnyVacCard.prototype, "_dbg", void 0);
+__decorate([
+    r()
+], AnyVacCard.prototype, "_zoneDrag", void 0);
+__decorate([
+    r()
+], AnyVacCard.prototype, "_zonePending", void 0);
 __decorate([
     r()
 ], AnyVacCard.prototype, "_localRoomSel", void 0);
@@ -3019,6 +3136,8 @@ let AnyVacCardEditor = class AnyVacCardEditor extends i$2 {
         ${this._selectField("Base layer", (vac.base ?? "map"), [{ value: "map", label: "Vacuum map" }, { value: "image", label: "Custom image" }, { value: "combined", label: "Image + map" }], v => this._setVacuum(mapVac, { base: v }))}
 
         ${this._entityPicker("AnyVac integration sensor", vac.integration_entity, ["sensor"], v => this._setVacuum(mapVac, { integration_entity: v }))}
+
+        ${vac.integration_entity ? this._selectField("Hide vacuum map (show only floorplan + robot/path)", vac.hide_map ? "yes" : "no", [{ value: "no", label: "no" }, { value: "yes", label: "yes" }], v => this._setVacuum(mapVac, { hide_map: v === "yes" })) : A}
 
         ${this._numberSlider("Card height (0=auto)", vac.base_height ?? 0, 0, 700, 10, v => this._setVacuum(mapVac, { base_height: v > 0 ? v : undefined }), "px")}
 

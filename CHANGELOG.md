@@ -8,9 +8,30 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Planned
 
-- Milestone 2 cont.: zone cleaning (drag a rectangle → `app_zoned_clean`), automatic robot detection
-  (canvas frame-diff) so calibration needs no taps, live robot dot on the custom image.
-- Milestone 3: companion `anyvac` integration (clean-history, statistics).
+- Rooms from the integration (real room polygons / names) for clickable cleaning on the floorplan.
+- Milestone 3b: companion `anyvac` integration data layers (clean-history, statistics).
+
+## [0.5.0] - 2026-06-19
+
+### Added
+
+- **Floorplan-only mode** — with an integration sensor selected, a *Hide vacuum map* toggle hides the
+  Roborock map image and shows only your custom floorplan plus the vector robot and path.
+- **Pin & Go and Zone cleaning use the integration calibration** — when an AnyVac sensor is selected,
+  Pin & Go and the new **Zone** mode convert taps/drags to millimetres via the sensor's
+  `calibration_points`, so they work with **no manual calibration**. Manual calibration remains the
+  fallback when no integration sensor is set.
+- **Zone cleaning** — a new *Zone* map tool: drag a rectangle on the map/floorplan, confirm, and the
+  card sends `app_zoned_clean` for that area.
+
+## [0.4.0] - 2026-06-19
+
+### Added
+
+- **Integration mode** — when an AnyVac companion sensor (`sensor.*_anyvac_map`) is selected for a
+  vacuum, the card draws the robot (with heading) and the cleaning path as a vector overlay, using the
+  `calibration_points` exposed by the sensor to map millimetres to map pixels. No manual calibration.
+  In combined mode the vector is seated like the map overlay, so it lands on a custom floorplan.
 
 ## [0.3.7] - 2026-06-14
 

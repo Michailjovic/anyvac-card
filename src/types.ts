@@ -183,6 +183,8 @@ export interface VacuumConfig {
   overlay_blend?: string;
   /** Entity id of the AnyVac companion sensor (sensor.*_anyvac_map) for integration mode. */
   integration_entity?: string;
+  /** Integration mode: hide the Roborock map image, show only the floorplan + vector robot/path. */
+  hide_map?: boolean;
   map?: MapConfig;
   rooms?: RoomConfig[];
   clean_action?: CleanAction;
