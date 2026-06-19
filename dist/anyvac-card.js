@@ -87,7 +87,7 @@ const t={ATTRIBUTE:1},e=t=>(...e)=>({_$litDirective$:t,values:e});let i$1 = clas
 
 const CARD_NAME = "anyvac-card";
 const EDITOR_NAME = "anyvac-card-editor";
-const CARD_VERSION = "0.8.0";
+const CARD_VERSION = "0.9.0";
 /** Server-side tracking blueprint */
 const BLUEPRINT_VERSION = "1.0.0";
 const BLUEPRINT_PATH = "anyvac_card/cleaning_tracker.yaml";
@@ -208,6 +208,7 @@ let AnyVacCard = class AnyVacCard extends i$2 {
         this._dbg = "";
         this._zoneDrag = null;
         this._zonePending = null;
+        this._layers = { dry: true, wet: false };
         /** Výběr místností — drží se lokálně v kartě (bez potřeby input_boolean helper entity) */
         this._localRoomSel = new Map();
         /** Aktivní úklidy — sledování průběhu pro vyhodnocení úspěchu */
@@ -495,7 +496,44 @@ let AnyVacCard = class AnyVacCard extends i$2 {
             return sum + this._roomCleanMins(r);
         }, 0);
     }
-    _roomAgeDays(room) {
+    _intRoomRec(vac, room) {
+        const ent = vac.integration_entity;
+        if (!ent)
+            return null;
+        const rlc = this.hass.states[ent]?.attributes?.rooms_last_cleaned;
+        if (!rlc)
+            return null;
+        return (rlc[room.key] ?? rlc[room.name ?? ""] ?? null);
+    }
+    _ageDaysFromIso(iso) {
+        if (!iso)
+            return null;
+        const t = new Date(iso).getTime();
+        return isNaN(t) ? null : (Date.now() - t) / 86400000;
+    }
+    /** Room age in days. With an integration sensor, uses last_dry/last_wet/any per the active
+     *  layer(s) (both on -> the worse/older); otherwise falls back to the last_clean helper entity. */
+    _roomAgeDays(room, vac) {
+        if (vac) {
+            const rec = this._intRoomRec(vac, room);
+            if (rec) {
+                const dry = this._ageDaysFromIso(rec.dry);
+                const wet = this._ageDaysFromIso(rec.wet);
+                const any = this._ageDaysFromIso(rec.any);
+                const dOn = this._layers.dry, wOn = this._layers.wet;
+                let d;
+                if (dOn && wOn)
+                    d = Math.max(dry ?? 9999, wet ?? 9999);
+                else if (dOn)
+                    d = dry;
+                else if (wOn)
+                    d = wet;
+                else
+                    d = any;
+                if (d !== null)
+                    return d;
+            }
+        }
         if (!room.last_clean_entity)
             return null;
         const raw = this.hass.states[room.last_clean_entity]?.state;
@@ -504,7 +542,7 @@ let AnyVacCard = class AnyVacCard extends i$2 {
         return (Date.now() - new Date(raw).getTime()) / 86400000;
     }
     _roomBorderColor(room, vac) {
-        const d = this._roomAgeDays(room);
+        const d = this._roomAgeDays(room, vac);
         if (d === null)
             return "rgba(255,77,77,0.85)";
         const ths = this._config.room_thresholds ?? [
@@ -1467,8 +1505,9 @@ let AnyVacCard = class AnyVacCard extends i$2 {
         const toPx = (x, y) => ({ x: t.a * x + t.b * y + t.c, y: t.d * x + t.e * y + t.f });
         const color = this._color(vac);
         const rr = Math.max(NW, NH) / 55;
-        const path = Array.isArray(at.path) ? at.path : [];
-        const ptsStr = path.map((p) => { const q = toPx(p.x, p.y); return q.x.toFixed(1) + "," + q.y.toFixed(1); }).join(" ");
+        const toPts = (arr) => (Array.isArray(arr) ? arr : []).map((p) => { const q = toPx(p.x, p.y); return q.x.toFixed(1) + "," + q.y.toFixed(1); }).join(" ");
+        const dryStr = this._layers.dry ? toPts(at.path) : "";
+        const wetStr = this._layers.wet ? toPts(at.mop_path) : "";
         const vp = at.vacuum_position;
         const rob = vp ? toPx(vp.x, vp.y) : null;
         let head = null;
@@ -1483,8 +1522,12 @@ let AnyVacCard = class AnyVacCard extends i$2 {
             aspectRatio: NW + " / " + NH,
             transform: "translate(-50%,-50%) rotate(" + (m?.rotation ?? 0) + "deg)",
         };
-        const pathT = ptsStr
-            ? w `<polyline points=${ptsStr} fill="none" stroke=${vac.path_color || color} stroke-width=${(rr * 0.35 * ((vac.path_width ?? 100) / 100)).toFixed(2)} stroke-linejoin="round" stroke-linecap="round" opacity="0.85"></polyline>`
+        const sw = (rr * 0.35 * ((vac.path_width ?? 100) / 100)).toFixed(2);
+        const dryT = dryStr
+            ? w `<polyline points=${dryStr} fill="none" stroke=${vac.path_color || color} stroke-width=${sw} stroke-linejoin="round" stroke-linecap="round" opacity="0.85"></polyline>`
+            : A;
+        const wetT = wetStr
+            ? w `<polyline points=${wetStr} fill="none" stroke="#49b6ff" stroke-width=${sw} stroke-linejoin="round" stroke-linecap="round" opacity="0.8"></polyline>`
             : A;
         const useImg = !!(vac.robot_image_on_map && vac.image);
         const robSize = rr * 2.6 * ((vac.robot_size ?? 100) / 100);
@@ -1494,7 +1537,39 @@ let AnyVacCard = class AnyVacCard extends i$2 {
                 ? w `<image href=${vac.image} x=${(rob.x - robSize / 2).toFixed(1)} y=${(rob.y - robSize / 2).toFixed(1)} width=${robSize.toFixed(1)} height=${robSize.toFixed(1)} preserveAspectRatio="xMidYMid meet" transform=${"rotate(" + robA + " " + rob.x.toFixed(1) + " " + rob.y.toFixed(1) + ")"}></image>`
                 : w `${head ? w `<line x1=${rob.x.toFixed(1)} y1=${rob.y.toFixed(1)} x2=${head.x.toFixed(1)} y2=${head.y.toFixed(1)} stroke="#ffffff" stroke-width=${(rr * 0.3).toFixed(2)} stroke-linecap="round"></line>` : A}<circle cx=${rob.x.toFixed(1)} cy=${rob.y.toFixed(1)} r=${rr.toFixed(1)} fill=${color} stroke="#ffffff" stroke-width=${(rr * 0.18).toFixed(2)}></circle>`)
             : A;
-        return b `<svg class="map-vector" viewBox="0 0 ${NW} ${NH}" preserveAspectRatio="none" style=${o(seat)}>${pathT}${robotT}</svg>`;
+        return b `<svg class="map-vector" viewBox="0 0 ${NW} ${NH}" preserveAspectRatio="none" style=${o(seat)}>${dryT}${wetT}${robotT}</svg>`;
+    }
+    _renderLayerToggles(vacs) {
+        const withInt = vacs.filter((v) => v.integration_entity);
+        if (!withInt.length)
+            return A;
+        const oldest = (type) => {
+            let max = null;
+            for (const v of withInt) {
+                const rlc = this.hass.states[v.integration_entity]?.attributes?.rooms_last_cleaned;
+                if (!rlc)
+                    continue;
+                for (const rec of Object.values(rlc)) {
+                    const d = this._ageDaysFromIso(rec?.[type]);
+                    if (d !== null && (max === null || d > max))
+                        max = d;
+                }
+            }
+            return max;
+        };
+        const badge = (d) => (d === null ? "\u2014" : d < 1 ? "<1d" : Math.round(d) + "d");
+        return b `
+      <div class="layer-toggles">
+        <button class="layer-btn ${this._layers.dry ? "on" : ""}" title="Dry layer"
+          @click=${() => { this._layers = { ...this._layers, dry: !this._layers.dry }; }}>
+          <ha-icon icon="mdi:broom"></ha-icon><span>${badge(oldest("dry"))}</span>
+        </button>
+        <button class="layer-btn ${this._layers.wet ? "on" : ""}" title="Wet layer"
+          @click=${() => { this._layers = { ...this._layers, wet: !this._layers.wet }; }}>
+          <ha-icon icon="mdi:water"></ha-icon><span>${badge(oldest("wet"))}</span>
+        </button>
+      </div>
+    `;
     }
     _renderMergedMap() {
         const shown = [...this._shownSet].filter((i) => i < this._config.vacuums.length).map((i) => this._config.vacuums[i]);
@@ -1532,6 +1607,7 @@ let AnyVacCard = class AnyVacCard extends i$2 {
             })} />`;
         })}
         ${shown.map((v) => (v.integration_entity ? this._renderIntegrationOverlay(v, v.map) : A))}
+        ${this._renderLayerToggles(shown)}
         ${shown.map((v) => (v.rooms ?? []).map((r) => this._renderRoomOverlay(r, v)))}
       </div>
     `;
@@ -1570,6 +1646,7 @@ let AnyVacCard = class AnyVacCard extends i$2 {
         })} />
         ` : A}
         ${showMap ? this._renderIntegrationOverlay(vac, m) : A}
+        ${this._renderLayerToggles([vac])}
         ${(vac.rooms ?? []).map((r) => this._renderRoomOverlay(r, vac))}
         ${this._mapMode !== "normal" && this._modeEntity === vac.entity
             ? b `<div class="map-clickcatch" style="touch-action:none"
@@ -1991,6 +2068,9 @@ AnyVacCard.styles = i$5 `
     .map-img--overlay { opacity: 0.55; pointer-events: none; }
     .map-vector { position: absolute; transform-origin: center center; pointer-events: none; overflow: visible; }
     .zone-rect { position: absolute; border: 2px solid #fff; background: rgba(255,255,255,0.15); border-radius: 4px; pointer-events: none; box-shadow: 0 0 0 1px rgba(0,0,0,0.45); }
+    .layer-toggles { position: absolute; top: 8px; right: 8px; display: flex; gap: 6px; z-index: 3; }
+    .layer-btn { display: flex; align-items: center; gap: 3px; padding: 3px 8px; border-radius: 999px; border: 1px solid rgba(255,255,255,0.2); background: rgba(0,0,0,0.45); color: rgba(255,255,255,0.55); font-size: 11px; font-weight: 600; cursor: pointer; --mdc-icon-size: 16px; }
+    .layer-btn.on { color: #fff; border-color: rgba(255,255,255,0.55); background: rgba(0,0,0,0.7); }
     .map-wrap--fixed { padding-top: 0; }
     .image-base-img--fit { position: absolute; inset: 0; width: 100%; height: 100%; object-fit: contain; }
 
@@ -2223,6 +2303,9 @@ __decorate([
 __decorate([
     r()
 ], AnyVacCard.prototype, "_zonePending", void 0);
+__decorate([
+    r()
+], AnyVacCard.prototype, "_layers", void 0);
 __decorate([
     r()
 ], AnyVacCard.prototype, "_localRoomSel", void 0);

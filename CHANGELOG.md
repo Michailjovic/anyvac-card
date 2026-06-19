@@ -11,6 +11,18 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Rooms from the integration (real room polygons / names) for clickable cleaning on the floorplan.
 - Milestone 3b: companion `anyvac` integration data layers (clean-history, statistics).
 
+## [0.9.0] - 2026-06-19
+
+### Added
+
+- **Dry / Wet view layers** — two toggle chips in the top-right of the map, each with a "how long ago"
+  badge (the oldest room for that clean type). Toggling a layer shows that type's trace (Dry = `path`,
+  Wet = `mop_path`) and colours the rooms by that type's age; with both on, rooms take the worse
+  (more-overdue) of the two. This separates *seeing* (layers) from *acting* (presets).
+- **Room age from the integration** — room colouring now reads `last_dry` / `last_wet` / `any` from the
+  AnyVac sensor (per the active layer), falling back to the old `last_clean` helper entity when no
+  integration sensor is set.
+
 ## [0.8.0] - 2026-06-19
 
 ### Added
