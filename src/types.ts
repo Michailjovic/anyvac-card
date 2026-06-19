@@ -181,6 +181,8 @@ export interface VacuumConfig {
   overlay_opacity?: number;
   /** CSS mix-blend-mode for the map overlay in combined mode (e.g. 'lighten' to isolate the path). */
   overlay_blend?: string;
+  /** Entity id of the AnyVac companion sensor (sensor.*_anyvac_map) for integration mode. */
+  integration_entity?: string;
   map?: MapConfig;
   rooms?: RoomConfig[];
   clean_action?: CleanAction;

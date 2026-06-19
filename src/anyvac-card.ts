@@ -1,4 +1,4 @@
-import { LitElement, html, css, nothing, type PropertyValues } from "lit";
+import { LitElement, html, svg, css, nothing, type PropertyValues } from "lit";
 import { customElement, property, state } from "lit/decorators.js";
 import { styleMap } from "lit/directives/style-map.js";
 
@@ -1145,6 +1145,61 @@ export class AnyVacCard extends LitElement {
     `;
   }
 
+  private _intAffine(cal: any): { a: number; b: number; c: number; d: number; e: number; f: number } | null {
+    if (!Array.isArray(cal) || cal.length < 3) return null;
+    try {
+      const M = cal.slice(0, 3).map((p: any) => [p.vacuum.x, p.vacuum.y, 1]);
+      const abc = this._solve3(M, cal.slice(0, 3).map((p: any) => p.map.x));
+      const def = this._solve3(M, cal.slice(0, 3).map((p: any) => p.map.y));
+      if (!abc || !def) return null;
+      return { a: abc[0], b: abc[1], c: abc[2], d: def[0], e: def[1], f: def[2] };
+    } catch { return null; }
+  }
+
+  /** Integration mode: draw the robot + cleaning path as a vector overlay using
+   *  the calibration_points (mm -> rendered-map px) exposed by the AnyVac sensor. */
+  private _renderIntegrationOverlay(vac: VacuumConfig, m: any) {
+    const ent = vac.integration_entity;
+    if (!ent) return nothing;
+    const at = this.hass?.states?.[ent]?.attributes as any;
+    if (!at) return nothing;
+    const t = this._intAffine(at.calibration_points);
+    const dims = at.image_dims;
+    if (!t || !dims) return nothing;
+    const sc = dims.scale ?? 1;
+    let NW = (dims.width ?? 0) * sc;
+    let NH = (dims.height ?? 0) * sc;
+    const rot = dims.rotation ?? 0;
+    if (rot === 90 || rot === 270) { const tmp = NW; NW = NH; NH = tmp; }
+    if (!NW || !NH) return nothing;
+    const toPx = (x: number, y: number) => ({ x: t.a * x + t.b * y + t.c, y: t.d * x + t.e * y + t.f });
+    const color = this._color(vac);
+    const rr = Math.max(NW, NH) / 55;
+    const path = Array.isArray(at.path) ? at.path : [];
+    const ptsStr = path.map((p: any) => { const q = toPx(p.x, p.y); return q.x.toFixed(1) + "," + q.y.toFixed(1); }).join(" ");
+    const vp = at.vacuum_position;
+    const rob = vp ? toPx(vp.x, vp.y) : null;
+    let head: { x: number; y: number } | null = null;
+    if (vp && vp.a != null) {
+      const ar = (vp.a * Math.PI) / 180;
+      head = toPx(vp.x + 320 * Math.cos(ar), vp.y + 320 * Math.sin(ar));
+    }
+    const seat = {
+      left: (50 + (m?.offset_x ?? 0)) + "%",
+      top: (50 + (m?.offset_y ?? 0)) + "%",
+      width: (m?.scale ?? 100) + "%",
+      aspectRatio: NW + " / " + NH,
+      transform: "translate(-50%,-50%) rotate(" + (m?.rotation ?? 0) + "deg)",
+    };
+    const pathT = ptsStr
+      ? svg`<polyline points=${ptsStr} fill="none" stroke=${color} stroke-width=${(rr * 0.35).toFixed(2)} stroke-linejoin="round" stroke-linecap="round" opacity="0.85"></polyline>`
+      : nothing;
+    const robotT = rob
+      ? svg`${head ? svg`<line x1=${rob.x.toFixed(1)} y1=${rob.y.toFixed(1)} x2=${head.x.toFixed(1)} y2=${head.y.toFixed(1)} stroke="#ffffff" stroke-width=${(rr * 0.3).toFixed(2)} stroke-linecap="round"></line>` : nothing}<circle cx=${rob.x.toFixed(1)} cy=${rob.y.toFixed(1)} r=${rr.toFixed(1)} fill=${color} stroke="#ffffff" stroke-width=${(rr * 0.18).toFixed(2)}></circle>`
+      : nothing;
+    return html`<svg class="map-vector" viewBox="0 0 ${NW} ${NH}" preserveAspectRatio="none" style=${styleMap(seat)}>${pathT}${robotT}</svg>`;
+  }
+
   private _renderMap(vac: VacuumConfig) {
     const base = vac.base ?? (vac.image_base?.src && !vac.map?.entity ? "image" : "map");
     const ib = vac.image_base;
@@ -1178,6 +1233,7 @@ export class AnyVacCard extends LitElement {
               ...(showImage ? { opacity: String((vac.overlay_opacity ?? 55) / 100), mixBlendMode: vac.overlay_blend ?? "normal" } : {}),
             })} />
         ` : nothing}
+        ${showMap ? this._renderIntegrationOverlay(vac, m) : nothing}
         ${(vac.rooms ?? []).map((r) => this._renderRoomOverlay(r, vac))}
         ${this._mapMode !== "normal" && this._modeEntity === vac.entity
           ? html`<div class="map-clickcatch" @click=${(e: MouseEvent) => this._onMapClick(vac, e)}></div>`
@@ -1599,6 +1655,7 @@ export class AnyVacCard extends LitElement {
     .map-wrap--image { padding-top: 0; }
     .image-base-img { position: relative; display: block; width: 100%; height: auto; transform-origin: center center; }
     .map-img--overlay { opacity: 0.55; pointer-events: none; }
+    .map-vector { position: absolute; transform-origin: center center; pointer-events: none; overflow: visible; }
     .map-wrap--fixed { padding-top: 0; }
     .image-base-img--fit { position: absolute; inset: 0; width: 100%; height: 100%; object-fit: contain; }
 

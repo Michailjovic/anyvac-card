@@ -911,6 +911,9 @@ export class AnyVacCardEditor extends LitElement {
           [{ value: "map", label: "Vacuum map" }, { value: "image", label: "Custom image" }, { value: "combined", label: "Image + map" }],
           v => this._setVacuum(mapVac, { base: v }))}
 
+        ${this._entityPicker("AnyVac integration sensor", vac.integration_entity, ["sensor"],
+          v => this._setVacuum(mapVac, { integration_entity: v }))}
+
         ${this._numberSlider("Card height (0=auto)", vac.base_height ?? 0, 0, 700, 10,
           v => this._setVacuum(mapVac, { base_height: v > 0 ? v : undefined }), "px")}
 
