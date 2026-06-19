@@ -266,6 +266,8 @@ export interface BackendConfig {
 export interface AnyVacCardConfig {
   type: string;
   vacuums: VacuumConfig[];
+  /** Render one shared map with all vacuums (merged), or one map per vacuum (split, default). */
+  map_mode?: "split" | "merged";
   /** Optional extra badges for whole-flat or cross-vacuum actions */
   global_actions?: GlobalAction[];
   /** Shared room overlay appearance — applies to all vacuums */

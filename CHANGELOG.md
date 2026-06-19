@@ -11,6 +11,19 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Rooms from the integration (real room polygons / names) for clickable cleaning on the floorplan.
 - Milestone 3b: companion `anyvac` integration data layers (clean-history, statistics).
 
+## [0.7.0] - 2026-06-19
+
+### Added
+
+- **Auto-filled vacuum sensors** — leave Status / Battery / Last clean / Progress / Current room /
+  Error blank and the card resolves them automatically from the vacuum's device (matched by
+  `translation_key` / `device_class`). Explicit config still wins.
+- **Merged map mode** (`map_mode: merged`) — render **one shared map** with all shown vacuums
+  overlaid (each robot's position + path in its own colour, seated by its own map transform), instead
+  of one map per vacuum. Per-vacuum controls and status stay below the shared map. A *Map mode*
+  selector was added to the editor. (First version: display + room overlays; map-click modes
+  pin&go/zone stay per-vacuum and are best used in split mode for now.)
+
 ## [0.6.0] - 2026-06-19
 
 ### Added

@@ -87,7 +87,7 @@ const t={ATTRIBUTE:1},e=t=>(...e)=>({_$litDirective$:t,values:e});let i$1 = clas
 
 const CARD_NAME = "anyvac-card";
 const EDITOR_NAME = "anyvac-card-editor";
-const CARD_VERSION = "0.6.0";
+const CARD_VERSION = "0.7.0";
 /** Server-side tracking blueprint */
 const BLUEPRINT_VERSION = "1.0.0";
 const BLUEPRINT_PATH = "anyvac_card/cleaning_tracker.yaml";
@@ -222,6 +222,7 @@ let AnyVacCard = class AnyVacCard extends i$2 {
         this._watched = null;
         /** roborock_card_event subscription (blueprint → card sync) */
         this._unsubEvents = null;
+        this._autoCache = new Map();
         this._holdEnd = () => {
             this._cancelHold();
         };
@@ -304,7 +305,7 @@ let AnyVacCard = class AnyVacCard extends i$2 {
         for (const vac of this._config?.vacuums ?? []) {
             for (const id of [vac.entity, vac.status_entity, vac.battery_entity,
                 vac.last_clean_entity, vac.progress_entity, vac.current_room_entity,
-                vac.error_entity, vac.map?.entity]) {
+                vac.error_entity, vac.map?.entity, ...Object.values(this._autoEntities(vac))]) {
                 if (id)
                     s.add(id);
             }
@@ -405,10 +406,38 @@ let AnyVacCard = class AnyVacCard extends i$2 {
     _colorKey(vac) {
         return vac.color ?? "green";
     }
+    /** Resolve a vacuum's sibling entities (battery/status/last-clean/progress/room/error) from its
+     *  device, so the user does not have to fill them in. Matched by translation_key / device_class. */
+    _autoEntities(vac) {
+        const reg = this.hass?.entities;
+        if (!reg || !vac.entity)
+            return {};
+        const cached = this._autoCache.get(vac.entity);
+        if (cached)
+            return cached;
+        const dev = reg[vac.entity]?.device_id;
+        if (!dev)
+            return {};
+        const sibs = Object.keys(reg).filter((id) => reg[id]?.device_id === dev);
+        const byTk = (tk) => sibs.find((id) => reg[id]?.translation_key === tk);
+        const byDc = (dc) => sibs.find((id) => this.hass.states[id]?.attributes?.device_class === dc);
+        const out = {
+            status: byTk("status"),
+            battery: byDc("battery"),
+            last_clean: byTk("last_clean_end"),
+            progress: byTk("clean_percent"),
+            current_room: byTk("current_room"),
+            error: byTk("vacuum_error"),
+        };
+        this._autoCache.set(vac.entity, out);
+        return out;
+    }
+    _ent(vac, kind) {
+        const explicit = vac[kind + "_entity"];
+        return explicit ?? this._autoEntities(vac)[kind];
+    }
     _statusInfo(vac) {
-        const raw = vac.status_entity
-            ? (this.hass.states[vac.status_entity]?.state ?? "unknown")
-            : (this.hass.states[vac.entity]?.state ?? "unknown");
+        const raw = this.hass.states[this._ent(vac, "status") ?? vac.entity]?.state ?? "unknown";
         return STATUS_MAP[raw] ?? [raw, "rgba(255,255,255,0.5)"];
     }
     _isCleaning(vac) {
@@ -418,15 +447,15 @@ let AnyVacCard = class AnyVacCard extends i$2 {
         return this.hass.states[vac.entity]?.state === "paused";
     }
     _battery(vac) {
-        if (!vac.battery_entity)
+        const bid = this._ent(vac, "battery");
+        if (!bid)
             return null;
-        const n = parseInt(this.hass.states[vac.battery_entity]?.state ?? "");
+        const n = parseInt(this.hass.states[bid]?.state ?? "");
         return isNaN(n) ? null : n;
     }
     _lastCleanStr(vac) {
-        const raw = vac.last_clean_entity
-            ? this.hass.states[vac.last_clean_entity]?.state
-            : undefined;
+        const lid = this._ent(vac, "last_clean");
+        const raw = lid ? this.hass.states[lid]?.state : undefined;
         if (!raw || raw === "unavailable" || raw === "unknown")
             return "—";
         const d = new Date(raw);
@@ -439,9 +468,10 @@ let AnyVacCard = class AnyVacCard extends i$2 {
         return d.toLocaleDateString([], { day: "2-digit", month: "2-digit" }) + " · " + t;
     }
     _progress(vac) {
-        if (!vac.progress_entity)
+        const pid = this._ent(vac, "progress");
+        if (!pid)
             return null;
-        const n = parseInt(this.hass.states[vac.progress_entity]?.state ?? "");
+        const n = parseInt(this.hass.states[pid]?.state ?? "");
         return isNaN(n) || n === 0 ? null : n;
     }
     _isRoomSelected(room, vac) {
@@ -1466,6 +1496,47 @@ let AnyVacCard = class AnyVacCard extends i$2 {
             : A;
         return b `<svg class="map-vector" viewBox="0 0 ${NW} ${NH}" preserveAspectRatio="none" style=${o(seat)}>${pathT}${robotT}</svg>`;
     }
+    _renderMergedMap() {
+        const shown = [...this._shownSet].filter((i) => i < this._config.vacuums.length).map((i) => this._config.vacuums[i]);
+        if (!shown.length)
+            return A;
+        const primary = shown.find((v) => v.image_base?.src) ?? shown[0];
+        const base = primary.base ?? (primary.image_base?.src && !primary.map?.entity ? "image" : "map");
+        const ib = primary.image_base;
+        const imgSrc = ib?.src;
+        const mapUrl = primary.map?.entity ? this._mapUrl(primary.map.entity) : null;
+        const showImage = (base === "image" || base === "combined") && !!imgSrc;
+        const showMap = (base === "map" || base === "combined") && !!mapUrl;
+        if (!showImage && !showMap)
+            return A;
+        const m0 = primary.map;
+        const fixedH = typeof primary.base_height === "number" && primary.base_height > 0;
+        const wrapClass = fixedH ? "map-wrap--fixed" : (showImage ? "map-wrap--image" : "");
+        const wrapStyle = o(fixedH ? { height: (primary.base_height ?? 0) + "px" } : {});
+        const imgClass = "image-base-img" + (fixedH ? " image-base-img--fit" : "");
+        return b `
+      <div class="map-wrap ${wrapClass}" style=${wrapStyle}>
+        ${showImage ? b `
+          <img class="${imgClass}" src=${imgSrc} alt="Floorplan"
+            style=${o({
+            transform: "translate(" + (ib?.offset_x ?? 0) + "%," + (ib?.offset_y ?? 0) + "%) rotate(" + (ib?.rotation ?? 0) + "deg) scale(" + ((ib?.scale ?? 100) / 100) + ")",
+        })} />
+        ` : A}
+        ${showMap ? b `
+          <img class="map-img ${showImage ? "map-img--overlay" : ""}" src=${mapUrl} alt="Vacuum map"
+            style=${o({
+            left: (50 + (m0?.offset_x ?? 0)) + "%",
+            top: (50 + (m0?.offset_y ?? 0)) + "%",
+            width: (m0?.scale ?? 100) + "%",
+            transform: "translate(-50%,-50%) rotate(" + (m0?.rotation ?? 0) + "deg)",
+            ...(primary.hide_map ? { opacity: "0" } : (showImage ? { opacity: String((primary.overlay_opacity ?? 55) / 100), mixBlendMode: primary.overlay_blend ?? "normal" } : {})),
+        })} />
+        ` : A}
+        ${shown.map((v) => (v.integration_entity ? this._renderIntegrationOverlay(v, v.map) : A))}
+        ${shown.map((v) => (v.rooms ?? []).map((r) => this._renderRoomOverlay(r, v)))}
+      </div>
+    `;
+    }
     _renderMap(vac) {
         const base = vac.base ?? (vac.image_base?.src && !vac.map?.entity ? "image" : "map");
         const ib = vac.image_base;
@@ -1593,15 +1664,13 @@ let AnyVacCard = class AnyVacCard extends i$2 {
         const bat = this._battery(vac);
         const lastClean = this._lastCleanStr(vac);
         // Current room
-        const roomState = vac.current_room_entity
-            ? this.hass.states[vac.current_room_entity]?.state
-            : null;
+        const crid = this._ent(vac, "current_room");
+        const roomState = crid ? this.hass.states[crid]?.state : null;
         const currentRoom = roomState && roomState !== "unknown" && roomState !== "unavailable"
             ? roomState : null;
         // Error
-        const errState = vac.error_entity
-            ? this.hass.states[vac.error_entity]?.state
-            : null;
+        const erid = this._ent(vac, "error");
+        const errState = erid ? this.hass.states[erid]?.state : null;
         const hasError = errState && errState !== "none" && errState !== "unknown" && errState !== "unavailable";
         return b `
       ${hasError ? b `
@@ -1788,13 +1857,21 @@ let AnyVacCard = class AnyVacCard extends i$2 {
           ${this._config.vacuums.map((v, i) => this._renderBadge(v, i))}
           ${(this._config.global_actions ?? []).map((ga, i) => this._renderGlobalBadge(ga, i))}
         </div>
-        ${[...this._shownSet]
-            .filter(i => i < this._config.vacuums.length)
-            .map(i => b `
-            ${this._renderMap(this._config.vacuums[i])}
-            ${this._renderMapTools(this._config.vacuums[i])}
-            ${this._renderStatusCard(this._config.vacuums[i], i)}
-          `)}
+        ${this._config.map_mode === "merged"
+            ? b `
+              ${this._renderMergedMap()}
+              ${[...this._shownSet].filter(i => i < this._config.vacuums.length).map(i => b `
+                ${this._renderMapTools(this._config.vacuums[i])}
+                ${this._renderStatusCard(this._config.vacuums[i], i)}
+              `)}
+            `
+            : [...this._shownSet]
+                .filter(i => i < this._config.vacuums.length)
+                .map(i => b `
+                ${this._renderMap(this._config.vacuums[i])}
+                ${this._renderMapTools(this._config.vacuums[i])}
+                ${this._renderStatusCard(this._config.vacuums[i], i)}
+              `)}
       </ha-card>
     `;
     }
@@ -2902,6 +2979,7 @@ let AnyVacCardEditor = class AnyVacCardEditor extends i$2 {
         </div>
         ${isOpen ? b `
           <div class="collapsible-body">
+            <p class="hint">Leave the sensors below blank to auto-fill them from the vacuum's device (battery, status, last clean, progress, current room, error).</p>
             ${this._entityPicker("Status", vac.status_entity, ["sensor"], v => this._setVacuum(vacIdx, { status_entity: v || undefined }))}
             ${this._entityPicker("Battery", vac.battery_entity, ["sensor"], v => this._setVacuum(vacIdx, { battery_entity: v || undefined }))}
             ${this._entityPicker("Last clean end", vac.last_clean_entity, ["sensor"], v => this._setVacuum(vacIdx, { last_clean_entity: v || undefined }))}
@@ -3138,6 +3216,8 @@ let AnyVacCardEditor = class AnyVacCardEditor extends i$2 {
               </button>`)}
           </div>
         ` : A}
+
+        ${this._selectField("Map mode (all vacuums)", this._config.map_mode ?? "split", [{ value: "split", label: "Split — one map per vacuum" }, { value: "merged", label: "Merged — all in one map" }], v => this._setConfig({ map_mode: v === "merged" ? "merged" : undefined }))}
 
         ${this._selectField("Base layer", (vac.base ?? "map"), [{ value: "map", label: "Vacuum map" }, { value: "image", label: "Custom image" }, { value: "combined", label: "Image + map" }], v => this._setVacuum(mapVac, { base: v }))}
 

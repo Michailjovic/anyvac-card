@@ -174,7 +174,7 @@ export class AnyVacCard extends LitElement {
     for (const vac of this._config?.vacuums ?? []) {
       for (const id of [vac.entity, vac.status_entity, vac.battery_entity,
         vac.last_clean_entity, vac.progress_entity, vac.current_room_entity,
-        vac.error_entity, vac.map?.entity]) {
+        vac.error_entity, vac.map?.entity, ...Object.values(this._autoEntities(vac))]) {
         if (id) s.add(id);
       }
       for (const r of vac.rooms ?? []) {
@@ -273,10 +273,37 @@ export class AnyVacCard extends LitElement {
     return vac.color ?? "green";
   }
 
+  private _autoCache = new Map<string, Record<string, string | undefined>>();
+  /** Resolve a vacuum's sibling entities (battery/status/last-clean/progress/room/error) from its
+   *  device, so the user does not have to fill them in. Matched by translation_key / device_class. */
+  private _autoEntities(vac: VacuumConfig): Record<string, string | undefined> {
+    const reg = (this.hass as any)?.entities as Record<string, any> | undefined;
+    if (!reg || !vac.entity) return {};
+    const cached = this._autoCache.get(vac.entity);
+    if (cached) return cached;
+    const dev = reg[vac.entity]?.device_id;
+    if (!dev) return {};
+    const sibs = Object.keys(reg).filter((id) => reg[id]?.device_id === dev);
+    const byTk = (tk: string) => sibs.find((id) => reg[id]?.translation_key === tk);
+    const byDc = (dc: string) => sibs.find((id) => this.hass.states[id]?.attributes?.device_class === dc);
+    const out: Record<string, string | undefined> = {
+      status: byTk("status"),
+      battery: byDc("battery"),
+      last_clean: byTk("last_clean_end"),
+      progress: byTk("clean_percent"),
+      current_room: byTk("current_room"),
+      error: byTk("vacuum_error"),
+    };
+    this._autoCache.set(vac.entity, out);
+    return out;
+  }
+  private _ent(vac: VacuumConfig, kind: "status" | "battery" | "last_clean" | "progress" | "current_room" | "error"): string | undefined {
+    const explicit = (vac as any)[kind + "_entity"] as string | undefined;
+    return explicit ?? this._autoEntities(vac)[kind];
+  }
+
   private _statusInfo(vac: VacuumConfig): readonly [string, string] {
-    const raw = vac.status_entity
-      ? (this.hass.states[vac.status_entity]?.state ?? "unknown")
-      : (this.hass.states[vac.entity]?.state ?? "unknown");
+    const raw = this.hass.states[this._ent(vac, "status") ?? vac.entity]?.state ?? "unknown";
     return STATUS_MAP[raw] ?? [raw, "rgba(255,255,255,0.5)"];
   }
 
@@ -289,15 +316,15 @@ export class AnyVacCard extends LitElement {
   }
 
   private _battery(vac: VacuumConfig): number | null {
-    if (!vac.battery_entity) return null;
-    const n = parseInt(this.hass.states[vac.battery_entity]?.state ?? "");
+    const bid = this._ent(vac, "battery");
+    if (!bid) return null;
+    const n = parseInt(this.hass.states[bid]?.state ?? "");
     return isNaN(n) ? null : n;
   }
 
   private _lastCleanStr(vac: VacuumConfig): string {
-    const raw = vac.last_clean_entity
-      ? this.hass.states[vac.last_clean_entity]?.state
-      : undefined;
+    const lid = this._ent(vac, "last_clean");
+    const raw = lid ? this.hass.states[lid]?.state : undefined;
     if (!raw || raw === "unavailable" || raw === "unknown") return "—";
     const d = new Date(raw);
     const diff = Math.floor((Date.now() - d.getTime()) / 86_400_000);
@@ -308,8 +335,9 @@ export class AnyVacCard extends LitElement {
   }
 
   private _progress(vac: VacuumConfig): number | null {
-    if (!vac.progress_entity) return null;
-    const n = parseInt(this.hass.states[vac.progress_entity]?.state ?? "");
+    const pid = this._ent(vac, "progress");
+    if (!pid) return null;
+    const n = parseInt(this.hass.states[pid]?.state ?? "");
     return isNaN(n) || n === 0 ? null : n;
   }
 
@@ -1285,6 +1313,46 @@ export class AnyVacCard extends LitElement {
     return html`<svg class="map-vector" viewBox="0 0 ${NW} ${NH}" preserveAspectRatio="none" style=${styleMap(seat)}>${pathT}${robotT}</svg>`;
   }
 
+  private _renderMergedMap() {
+    const shown = [...this._shownSet].filter((i) => i < this._config.vacuums.length).map((i) => this._config.vacuums[i]);
+    if (!shown.length) return nothing;
+    const primary = shown.find((v) => v.image_base?.src) ?? shown[0];
+    const base = primary.base ?? (primary.image_base?.src && !primary.map?.entity ? "image" : "map");
+    const ib = primary.image_base;
+    const imgSrc = ib?.src;
+    const mapUrl = primary.map?.entity ? this._mapUrl(primary.map.entity) : null;
+    const showImage = (base === "image" || base === "combined") && !!imgSrc;
+    const showMap = (base === "map" || base === "combined") && !!mapUrl;
+    if (!showImage && !showMap) return nothing;
+    const m0 = primary.map;
+    const fixedH = typeof primary.base_height === "number" && primary.base_height > 0;
+    const wrapClass = fixedH ? "map-wrap--fixed" : (showImage ? "map-wrap--image" : "");
+    const wrapStyle = styleMap(fixedH ? { height: (primary.base_height ?? 0) + "px" } : {});
+    const imgClass = "image-base-img" + (fixedH ? " image-base-img--fit" : "");
+    return html`
+      <div class="map-wrap ${wrapClass}" style=${wrapStyle}>
+        ${showImage ? html`
+          <img class="${imgClass}" src=${imgSrc!} alt="Floorplan"
+            style=${styleMap({
+              transform: "translate(" + (ib?.offset_x ?? 0) + "%," + (ib?.offset_y ?? 0) + "%) rotate(" + (ib?.rotation ?? 0) + "deg) scale(" + ((ib?.scale ?? 100) / 100) + ")",
+            })} />
+        ` : nothing}
+        ${showMap ? html`
+          <img class="map-img ${showImage ? "map-img--overlay" : ""}" src=${mapUrl!} alt="Vacuum map"
+            style=${styleMap({
+              left: (50 + (m0?.offset_x ?? 0)) + "%",
+              top: (50 + (m0?.offset_y ?? 0)) + "%",
+              width: (m0?.scale ?? 100) + "%",
+              transform: "translate(-50%,-50%) rotate(" + (m0?.rotation ?? 0) + "deg)",
+              ...(primary.hide_map ? { opacity: "0" } : (showImage ? { opacity: String((primary.overlay_opacity ?? 55) / 100), mixBlendMode: primary.overlay_blend ?? "normal" } : {})),
+            })} />
+        ` : nothing}
+        ${shown.map((v) => (v.integration_entity ? this._renderIntegrationOverlay(v, v.map) : nothing))}
+        ${shown.map((v) => (v.rooms ?? []).map((r) => this._renderRoomOverlay(r, v)))}
+      </div>
+    `;
+  }
+
   private _renderMap(vac: VacuumConfig) {
     const base = vac.base ?? (vac.image_base?.src && !vac.map?.entity ? "image" : "map");
     const ib = vac.image_base;
@@ -1418,16 +1486,14 @@ export class AnyVacCard extends LitElement {
     const lastClean = this._lastCleanStr(vac);
 
     // Current room
-    const roomState = vac.current_room_entity
-      ? this.hass.states[vac.current_room_entity]?.state
-      : null;
+    const crid = this._ent(vac, "current_room");
+    const roomState = crid ? this.hass.states[crid]?.state : null;
     const currentRoom = roomState && roomState !== "unknown" && roomState !== "unavailable"
       ? roomState : null;
 
     // Error
-    const errState = vac.error_entity
-      ? this.hass.states[vac.error_entity]?.state
-      : null;
+    const erid = this._ent(vac, "error");
+    const errState = erid ? this.hass.states[erid]?.state : null;
     const hasError = errState && errState !== "none" && errState !== "unknown" && errState !== "unavailable";
 
     return html`
@@ -1626,13 +1692,21 @@ export class AnyVacCard extends LitElement {
           ${this._config.vacuums.map((v, i) => this._renderBadge(v, i))}
           ${(this._config.global_actions ?? []).map((ga, i) => this._renderGlobalBadge(ga, i))}
         </div>
-        ${[...this._shownSet]
-          .filter(i => i < this._config.vacuums.length)
-          .map(i => html`
-            ${this._renderMap(this._config.vacuums[i])}
-            ${this._renderMapTools(this._config.vacuums[i])}
-            ${this._renderStatusCard(this._config.vacuums[i], i)}
-          `)}
+        ${this._config.map_mode === "merged"
+          ? html`
+              ${this._renderMergedMap()}
+              ${[...this._shownSet].filter(i => i < this._config.vacuums.length).map(i => html`
+                ${this._renderMapTools(this._config.vacuums[i])}
+                ${this._renderStatusCard(this._config.vacuums[i], i)}
+              `)}
+            `
+          : [...this._shownSet]
+              .filter(i => i < this._config.vacuums.length)
+              .map(i => html`
+                ${this._renderMap(this._config.vacuums[i])}
+                ${this._renderMapTools(this._config.vacuums[i])}
+                ${this._renderStatusCard(this._config.vacuums[i], i)}
+              `)}
       </ha-card>
     `;
   }

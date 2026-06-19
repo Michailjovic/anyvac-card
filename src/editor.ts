@@ -640,6 +640,7 @@ export class AnyVacCardEditor extends LitElement {
         </div>
         ${isOpen ? html`
           <div class="collapsible-body">
+            <p class="hint">Leave the sensors below blank to auto-fill them from the vacuum's device (battery, status, last clean, progress, current room, error).</p>
             ${this._entityPicker("Status", vac.status_entity, ["sensor"],
               v => this._setVacuum(vacIdx, { status_entity: v || undefined }))}
             ${this._entityPicker("Battery", vac.battery_entity, ["sensor"],
@@ -907,6 +908,10 @@ export class AnyVacCardEditor extends LitElement {
               </button>`)}
           </div>
         ` : nothing}
+
+        ${this._selectField<"split" | "merged">("Map mode (all vacuums)", this._config.map_mode ?? "split",
+          [{ value: "split", label: "Split — one map per vacuum" }, { value: "merged", label: "Merged — all in one map" }],
+          v => this._setConfig({ map_mode: v === "merged" ? "merged" : undefined }))}
 
         ${this._selectField("Base layer", (vac.base ?? "map"),
           [{ value: "map", label: "Vacuum map" }, { value: "image", label: "Custom image" }, { value: "combined", label: "Image + map" }],
