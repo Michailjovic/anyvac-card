@@ -276,6 +276,8 @@ export interface AnyVacCardConfig {
   image_base?: ImageBaseConfig;
   /** Merged mode: shared card height. */
   base_height?: number;
+  /** Merged mode: shared room list, defined once on the card (not per vacuum). */
+  rooms?: RoomConfig[];
   /** Optional extra badges for whole-flat or cross-vacuum actions */
   global_actions?: GlobalAction[];
   /** Shared room overlay appearance — applies to all vacuums */

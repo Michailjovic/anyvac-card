@@ -11,6 +11,16 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Rooms from the integration (real room polygons / names) for clickable cleaning on the floorplan.
 - Milestone 3b: companion `anyvac` integration data layers (clean-history, statistics).
 
+## [0.14.0] - 2026-06-20
+
+### Added
+
+- **Card-level room list** (step 2 of the merged config rebuild) — define `rooms` once at the top
+  level of the card and every vacuum uses them: rectangles, selection (across vacuums), the hold
+  dropdown and cleaning all read the shared list, and `native-auto` resolves each vacuum's segment by
+  the room `key` (= Roborock name). No more configuring the same rooms per vacuum. Falls back to the
+  per-vacuum `rooms` when no card-level list is set (backward compatible; split mode unchanged).
+
 ## [0.13.0] - 2026-06-20
 
 ### Added

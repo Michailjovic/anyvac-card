@@ -181,7 +181,7 @@ export class AnyVacCard extends LitElement {
         vac.error_entity, vac.map?.entity, ...Object.values(this._autoEntities(vac))]) {
         if (id) s.add(id);
       }
-      for (const r of vac.rooms ?? []) {
+      for (const r of this._roomsFor(vac)) {
         if (r.last_clean_entity) s.add(r.last_clean_entity);
         if (r.clean_time_entity) s.add(r.clean_time_entity);
       }
@@ -349,8 +349,12 @@ export class AnyVacCard extends LitElement {
     return this._localRoomSel.get(vac.entity + ":" + room.key) ?? false;
   }
 
+  /** Rooms for a vacuum: card-level `rooms` if defined (merged config), else the vacuum's own. */
+  private _roomsFor(vac: VacuumConfig): RoomConfig[] {
+    return (this._config.rooms?.length ? this._config.rooms : vac.rooms) ?? [];
+  }
   private _hasSelectedRooms(vac: VacuumConfig): boolean {
-    return (vac.rooms ?? []).some((r) => this._isRoomSelected(r, vac));
+    return (this._roomsFor(vac)).some((r) => this._isRoomSelected(r, vac));
   }
 
   private _roomCleanMins(room: RoomConfig): number {
@@ -362,7 +366,7 @@ export class AnyVacCard extends LitElement {
   }
 
   private _totalCleanMins(vac: VacuumConfig): number {
-    return (vac.rooms ?? []).reduce((sum, r) => {
+    return (this._roomsFor(vac)).reduce((sum, r) => {
       if (!this._isRoomSelected(r, vac)) return sum;
       return sum + this._roomCleanMins(r);
     }, 0);
@@ -571,7 +575,7 @@ export class AnyVacCard extends LitElement {
     vac: VacuumConfig, roomName: string, elapsedMins: number
   ): Promise<void> {
     if (elapsedMins < 0.5 || elapsedMins > 120) return;
-    const room = (vac.rooms ?? []).find(
+    const room = (this._roomsFor(vac)).find(
       r => r.name === roomName || r.key === roomName
     );
     if (!room?.clean_time_entity) return;
@@ -790,7 +794,7 @@ export class AnyVacCard extends LitElement {
     const target = !this._isRoomSelectedAny(key, vacs);
     const next = new Map(this._localRoomSel);
     for (const v of vacs) {
-      if ((v.rooms ?? []).some((r) => r.key === key)) next.set(v.entity + ":" + key, target);
+      if (this._roomsFor(v).some((r) => r.key === key)) next.set(v.entity + ":" + key, target);
     }
     this._localRoomSel = next;
     for (const v of vacs) this._saveRoomSel(v.entity);
@@ -798,14 +802,14 @@ export class AnyVacCard extends LitElement {
 
   private _selectAll(vac: VacuumConfig): void {
     const next = new Map(this._localRoomSel);
-    for (const r of vac.rooms ?? []) next.set(vac.entity + ":" + r.key, true);
+    for (const r of this._roomsFor(vac)) next.set(vac.entity + ":" + r.key, true);
     this._localRoomSel = next;
     this._saveRoomSel(vac.entity);
   }
 
   private _deselectAll(vac: VacuumConfig): void {
     const next = new Map(this._localRoomSel);
-    for (const r of vac.rooms ?? []) next.delete(vac.entity + ":" + r.key);
+    for (const r of this._roomsFor(vac)) next.delete(vac.entity + ":" + r.key);
     this._localRoomSel = next;
     this._saveRoomSel(vac.entity);
   }
@@ -813,7 +817,7 @@ export class AnyVacCard extends LitElement {
   private async _startClean(vac: VacuumConfig): Promise<void> {
     if (!vac.clean_action) return;
 
-    const selected = (vac.rooms ?? []).filter((r) => this._isRoomSelected(r, vac));
+    const selected = (this._roomsFor(vac)).filter((r) => this._isRoomSelected(r, vac));
     if (selected.length === 0) return;
 
     // Script strategy -- no in-flight tracking
@@ -1395,11 +1399,7 @@ export class AnyVacCard extends LitElement {
   }
   /** Hold-expanded per-room ages for one layer (dry/wet). */
   private _renderLayerMenu(vacs: VacuumConfig[], type: "dry" | "wet") {
-    const seen = new Set<string>();
-    const rooms: Array<{ r: RoomConfig; v: VacuumConfig }> = [];
-    for (const v of vacs) for (const r of v.rooms ?? []) {
-      if (r.key && !seen.has(r.key)) { seen.add(r.key); rooms.push({ r, v }); }
-    }
+    const rooms = this._mergedRoomDefs(vacs);
     const badge = (d: number | null) => (d === null ? "\u2014" : d < 1 ? "<1d" : Math.round(d) + "d");
     return html`
       <div class="layer-menu">
@@ -1487,17 +1487,19 @@ export class AnyVacCard extends LitElement {
   }
 
   /** Merged mode rooms: one rectangle per room key (deduped across vacuums); click selects across all. */
-  private _renderMergedRooms(shown: VacuumConfig[]) {
+  /** Deduped room defs for merged mode: card-level rooms (rep = first vacuum) or per-vacuum dedup by key. */
+  private _mergedRoomDefs(shown: VacuumConfig[]): Array<{ r: RoomConfig; v: VacuumConfig }> {
+    const rep = shown[0];
+    if (this._config.rooms?.length && rep) return this._config.rooms.map((r) => ({ r, v: rep }));
     const seen = new Set<string>();
-    const out: any[] = [];
-    for (const v of shown) {
-      for (const r of v.rooms ?? []) {
-        if (!r.key || seen.has(r.key)) continue;
-        seen.add(r.key);
-        out.push(this._renderRoomOverlay(r, v, { vacs: shown }));
-      }
+    const out: Array<{ r: RoomConfig; v: VacuumConfig }> = [];
+    for (const v of shown) for (const r of v.rooms ?? []) {
+      if (r.key && !seen.has(r.key)) { seen.add(r.key); out.push({ r, v }); }
     }
     return out;
+  }
+  private _renderMergedRooms(shown: VacuumConfig[]) {
+    return this._mergedRoomDefs(shown).map(({ r, v }) => this._renderRoomOverlay(r, v, { vacs: shown }));
   }
 
   private _renderMergedMap() {
@@ -1576,7 +1578,7 @@ export class AnyVacCard extends LitElement {
         ` : nothing}
         ${showMap ? this._renderIntegrationOverlay(vac, m) : nothing}
         ${this._renderLayerToggles([vac])}
-        ${(vac.rooms ?? []).map((r) => this._renderRoomOverlay(r, vac))}
+        ${(this._roomsFor(vac)).map((r) => this._renderRoomOverlay(r, vac))}
         ${this._mapMode !== "normal" && this._modeEntity === vac.entity
           ? html`<div class="map-clickcatch" style="touch-action:none"
               @click=${(e: MouseEvent) => this._onMapClick(vac, e)}
@@ -1809,9 +1811,9 @@ export class AnyVacCard extends LitElement {
           <ha-icon icon="mdi:rocket-launch" style=${styleMap({ color: startIconColor })}></ha-icon>
           <div class="start-body">
             <span style=${styleMap({ color: startTextColor })}>START</span>
-            ${(vac.rooms ?? []).length > 0 ? html`
+            ${(this._roomsFor(vac)).length > 0 ? html`
               <div class="room-icons">
-                ${(vac.rooms ?? []).map(r => html`
+                ${(this._roomsFor(vac)).map(r => html`
                   <ha-icon
                     icon=${r.icon || "mdi:square"}
                     style=${styleMap({ color: this._isRoomSelected(r, vac) ? color : "rgba(255,255,255,0.15)" })}
@@ -1820,7 +1822,7 @@ export class AnyVacCard extends LitElement {
               </div>
             ` : nothing}
             ${timeStr ? html`<small style="color:rgba(255,255,255,0.4)">${timeStr}</small>` : nothing}
-            ${(vac.rooms ?? []).length > 1 ? html`
+            ${(this._roomsFor(vac)).length > 1 ? html`
               <div class="sel-all-row">
                 <button class="sel-link" @click=${(e: Event) => { e.stopPropagation(); this._selectAll(vac); }}>all</button>
                 <span style="color:rgba(255,255,255,0.2)">·</span>

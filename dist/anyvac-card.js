@@ -87,7 +87,7 @@ const t={ATTRIBUTE:1},e=t=>(...e)=>({_$litDirective$:t,values:e});let i$1 = clas
 
 const CARD_NAME = "anyvac-card";
 const EDITOR_NAME = "anyvac-card-editor";
-const CARD_VERSION = "0.13.0";
+const CARD_VERSION = "0.14.0";
 /** Server-side tracking blueprint */
 const BLUEPRINT_VERSION = "1.0.0";
 const BLUEPRINT_PATH = "anyvac_card/cleaning_tracker.yaml";
@@ -313,7 +313,7 @@ let AnyVacCard = class AnyVacCard extends i$2 {
                 if (id)
                     s.add(id);
             }
-            for (const r of vac.rooms ?? []) {
+            for (const r of this._roomsFor(vac)) {
                 if (r.last_clean_entity)
                     s.add(r.last_clean_entity);
                 if (r.clean_time_entity)
@@ -481,8 +481,12 @@ let AnyVacCard = class AnyVacCard extends i$2 {
     _isRoomSelected(room, vac) {
         return this._localRoomSel.get(vac.entity + ":" + room.key) ?? false;
     }
+    /** Rooms for a vacuum: card-level `rooms` if defined (merged config), else the vacuum's own. */
+    _roomsFor(vac) {
+        return (this._config.rooms?.length ? this._config.rooms : vac.rooms) ?? [];
+    }
     _hasSelectedRooms(vac) {
-        return (vac.rooms ?? []).some((r) => this._isRoomSelected(r, vac));
+        return (this._roomsFor(vac)).some((r) => this._isRoomSelected(r, vac));
     }
     _roomCleanMins(room) {
         if (room.clean_time_entity) {
@@ -493,7 +497,7 @@ let AnyVacCard = class AnyVacCard extends i$2 {
         return room.clean_time_mins ?? 0;
     }
     _totalCleanMins(vac) {
-        return (vac.rooms ?? []).reduce((sum, r) => {
+        return (this._roomsFor(vac)).reduce((sum, r) => {
             if (!this._isRoomSelected(r, vac))
                 return sum;
             return sum + this._roomCleanMins(r);
@@ -712,7 +716,7 @@ let AnyVacCard = class AnyVacCard extends i$2 {
     async _updateRoomCleanTime(vac, roomName, elapsedMins) {
         if (elapsedMins < 0.5 || elapsedMins > 120)
             return;
-        const room = (vac.rooms ?? []).find(r => r.name === roomName || r.key === roomName);
+        const room = (this._roomsFor(vac)).find(r => r.name === roomName || r.key === roomName);
         if (!room?.clean_time_entity)
             return;
         const currentVal = parseFloat(this.hass.states[room.clean_time_entity]?.state ?? "0");
@@ -914,7 +918,7 @@ let AnyVacCard = class AnyVacCard extends i$2 {
         const target = !this._isRoomSelectedAny(key, vacs);
         const next = new Map(this._localRoomSel);
         for (const v of vacs) {
-            if ((v.rooms ?? []).some((r) => r.key === key))
+            if (this._roomsFor(v).some((r) => r.key === key))
                 next.set(v.entity + ":" + key, target);
         }
         this._localRoomSel = next;
@@ -923,14 +927,14 @@ let AnyVacCard = class AnyVacCard extends i$2 {
     }
     _selectAll(vac) {
         const next = new Map(this._localRoomSel);
-        for (const r of vac.rooms ?? [])
+        for (const r of this._roomsFor(vac))
             next.set(vac.entity + ":" + r.key, true);
         this._localRoomSel = next;
         this._saveRoomSel(vac.entity);
     }
     _deselectAll(vac) {
         const next = new Map(this._localRoomSel);
-        for (const r of vac.rooms ?? [])
+        for (const r of this._roomsFor(vac))
             next.delete(vac.entity + ":" + r.key);
         this._localRoomSel = next;
         this._saveRoomSel(vac.entity);
@@ -938,7 +942,7 @@ let AnyVacCard = class AnyVacCard extends i$2 {
     async _startClean(vac) {
         if (!vac.clean_action)
             return;
-        const selected = (vac.rooms ?? []).filter((r) => this._isRoomSelected(r, vac));
+        const selected = (this._roomsFor(vac)).filter((r) => this._isRoomSelected(r, vac));
         if (selected.length === 0)
             return;
         // Script strategy -- no in-flight tracking
@@ -1596,15 +1600,7 @@ let AnyVacCard = class AnyVacCard extends i$2 {
     }
     /** Hold-expanded per-room ages for one layer (dry/wet). */
     _renderLayerMenu(vacs, type) {
-        const seen = new Set();
-        const rooms = [];
-        for (const v of vacs)
-            for (const r of v.rooms ?? []) {
-                if (r.key && !seen.has(r.key)) {
-                    seen.add(r.key);
-                    rooms.push({ r, v });
-                }
-            }
+        const rooms = this._mergedRoomDefs(vacs);
         const badge = (d) => (d === null ? "\u2014" : d < 1 ? "<1d" : Math.round(d) + "d");
         return b `
       <div class="layer-menu">
@@ -1698,18 +1694,24 @@ let AnyVacCard = class AnyVacCard extends i$2 {
     `;
     }
     /** Merged mode rooms: one rectangle per room key (deduped across vacuums); click selects across all. */
-    _renderMergedRooms(shown) {
+    /** Deduped room defs for merged mode: card-level rooms (rep = first vacuum) or per-vacuum dedup by key. */
+    _mergedRoomDefs(shown) {
+        const rep = shown[0];
+        if (this._config.rooms?.length && rep)
+            return this._config.rooms.map((r) => ({ r, v: rep }));
         const seen = new Set();
         const out = [];
-        for (const v of shown) {
+        for (const v of shown)
             for (const r of v.rooms ?? []) {
-                if (!r.key || seen.has(r.key))
-                    continue;
-                seen.add(r.key);
-                out.push(this._renderRoomOverlay(r, v, { vacs: shown }));
+                if (r.key && !seen.has(r.key)) {
+                    seen.add(r.key);
+                    out.push({ r, v });
+                }
             }
-        }
         return out;
+    }
+    _renderMergedRooms(shown) {
+        return this._mergedRoomDefs(shown).map(({ r, v }) => this._renderRoomOverlay(r, v, { vacs: shown }));
     }
     _renderMergedMap() {
         const shown = [...this._shownSet].filter((i) => i < this._config.vacuums.length).map((i) => this._config.vacuums[i]);
@@ -1788,7 +1790,7 @@ let AnyVacCard = class AnyVacCard extends i$2 {
         ` : A}
         ${showMap ? this._renderIntegrationOverlay(vac, m) : A}
         ${this._renderLayerToggles([vac])}
-        ${(vac.rooms ?? []).map((r) => this._renderRoomOverlay(r, vac))}
+        ${(this._roomsFor(vac)).map((r) => this._renderRoomOverlay(r, vac))}
         ${this._mapMode !== "normal" && this._modeEntity === vac.entity
             ? b `<div class="map-clickcatch" style="touch-action:none"
               @click=${(e) => this._onMapClick(vac, e)}
@@ -2007,9 +2009,9 @@ let AnyVacCard = class AnyVacCard extends i$2 {
           <ha-icon icon="mdi:rocket-launch" style=${o({ color: startIconColor })}></ha-icon>
           <div class="start-body">
             <span style=${o({ color: startTextColor })}>START</span>
-            ${(vac.rooms ?? []).length > 0 ? b `
+            ${(this._roomsFor(vac)).length > 0 ? b `
               <div class="room-icons">
-                ${(vac.rooms ?? []).map(r => b `
+                ${(this._roomsFor(vac)).map(r => b `
                   <ha-icon
                     icon=${r.icon || "mdi:square"}
                     style=${o({ color: this._isRoomSelected(r, vac) ? color : "rgba(255,255,255,0.15)" })}
@@ -2018,7 +2020,7 @@ let AnyVacCard = class AnyVacCard extends i$2 {
               </div>
             ` : A}
             ${timeStr ? b `<small style="color:rgba(255,255,255,0.4)">${timeStr}</small>` : A}
-            ${(vac.rooms ?? []).length > 1 ? b `
+            ${(this._roomsFor(vac)).length > 1 ? b `
               <div class="sel-all-row">
                 <button class="sel-link" @click=${(e) => { e.stopPropagation(); this._selectAll(vac); }}>all</button>
                 <span style="color:rgba(255,255,255,0.2)">·</span>
