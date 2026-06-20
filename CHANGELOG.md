@@ -11,6 +11,15 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Rooms from the integration (real room polygons / names) for clickable cleaning on the floorplan.
 - Milestone 3b: companion `anyvac` integration data layers (clean-history, statistics).
 
+## [0.17.1] - 2026-06-20
+
+### Fixed
+
+- **3-point align now computes in the trace's coordinate space** — it derives the seating using the
+  integration's `image_dims` (where the robot path is actually drawn) instead of the raw map PNG's
+  pixel size. Previously the two had different aspect ratios, so the alignment lined up the map image
+  but left the vector trace scattered.
+
 ## [0.17.0] - 2026-06-20
 
 ### Added

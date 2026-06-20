@@ -222,10 +222,22 @@ export class AnyVacCardEditor extends LitElement {
    *  vacuum's map seating. Works in each image's natural-pixel space; assumes identity floorplan seating. */
   private _alignApply(mapVac: number): void {
     if (this._alignPairs.length < 2) return;
-    const nImg = this.renderRoot?.querySelector(".align-native-img") as HTMLImageElement | null;
     const fImg = this.renderRoot?.querySelector(".align-floor-img") as HTMLImageElement | null;
-    const NW = nImg?.naturalWidth || 1, NH = nImg?.naturalHeight || 1;
     const FW = fImg?.naturalWidth || 1, FH = fImg?.naturalHeight || 1;
+    // Native space must match where the TRACE is drawn (the integration's map-pixel space = image_dims),
+    // NOT the raw map PNG — otherwise the seating lines up the image but not the vector path.
+    const vac = this._config.vacuums[mapVac];
+    const dims = (this.hass?.states?.[vac?.integration_entity ?? ""]?.attributes as any)?.image_dims;
+    let NW = 1, NH = 1;
+    if (dims && dims.width && dims.height) {
+      const sc = dims.scale ?? 1;
+      NW = dims.width * sc; NH = dims.height * sc;
+      const rot = dims.rotation ?? 0;
+      if (rot === 90 || rot === 270) { const t = NW; NW = NH; NH = t; }
+    } else {
+      const nImg = this.renderRoot?.querySelector(".align-native-img") as HTMLImageElement | null;
+      NW = nImg?.naturalWidth || 1; NH = nImg?.naturalHeight || 1;
+    }
     const P = this._alignPairs.map((p) => [p.n[0] * NW, p.n[1] * NH] as [number, number]);
     const Q = this._alignPairs.map((p) => [p.f[0] * FW, p.f[1] * FH] as [number, number]);
     const n = P.length;

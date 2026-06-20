@@ -87,7 +87,7 @@ const t={ATTRIBUTE:1},e=t=>(...e)=>({_$litDirective$:t,values:e});let i$1 = clas
 
 const CARD_NAME = "anyvac-card";
 const EDITOR_NAME = "anyvac-card-editor";
-const CARD_VERSION = "0.17.0";
+const CARD_VERSION = "0.17.1";
 /** Server-side tracking blueprint */
 const BLUEPRINT_VERSION = "1.0.0";
 const BLUEPRINT_PATH = "anyvac_card/cleaning_tracker.yaml";
@@ -2825,10 +2825,29 @@ let AnyVacCardEditor = class AnyVacCardEditor extends i$2 {
     _alignApply(mapVac) {
         if (this._alignPairs.length < 2)
             return;
-        const nImg = this.renderRoot?.querySelector(".align-native-img");
         const fImg = this.renderRoot?.querySelector(".align-floor-img");
-        const NW = nImg?.naturalWidth || 1, NH = nImg?.naturalHeight || 1;
         const FW = fImg?.naturalWidth || 1, FH = fImg?.naturalHeight || 1;
+        // Native space must match where the TRACE is drawn (the integration's map-pixel space = image_dims),
+        // NOT the raw map PNG — otherwise the seating lines up the image but not the vector path.
+        const vac = this._config.vacuums[mapVac];
+        const dims = this.hass?.states?.[vac?.integration_entity ?? ""]?.attributes?.image_dims;
+        let NW = 1, NH = 1;
+        if (dims && dims.width && dims.height) {
+            const sc = dims.scale ?? 1;
+            NW = dims.width * sc;
+            NH = dims.height * sc;
+            const rot = dims.rotation ?? 0;
+            if (rot === 90 || rot === 270) {
+                const t = NW;
+                NW = NH;
+                NH = t;
+            }
+        }
+        else {
+            const nImg = this.renderRoot?.querySelector(".align-native-img");
+            NW = nImg?.naturalWidth || 1;
+            NH = nImg?.naturalHeight || 1;
+        }
         const P = this._alignPairs.map((p) => [p.n[0] * NW, p.n[1] * NH]);
         const Q = this._alignPairs.map((p) => [p.f[0] * FW, p.f[1] * FH]);
         const n = P.length;
