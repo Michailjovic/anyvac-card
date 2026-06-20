@@ -11,6 +11,17 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Rooms from the integration (real room polygons / names) for clickable cleaning on the floorplan.
 - Milestone 3b: companion `anyvac` integration data layers (clean-history, statistics).
 
+## [0.15.0] - 2026-06-20
+
+### Added
+
+- **Editor GUI for the card-level merged config** (step 3 of the merged config rebuild) — in the Maps
+  tab, when *Map mode* is **Merged**, the floorplan (Image src/rotation/scale/offset), card height and
+  the room list are edited **card-level** (once for all vacuums): a *Shared floorplan* section, an
+  *Add room* button, per-room Key / Name / Clean time / position / icon, and *Delete room* — all
+  writing to the top-level `image_base` / `base_height` / `rooms`. In split mode the editor is
+  unchanged (per-vacuum). Per-vacuum map seating, role and integration stay per the selected vacuum.
+
 ## [0.14.0] - 2026-06-20
 
 ### Added

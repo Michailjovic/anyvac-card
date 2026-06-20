@@ -87,7 +87,7 @@ const t={ATTRIBUTE:1},e=t=>(...e)=>({_$litDirective$:t,values:e});let i$1 = clas
 
 const CARD_NAME = "anyvac-card";
 const EDITOR_NAME = "anyvac-card-editor";
-const CARD_VERSION = "0.14.0";
+const CARD_VERSION = "0.15.0";
 /** Server-side tracking blueprint */
 const BLUEPRINT_VERSION = "1.0.0";
 const BLUEPRINT_PATH = "anyvac_card/cleaning_tracker.yaml";
@@ -2754,6 +2754,53 @@ let AnyVacCardEditor = class AnyVacCardEditor extends i$2 {
         const existing = this._config.vacuums[vacIdx].image_base ?? { src: "" };
         this._setVacuum(vacIdx, { image_base: { ...existing, ...updates } });
     }
+    get _mergedEdit() { return this._config.map_mode === "merged"; }
+    _editRooms() {
+        if (this._mergedEdit)
+            return this._config.rooms ?? [];
+        const vac = this._config.vacuums[Math.min(this._mapVac, this._config.vacuums.length - 1)];
+        return vac?.rooms ?? [];
+    }
+    _setEditedRoom(roomIdx, updates) {
+        if (this._mergedEdit) {
+            const rooms = [...(this._config.rooms ?? [])];
+            rooms[roomIdx] = { ...rooms[roomIdx], ...updates };
+            this._setConfig({ rooms });
+        }
+        else {
+            this._setRoom(Math.min(this._mapVac, this._config.vacuums.length - 1), roomIdx, updates);
+        }
+    }
+    _addEditedRoom() {
+        if (this._mergedEdit) {
+            const rooms = [...(this._config.rooms ?? []), { ...DEFAULT_ROOM }];
+            this._setConfig({ rooms });
+            this._mapRoom = rooms.length - 1;
+        }
+        else {
+            this._addRoom(Math.min(this._mapVac, this._config.vacuums.length - 1));
+            this._mapRoom = (this._config.vacuums[this._mapVac]?.rooms?.length ?? 1) - 1;
+        }
+    }
+    _deleteEditedRoom(roomIdx) {
+        if (this._mergedEdit) {
+            const rooms = (this._config.rooms ?? []).filter((_, i) => i !== roomIdx);
+            this._setConfig({ rooms });
+            if (this._mapRoom === roomIdx)
+                this._mapRoom = null;
+        }
+        else {
+            this._deleteRoom(Math.min(this._mapVac, this._config.vacuums.length - 1), roomIdx);
+        }
+    }
+    _setEditedImageBase(updates) {
+        if (this._mergedEdit) {
+            this._setConfig({ image_base: { ...(this._config.image_base ?? { src: "" }), ...updates } });
+        }
+        else {
+            this._setImageBase(Math.min(this._mapVac, this._config.vacuums.length - 1), updates);
+        }
+    }
     _setRoom(vacIdx, roomIdx, updates) {
         const rooms = [...(this._config.vacuums[vacIdx].rooms ?? [])];
         rooms[roomIdx] = { ...rooms[roomIdx], ...updates };
@@ -3437,14 +3484,14 @@ let AnyVacCardEditor = class AnyVacCardEditor extends i$2 {
         const mapUrl = map.entity
             ? (this.hass.states[map.entity]?.attributes["entity_picture"] ?? "") : "";
         const base = vac.base ?? "map";
-        const ib = vac.image_base;
-        const useImg = (base === "image" || base === "combined") && !!ib?.src;
+        const ib = this._config.map_mode === "merged" ? this._config.image_base : vac.image_base;
+        const useImg = this._config.map_mode === "merged" ? !!ib?.src : ((base === "image" || base === "combined") && !!ib?.src);
         const previewUrl = useImg ? (ib.src) : mapUrl;
         const pvRot = useImg ? (ib.rotation ?? 0) : (map.rotation ?? 0);
         const pvScale = useImg ? (ib.scale ?? 100) : (map.scale ?? 100);
         const pvOx = useImg ? (ib.offset_x ?? 0) : (map.offset_x ?? 0);
         const pvOy = useImg ? (ib.offset_y ?? 0) : (map.offset_y ?? 0);
-        const rooms = vac.rooms ?? [];
+        const rooms = this._editRooms();
         return b `
       <div class="tab-body">
 
@@ -3474,7 +3521,7 @@ let AnyVacCardEditor = class AnyVacCardEditor extends i$2 {
           ${vac.robot_image_on_map ? this._numberSlider("Robot image rotation", vac.robot_image_rotation ?? 0, -180, 180, 15, v => this._setVacuum(mapVac, { robot_image_rotation: v }), "°") : A}
         ` : A}
 
-        ${this._numberSlider("Card height (0=auto)", vac.base_height ?? 0, 0, 700, 10, v => this._setVacuum(mapVac, { base_height: v > 0 ? v : undefined }), "px")}
+        ${this._numberSlider("Card height (0=auto)", (this._config.map_mode === "merged" ? this._config.base_height : vac.base_height) ?? 0, 0, 700, 10, v => this._config.map_mode === "merged" ? this._setConfig({ base_height: v > 0 ? v : undefined }) : this._setVacuum(mapVac, { base_height: v > 0 ? v : undefined }), "px")}
 
         ${(vac.base === "combined" || this._config.map_mode === "merged") ? b `
           ${this._numberSlider("Overlay opacity", vac.overlay_opacity ?? 55, 0, 100, 5, v => this._setVacuum(mapVac, { overlay_opacity: v }), "%")}
@@ -3482,11 +3529,12 @@ let AnyVacCardEditor = class AnyVacCardEditor extends i$2 {
         ` : A}
 
         ${vac.base === "image" || vac.base === "combined" || this._config.map_mode === "merged" ? b `
-          ${this._textField("Image src (URL)", vac.image_base?.src, v => this._setImageBase(mapVac, { src: v }), "/local/anyvac/flat.svg")}
-          ${this._numberSlider("Image rotation", vac.image_base?.rotation ?? 0, 0, 360, 90, v => this._setImageBase(mapVac, { rotation: v }), "°")}
-          ${this._numberSlider("Image scale", vac.image_base?.scale ?? 100, 50, 200, 5, v => this._setImageBase(mapVac, { scale: v }), "%")}
-          ${this._numberSlider("Image offset X", vac.image_base?.offset_x ?? 0, -50, 50, 1, v => this._setImageBase(mapVac, { offset_x: v }), "%")}
-          ${this._numberSlider("Image offset Y", vac.image_base?.offset_y ?? 0, -50, 50, 1, v => this._setImageBase(mapVac, { offset_y: v }), "%")}
+          ${this._config.map_mode === "merged" ? b `<div class="section-title">Shared floorplan (all vacuums)</div>` : A}
+          ${this._textField("Image src (URL)", ib?.src, v => this._setEditedImageBase({ src: v }), "/local/anyvac/flat.svg")}
+          ${this._numberSlider("Image rotation", ib?.rotation ?? 0, 0, 360, 90, v => this._setEditedImageBase({ rotation: v }), "°")}
+          ${this._numberSlider("Image scale", ib?.scale ?? 100, 50, 200, 5, v => this._setEditedImageBase({ scale: v }), "%")}
+          ${this._numberSlider("Image offset X", ib?.offset_x ?? 0, -50, 50, 1, v => this._setEditedImageBase({ offset_x: v }), "%")}
+          ${this._numberSlider("Image offset Y", ib?.offset_y ?? 0, -50, 50, 1, v => this._setEditedImageBase({ offset_y: v }), "%")}
         ` : A}
 
         ${this._entityPicker("Map image entity", map.entity, ["image"], v => this._setMap(mapVac, { entity: v }))}
@@ -3499,7 +3547,7 @@ let AnyVacCardEditor = class AnyVacCardEditor extends i$2 {
             const rect = e.currentTarget.getBoundingClientRect();
             const x = Math.round(((e.clientX - rect.left) / rect.width) * 100);
             const y = Math.round(((e.clientY - rect.top) / rect.height) * 100);
-            this._setRoom(mapVac, this._mapRoom, { map_x: x, map_y: y });
+            this._setEditedRoom(this._mapRoom, { map_x: x, map_y: y });
         }}>
             <div class="map-preview-wrap">
               <img class="map-preview-img" src=${previewUrl} alt="Map preview"
@@ -3524,6 +3572,7 @@ let AnyVacCardEditor = class AnyVacCardEditor extends i$2 {
           ${this._numberSlider("Offset X", map.offset_x ?? 0, -50, 50, 1, v => this._setMap(mapVac, { offset_x: v }), "%")}
           ${this._numberSlider("Offset Y", map.offset_y ?? 0, -50, 50, 1, v => this._setMap(mapVac, { offset_y: v }), "%")}
 
+          ${this._config.map_mode === "merged" ? b `<button class="btn btn--add btn--sm" style="align-self:flex-start;margin-top:4px" @click=${() => this._addEditedRoom()}><ha-icon icon="mdi:plus"></ha-icon> Add room</button>` : A}
           ${rooms.length ? b `
             <div class="section-title">Room positions</div>
             <p class="hint">${this._mapRoom !== null
@@ -3539,30 +3588,35 @@ let AnyVacCardEditor = class AnyVacCardEditor extends i$2 {
             </div>
 
             ${this._mapRoom !== null ? b `
+              ${this._config.map_mode === "merged" ? b `
+                ${this._textField("Key (= Roborock room name)", rooms[this._mapRoom]?.key, v => this._setEditedRoom(this._mapRoom, { key: v }), "Kitchen")}
+                ${this._textField("Name", rooms[this._mapRoom]?.name, v => this._setEditedRoom(this._mapRoom, { name: v }), "Kitchen")}
+                ${this._numberSlider("Clean time (min)", rooms[this._mapRoom]?.clean_time_mins ?? 0, 0, 120, 1, v => this._setEditedRoom(this._mapRoom, { clean_time_mins: v > 0 ? v : undefined }), " min")}
+              ` : A}
               <div class="section-title" style="margin-top:4px">Position</div>
-              ${this._numberSlider("X", rooms[this._mapRoom]?.map_x ?? 50, 0, 100, 1, v => this._setRoom(mapVac, this._mapRoom, { map_x: v }), "%")}
-              ${this._numberSlider("Y", rooms[this._mapRoom]?.map_y ?? 50, 0, 100, 1, v => this._setRoom(mapVac, this._mapRoom, { map_y: v }), "%")}
+              ${this._numberSlider("X", rooms[this._mapRoom]?.map_x ?? 50, 0, 100, 1, v => this._setEditedRoom(this._mapRoom, { map_x: v }), "%")}
+              ${this._numberSlider("Y", rooms[this._mapRoom]?.map_y ?? 50, 0, 100, 1, v => this._setEditedRoom(this._mapRoom, { map_y: v }), "%")}
 
               <div class="section-title" style="margin-top:4px">Overlay mode</div>
               ${(() => {
             const room = rooms[this._mapRoom];
             return room?.map_w !== undefined ? b `
-                  ${this._numberSlider("Width", room.map_w, 1, 100, 1, v => this._setRoom(mapVac, this._mapRoom, { map_w: v }), "%")}
-                  ${this._numberSlider("Height", room.map_h ?? 15, 1, 100, 1, v => this._setRoom(mapVac, this._mapRoom, { map_h: v }), "%")}
+                  ${this._numberSlider("Width", room.map_w, 1, 100, 1, v => this._setEditedRoom(this._mapRoom, { map_w: v }), "%")}
+                  ${this._numberSlider("Height", room.map_h ?? 15, 1, 100, 1, v => this._setEditedRoom(this._mapRoom, { map_h: v }), "%")}
                   <button class="btn btn--sm" style="align-self:flex-start"
-                    @click=${() => this._setRoom(mapVac, this._mapRoom, { map_w: undefined, map_h: undefined })}>
+                    @click=${() => this._setEditedRoom(this._mapRoom, { map_w: undefined, map_h: undefined })}>
                     Switch to point mode
                   </button>
                 ` : b `
                   <button class="btn btn--add btn--sm" style="align-self:flex-start"
-                    @click=${() => this._setRoom(mapVac, this._mapRoom, { map_w: 20, map_h: 15 })}>
+                    @click=${() => this._setEditedRoom(this._mapRoom, { map_w: 20, map_h: 15 })}>
                     <ha-icon icon="mdi:rectangle-outline"></ha-icon> Enable rectangle overlay
                   </button>
                 `;
         })()}
 
               <div class="section-title" style="margin-top:4px">Icon</div>
-              ${this._iconPickerField(rooms[this._mapRoom]?.icon, v => this._setRoom(mapVac, this._mapRoom, { icon: v }))}
+              ${this._iconPickerField(rooms[this._mapRoom]?.icon, v => this._setEditedRoom(this._mapRoom, { icon: v }))}
               ${rooms[this._mapRoom]?.icon ? b `
                 <div class="field">
                   <label>Icon position</label>
@@ -3572,19 +3626,20 @@ let AnyVacCardEditor = class AnyVacCardEditor extends i$2 {
             return b `<button
                         class="anchor-cell ${(rooms[this._mapRoom]?.icon_anchor ?? "c") === pos ? "anchor-cell--active" : ""}"
                         title=${pos}
-                        @click=${() => this._setRoom(mapVac, this._mapRoom, { icon_anchor: pos })}>
+                        @click=${() => this._setEditedRoom(this._mapRoom, { icon_anchor: pos })}>
                         ${lbl[pos]}
                       </button>`;
         })}
                   </div>
                   <button class="btn btn--sm" style="margin-top:4px;align-self:flex-start"
-                    @click=${() => this._setRoom(mapVac, this._mapRoom, { icon_anchor: "none" })}>
+                    @click=${() => this._setEditedRoom(this._mapRoom, { icon_anchor: "none" })}>
                     Hide icon in overlay
                   </button>
                 </div>
               ` : A}
+              ${this._config.map_mode === "merged" ? b `<button class="btn btn--sm" style="align-self:flex-start;margin-top:6px" @click=${() => this._deleteEditedRoom(this._mapRoom)}><ha-icon icon="mdi:delete"></ha-icon> Delete room</button>` : A}
             ` : A}
-          ` : b `<p class="hint">Add rooms in the Vacuums tab to position them here.</p>`}
+          ` : b `${this._config.map_mode === "merged" ? b `<p class="hint">No rooms yet — use "Add room" above.</p>` : b `<p class="hint">Add rooms in the Vacuums tab to position them here.</p>`}`}
         ` : b `<p class="hint">Select a map or image above to enable the placement preview.</p>`}
 
       </div>`;
