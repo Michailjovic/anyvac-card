@@ -11,6 +11,23 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Rooms from the integration (real room polygons / names) for clickable cleaning on the floorplan.
 - Milestone 3b: companion `anyvac` integration data layers (clean-history, statistics).
 
+## [0.13.0] - 2026-06-20
+
+### Added
+
+- **Card-level floorplan for merged mode** (step 1 of the merged config rebuild) — `image_base` and
+  `base_height` can now be set once at the top level of the card config and are used as the shared
+  base in `merged` mode, instead of putting the custom floorplan on a vacuum. Falls back to the
+  per-vacuum `image_base` when not set (backward compatible).
+
+## [0.12.0] - 2026-06-19
+
+### Changed
+
+- **Per-room ages moved into the layer toggles** — instead of a permanent list under the map,
+  **tap** a Dry/Wet chip to toggle the layer and **hold** it to expand a dropdown of every room's age
+  for that layer (tap a row to select the room across vacuums). Cleaner, and compact on mobile.
+
 ## [0.11.0] - 2026-06-19
 
 ### Fixed

@@ -87,7 +87,7 @@ const t={ATTRIBUTE:1},e=t=>(...e)=>({_$litDirective$:t,values:e});let i$1 = clas
 
 const CARD_NAME = "anyvac-card";
 const EDITOR_NAME = "anyvac-card-editor";
-const CARD_VERSION = "0.11.0";
+const CARD_VERSION = "0.13.0";
 /** Server-side tracking blueprint */
 const BLUEPRINT_VERSION = "1.0.0";
 const BLUEPRINT_PATH = "anyvac_card/cleaning_tracker.yaml";
@@ -209,6 +209,9 @@ let AnyVacCard = class AnyVacCard extends i$2 {
         this._zoneDrag = null;
         this._zonePending = null;
         this._layers = { dry: true, wet: false };
+        this._layerMenu = null;
+        this._layerHoldTimer = null;
+        this._layerHeld = false;
         /** Výběr místností — drží se lokálně v kartě (bez potřeby input_boolean helper entity) */
         this._localRoomSel = new Map();
         /** Aktivní úklidy — sledování průběhu pro vyhodnocení úspěchu */
@@ -1570,6 +1573,60 @@ let AnyVacCard = class AnyVacCard extends i$2 {
             : A;
         return b `<svg class="map-vector" viewBox="0 0 ${NW} ${NH}" preserveAspectRatio="none" style=${o(seat)}>${traceT}${robotT}</svg>`;
     }
+    _onLayerDown(type) {
+        this._layerHeld = false;
+        this._layerHoldTimer = window.setTimeout(() => {
+            this._layerHeld = true;
+            this._layerMenu = this._layerMenu === type ? null : type;
+        }, 380);
+    }
+    _onLayerUp() {
+        if (this._layerHoldTimer !== null) {
+            window.clearTimeout(this._layerHoldTimer);
+            this._layerHoldTimer = null;
+        }
+    }
+    _onLayerClick(type) {
+        if (this._layerHeld) {
+            this._layerHeld = false;
+            return;
+        }
+        this._layers = { ...this._layers, [type]: !this._layers[type] };
+        this._layerMenu = null;
+    }
+    /** Hold-expanded per-room ages for one layer (dry/wet). */
+    _renderLayerMenu(vacs, type) {
+        const seen = new Set();
+        const rooms = [];
+        for (const v of vacs)
+            for (const r of v.rooms ?? []) {
+                if (r.key && !seen.has(r.key)) {
+                    seen.add(r.key);
+                    rooms.push({ r, v });
+                }
+            }
+        const badge = (d) => (d === null ? "\u2014" : d < 1 ? "<1d" : Math.round(d) + "d");
+        return b `
+      <div class="layer-menu">
+        <div class="layer-menu-head">
+          <ha-icon icon=${type === "dry" ? "mdi:broom" : "mdi:water"}></ha-icon>
+          <span>${type === "dry" ? "Dry" : "Wet"} \u00b7 last cleaned</span>
+        </div>
+        ${rooms.map(({ r, v }) => {
+            const rec = this._intRoomRec(v, r);
+            const d = this._ageDaysFromIso(rec?.[type]);
+            const sel = this._isRoomSelectedAny(r.key, vacs);
+            return b `
+            <button class="layer-menu-row ${sel ? "on" : ""}" @click=${() => this._toggleRoomAcross(r.key, vacs)}>
+              <ha-icon icon=${r.icon ?? "mdi:square"}></ha-icon>
+              <span class="lm-name">${r.name ?? r.key}</span>
+              <b style=${o({ color: this._colorForAgeDays(d) })}>${badge(d)}</b>
+            </button>
+          `;
+        })}
+      </div>
+    `;
+    }
     _renderLayerToggles(vacs) {
         const withInt = vacs.filter((v) => v.integration_entity);
         if (!withInt.length)
@@ -1591,14 +1648,17 @@ let AnyVacCard = class AnyVacCard extends i$2 {
         const badge = (d) => (d === null ? "\u2014" : d < 1 ? "<1d" : Math.round(d) + "d");
         return b `
       <div class="layer-toggles">
-        <button class="layer-btn ${this._layers.dry ? "on" : ""}" title="Dry layer"
-          @click=${() => { this._layers = { ...this._layers, dry: !this._layers.dry }; }}>
+        <button class="layer-btn ${this._layers.dry ? "on" : ""}" title="Dry \u2014 tap to toggle, hold for rooms"
+          @pointerdown=${() => this._onLayerDown("dry")} @pointerup=${() => this._onLayerUp()} @pointerleave=${() => this._onLayerUp()}
+          @click=${() => this._onLayerClick("dry")}>
           <ha-icon icon="mdi:broom"></ha-icon><span>${badge(oldest("dry"))}</span>
         </button>
-        <button class="layer-btn ${this._layers.wet ? "on" : ""}" title="Wet layer"
-          @click=${() => { this._layers = { ...this._layers, wet: !this._layers.wet }; }}>
+        <button class="layer-btn ${this._layers.wet ? "on" : ""}" title="Wet \u2014 tap to toggle, hold for rooms"
+          @pointerdown=${() => this._onLayerDown("wet")} @pointerup=${() => this._onLayerUp()} @pointerleave=${() => this._onLayerUp()}
+          @click=${() => this._onLayerClick("wet")}>
           <ha-icon icon="mdi:water"></ha-icon><span>${badge(oldest("wet"))}</span>
         </button>
+        ${this._layerMenu ? this._renderLayerMenu(withInt, this._layerMenu) : A}
       </div>
     `;
     }
@@ -1656,11 +1716,12 @@ let AnyVacCard = class AnyVacCard extends i$2 {
         if (!shown.length)
             return A;
         const primary = shown.find((v) => v.image_base?.src) ?? shown[0];
-        const ib = primary.image_base;
+        const ib = this._config.image_base ?? primary.image_base;
         const hasImage = !!ib?.src;
-        const fixedH = typeof primary.base_height === "number" && primary.base_height > 0;
+        const bh = this._config.base_height ?? primary.base_height;
+        const fixedH = typeof bh === "number" && bh > 0;
         const wrapClass = fixedH ? "map-wrap--fixed" : (hasImage ? "map-wrap--image" : "");
-        const wrapStyle = o(fixedH ? { height: (primary.base_height ?? 0) + "px" } : {});
+        const wrapStyle = o(fixedH ? { height: (bh ?? 0) + "px" } : {});
         const imgClass = "image-base-img" + (fixedH ? " image-base-img--fit" : "");
         return b `
       <div class="map-wrap ${wrapClass}" style=${wrapStyle}>
@@ -2016,7 +2077,6 @@ let AnyVacCard = class AnyVacCard extends i$2 {
         ${this._config.map_mode === "merged"
             ? b `
               ${this._renderMergedMap()}
-              ${this._renderRoomList([...this._shownSet].filter((i) => i < this._config.vacuums.length).map((i) => this._config.vacuums[i]))}
               ${[...this._shownSet].filter(i => i < this._config.vacuums.length).map(i => b `
                 ${this._renderMapTools(this._config.vacuums[i])}
                 ${this._renderStatusCard(this._config.vacuums[i], i)}
@@ -2150,8 +2210,14 @@ AnyVacCard.styles = i$5 `
     .map-vector { position: absolute; transform-origin: center center; pointer-events: none; overflow: visible; }
     .zone-rect { position: absolute; border: 2px solid #fff; background: rgba(255,255,255,0.15); border-radius: 4px; pointer-events: none; box-shadow: 0 0 0 1px rgba(0,0,0,0.45); }
     .layer-toggles { position: absolute; top: 8px; right: 8px; display: flex; gap: 6px; z-index: 3; }
-    .layer-btn { display: flex; align-items: center; gap: 3px; padding: 3px 8px; border-radius: 999px; border: 1px solid rgba(255,255,255,0.2); background: rgba(0,0,0,0.45); color: rgba(255,255,255,0.55); font-size: 11px; font-weight: 600; cursor: pointer; --mdc-icon-size: 16px; }
+    .layer-btn { display: flex; align-items: center; gap: 3px; padding: 3px 8px; border-radius: 999px; border: 1px solid rgba(255,255,255,0.2); background: rgba(0,0,0,0.45); color: rgba(255,255,255,0.55); font-size: 11px; font-weight: 600; cursor: pointer; --mdc-icon-size: 16px; user-select: none; -webkit-touch-callout: none; touch-action: manipulation; }
     .layer-btn.on { color: #fff; border-color: rgba(255,255,255,0.55); background: rgba(0,0,0,0.7); }
+    .layer-menu { position: absolute; top: 38px; right: 0; min-width: 200px; max-width: 86vw; max-height: 60vh; overflow-y: auto; display: flex; flex-direction: column; gap: 2px; padding: 6px; border-radius: 12px; background: rgba(15,15,18,0.96); border: 1px solid rgba(255,255,255,0.15); box-shadow: 0 8px 24px rgba(0,0,0,0.5); }
+    .layer-menu-head { display: flex; align-items: center; gap: 6px; font-size: 11px; color: rgba(255,255,255,0.5); padding: 2px 6px 5px; --mdc-icon-size: 14px; }
+    .layer-menu-row { display: flex; align-items: center; gap: 8px; padding: 6px 8px; border-radius: 8px; border: 1px solid transparent; background: transparent; color: rgba(255,255,255,0.88); cursor: pointer; font-size: 13px; --mdc-icon-size: 16px; }
+    .layer-menu-row.on { background: rgba(255,255,255,0.12); border-color: rgba(255,255,255,0.4); }
+    .lm-name { flex: 1; text-align: left; }
+    .layer-menu-row b { font-weight: 700; }
     .room-list { display: flex; flex-direction: column; gap: 4px; }
     .room-row { display: flex; align-items: center; gap: 8px; padding: 6px 10px; border-radius: 10px; border: 1px solid rgba(255,255,255,0.08); background: rgba(255,255,255,0.03); color: rgba(255,255,255,0.85); cursor: pointer; --mdc-icon-size: 18px; }
     .room-row.on { border-color: rgba(255,255,255,0.5); background: rgba(255,255,255,0.1); }
@@ -2394,6 +2460,9 @@ __decorate([
 __decorate([
     r()
 ], AnyVacCard.prototype, "_layers", void 0);
+__decorate([
+    r()
+], AnyVacCard.prototype, "_layerMenu", void 0);
 __decorate([
     r()
 ], AnyVacCard.prototype, "_localRoomSel", void 0);

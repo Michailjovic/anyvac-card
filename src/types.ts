@@ -272,6 +272,10 @@ export interface AnyVacCardConfig {
   vacuums: VacuumConfig[];
   /** Render one shared map with all vacuums (merged), or one map per vacuum (split, default). */
   map_mode?: "split" | "merged";
+  /** Merged mode: shared custom floorplan, set once on the card (not per vacuum). */
+  image_base?: ImageBaseConfig;
+  /** Merged mode: shared card height. */
+  base_height?: number;
   /** Optional extra badges for whole-flat or cross-vacuum actions */
   global_actions?: GlobalAction[];
   /** Shared room overlay appearance — applies to all vacuums */
