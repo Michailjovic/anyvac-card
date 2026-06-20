@@ -11,6 +11,16 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Rooms from the integration (real room polygons / names) for clickable cleaning on the floorplan.
 - Milestone 3b: companion `anyvac` integration data layers (clean-history, statistics).
 
+## [0.17.0] - 2026-06-20
+
+### Added
+
+- **Optional 3-point map alignment** (merged) — a *3-point align* button in the Map seating section
+  opens two panes (the vacuum map and the floorplan). Click the same recognisable point on both, 2–3
+  times, then *Apply* and the card fits a similarity transform and writes the vacuum's
+  rotation / scale / offset automatically — no more dragging the seating sliders. Manual sliders remain
+  as the alternative. (Assumes the floorplan's own seating is identity.)
+
 ## [0.16.0] - 2026-06-20
 
 ### Changed

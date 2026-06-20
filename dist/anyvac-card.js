@@ -87,7 +87,7 @@ const t={ATTRIBUTE:1},e=t=>(...e)=>({_$litDirective$:t,values:e});let i$1 = clas
 
 const CARD_NAME = "anyvac-card";
 const EDITOR_NAME = "anyvac-card-editor";
-const CARD_VERSION = "0.16.0";
+const CARD_VERSION = "0.17.0";
 /** Server-side tracking blueprint */
 const BLUEPRINT_VERSION = "1.0.0";
 const BLUEPRINT_PATH = "anyvac_card/cleaning_tracker.yaml";
@@ -2692,6 +2692,9 @@ let AnyVacCardEditor = class AnyVacCardEditor extends i$2 {
         // Maps tab state
         this._mapVac = 0;
         this._mapRoom = null;
+        this._alignActive = false;
+        this._alignPairs = [];
+        this._alignPending = null;
         // Backend (blueprint) deploy state
         this._bpStatus = "unknown";
         this._bpBusy = null;
@@ -2800,6 +2803,74 @@ let AnyVacCardEditor = class AnyVacCardEditor extends i$2 {
         else {
             this._setImageBase(Math.min(this._mapVac, this._config.vacuums.length - 1), updates);
         }
+    }
+    _alignNorm(e) {
+        const el = e.currentTarget;
+        const r = el.getBoundingClientRect();
+        return [Math.min(1, Math.max(0, (e.clientX - r.left) / r.width)), Math.min(1, Math.max(0, (e.clientY - r.top) / r.height))];
+    }
+    _alignClickNative(e) {
+        if (!this._alignActive || this._alignPending)
+            return;
+        this._alignPending = this._alignNorm(e);
+    }
+    _alignClickFloor(e) {
+        if (!this._alignActive || !this._alignPending)
+            return;
+        this._alignPairs = [...this._alignPairs, { n: this._alignPending, f: this._alignNorm(e) }];
+        this._alignPending = null;
+    }
+    /** Fit a similarity (scale, rotation, translation) from the marked point pairs and write it to the
+     *  vacuum's map seating. Works in each image's natural-pixel space; assumes identity floorplan seating. */
+    _alignApply(mapVac) {
+        if (this._alignPairs.length < 2)
+            return;
+        const nImg = this.renderRoot?.querySelector(".align-native-img");
+        const fImg = this.renderRoot?.querySelector(".align-floor-img");
+        const NW = nImg?.naturalWidth || 1, NH = nImg?.naturalHeight || 1;
+        const FW = fImg?.naturalWidth || 1, FH = fImg?.naturalHeight || 1;
+        const P = this._alignPairs.map((p) => [p.n[0] * NW, p.n[1] * NH]);
+        const Q = this._alignPairs.map((p) => [p.f[0] * FW, p.f[1] * FH]);
+        const n = P.length;
+        const mean = (a) => {
+            let sx = 0, sy = 0;
+            for (const p of a) {
+                sx += p[0];
+                sy += p[1];
+            }
+            return [sx / a.length, sy / a.length];
+        };
+        const mP = mean(P), mQ = mean(Q);
+        let numCos = 0, numSin = 0, denom = 0;
+        for (let i = 0; i < n; i++) {
+            const dpx = P[i][0] - mP[0], dpy = P[i][1] - mP[1], dqx = Q[i][0] - mQ[0], dqy = Q[i][1] - mQ[1];
+            numCos += dpx * dqx + dpy * dqy;
+            numSin += dpx * dqy - dpy * dqx;
+            denom += dpx * dpx + dpy * dpy;
+        }
+        if (denom < 1e-9)
+            return;
+        const theta = Math.atan2(numSin, numCos);
+        const s = Math.sqrt(numCos * numCos + numSin * numSin) / denom;
+        const cos = Math.cos(theta), sin = Math.sin(theta);
+        const tx = mQ[0] - s * (cos * mP[0] - sin * mP[1]);
+        const ty = mQ[1] - s * (sin * mP[0] + cos * mP[1]);
+        const cx = s * (cos * (NW / 2) - sin * (NH / 2)) + tx;
+        const cy = s * (sin * (NW / 2) + cos * (NH / 2)) + ty;
+        const scalePct = (s * NW) / FW * 100;
+        const offX = (cx / FW - 0.5) * 100;
+        const offY = (cy / FH - 0.5) * 100;
+        let rot = (theta * 180) / Math.PI;
+        rot = ((rot % 360) + 360) % 360;
+        this._setMap(mapVac, {
+            rotation: Math.round(rot),
+            scale: Math.round(scalePct),
+            offset_x: Math.round(offX * 10) / 10,
+            offset_y: Math.round(offY * 10) / 10,
+        });
+        this._alignActive = false;
+        this._alignPairs = [];
+        this._alignPending = null;
     }
     _setRoom(vacIdx, roomIdx, updates) {
         const rooms = [...(this._config.vacuums[vacIdx].rooms ?? [])];
@@ -3580,6 +3651,34 @@ let AnyVacCardEditor = class AnyVacCardEditor extends i$2 {
           ${this._numberSlider("Scale", map.scale ?? 100, 50, 200, 5, v => this._setMap(mapVac, { scale: v }), "%")}
           ${this._numberSlider("Offset X", map.offset_x ?? 0, -50, 50, 1, v => this._setMap(mapVac, { offset_x: v }), "%")}
           ${this._numberSlider("Offset Y", map.offset_y ?? 0, -50, 50, 1, v => this._setMap(mapVac, { offset_y: v }), "%")}
+
+          ${this._mergedEdit && useImg && mapUrl ? b `
+            <button class="btn btn--sm" style="align-self:flex-start;margin-top:6px"
+              @click=${() => { this._alignActive = !this._alignActive; this._alignPairs = []; this._alignPending = null; }}>
+              <ha-icon icon="mdi:vector-point"></ha-icon> ${this._alignActive ? "Cancel 3-point align" : "3-point align (optional)"}
+            </button>
+            ${this._alignActive ? b `
+              <p class="hint">${this._alignPending
+            ? "Now click the SAME point on the FLOORPLAN (right)."
+            : "Click a recognisable point on the VACUUM MAP (left). " + this._alignPairs.length + "/3 pairs."}</p>
+              <div class="align-grid">
+                <div class="align-pane" @click=${(e) => this._alignClickNative(e)}>
+                  <img class="align-native-img" src=${mapUrl} alt="Vacuum map" />
+                  ${this._alignPending ? b `<div class="align-dot align-dot--pending" style=${o({ left: this._alignPending[0] * 100 + "%", top: this._alignPending[1] * 100 + "%" })}></div>` : A}
+                  ${this._alignPairs.map((p, i) => b `<div class="align-dot" style=${o({ left: p.n[0] * 100 + "%", top: p.n[1] * 100 + "%" })}>${i + 1}</div>`)}
+                </div>
+                <div class="align-pane" @click=${(e) => this._alignClickFloor(e)}>
+                  <img class="align-floor-img" src=${ib.src} alt="Floorplan" />
+                  ${this._alignPairs.map((p, i) => b `<div class="align-dot" style=${o({ left: p.f[0] * 100 + "%", top: p.f[1] * 100 + "%" })}>${i + 1}</div>`)}
+                </div>
+              </div>
+              <button class="btn btn--add btn--sm" style="align-self:flex-start;margin-top:4px"
+                ?disabled=${this._alignPairs.length < 2}
+                @click=${() => this._alignApply(mapVac)}>
+                <ha-icon icon="mdi:check"></ha-icon> Apply alignment (${this._alignPairs.length} pts)
+              </button>
+            ` : A}
+          ` : A}
 
           ${this._config.map_mode === "merged" ? b `<button class="btn btn--add btn--sm" style="align-self:flex-start;margin-top:4px" @click=${() => this._addEditedRoom()}><ha-icon icon="mdi:plus"></ha-icon> Add room</button>` : A}
           ${rooms.length ? b `
@@ -4375,6 +4474,11 @@ AnyVacCardEditor.styles = i$5 `
       overflow:hidden; border-radius:8px; background:rgba(0,0,0,.06);
     }
     .map-preview-img { position:absolute; transform-origin:center center; object-fit:cover; }
+    .align-grid { display:grid; grid-template-columns:1fr 1fr; gap:6px; margin-top:4px; }
+    .align-pane { position:relative; border:1px solid rgba(255,255,255,0.2); border-radius:8px; overflow:hidden; cursor:crosshair; background:rgba(0,0,0,0.3); }
+    .align-pane img { display:block; width:100%; height:auto; }
+    .align-dot { position:absolute; transform:translate(-50%,-50%); width:16px; height:16px; border-radius:50%; background:#4db6ff; color:#fff; font-size:10px; font-weight:700; display:flex; align-items:center; justify-content:center; border:2px solid #fff; pointer-events:none; }
+    .align-dot--pending { background:#ffb74d; }
 
     .pos-dot {
       position:absolute; transform:translate(-50%,-50%);
@@ -4518,6 +4622,15 @@ __decorate([
 __decorate([
     r()
 ], AnyVacCardEditor.prototype, "_mapRoom", void 0);
+__decorate([
+    r()
+], AnyVacCardEditor.prototype, "_alignActive", void 0);
+__decorate([
+    r()
+], AnyVacCardEditor.prototype, "_alignPairs", void 0);
+__decorate([
+    r()
+], AnyVacCardEditor.prototype, "_alignPending", void 0);
 __decorate([
     r()
 ], AnyVacCardEditor.prototype, "_bpStatus", void 0);

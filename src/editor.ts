@@ -91,6 +91,9 @@ export class AnyVacCardEditor extends LitElement {
   // Maps tab state
   @state() private _mapVac  = 0;
   @state() private _mapRoom: number | null = null;
+  @state() private _alignActive = false;
+  @state() private _alignPairs: Array<{ n: [number, number]; f: [number, number] }> = [];
+  @state() private _alignPending: [number, number] | null = null;
 
   // Backend (blueprint) deploy state
   @state() private _bpStatus: "unknown" | "missing" | "outdated" | "current" = "unknown";
@@ -201,6 +204,59 @@ export class AnyVacCardEditor extends LitElement {
     } else {
       this._setImageBase(Math.min(this._mapVac, this._config.vacuums.length - 1), updates);
     }
+  }
+  private _alignNorm(e: MouseEvent): [number, number] {
+    const el = e.currentTarget as HTMLElement; const r = el.getBoundingClientRect();
+    return [Math.min(1, Math.max(0, (e.clientX - r.left) / r.width)), Math.min(1, Math.max(0, (e.clientY - r.top) / r.height))];
+  }
+  private _alignClickNative(e: MouseEvent): void {
+    if (!this._alignActive || this._alignPending) return;
+    this._alignPending = this._alignNorm(e);
+  }
+  private _alignClickFloor(e: MouseEvent): void {
+    if (!this._alignActive || !this._alignPending) return;
+    this._alignPairs = [...this._alignPairs, { n: this._alignPending, f: this._alignNorm(e) }];
+    this._alignPending = null;
+  }
+  /** Fit a similarity (scale, rotation, translation) from the marked point pairs and write it to the
+   *  vacuum's map seating. Works in each image's natural-pixel space; assumes identity floorplan seating. */
+  private _alignApply(mapVac: number): void {
+    if (this._alignPairs.length < 2) return;
+    const nImg = this.renderRoot?.querySelector(".align-native-img") as HTMLImageElement | null;
+    const fImg = this.renderRoot?.querySelector(".align-floor-img") as HTMLImageElement | null;
+    const NW = nImg?.naturalWidth || 1, NH = nImg?.naturalHeight || 1;
+    const FW = fImg?.naturalWidth || 1, FH = fImg?.naturalHeight || 1;
+    const P = this._alignPairs.map((p) => [p.n[0] * NW, p.n[1] * NH] as [number, number]);
+    const Q = this._alignPairs.map((p) => [p.f[0] * FW, p.f[1] * FH] as [number, number]);
+    const n = P.length;
+    const mean = (a: Array<[number, number]>): [number, number] => {
+      let sx = 0, sy = 0; for (const p of a) { sx += p[0]; sy += p[1]; } return [sx / a.length, sy / a.length];
+    };
+    const mP = mean(P), mQ = mean(Q);
+    let numCos = 0, numSin = 0, denom = 0;
+    for (let i = 0; i < n; i++) {
+      const dpx = P[i][0] - mP[0], dpy = P[i][1] - mP[1], dqx = Q[i][0] - mQ[0], dqy = Q[i][1] - mQ[1];
+      numCos += dpx * dqx + dpy * dqy; numSin += dpx * dqy - dpy * dqx; denom += dpx * dpx + dpy * dpy;
+    }
+    if (denom < 1e-9) return;
+    const theta = Math.atan2(numSin, numCos);
+    const s = Math.sqrt(numCos * numCos + numSin * numSin) / denom;
+    const cos = Math.cos(theta), sin = Math.sin(theta);
+    const tx = mQ[0] - s * (cos * mP[0] - sin * mP[1]);
+    const ty = mQ[1] - s * (sin * mP[0] + cos * mP[1]);
+    const cx = s * (cos * (NW / 2) - sin * (NH / 2)) + tx;
+    const cy = s * (sin * (NW / 2) + cos * (NH / 2)) + ty;
+    const scalePct = (s * NW) / FW * 100;
+    const offX = (cx / FW - 0.5) * 100;
+    const offY = (cy / FH - 0.5) * 100;
+    let rot = (theta * 180) / Math.PI; rot = ((rot % 360) + 360) % 360;
+    this._setMap(mapVac, {
+      rotation: Math.round(rot),
+      scale: Math.round(scalePct),
+      offset_x: Math.round(offX * 10) / 10,
+      offset_y: Math.round(offY * 10) / 10,
+    });
+    this._alignActive = false; this._alignPairs = []; this._alignPending = null;
   }
   private _setRoom(vacIdx: number, roomIdx: number, updates: Partial<RoomConfig>): void {
     const rooms = [...(this._config.vacuums[vacIdx].rooms ?? [])];
@@ -1039,6 +1095,34 @@ export class AnyVacCardEditor extends LitElement {
           ${this._numberSlider("Offset X",  map.offset_x  ?? 0,  -50,  50,  1, v => this._setMap(mapVac, { offset_x:  v }), "%")}
           ${this._numberSlider("Offset Y",  map.offset_y  ?? 0,  -50,  50,  1, v => this._setMap(mapVac, { offset_y:  v }), "%")}
 
+          ${this._mergedEdit && useImg && mapUrl ? html`
+            <button class="btn btn--sm" style="align-self:flex-start;margin-top:6px"
+              @click=${() => { this._alignActive = !this._alignActive; this._alignPairs = []; this._alignPending = null; }}>
+              <ha-icon icon="mdi:vector-point"></ha-icon> ${this._alignActive ? "Cancel 3-point align" : "3-point align (optional)"}
+            </button>
+            ${this._alignActive ? html`
+              <p class="hint">${this._alignPending
+                ? "Now click the SAME point on the FLOORPLAN (right)."
+                : "Click a recognisable point on the VACUUM MAP (left). " + this._alignPairs.length + "/3 pairs."}</p>
+              <div class="align-grid">
+                <div class="align-pane" @click=${(e: MouseEvent) => this._alignClickNative(e)}>
+                  <img class="align-native-img" src=${mapUrl} alt="Vacuum map" />
+                  ${this._alignPending ? html`<div class="align-dot align-dot--pending" style=${styleMap({ left: this._alignPending[0] * 100 + "%", top: this._alignPending[1] * 100 + "%" })}></div>` : nothing}
+                  ${this._alignPairs.map((p, i) => html`<div class="align-dot" style=${styleMap({ left: p.n[0] * 100 + "%", top: p.n[1] * 100 + "%" })}>${i + 1}</div>`)}
+                </div>
+                <div class="align-pane" @click=${(e: MouseEvent) => this._alignClickFloor(e)}>
+                  <img class="align-floor-img" src=${ib!.src} alt="Floorplan" />
+                  ${this._alignPairs.map((p, i) => html`<div class="align-dot" style=${styleMap({ left: p.f[0] * 100 + "%", top: p.f[1] * 100 + "%" })}>${i + 1}</div>`)}
+                </div>
+              </div>
+              <button class="btn btn--add btn--sm" style="align-self:flex-start;margin-top:4px"
+                ?disabled=${this._alignPairs.length < 2}
+                @click=${() => this._alignApply(mapVac)}>
+                <ha-icon icon="mdi:check"></ha-icon> Apply alignment (${this._alignPairs.length} pts)
+              </button>
+            ` : nothing}
+          ` : nothing}
+
           ${this._config.map_mode === "merged" ? html`<button class="btn btn--add btn--sm" style="align-self:flex-start;margin-top:4px" @click=${() => this._addEditedRoom()}><ha-icon icon="mdi:plus"></ha-icon> Add room</button>` : nothing}
           ${rooms.length ? html`
             <div class="section-title">Room positions</div>
@@ -1854,6 +1938,11 @@ export class AnyVacCardEditor extends LitElement {
       overflow:hidden; border-radius:8px; background:rgba(0,0,0,.06);
     }
     .map-preview-img { position:absolute; transform-origin:center center; object-fit:cover; }
+    .align-grid { display:grid; grid-template-columns:1fr 1fr; gap:6px; margin-top:4px; }
+    .align-pane { position:relative; border:1px solid rgba(255,255,255,0.2); border-radius:8px; overflow:hidden; cursor:crosshair; background:rgba(0,0,0,0.3); }
+    .align-pane img { display:block; width:100%; height:auto; }
+    .align-dot { position:absolute; transform:translate(-50%,-50%); width:16px; height:16px; border-radius:50%; background:#4db6ff; color:#fff; font-size:10px; font-weight:700; display:flex; align-items:center; justify-content:center; border:2px solid #fff; pointer-events:none; }
+    .align-dot--pending { background:#ffb74d; }
 
     .pos-dot {
       position:absolute; transform:translate(-50%,-50%);
