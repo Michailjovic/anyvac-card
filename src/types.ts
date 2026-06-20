@@ -62,7 +62,11 @@ export interface RoomConfig {
   icon_anchor?: "none"|"tl"|"t"|"tr"|"l"|"c"|"r"|"bl"|"b"|"br";
   segment_id?: number;
   area_id?: string;
-  clean_time_mins?: number;            // odhadovaný čas úklidu (minuty) — fallback when no entity
+  clean_time_mins?: number;
+  /** Estimated minutes for a DRY clean of this room (used when the vacuum's role is dry). */
+  clean_time_dry?: number;
+  /** Estimated minutes for a WET (mop) clean of this room (used when the vacuum's role is wet). */
+  clean_time_wet?: number;            // odhadovaný čas úklidu (minuty) — fallback when no entity
   clean_time_entity?: string;          // input_number — auto-calibrated rolling average (minutes)
   last_clean_entity?: string;
   map_x: number;

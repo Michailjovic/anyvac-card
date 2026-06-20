@@ -11,6 +11,24 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Rooms from the integration (real room polygons / names) for clickable cleaning on the floorplan.
 - Milestone 3b: companion `anyvac` integration data layers (clean-history, statistics).
 
+## [0.18.0] - 2026-06-20
+
+### Added
+
+- **Per-clean-type time estimates** — rooms can carry a `clean_time_dry` and `clean_time_wet`, and the
+  estimated cleaning time shown for a vacuum uses the one matching its clean-type role (dry/wet). So a
+  dry vacuum shows the dry estimate and a mop vacuum the wet estimate for the same room; switching a
+  vacuum's role flips its estimate. Falls back to `clean_time_mins` / the learned `clean_time_entity`.
+  Editor (merged room editor) gains *Dry clean time* and *Wet clean time* fields.
+
+## [0.17.2] - 2026-06-20
+
+### Removed
+
+- **3-point map alignment** — the experimental auto-alignment did not produce reliable results, so it
+  was removed. Aligning a vacuum's map to the floorplan is done with the visual *Map seating* sliders
+  (the faded overlay shows the alignment as you drag), which works reliably.
+
 ## [0.17.1] - 2026-06-20
 
 ### Fixed

@@ -1107,34 +1107,6 @@ export class AnyVacCardEditor extends LitElement {
           ${this._numberSlider("Offset X",  map.offset_x  ?? 0,  -50,  50,  1, v => this._setMap(mapVac, { offset_x:  v }), "%")}
           ${this._numberSlider("Offset Y",  map.offset_y  ?? 0,  -50,  50,  1, v => this._setMap(mapVac, { offset_y:  v }), "%")}
 
-          ${this._mergedEdit && useImg && mapUrl ? html`
-            <button class="btn btn--sm" style="align-self:flex-start;margin-top:6px"
-              @click=${() => { this._alignActive = !this._alignActive; this._alignPairs = []; this._alignPending = null; }}>
-              <ha-icon icon="mdi:vector-point"></ha-icon> ${this._alignActive ? "Cancel 3-point align" : "3-point align (optional)"}
-            </button>
-            ${this._alignActive ? html`
-              <p class="hint">${this._alignPending
-                ? "Now click the SAME point on the FLOORPLAN (right)."
-                : "Click a recognisable point on the VACUUM MAP (left). " + this._alignPairs.length + "/3 pairs."}</p>
-              <div class="align-grid">
-                <div class="align-pane" @click=${(e: MouseEvent) => this._alignClickNative(e)}>
-                  <img class="align-native-img" src=${mapUrl} alt="Vacuum map" />
-                  ${this._alignPending ? html`<div class="align-dot align-dot--pending" style=${styleMap({ left: this._alignPending[0] * 100 + "%", top: this._alignPending[1] * 100 + "%" })}></div>` : nothing}
-                  ${this._alignPairs.map((p, i) => html`<div class="align-dot" style=${styleMap({ left: p.n[0] * 100 + "%", top: p.n[1] * 100 + "%" })}>${i + 1}</div>`)}
-                </div>
-                <div class="align-pane" @click=${(e: MouseEvent) => this._alignClickFloor(e)}>
-                  <img class="align-floor-img" src=${ib!.src} alt="Floorplan" />
-                  ${this._alignPairs.map((p, i) => html`<div class="align-dot" style=${styleMap({ left: p.f[0] * 100 + "%", top: p.f[1] * 100 + "%" })}>${i + 1}</div>`)}
-                </div>
-              </div>
-              <button class="btn btn--add btn--sm" style="align-self:flex-start;margin-top:4px"
-                ?disabled=${this._alignPairs.length < 2}
-                @click=${() => this._alignApply(mapVac)}>
-                <ha-icon icon="mdi:check"></ha-icon> Apply alignment (${this._alignPairs.length} pts)
-              </button>
-            ` : nothing}
-          ` : nothing}
-
           ${this._config.map_mode === "merged" ? html`<button class="btn btn--add btn--sm" style="align-self:flex-start;margin-top:4px" @click=${() => this._addEditedRoom()}><ha-icon icon="mdi:plus"></ha-icon> Add room</button>` : nothing}
           ${rooms.length ? html`
             <div class="section-title">Room positions</div>
@@ -1154,7 +1126,8 @@ export class AnyVacCardEditor extends LitElement {
               ${this._config.map_mode === "merged" ? html`
                 ${this._textField("Key (= Roborock room name)", rooms[this._mapRoom]?.key, v => this._setEditedRoom(this._mapRoom!, { key: v }), "Kitchen")}
                 ${this._textField("Name", rooms[this._mapRoom]?.name, v => this._setEditedRoom(this._mapRoom!, { name: v }), "Kitchen")}
-                ${this._numberSlider("Clean time (min)", rooms[this._mapRoom]?.clean_time_mins ?? 0, 0, 120, 1, v => this._setEditedRoom(this._mapRoom!, { clean_time_mins: v > 0 ? v : undefined }), " min")}
+                ${this._numberSlider("Dry clean time", rooms[this._mapRoom]?.clean_time_dry ?? 0, 0, 120, 1, v => this._setEditedRoom(this._mapRoom!, { clean_time_dry: v > 0 ? v : undefined }), " min")}
+                ${this._numberSlider("Wet clean time", rooms[this._mapRoom]?.clean_time_wet ?? 0, 0, 180, 1, v => this._setEditedRoom(this._mapRoom!, { clean_time_wet: v > 0 ? v : undefined }), " min")}
               ` : nothing}
               <div class="section-title" style="margin-top:4px">Position</div>
               ${this._numberSlider("X", rooms[this._mapRoom]?.map_x ?? 50, 0, 100, 1,

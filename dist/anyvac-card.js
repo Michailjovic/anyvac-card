@@ -87,7 +87,7 @@ const t={ATTRIBUTE:1},e=t=>(...e)=>({_$litDirective$:t,values:e});let i$1 = clas
 
 const CARD_NAME = "anyvac-card";
 const EDITOR_NAME = "anyvac-card-editor";
-const CARD_VERSION = "0.17.1";
+const CARD_VERSION = "0.18.0";
 /** Server-side tracking blueprint */
 const BLUEPRINT_VERSION = "1.0.0";
 const BLUEPRINT_PATH = "anyvac_card/cleaning_tracker.yaml";
@@ -488,7 +488,13 @@ let AnyVacCard = class AnyVacCard extends i$2 {
     _hasSelectedRooms(vac) {
         return (this._roomsFor(vac)).some((r) => this._isRoomSelected(r, vac));
     }
-    _roomCleanMins(room) {
+    _roomCleanMins(room, vac) {
+        const ct = this._vacCleanType(vac);
+        const typed = (ct.wet && !ct.dry) ? room.clean_time_wet
+            : (ct.dry && !ct.wet) ? room.clean_time_dry
+                : (room.clean_time_wet ?? room.clean_time_dry);
+        if (typed != null && typed > 0)
+            return typed;
         if (room.clean_time_entity) {
             const val = parseFloat(this.hass.states[room.clean_time_entity]?.state ?? "");
             if (!isNaN(val) && val > 0)
@@ -500,7 +506,7 @@ let AnyVacCard = class AnyVacCard extends i$2 {
         return (this._roomsFor(vac)).reduce((sum, r) => {
             if (!this._isRoomSelected(r, vac))
                 return sum;
-            return sum + this._roomCleanMins(r);
+            return sum + this._roomCleanMins(r, vac);
         }, 0);
     }
     _intRoomRec(vac, room) {
@@ -3671,34 +3677,6 @@ let AnyVacCardEditor = class AnyVacCardEditor extends i$2 {
           ${this._numberSlider("Offset X", map.offset_x ?? 0, -50, 50, 1, v => this._setMap(mapVac, { offset_x: v }), "%")}
           ${this._numberSlider("Offset Y", map.offset_y ?? 0, -50, 50, 1, v => this._setMap(mapVac, { offset_y: v }), "%")}
 
-          ${this._mergedEdit && useImg && mapUrl ? b `
-            <button class="btn btn--sm" style="align-self:flex-start;margin-top:6px"
-              @click=${() => { this._alignActive = !this._alignActive; this._alignPairs = []; this._alignPending = null; }}>
-              <ha-icon icon="mdi:vector-point"></ha-icon> ${this._alignActive ? "Cancel 3-point align" : "3-point align (optional)"}
-            </button>
-            ${this._alignActive ? b `
-              <p class="hint">${this._alignPending
-            ? "Now click the SAME point on the FLOORPLAN (right)."
-            : "Click a recognisable point on the VACUUM MAP (left). " + this._alignPairs.length + "/3 pairs."}</p>
-              <div class="align-grid">
-                <div class="align-pane" @click=${(e) => this._alignClickNative(e)}>
-                  <img class="align-native-img" src=${mapUrl} alt="Vacuum map" />
-                  ${this._alignPending ? b `<div class="align-dot align-dot--pending" style=${o({ left: this._alignPending[0] * 100 + "%", top: this._alignPending[1] * 100 + "%" })}></div>` : A}
-                  ${this._alignPairs.map((p, i) => b `<div class="align-dot" style=${o({ left: p.n[0] * 100 + "%", top: p.n[1] * 100 + "%" })}>${i + 1}</div>`)}
-                </div>
-                <div class="align-pane" @click=${(e) => this._alignClickFloor(e)}>
-                  <img class="align-floor-img" src=${ib.src} alt="Floorplan" />
-                  ${this._alignPairs.map((p, i) => b `<div class="align-dot" style=${o({ left: p.f[0] * 100 + "%", top: p.f[1] * 100 + "%" })}>${i + 1}</div>`)}
-                </div>
-              </div>
-              <button class="btn btn--add btn--sm" style="align-self:flex-start;margin-top:4px"
-                ?disabled=${this._alignPairs.length < 2}
-                @click=${() => this._alignApply(mapVac)}>
-                <ha-icon icon="mdi:check"></ha-icon> Apply alignment (${this._alignPairs.length} pts)
-              </button>
-            ` : A}
-          ` : A}
-
           ${this._config.map_mode === "merged" ? b `<button class="btn btn--add btn--sm" style="align-self:flex-start;margin-top:4px" @click=${() => this._addEditedRoom()}><ha-icon icon="mdi:plus"></ha-icon> Add room</button>` : A}
           ${rooms.length ? b `
             <div class="section-title">Room positions</div>
@@ -3718,7 +3696,8 @@ let AnyVacCardEditor = class AnyVacCardEditor extends i$2 {
               ${this._config.map_mode === "merged" ? b `
                 ${this._textField("Key (= Roborock room name)", rooms[this._mapRoom]?.key, v => this._setEditedRoom(this._mapRoom, { key: v }), "Kitchen")}
                 ${this._textField("Name", rooms[this._mapRoom]?.name, v => this._setEditedRoom(this._mapRoom, { name: v }), "Kitchen")}
-                ${this._numberSlider("Clean time (min)", rooms[this._mapRoom]?.clean_time_mins ?? 0, 0, 120, 1, v => this._setEditedRoom(this._mapRoom, { clean_time_mins: v > 0 ? v : undefined }), " min")}
+                ${this._numberSlider("Dry clean time", rooms[this._mapRoom]?.clean_time_dry ?? 0, 0, 120, 1, v => this._setEditedRoom(this._mapRoom, { clean_time_dry: v > 0 ? v : undefined }), " min")}
+                ${this._numberSlider("Wet clean time", rooms[this._mapRoom]?.clean_time_wet ?? 0, 0, 180, 1, v => this._setEditedRoom(this._mapRoom, { clean_time_wet: v > 0 ? v : undefined }), " min")}
               ` : A}
               <div class="section-title" style="margin-top:4px">Position</div>
               ${this._numberSlider("X", rooms[this._mapRoom]?.map_x ?? 50, 0, 100, 1, v => this._setEditedRoom(this._mapRoom, { map_x: v }), "%")}

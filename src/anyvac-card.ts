@@ -357,7 +357,12 @@ export class AnyVacCard extends LitElement {
     return (this._roomsFor(vac)).some((r) => this._isRoomSelected(r, vac));
   }
 
-  private _roomCleanMins(room: RoomConfig): number {
+  private _roomCleanMins(room: RoomConfig, vac: VacuumConfig): number {
+    const ct = this._vacCleanType(vac);
+    const typed = (ct.wet && !ct.dry) ? room.clean_time_wet
+                : (ct.dry && !ct.wet) ? room.clean_time_dry
+                : (room.clean_time_wet ?? room.clean_time_dry);
+    if (typed != null && typed > 0) return typed;
     if (room.clean_time_entity) {
       const val = parseFloat(this.hass.states[room.clean_time_entity]?.state ?? "");
       if (!isNaN(val) && val > 0) return val;
@@ -368,7 +373,7 @@ export class AnyVacCard extends LitElement {
   private _totalCleanMins(vac: VacuumConfig): number {
     return (this._roomsFor(vac)).reduce((sum, r) => {
       if (!this._isRoomSelected(r, vac)) return sum;
-      return sum + this._roomCleanMins(r);
+      return sum + this._roomCleanMins(r, vac);
     }, 0);
   }
 
