@@ -11,6 +11,15 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Rooms from the integration (real room polygons / names) for clickable cleaning on the floorplan.
 - Milestone 3b: companion `anyvac` integration data layers (clean-history, statistics).
 
+## [0.9.2] - 2026-06-19
+
+### Fixed
+
+- **Release workflow attaches the JS asset again** — the GitHub release action now receives the tag
+  explicitly (`tag_name: ${{ github.event.release.tag_name }}`), fixing the "GitHub Releases requires a
+  tag" failure so `dist/anyvac-card.js` is attached to each release automatically (no manual upload,
+  HACS picks it up as before).
+
 ## [0.9.1] - 2026-06-19
 
 ### Fixed
