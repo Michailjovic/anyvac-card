@@ -848,14 +848,18 @@ export class AnyVacCard extends LitElement {
         const slugMap: Record<string, number> = {};
         for (const [sid, name] of Object.entries(roomsMap)) slugMap[slugify(name)] = Number(sid);
         for (const room of selected) {
-          const areaId = room.area_id ?? this._config.area_mappings?.[room.key] ?? room.key;
-          const sid = slugMap[areaId];
+          // Match against the Roborock room NAME: the room key (our convention = Roborock name)
+          // first, then the display name, then any explicit area mapping as a fallback.
+          const sid =
+            slugMap[slugify(room.key)] ??
+            slugMap[slugify(room.name ?? "")] ??
+            slugMap[String(room.area_id ?? this._config.area_mappings?.[room.key] ?? "")];
           if (sid !== undefined) {
             autoSegments.push(sid);
           } else if (room.segment_id !== undefined) {
             autoSegments.push(room.segment_id); // fallback to manual segment_id
           } else {
-            console.warn("[anyvac-card] no segment for", room.key, "(area:", areaId + ")");
+            console.warn("[anyvac-card] no segment for", room.key);
           }
         }
       } catch (err) {

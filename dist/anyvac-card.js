@@ -87,7 +87,7 @@ const t={ATTRIBUTE:1},e=t=>(...e)=>({_$litDirective$:t,values:e});let i$1 = clas
 
 const CARD_NAME = "anyvac-card";
 const EDITOR_NAME = "anyvac-card-editor";
-const CARD_VERSION = "0.9.0";
+const CARD_VERSION = "0.9.1";
 /** Server-side tracking blueprint */
 const BLUEPRINT_VERSION = "1.0.0";
 const BLUEPRINT_PATH = "anyvac_card/cleaning_tracker.yaml";
@@ -964,8 +964,11 @@ let AnyVacCard = class AnyVacCard extends i$2 {
                 for (const [sid, name] of Object.entries(roomsMap))
                     slugMap[slugify(name)] = Number(sid);
                 for (const room of selected) {
-                    const areaId = room.area_id ?? this._config.area_mappings?.[room.key] ?? room.key;
-                    const sid = slugMap[areaId];
+                    // Match against the Roborock room NAME: the room key (our convention = Roborock name)
+                    // first, then the display name, then any explicit area mapping as a fallback.
+                    const sid = slugMap[slugify(room.key)] ??
+                        slugMap[slugify(room.name ?? "")] ??
+                        slugMap[String(room.area_id ?? this._config.area_mappings?.[room.key] ?? "")];
                     if (sid !== undefined) {
                         autoSegments.push(sid);
                     }
@@ -973,7 +976,7 @@ let AnyVacCard = class AnyVacCard extends i$2 {
                         autoSegments.push(room.segment_id); // fallback to manual segment_id
                     }
                     else {
-                        console.warn("[anyvac-card] no segment for", room.key, "(area:", areaId + ")");
+                        console.warn("[anyvac-card] no segment for", room.key);
                     }
                 }
             }

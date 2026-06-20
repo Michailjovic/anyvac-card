@@ -11,6 +11,17 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Rooms from the integration (real room polygons / names) for clickable cleaning on the floorplan.
 - Milestone 3b: companion `anyvac` integration data layers (clean-history, statistics).
 
+## [0.9.1] - 2026-06-19
+
+### Fixed
+
+- **`native-auto` now matches rooms by the Roborock room name** — it resolves each room's segment by
+  the room `key` (our convention: the Roborock room name), then the display `name`, and only then an
+  explicit `area_mappings` entry. Previously it looked up `area_mappings[key]` first, so a room whose
+  HA area differs from its Roborock name (e.g. key `Corridor` mapped to area `hall`) failed to resolve
+  a segment — the robot beeped but never went there. Other rooms only worked because their area id
+  happened to equal the Roborock name.
+
 ## [0.9.0] - 2026-06-19
 
 ### Added
