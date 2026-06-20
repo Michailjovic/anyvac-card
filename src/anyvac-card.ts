@@ -767,6 +767,19 @@ export class AnyVacCard extends LitElement {
     this._localRoomSel = next;
     this._saveRoomSel(vac.entity);
   }
+  private _isRoomSelectedAny(key: string, vacs: VacuumConfig[]): boolean {
+    return vacs.some((v) => this._localRoomSel.get(v.entity + ":" + key) ?? false);
+  }
+  /** Merged mode: toggle a room across every shown vacuum that has it (one rectangle -> both controllers). */
+  private _toggleRoomAcross(key: string, vacs: VacuumConfig[]): void {
+    const target = !this._isRoomSelectedAny(key, vacs);
+    const next = new Map(this._localRoomSel);
+    for (const v of vacs) {
+      if ((v.rooms ?? []).some((r) => r.key === key)) next.set(v.entity + ":" + key, target);
+    }
+    this._localRoomSel = next;
+    for (const v of vacs) this._saveRoomSel(v.entity);
+  }
 
   private _selectAll(vac: VacuumConfig): void {
     const next = new Map(this._localRoomSel);
@@ -1382,6 +1395,20 @@ export class AnyVacCard extends LitElement {
     `;
   }
 
+  /** Merged mode rooms: one rectangle per room key (deduped across vacuums); click selects across all. */
+  private _renderMergedRooms(shown: VacuumConfig[]) {
+    const seen = new Set<string>();
+    const out: any[] = [];
+    for (const v of shown) {
+      for (const r of v.rooms ?? []) {
+        if (!r.key || seen.has(r.key)) continue;
+        seen.add(r.key);
+        out.push(this._renderRoomOverlay(r, v, { vacs: shown }));
+      }
+    }
+    return out;
+  }
+
   private _renderMergedMap() {
     const shown = [...this._shownSet].filter((i) => i < this._config.vacuums.length).map((i) => this._config.vacuums[i]);
     if (!shown.length) return nothing;
@@ -1417,7 +1444,7 @@ export class AnyVacCard extends LitElement {
         })}
         ${shown.map((v) => (v.integration_entity ? this._renderIntegrationOverlay(v, v.map) : nothing))}
         ${this._renderLayerToggles(shown)}
-        ${shown.map((v) => (v.rooms ?? []).map((r) => this._renderRoomOverlay(r, v)))}
+        ${this._renderMergedRooms(shown)}
       </div>
     `;
   }
@@ -1480,8 +1507,8 @@ export class AnyVacCard extends LitElement {
     `;
   }
 
-  private _renderRoomOverlay(room: RoomConfig, vac: VacuumConfig) {
-    const selected = this._isRoomSelected(room, vac);
+  private _renderRoomOverlay(room: RoomConfig, vac: VacuumConfig, opts?: { vacs?: VacuumConfig[] }) {
+    const selected = opts?.vacs ? this._isRoomSelectedAny(room.key, opts.vacs) : this._isRoomSelected(room, vac);
     const color = this._color(vac);
     const ageColor = this._roomBorderColor(room, vac);
     const anchor = room.icon_anchor ?? "c";
@@ -1510,7 +1537,7 @@ export class AnyVacCard extends LitElement {
             background: bg, boxShadow: shadow,
             justifyContent: jc, alignItems: ai,
           })}
-          @click=${() => this._toggleRoom(room, vac)}
+          @click=${() => (opts?.vacs ? this._toggleRoomAcross(room.key, opts.vacs) : this._toggleRoom(room, vac))}
           title=${room.name} aria-label=${room.name}
           aria-pressed=${selected ? "true" : "false"}
         >
@@ -1535,7 +1562,7 @@ export class AnyVacCard extends LitElement {
           border: "4px solid " + ageColor,
           boxShadow: shadow,
         })}
-        @click=${() => this._toggleRoom(room, vac)}
+        @click=${() => (opts?.vacs ? this._toggleRoomAcross(room.key, opts.vacs) : this._toggleRoom(room, vac))}
         title=${room.name} aria-label=${room.name}
         aria-pressed=${selected ? "true" : "false"}
       >
