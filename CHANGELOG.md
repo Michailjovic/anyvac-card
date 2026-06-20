@@ -11,6 +11,16 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Rooms from the integration (real room polygons / names) for clickable cleaning on the floorplan.
 - Milestone 3b: companion `anyvac` integration data layers (clean-history, statistics).
 
+## [0.16.0] - 2026-06-20
+
+### Changed
+
+- **Editor UX cleanup + visual map seating (merged)** — the per-vacuum *Base layer* selector is hidden
+  in merged mode (it is irrelevant there), the *Calibration* section is renamed *Map seating*, and the
+  Maps-tab preview now shows the selected vacuum's native map **as a faded overlay on the shared
+  floorplan**, so the seating sliders (rotation / scale / offset) are finally visual — you drag until
+  the map lines up with the floorplan. Foundation for the upcoming one-click 3-point alignment.
+
 ## [0.15.0] - 2026-06-20
 
 ### Added

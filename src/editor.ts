@@ -954,7 +954,7 @@ export class AnyVacCardEditor extends LitElement {
           [{ value: "split", label: "Split — one map per vacuum" }, { value: "merged", label: "Merged — all in one map" }],
           v => this._setConfig({ map_mode: v === "merged" ? "merged" : undefined }))}
 
-        ${this._selectField("Base layer", (vac.base ?? "map"),
+        ${this._mergedEdit ? nothing : this._selectField("Base layer", (vac.base ?? "map"),
           [{ value: "map", label: "Vacuum map" }, { value: "combined", label: "Image + map" }],
           v => this._setVacuum(mapVac, { base: v }))}
 
@@ -1015,6 +1015,14 @@ export class AnyVacCardEditor extends LitElement {
                   width:     pvScale + "%",
                   transform: "translate(-50%,-50%) rotate(" + pvRot + "deg)",
                 })} />
+              ${this._mergedEdit && useImg && mapUrl ? html`<img class="map-preview-img" src=${mapUrl} alt="Native map"
+                style=${styleMap({
+                  left:      (50 + (map.offset_x ?? 0)) + "%",
+                  top:       (50 + (map.offset_y ?? 0)) + "%",
+                  width:     (map.scale ?? 100) + "%",
+                  transform: "translate(-50%,-50%) rotate(" + (map.rotation ?? 0) + "deg)",
+                  opacity:   "0.5",
+                })} />` : nothing}
               ${rooms.map((r, ri) => html`
                 <div class="pos-dot ${ri === this._mapRoom ? "pos-dot--active" : ""}"
                   style=${styleMap({ left: r.map_x + "%", top: r.map_y + "%" })}
@@ -1024,7 +1032,8 @@ export class AnyVacCardEditor extends LitElement {
             </div>
           </div>
 
-          <div class="section-title">Calibration</div>
+          <div class="section-title">Map seating ${this._mergedEdit ? "(this vacuum)" : ""}</div>
+          ${this._mergedEdit ? html`<p class="hint">Drag the sliders so this vacuum's map (the faded overlay) lines up with the floorplan.</p>` : nothing}
           ${this._numberSlider("Rotation",  map.rotation  ?? 0,    0, 360, 90, v => this._setMap(mapVac, { rotation:  v }), "°")}
           ${this._numberSlider("Scale",     map.scale     ?? 100, 50, 200,  5, v => this._setMap(mapVac, { scale:     v }), "%")}
           ${this._numberSlider("Offset X",  map.offset_x  ?? 0,  -50,  50,  1, v => this._setMap(mapVac, { offset_x:  v }), "%")}

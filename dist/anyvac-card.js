@@ -87,7 +87,7 @@ const t={ATTRIBUTE:1},e=t=>(...e)=>({_$litDirective$:t,values:e});let i$1 = clas
 
 const CARD_NAME = "anyvac-card";
 const EDITOR_NAME = "anyvac-card-editor";
-const CARD_VERSION = "0.15.0";
+const CARD_VERSION = "0.16.0";
 /** Server-side tracking blueprint */
 const BLUEPRINT_VERSION = "1.0.0";
 const BLUEPRINT_PATH = "anyvac_card/cleaning_tracker.yaml";
@@ -3507,7 +3507,7 @@ let AnyVacCardEditor = class AnyVacCardEditor extends i$2 {
 
         ${this._selectField("Map mode (all vacuums)", this._config.map_mode ?? "split", [{ value: "split", label: "Split — one map per vacuum" }, { value: "merged", label: "Merged — all in one map" }], v => this._setConfig({ map_mode: v === "merged" ? "merged" : undefined }))}
 
-        ${this._selectField("Base layer", (vac.base ?? "map"), [{ value: "map", label: "Vacuum map" }, { value: "combined", label: "Image + map" }], v => this._setVacuum(mapVac, { base: v }))}
+        ${this._mergedEdit ? A : this._selectField("Base layer", (vac.base ?? "map"), [{ value: "map", label: "Vacuum map" }, { value: "combined", label: "Image + map" }], v => this._setVacuum(mapVac, { base: v }))}
 
         ${this._entityPicker("AnyVac integration sensor", vac.integration_entity, ["sensor"], v => this._setVacuum(mapVac, { integration_entity: v }))}
 
@@ -3557,6 +3557,14 @@ let AnyVacCardEditor = class AnyVacCardEditor extends i$2 {
             width: pvScale + "%",
             transform: "translate(-50%,-50%) rotate(" + pvRot + "deg)",
         })} />
+              ${this._mergedEdit && useImg && mapUrl ? b `<img class="map-preview-img" src=${mapUrl} alt="Native map"
+                style=${o({
+            left: (50 + (map.offset_x ?? 0)) + "%",
+            top: (50 + (map.offset_y ?? 0)) + "%",
+            width: (map.scale ?? 100) + "%",
+            transform: "translate(-50%,-50%) rotate(" + (map.rotation ?? 0) + "deg)",
+            opacity: "0.5",
+        })} />` : A}
               ${rooms.map((r, ri) => b `
                 <div class="pos-dot ${ri === this._mapRoom ? "pos-dot--active" : ""}"
                   style=${o({ left: r.map_x + "%", top: r.map_y + "%" })}
@@ -3566,7 +3574,8 @@ let AnyVacCardEditor = class AnyVacCardEditor extends i$2 {
             </div>
           </div>
 
-          <div class="section-title">Calibration</div>
+          <div class="section-title">Map seating ${this._mergedEdit ? "(this vacuum)" : ""}</div>
+          ${this._mergedEdit ? b `<p class="hint">Drag the sliders so this vacuum's map (the faded overlay) lines up with the floorplan.</p>` : A}
           ${this._numberSlider("Rotation", map.rotation ?? 0, 0, 360, 90, v => this._setMap(mapVac, { rotation: v }), "°")}
           ${this._numberSlider("Scale", map.scale ?? 100, 50, 200, 5, v => this._setMap(mapVac, { scale: v }), "%")}
           ${this._numberSlider("Offset X", map.offset_x ?? 0, -50, 50, 1, v => this._setMap(mapVac, { offset_x: v }), "%")}
