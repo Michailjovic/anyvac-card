@@ -87,7 +87,7 @@ const t={ATTRIBUTE:1},e=t=>(...e)=>({_$litDirective$:t,values:e});let i$1 = clas
 
 const CARD_NAME = "anyvac-card";
 const EDITOR_NAME = "anyvac-card-editor";
-const CARD_VERSION = "0.10.0";
+const CARD_VERSION = "0.11.0";
 /** Server-side tracking blueprint */
 const BLUEPRINT_VERSION = "1.0.0";
 const BLUEPRINT_PATH = "anyvac_card/cleaning_tracker.yaml";
@@ -541,8 +541,7 @@ let AnyVacCard = class AnyVacCard extends i$2 {
             return null;
         return (Date.now() - new Date(raw).getTime()) / 86400000;
     }
-    _roomBorderColor(room, vac) {
-        const d = this._roomAgeDays(room, vac);
+    _colorForAgeDays(d) {
         if (d === null)
             return "rgba(255,77,77,0.85)";
         const ths = this._config.room_thresholds ?? [
@@ -556,6 +555,22 @@ let AnyVacCard = class AnyVacCard extends i$2 {
                 return th.color;
         }
         return "rgba(255,77,77,0.85)";
+    }
+    /** A vacuum's clean-type role (dry/wet) — explicit config, else derived from its clean_action. */
+    _vacCleanType(vac) {
+        if (vac.clean_type === "dry")
+            return { dry: true, wet: false };
+        if (vac.clean_type === "wet")
+            return { dry: false, wet: true };
+        if (vac.clean_type === "both")
+            return { dry: true, wet: true };
+        const ca = vac.clean_action;
+        const wet = !!(ca && (ca.mop_mode || ca.mop_mode_entity || ca.mop_intensity || ca.mop_intensity_entity));
+        const dry = !wet || (ca?.suction_level != null && ca.suction_level !== "off");
+        return { dry, wet };
+    }
+    _roomBorderColor(room, vac) {
+        return this._colorForAgeDays(this._roomAgeDays(room, vac));
     }
     _batIcon(pct) {
         if (pct > 80)
@@ -1524,8 +1539,9 @@ let AnyVacCard = class AnyVacCard extends i$2 {
         const color = this._color(vac);
         const rr = Math.max(NW, NH) / 55;
         const toPts = (arr) => (Array.isArray(arr) ? arr : []).map((p) => { const q = toPx(p.x, p.y); return q.x.toFixed(1) + "," + q.y.toFixed(1); }).join(" ");
-        const dryStr = this._layers.dry ? toPts(at.path) : "";
-        const wetStr = this._layers.wet ? toPts(at.mop_path) : "";
+        const ct = this._vacCleanType(vac);
+        const showTrace = (this._layers.dry && ct.dry) || (this._layers.wet && ct.wet);
+        const traceStr = showTrace ? toPts(at.path) : "";
         const vp = at.vacuum_position;
         const rob = vp ? toPx(vp.x, vp.y) : null;
         let head = null;
@@ -1541,11 +1557,8 @@ let AnyVacCard = class AnyVacCard extends i$2 {
             transform: "translate(-50%,-50%) rotate(" + (m?.rotation ?? 0) + "deg)",
         };
         const sw = (rr * 0.35 * ((vac.path_width ?? 100) / 100)).toFixed(2);
-        const dryT = dryStr
-            ? w `<polyline points=${dryStr} fill="none" stroke=${vac.path_color || color} stroke-width=${sw} stroke-linejoin="round" stroke-linecap="round" opacity="0.85"></polyline>`
-            : A;
-        const wetT = wetStr
-            ? w `<polyline points=${wetStr} fill="none" stroke="#49b6ff" stroke-width=${sw} stroke-linejoin="round" stroke-linecap="round" opacity="0.8"></polyline>`
+        const traceT = traceStr
+            ? w `<polyline points=${traceStr} fill="none" stroke=${vac.path_color || color} stroke-width=${sw} stroke-linejoin="round" stroke-linecap="round" opacity="0.85"></polyline>`
             : A;
         const useImg = !!(vac.robot_image_on_map && vac.image);
         const robSize = rr * 2.6 * ((vac.robot_size ?? 100) / 100);
@@ -1555,7 +1568,7 @@ let AnyVacCard = class AnyVacCard extends i$2 {
                 ? w `<image href=${vac.image} x=${(rob.x - robSize / 2).toFixed(1)} y=${(rob.y - robSize / 2).toFixed(1)} width=${robSize.toFixed(1)} height=${robSize.toFixed(1)} preserveAspectRatio="xMidYMid meet" transform=${"rotate(" + robA + " " + rob.x.toFixed(1) + " " + rob.y.toFixed(1) + ")"}></image>`
                 : w `${head ? w `<line x1=${rob.x.toFixed(1)} y1=${rob.y.toFixed(1)} x2=${head.x.toFixed(1)} y2=${head.y.toFixed(1)} stroke="#ffffff" stroke-width=${(rr * 0.3).toFixed(2)} stroke-linecap="round"></line>` : A}<circle cx=${rob.x.toFixed(1)} cy=${rob.y.toFixed(1)} r=${rr.toFixed(1)} fill=${color} stroke="#ffffff" stroke-width=${(rr * 0.18).toFixed(2)}></circle>`)
             : A;
-        return b `<svg class="map-vector" viewBox="0 0 ${NW} ${NH}" preserveAspectRatio="none" style=${o(seat)}>${dryT}${wetT}${robotT}</svg>`;
+        return b `<svg class="map-vector" viewBox="0 0 ${NW} ${NH}" preserveAspectRatio="none" style=${o(seat)}>${traceT}${robotT}</svg>`;
     }
     _renderLayerToggles(vacs) {
         const withInt = vacs.filter((v) => v.integration_entity);
@@ -1586,6 +1599,41 @@ let AnyVacCard = class AnyVacCard extends i$2 {
           @click=${() => { this._layers = { ...this._layers, wet: !this._layers.wet }; }}>
           <ha-icon icon="mdi:water"></ha-icon><span>${badge(oldest("wet"))}</span>
         </button>
+      </div>
+    `;
+    }
+    /** Per-room status list (dry + wet age), deduped across vacuums; click selects across all. */
+    _renderRoomList(shown) {
+        if (!shown.some((v) => v.integration_entity))
+            return A;
+        const seen = new Set();
+        const rooms = [];
+        for (const v of shown)
+            for (const r of v.rooms ?? []) {
+                if (r.key && !seen.has(r.key)) {
+                    seen.add(r.key);
+                    rooms.push({ r, v });
+                }
+            }
+        if (!rooms.length)
+            return A;
+        const badge = (d) => (d === null ? "\u2014" : d < 1 ? "<1d" : Math.round(d) + "d");
+        return b `
+      <div class="room-list">
+        ${rooms.map(({ r, v }) => {
+            const rec = this._intRoomRec(v, r);
+            const dry = this._ageDaysFromIso(rec?.dry);
+            const wet = this._ageDaysFromIso(rec?.wet);
+            const sel = this._isRoomSelectedAny(r.key, shown);
+            return b `
+            <button class="room-row ${sel ? "on" : ""}" @click=${() => this._toggleRoomAcross(r.key, shown)}>
+              <ha-icon class="rl-icon" icon=${r.icon ?? "mdi:square"}></ha-icon>
+              <span class="rl-name">${r.name ?? r.key}</span>
+              <span class="rl-age"><ha-icon icon="mdi:broom"></ha-icon><b style=${o({ color: this._colorForAgeDays(dry) })}>${badge(dry)}</b></span>
+              <span class="rl-age"><ha-icon icon="mdi:water"></ha-icon><b style=${o({ color: this._colorForAgeDays(wet) })}>${badge(wet)}</b></span>
+            </button>
+          `;
+        })}
       </div>
     `;
     }
@@ -1968,6 +2016,7 @@ let AnyVacCard = class AnyVacCard extends i$2 {
         ${this._config.map_mode === "merged"
             ? b `
               ${this._renderMergedMap()}
+              ${this._renderRoomList([...this._shownSet].filter((i) => i < this._config.vacuums.length).map((i) => this._config.vacuums[i]))}
               ${[...this._shownSet].filter(i => i < this._config.vacuums.length).map(i => b `
                 ${this._renderMapTools(this._config.vacuums[i])}
                 ${this._renderStatusCard(this._config.vacuums[i], i)}
@@ -2103,6 +2152,13 @@ AnyVacCard.styles = i$5 `
     .layer-toggles { position: absolute; top: 8px; right: 8px; display: flex; gap: 6px; z-index: 3; }
     .layer-btn { display: flex; align-items: center; gap: 3px; padding: 3px 8px; border-radius: 999px; border: 1px solid rgba(255,255,255,0.2); background: rgba(0,0,0,0.45); color: rgba(255,255,255,0.55); font-size: 11px; font-weight: 600; cursor: pointer; --mdc-icon-size: 16px; }
     .layer-btn.on { color: #fff; border-color: rgba(255,255,255,0.55); background: rgba(0,0,0,0.7); }
+    .room-list { display: flex; flex-direction: column; gap: 4px; }
+    .room-row { display: flex; align-items: center; gap: 8px; padding: 6px 10px; border-radius: 10px; border: 1px solid rgba(255,255,255,0.08); background: rgba(255,255,255,0.03); color: rgba(255,255,255,0.85); cursor: pointer; --mdc-icon-size: 18px; }
+    .room-row.on { border-color: rgba(255,255,255,0.5); background: rgba(255,255,255,0.1); }
+    .rl-icon { color: rgba(255,255,255,0.6); }
+    .rl-name { flex: 1; text-align: left; font-size: 13px; }
+    .rl-age { display: flex; align-items: center; gap: 3px; font-size: 12px; --mdc-icon-size: 14px; color: rgba(255,255,255,0.45); }
+    .rl-age b { font-weight: 700; }
     .map-wrap--fixed { padding-top: 0; }
     .image-base-img--fit { position: absolute; inset: 0; width: 100%; height: 100%; object-fit: contain; }
 

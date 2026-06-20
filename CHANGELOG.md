@@ -11,6 +11,21 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Rooms from the integration (real room polygons / names) for clickable cleaning on the floorplan.
 - Milestone 3b: companion `anyvac` integration data layers (clean-history, statistics).
 
+## [0.11.0] - 2026-06-19
+
+### Fixed
+
+- **Traces follow the vacuum's clean type, not the path field** — a vacuum's trace now shows only under
+  the layer matching its role (dry/wet), derived from its `clean_action` (mop settings → wet, suction →
+  dry) or an explicit `clean_type` (`dry` / `wet` / `both`). A mop-only vacuum no longer draws a trace
+  on the Dry layer.
+
+### Added
+
+- **Per-room status list** — below the merged map, each room is listed once (deduped across vacuums)
+  with its **dry and wet age** (coloured by the thresholds). Tapping a row selects the room across all
+  vacuums, the same as the map rectangle. This is the calibration-independent home for per-room state.
+
 ## [0.10.0] - 2026-06-19
 
 ### Added
