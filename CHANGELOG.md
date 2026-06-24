@@ -11,6 +11,15 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Rooms from the integration (real room polygons / names) for clickable cleaning on the floorplan.
 - Milestone 3b: companion `anyvac` integration data layers (clean-history, statistics).
 
+## [0.20.0] - 2026-06-25
+
+### Added
+
+- **Clean type is now editable in the GUI editor** (Vacuums tab, under Accent colour): Auto-detect /
+  Dry only / Wet only / Both — follow live mode. Previously `clean_type` could only be set by editing
+  YAML. "Auto-detect" keeps the prior heuristic (infers dry/wet from the clean action); the explicit
+  options remove the ambiguity for dual-capable vacuums.
+
 ## [0.19.0] - 2026-06-25
 
 ### Added

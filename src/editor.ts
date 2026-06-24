@@ -715,6 +715,13 @@ export class AnyVacCardEditor extends LitElement {
             ${this._selectField<VacuumColor>("Accent colour", vac.color ?? "green",
               [{ value: "green", label: "Green" }, { value: "blue", label: "Blue" }, { value: "orange", label: "Orange" }],
               v => this._setVacuum(idx, { color: v }))}
+            ${this._selectField<"auto" | "dry" | "wet" | "both">("Clean type (time estimate & layers)", vac.clean_type ?? "auto",
+              [{ value: "auto", label: "Auto-detect from clean action" },
+               { value: "dry", label: "Dry only" },
+               { value: "wet", label: "Wet only" },
+               { value: "both", label: "Both — follow live mode" }],
+              v => this._setVacuum(idx, { clean_type: v === "auto" ? undefined : v }))}
+            <p class="hint">Controls which time estimate and which dry/wet layer the vacuum uses. "Both" follows the live water mode (needs the integration sensor).</p>
 
             ${this._renderSensorsSection(idx, vac)}
             ${this._renderCleanActionSection(idx, vac)}
