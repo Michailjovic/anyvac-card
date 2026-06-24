@@ -87,7 +87,7 @@ const t={ATTRIBUTE:1},e=t=>(...e)=>({_$litDirective$:t,values:e});let i$1 = clas
 
 const CARD_NAME = "anyvac-card";
 const EDITOR_NAME = "anyvac-card-editor";
-const CARD_VERSION = "0.18.1";
+const CARD_VERSION = "0.19.0";
 /** Server-side tracking blueprint */
 const BLUEPRINT_VERSION = "1.0.0";
 const BLUEPRINT_PATH = "anyvac_card/cleaning_tracker.yaml";
@@ -501,6 +501,19 @@ let AnyVacCard = class AnyVacCard extends i$2 {
             return ct;
         return this._deriveCleanType(vac);
     }
+    /** Self-calibrated clean-time estimate learned by the backend integration,
+     *  per room name + type (dry/wet). Null when no integration / no learned value. */
+    _backendEstimate(vac, room, kind) {
+        const ent = vac.integration_entity;
+        if (!ent)
+            return null;
+        const re = this.hass.states[ent]?.attributes?.rooms_estimate;
+        if (!re)
+            return null;
+        const rec = re[room.name ?? ""] ?? re[room.key];
+        const v = rec ? rec[kind] : undefined;
+        return (typeof v === "number" && v > 0) ? v : null;
+    }
     _roomCleanMins(room, vac) {
         const ct = this._vacCleanType(vac);
         // Dual-capable vacuum (both dry+wet) must resolve to the CURRENT live mode,
@@ -508,6 +521,11 @@ let AnyVacCard = class AnyVacCard extends i$2 {
         const useWet = (ct.wet && !ct.dry) ? true
             : (ct.dry && !ct.wet) ? false
                 : (this._liveCleanType(vac) === "wet");
+        // 1) Backend self-calibrated estimate (learned from real single-room cleans).
+        const learned = this._backendEstimate(vac, room, useWet ? "wet" : "dry");
+        if (learned != null)
+            return learned;
+        // 2) Static config for the matching type, then the other type as a last resort.
         const primary = useWet ? room.clean_time_wet : room.clean_time_dry;
         if (primary != null && primary > 0)
             return primary;

@@ -370,6 +370,18 @@ export class AnyVacCard extends LitElement {
     return this._deriveCleanType(vac);
   }
 
+  /** Self-calibrated clean-time estimate learned by the backend integration,
+   *  per room name + type (dry/wet). Null when no integration / no learned value. */
+  private _backendEstimate(vac: VacuumConfig, room: RoomConfig, kind: "dry" | "wet"): number | null {
+    const ent = vac.integration_entity;
+    if (!ent) return null;
+    const re = this.hass.states[ent]?.attributes?.rooms_estimate as Record<string, any> | undefined;
+    if (!re) return null;
+    const rec = re[room.name ?? ""] ?? re[room.key];
+    const v = rec ? rec[kind] : undefined;
+    return (typeof v === "number" && v > 0) ? v : null;
+  }
+
   private _roomCleanMins(room: RoomConfig, vac: VacuumConfig): number {
     const ct = this._vacCleanType(vac);
     // Dual-capable vacuum (both dry+wet) must resolve to the CURRENT live mode,
@@ -377,6 +389,10 @@ export class AnyVacCard extends LitElement {
     const useWet = (ct.wet && !ct.dry) ? true
                  : (ct.dry && !ct.wet) ? false
                  : (this._liveCleanType(vac) === "wet");
+    // 1) Backend self-calibrated estimate (learned from real single-room cleans).
+    const learned = this._backendEstimate(vac, room, useWet ? "wet" : "dry");
+    if (learned != null) return learned;
+    // 2) Static config for the matching type, then the other type as a last resort.
     const primary = useWet ? room.clean_time_wet : room.clean_time_dry;
     if (primary != null && primary > 0) return primary;
     const alt = useWet ? room.clean_time_dry : room.clean_time_wet;

@@ -11,6 +11,18 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Rooms from the integration (real room polygons / names) for clickable cleaning on the floorplan.
 - Milestone 3b: companion `anyvac` integration data layers (clean-history, statistics).
 
+## [0.19.0] - 2026-06-25
+
+### Added
+
+- **Reads backend-calibrated clean-time estimates.** When the companion `anyvac` integration
+  (v0.5.0+) is present, the per-room time estimate now prefers the value the backend has *learned*
+  from real single-room cleans (`rooms_estimate`, per room name and clean type) over the static
+  `clean_time_dry` / `clean_time_wet` config. Static values become the seed/fallback used until the
+  backend has learned a room, and everything still degrades to config when no integration is set. This
+  finally makes single-room time calibration work: the writable, type-aware store lives in the
+  backend, so dry and wet estimates no longer fight over one value.
+
 ## [0.18.1] - 2026-06-24
 
 ### Fixed
