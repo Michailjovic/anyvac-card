@@ -11,6 +11,17 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Rooms from the integration (real room polygons / names) for clickable cleaning on the floorplan.
 - Milestone 3b: companion `anyvac` integration data layers (clean-history, statistics).
 
+## [0.18.1] - 2026-06-24
+
+### Fixed
+
+- **Dual-capable vacuum showed the wrong time estimate** — a vacuum configured as `clean_type: both`
+  (e.g. an S7 MaxV that both vacuums and mops) fell through to the wet estimate even for a dry run,
+  so its dry clean borrowed another vacuum's wet `clean_time_wet`. The estimate now resolves a
+  dual-capable vacuum to its *current* mode using the live backend `clean_type` (the integration
+  sensor that follows the actual water mode), falling back to the configured clean action — so a dry
+  run uses `clean_time_dry` and a wet run uses `clean_time_wet`.
+
 ## [0.18.0] - 2026-06-20
 
 ### Added

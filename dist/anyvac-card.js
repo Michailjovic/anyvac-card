@@ -87,7 +87,7 @@ const t={ATTRIBUTE:1},e=t=>(...e)=>({_$litDirective$:t,values:e});let i$1 = clas
 
 const CARD_NAME = "anyvac-card";
 const EDITOR_NAME = "anyvac-card-editor";
-const CARD_VERSION = "0.18.0";
+const CARD_VERSION = "0.18.1";
 /** Server-side tracking blueprint */
 const BLUEPRINT_VERSION = "1.0.0";
 const BLUEPRINT_PATH = "anyvac_card/cleaning_tracker.yaml";
@@ -488,13 +488,32 @@ let AnyVacCard = class AnyVacCard extends i$2 {
     _hasSelectedRooms(vac) {
         return (this._roomsFor(vac)).some((r) => this._isRoomSelected(r, vac));
     }
+    /** Resolve a vacuum to a single current clean type ("dry"/"wet").
+     *  Prefers the live backend signal (integration sensor `clean_type`, which
+     *  follows the actual water mode), then the configured clean_action. This is
+     *  what makes a dual-capable vacuum (clean_type: both) pick the right estimate. */
+    _liveCleanType(vac) {
+        const ent = vac.integration_entity;
+        const ct = ent
+            ? this.hass.states[ent]?.attributes?.clean_type
+            : undefined;
+        if (ct === "wet" || ct === "dry")
+            return ct;
+        return this._deriveCleanType(vac);
+    }
     _roomCleanMins(room, vac) {
         const ct = this._vacCleanType(vac);
-        const typed = (ct.wet && !ct.dry) ? room.clean_time_wet
-            : (ct.dry && !ct.wet) ? room.clean_time_dry
-                : (room.clean_time_wet ?? room.clean_time_dry);
-        if (typed != null && typed > 0)
-            return typed;
+        // Dual-capable vacuum (both dry+wet) must resolve to the CURRENT live mode,
+        // otherwise a dry run falls back to the wet estimate (and vice versa).
+        const useWet = (ct.wet && !ct.dry) ? true
+            : (ct.dry && !ct.wet) ? false
+                : (this._liveCleanType(vac) === "wet");
+        const primary = useWet ? room.clean_time_wet : room.clean_time_dry;
+        if (primary != null && primary > 0)
+            return primary;
+        const alt = useWet ? room.clean_time_dry : room.clean_time_wet;
+        if (alt != null && alt > 0)
+            return alt;
         if (room.clean_time_entity) {
             const val = parseFloat(this.hass.states[room.clean_time_entity]?.state ?? "");
             if (!isNaN(val) && val > 0)

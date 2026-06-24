@@ -357,12 +357,30 @@ export class AnyVacCard extends LitElement {
     return (this._roomsFor(vac)).some((r) => this._isRoomSelected(r, vac));
   }
 
+  /** Resolve a vacuum to a single current clean type ("dry"/"wet").
+   *  Prefers the live backend signal (integration sensor `clean_type`, which
+   *  follows the actual water mode), then the configured clean_action. This is
+   *  what makes a dual-capable vacuum (clean_type: both) pick the right estimate. */
+  private _liveCleanType(vac: VacuumConfig): "dry" | "wet" {
+    const ent = vac.integration_entity;
+    const ct = ent
+      ? (this.hass.states[ent]?.attributes?.clean_type as string | undefined)
+      : undefined;
+    if (ct === "wet" || ct === "dry") return ct;
+    return this._deriveCleanType(vac);
+  }
+
   private _roomCleanMins(room: RoomConfig, vac: VacuumConfig): number {
     const ct = this._vacCleanType(vac);
-    const typed = (ct.wet && !ct.dry) ? room.clean_time_wet
-                : (ct.dry && !ct.wet) ? room.clean_time_dry
-                : (room.clean_time_wet ?? room.clean_time_dry);
-    if (typed != null && typed > 0) return typed;
+    // Dual-capable vacuum (both dry+wet) must resolve to the CURRENT live mode,
+    // otherwise a dry run falls back to the wet estimate (and vice versa).
+    const useWet = (ct.wet && !ct.dry) ? true
+                 : (ct.dry && !ct.wet) ? false
+                 : (this._liveCleanType(vac) === "wet");
+    const primary = useWet ? room.clean_time_wet : room.clean_time_dry;
+    if (primary != null && primary > 0) return primary;
+    const alt = useWet ? room.clean_time_dry : room.clean_time_wet;
+    if (alt != null && alt > 0) return alt;
     if (room.clean_time_entity) {
       const val = parseFloat(this.hass.states[room.clean_time_entity]?.state ?? "");
       if (!isNaN(val) && val > 0) return val;
