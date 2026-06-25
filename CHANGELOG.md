@@ -11,6 +11,22 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Rooms from the integration (real room polygons / names) for clickable cleaning on the floorplan.
 - Milestone 3b: companion `anyvac` integration data layers (clean-history, statistics).
 
+## [0.22.0] - 2026-06-25
+
+### Added
+
+- **Per-vacuum setting presets (Manual mode, step B).** A vacuum can now carry named setting bundles
+  (`presets: [{id, label, icon, suction_level, mop_mode, mop_intensity, repeat}]`). They render as
+  selectable chips above the START button (shown only when 2+ presets exist); the active preset's
+  motor/mop settings are applied when the clean starts. When no `presets` are configured, a single
+  default is synthesized from the legacy `clean_action`, so existing configs behave identically.
+  (Data contract for setting/global presets + Auto/Manual `ui_mode` added to `types.ts`.)
+
+### Changed
+
+- **Mop trace gets a centre line.** The wet `mop_path` now draws a thin centre line on top of the
+  translucent sheen band, so the wet trace reads as a path inside the band (matching the dry line).
+
 ## [0.21.0] - 2026-06-25
 
 ### Added

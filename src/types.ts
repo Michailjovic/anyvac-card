@@ -126,6 +126,60 @@ export interface ScriptCleanAction {
 
 export type CleanAction = NativeCleanAction | NativeAreaCleanAction | NativeAutoCleanAction | ScriptCleanAction;
 
+// ── Presets & orchestration (docs/11) ─────────────────────────────────────
+
+/**
+ * A named "how" bundle for a single vacuum (Manual mode). The user picks one on
+ * the vacuum's controller, then picks rooms on the map. Values are applied via
+ * the vacuum's clean_action plumbing (mop_mode_entity / mop_intensity_entity /
+ * set_fan_speed). Clean type (dry/wet/both) is DERIVED from these, never stored.
+ */
+export interface SettingPreset {
+  /** Stable id (used for backend estimate keying / referencing). */
+  id: string;
+  label: string;
+  icon?: string;
+  suction_level?: string;
+  mop_mode?: string;
+  mop_intensity?: string;
+  repeat?: number;
+}
+
+/** One step of a (possibly multi-step) targeted clean. */
+export interface CleanStep {
+  /** Room keys; empty/omitted = all rooms in scope. */
+  rooms?: string[];
+  suction_level?: string;
+  mop_mode?: string;
+  mop_intensity?: string;
+  repeat?: number;
+}
+
+/** Orchestrator policy (Auto mode). Global default on the card; optional per-preset override. */
+export interface OrchestratorPolicy {
+  /** Never run dry and wet on the same area at the same time. Default true. */
+  avoid_dry_wet_collision?: boolean;
+  /** Optimisation priority. */
+  priority?: "speed" | "fewer_robots";
+}
+
+/**
+ * A card-level targeted clean (Auto mode). The user taps it; the integration
+ * orchestrates which robots, in which order, with what timing. `scope` = what to
+ * clean; the orchestrator decides who/how.
+ */
+export interface GlobalPreset {
+  id: string;
+  label: string;
+  icon?: string;
+  /** "all" = whole flat, "select" = pick rooms on the map at run time, or fixed room keys. */
+  scope: "all" | "select" | string[];
+  /** Optional ordered steps (e.g. a dry pass then a wet pass). */
+  steps?: CleanStep[];
+  /** Per-preset override of the orchestrator policy. */
+  policy?: OrchestratorPolicy;
+}
+
 // ── Global action ─────────────────────────────────────────────────────────
 
 /**
@@ -189,6 +243,8 @@ export interface VacuumConfig {
   integration_entity?: string;
   /** Vacuum's clean-type role for the dry/wet layers; derived from clean_action if unset. */
   clean_type?: "dry" | "wet" | "both";
+  /** Manual-mode setting presets (named "how" bundles). Legacy clean_action = presets[0] if unset. */
+  presets?: SettingPreset[];
   /** Integration mode: hide the Roborock map image, show only the floorplan + vector robot/path. */
   hide_map?: boolean;
   /** Integration vector: path stroke colour (defaults to the vacuum colour). */
@@ -309,4 +365,10 @@ export interface AnyVacCardConfig {
   single_room_time?: boolean;
   /** Server-side tracking blueprint deploy settings */
   backend?: BackendConfig;
+  /** Controller surface: "auto" = single orchestrated controller, "manual" = per-robot controllers. Default auto. */
+  ui_mode?: "auto" | "manual";
+  /** Card-level targeted cleans for Auto mode (orchestrated across robots). */
+  global_presets?: GlobalPreset[];
+  /** Default orchestrator policy (overridable per global preset). */
+  orchestrator?: OrchestratorPolicy;
 }

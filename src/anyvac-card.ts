@@ -12,6 +12,7 @@ import type {
   NativeAreaCleanAction,
   NativeAutoCleanAction,
   ScriptCleanAction,
+  SettingPreset,
   GlobalAction,
   GlobalActionCall,
   NotifyTemplates,
@@ -85,6 +86,8 @@ export class AnyVacCard extends LitElement {
   private _layerHeld = false;
   /** Výběr místností — drží se lokálně v kartě (bez potřeby input_boolean helper entity) */
   @state() private _localRoomSel = new Map<string, boolean>();
+  /** Active setting preset per vacuum (Manual mode): vac.entity -> preset id. */
+  @state() private _activePresets = new Map<string, string>();
   /** Aktivní úklidy — sledování průběhu pro vyhodnocení úspěchu */
   private _inFlight = new Map<string, InFlightCleaning>();
   private _prevVacStates = new Map<string, string>();
@@ -853,6 +856,64 @@ export class AnyVacCard extends LitElement {
     this._saveRoomSel(vac.entity);
   }
 
+  /** Setting presets for a vacuum; falls back to a single default synthesized from clean_action. */
+  private _settingPresets(vac: VacuumConfig): SettingPreset[] {
+    if (vac.presets && vac.presets.length) return vac.presets;
+    const ca = vac.clean_action as Partial<NativeAutoCleanAction> | undefined;
+    return [{
+      id: "default",
+      label: "Default",
+      suction_level: ca?.suction_level,
+      mop_mode: ca?.mop_mode,
+      mop_intensity: ca?.mop_intensity,
+      repeat: ca?.repeat,
+    }];
+  }
+  private _activePresetId(vac: VacuumConfig): string {
+    const presets = this._settingPresets(vac);
+    const sel = this._activePresets.get(vac.entity);
+    if (sel && presets.some((p) => p.id === sel)) return sel;
+    return presets[0]?.id ?? "default";
+  }
+  private _activePreset(vac: VacuumConfig): SettingPreset {
+    const presets = this._settingPresets(vac);
+    const id = this._activePresetId(vac);
+    return presets.find((p) => p.id === id) ?? presets[0];
+  }
+  private _setActivePreset(vac: VacuumConfig, id: string): void {
+    const next = new Map(this._activePresets);
+    next.set(vac.entity, id);
+    this._activePresets = next;
+  }
+
+  private _renderPresetChips(vac: VacuumConfig) {
+    const presets = this._settingPresets(vac);
+    if (presets.length < 2) return nothing;  // only when there is a real choice
+    const activeId = this._activePresetId(vac);
+    const color = this._color(vac);
+    return html`
+      <div style="display:flex;flex-wrap:wrap;gap:6px;margin-bottom:8px;justify-content:center">
+        ${presets.map((p) => {
+          const active = p.id === activeId;
+          return html`<button
+            @click=${(e: Event) => { e.stopPropagation(); this._setActivePreset(vac, p.id); }}
+            style=${styleMap({
+              display: "inline-flex", alignItems: "center", gap: "4px",
+              padding: "4px 10px", borderRadius: "14px", cursor: "pointer",
+              fontSize: "12px", lineHeight: "1",
+              border: "1px solid " + (active ? color : "rgba(255,255,255,0.15)"),
+              background: active ? COLOR_BG[this._colorKey(vac)] : "rgba(255,255,255,0.04)",
+              color: active ? "white" : "rgba(255,255,255,0.55)",
+            })}
+          >
+            ${p.icon ? html`<ha-icon icon=${p.icon} style="--mdc-icon-size:14px"></ha-icon>` : nothing}
+            <span>${p.label}</span>
+          </button>`;
+        })}
+      </div>
+    `;
+  }
+
   private async _startClean(vac: VacuumConfig): Promise<void> {
     if (!vac.clean_action) return;
 
@@ -874,16 +935,22 @@ export class AnyVacCard extends LitElement {
       return;
     }
 
-    // Native variants: pre-set fan / mop, then call vacuum
+    // Native variants: pre-set fan / mop from the active setting preset (default
+    // preset = the values from clean_action, so behaviour is unchanged when no
+    // custom presets are defined), then call vacuum.
     const nativeAction = vac.clean_action as NativeCleanAction | NativeAreaCleanAction | NativeAutoCleanAction;
-    if (nativeAction.mop_mode_entity && nativeAction.mop_mode) {
-      await this._call("select", "select_option", { entity_id: nativeAction.mop_mode_entity, option: nativeAction.mop_mode });
+    const ap = this._activePreset(vac);
+    const apMopMode = ap.mop_mode ?? nativeAction.mop_mode;
+    const apMopInt = ap.mop_intensity ?? nativeAction.mop_intensity;
+    const apSuction = ap.suction_level ?? nativeAction.suction_level;
+    if (nativeAction.mop_mode_entity && apMopMode) {
+      await this._call("select", "select_option", { entity_id: nativeAction.mop_mode_entity, option: apMopMode });
     }
-    if (nativeAction.mop_intensity_entity && nativeAction.mop_intensity) {
-      await this._call("select", "select_option", { entity_id: nativeAction.mop_intensity_entity, option: nativeAction.mop_intensity });
+    if (nativeAction.mop_intensity_entity && apMopInt) {
+      await this._call("select", "select_option", { entity_id: nativeAction.mop_intensity_entity, option: apMopInt });
     }
-    if (nativeAction.suction_level) {
-      await this._call("vacuum", "set_fan_speed", { entity_id: vac.entity, fan_speed: nativeAction.suction_level });
+    if (apSuction) {
+      await this._call("vacuum", "set_fan_speed", { entity_id: vac.entity, fan_speed: apSuction });
     }
 
     if (vac.clean_action.type === "native-area") {
@@ -1418,6 +1485,10 @@ export class AnyVacCard extends LitElement {
     const mopBand = wetStr
       ? svg`<polyline points=${wetStr} fill="none" stroke=${wetColor} stroke-width=${bw} stroke-linejoin="round" stroke-linecap="round" opacity="0.28"></polyline>`
       : nothing;
+    // Thin centre line down the mop band, so the wet trace reads as a path inside the sheen.
+    const mopLine = wetStr
+      ? svg`<polyline points=${wetStr} fill="none" stroke=${wetColor} stroke-width=${sw} stroke-linejoin="round" stroke-linecap="round" opacity="0.9"></polyline>`
+      : nothing;
     const traceT = dryStr
       ? svg`<polyline points=${dryStr} fill="none" stroke=${vac.path_color || color} stroke-width=${sw} stroke-linejoin="round" stroke-linecap="round" opacity="0.85"></polyline>`
       : nothing;
@@ -1429,7 +1500,7 @@ export class AnyVacCard extends LitElement {
           ? svg`<image href=${vac.image!} x=${(rob.x - robSize / 2).toFixed(1)} y=${(rob.y - robSize / 2).toFixed(1)} width=${robSize.toFixed(1)} height=${robSize.toFixed(1)} preserveAspectRatio="xMidYMid meet" transform=${"rotate(" + robA + " " + rob.x.toFixed(1) + " " + rob.y.toFixed(1) + ")"}></image>`
           : svg`${head ? svg`<line x1=${rob.x.toFixed(1)} y1=${rob.y.toFixed(1)} x2=${head.x.toFixed(1)} y2=${head.y.toFixed(1)} stroke="#ffffff" stroke-width=${(rr * 0.3).toFixed(2)} stroke-linecap="round"></line>` : nothing}<circle cx=${rob.x.toFixed(1)} cy=${rob.y.toFixed(1)} r=${rr.toFixed(1)} fill=${color} stroke="#ffffff" stroke-width=${(rr * 0.18).toFixed(2)}></circle>`)
       : nothing;
-    return html`<svg class="map-vector" viewBox="0 0 ${NW} ${NH}" preserveAspectRatio="none" style=${styleMap(seat)}>${mopBand}${traceT}${robotT}</svg>`;
+    return html`<svg class="map-vector" viewBox="0 0 ${NW} ${NH}" preserveAspectRatio="none" style=${styleMap(seat)}>${mopBand}${mopLine}${traceT}${robotT}</svg>`;
   }
 
   private _onLayerDown(type: "dry" | "wet"): void {
@@ -1848,6 +1919,7 @@ export class AnyVacCard extends LitElement {
 
     return html`
       <div class="actions">
+        ${this._renderPresetChips(vac)}
         <button
           class="action-btn ${hasRooms && this._holdId === hId ? "action-btn--holding" : ""}"
           style=${styleMap({ background: startBg, border: startBorder })}

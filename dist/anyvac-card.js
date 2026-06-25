@@ -87,7 +87,7 @@ const t={ATTRIBUTE:1},e=t=>(...e)=>({_$litDirective$:t,values:e});let i$1 = clas
 
 const CARD_NAME = "anyvac-card";
 const EDITOR_NAME = "anyvac-card-editor";
-const CARD_VERSION = "0.21.0";
+const CARD_VERSION = "0.22.0";
 /** Server-side tracking blueprint */
 const BLUEPRINT_VERSION = "1.0.0";
 const BLUEPRINT_PATH = "anyvac_card/cleaning_tracker.yaml";
@@ -214,6 +214,8 @@ let AnyVacCard = class AnyVacCard extends i$2 {
         this._layerHeld = false;
         /** Výběr místností — drží se lokálně v kartě (bez potřeby input_boolean helper entity) */
         this._localRoomSel = new Map();
+        /** Active setting preset per vacuum (Manual mode): vac.entity -> preset id. */
+        this._activePresets = new Map();
         /** Aktivní úklidy — sledování průběhu pro vyhodnocení úspěchu */
         this._inFlight = new Map();
         this._prevVacStates = new Map();
@@ -982,6 +984,65 @@ let AnyVacCard = class AnyVacCard extends i$2 {
         this._localRoomSel = next;
         this._saveRoomSel(vac.entity);
     }
+    /** Setting presets for a vacuum; falls back to a single default synthesized from clean_action. */
+    _settingPresets(vac) {
+        if (vac.presets && vac.presets.length)
+            return vac.presets;
+        const ca = vac.clean_action;
+        return [{
+                id: "default",
+                label: "Default",
+                suction_level: ca?.suction_level,
+                mop_mode: ca?.mop_mode,
+                mop_intensity: ca?.mop_intensity,
+                repeat: ca?.repeat,
+            }];
+    }
+    _activePresetId(vac) {
+        const presets = this._settingPresets(vac);
+        const sel = this._activePresets.get(vac.entity);
+        if (sel && presets.some((p) => p.id === sel))
+            return sel;
+        return presets[0]?.id ?? "default";
+    }
+    _activePreset(vac) {
+        const presets = this._settingPresets(vac);
+        const id = this._activePresetId(vac);
+        return presets.find((p) => p.id === id) ?? presets[0];
+    }
+    _setActivePreset(vac, id) {
+        const next = new Map(this._activePresets);
+        next.set(vac.entity, id);
+        this._activePresets = next;
+    }
+    _renderPresetChips(vac) {
+        const presets = this._settingPresets(vac);
+        if (presets.length < 2)
+            return A; // only when there is a real choice
+        const activeId = this._activePresetId(vac);
+        const color = this._color(vac);
+        return b `
+      <div style="display:flex;flex-wrap:wrap;gap:6px;margin-bottom:8px;justify-content:center">
+        ${presets.map((p) => {
+            const active = p.id === activeId;
+            return b `<button
+            @click=${(e) => { e.stopPropagation(); this._setActivePreset(vac, p.id); }}
+            style=${o({
+                display: "inline-flex", alignItems: "center", gap: "4px",
+                padding: "4px 10px", borderRadius: "14px", cursor: "pointer",
+                fontSize: "12px", lineHeight: "1",
+                border: "1px solid " + (active ? color : "rgba(255,255,255,0.15)"),
+                background: active ? COLOR_BG[this._colorKey(vac)] : "rgba(255,255,255,0.04)",
+                color: active ? "white" : "rgba(255,255,255,0.55)",
+            })}
+          >
+            ${p.icon ? b `<ha-icon icon=${p.icon} style="--mdc-icon-size:14px"></ha-icon>` : A}
+            <span>${p.label}</span>
+          </button>`;
+        })}
+      </div>
+    `;
+    }
     async _startClean(vac) {
         if (!vac.clean_action)
             return;
@@ -1002,16 +1063,22 @@ let AnyVacCard = class AnyVacCard extends i$2 {
             await this._call("script", "turn_on", { entity_id: action.entity_id, variables });
             return;
         }
-        // Native variants: pre-set fan / mop, then call vacuum
+        // Native variants: pre-set fan / mop from the active setting preset (default
+        // preset = the values from clean_action, so behaviour is unchanged when no
+        // custom presets are defined), then call vacuum.
         const nativeAction = vac.clean_action;
-        if (nativeAction.mop_mode_entity && nativeAction.mop_mode) {
-            await this._call("select", "select_option", { entity_id: nativeAction.mop_mode_entity, option: nativeAction.mop_mode });
+        const ap = this._activePreset(vac);
+        const apMopMode = ap.mop_mode ?? nativeAction.mop_mode;
+        const apMopInt = ap.mop_intensity ?? nativeAction.mop_intensity;
+        const apSuction = ap.suction_level ?? nativeAction.suction_level;
+        if (nativeAction.mop_mode_entity && apMopMode) {
+            await this._call("select", "select_option", { entity_id: nativeAction.mop_mode_entity, option: apMopMode });
         }
-        if (nativeAction.mop_intensity_entity && nativeAction.mop_intensity) {
-            await this._call("select", "select_option", { entity_id: nativeAction.mop_intensity_entity, option: nativeAction.mop_intensity });
+        if (nativeAction.mop_intensity_entity && apMopInt) {
+            await this._call("select", "select_option", { entity_id: nativeAction.mop_intensity_entity, option: apMopInt });
         }
-        if (nativeAction.suction_level) {
-            await this._call("vacuum", "set_fan_speed", { entity_id: vac.entity, fan_speed: nativeAction.suction_level });
+        if (apSuction) {
+            await this._call("vacuum", "set_fan_speed", { entity_id: vac.entity, fan_speed: apSuction });
         }
         if (vac.clean_action.type === "native-area") {
             // Uses HA vacuum.clean_area — area_id resolved via area_mappings
@@ -1618,6 +1685,10 @@ let AnyVacCard = class AnyVacCard extends i$2 {
         const mopBand = wetStr
             ? w `<polyline points=${wetStr} fill="none" stroke=${wetColor} stroke-width=${bw} stroke-linejoin="round" stroke-linecap="round" opacity="0.28"></polyline>`
             : A;
+        // Thin centre line down the mop band, so the wet trace reads as a path inside the sheen.
+        const mopLine = wetStr
+            ? w `<polyline points=${wetStr} fill="none" stroke=${wetColor} stroke-width=${sw} stroke-linejoin="round" stroke-linecap="round" opacity="0.9"></polyline>`
+            : A;
         const traceT = dryStr
             ? w `<polyline points=${dryStr} fill="none" stroke=${vac.path_color || color} stroke-width=${sw} stroke-linejoin="round" stroke-linecap="round" opacity="0.85"></polyline>`
             : A;
@@ -1629,7 +1700,7 @@ let AnyVacCard = class AnyVacCard extends i$2 {
                 ? w `<image href=${vac.image} x=${(rob.x - robSize / 2).toFixed(1)} y=${(rob.y - robSize / 2).toFixed(1)} width=${robSize.toFixed(1)} height=${robSize.toFixed(1)} preserveAspectRatio="xMidYMid meet" transform=${"rotate(" + robA + " " + rob.x.toFixed(1) + " " + rob.y.toFixed(1) + ")"}></image>`
                 : w `${head ? w `<line x1=${rob.x.toFixed(1)} y1=${rob.y.toFixed(1)} x2=${head.x.toFixed(1)} y2=${head.y.toFixed(1)} stroke="#ffffff" stroke-width=${(rr * 0.3).toFixed(2)} stroke-linecap="round"></line>` : A}<circle cx=${rob.x.toFixed(1)} cy=${rob.y.toFixed(1)} r=${rr.toFixed(1)} fill=${color} stroke="#ffffff" stroke-width=${(rr * 0.18).toFixed(2)}></circle>`)
             : A;
-        return b `<svg class="map-vector" viewBox="0 0 ${NW} ${NH}" preserveAspectRatio="none" style=${o(seat)}>${mopBand}${traceT}${robotT}</svg>`;
+        return b `<svg class="map-vector" viewBox="0 0 ${NW} ${NH}" preserveAspectRatio="none" style=${o(seat)}>${mopBand}${mopLine}${traceT}${robotT}</svg>`;
     }
     _onLayerDown(type) {
         this._layerHeld = false;
@@ -2050,6 +2121,7 @@ let AnyVacCard = class AnyVacCard extends i$2 {
         const startTextColor = hasRooms ? "white" : "rgba(255,255,255,0.25)";
         return b `
       <div class="actions">
+        ${this._renderPresetChips(vac)}
         <button
           class="action-btn ${hasRooms && this._holdId === hId ? "action-btn--holding" : ""}"
           style=${o({ background: startBg, border: startBorder })}
@@ -2522,6 +2594,9 @@ __decorate([
 __decorate([
     r()
 ], AnyVacCard.prototype, "_localRoomSel", void 0);
+__decorate([
+    r()
+], AnyVacCard.prototype, "_activePresets", void 0);
 AnyVacCard = __decorate([
     t$1(CARD_NAME)
 ], AnyVacCard);
