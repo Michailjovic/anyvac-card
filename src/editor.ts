@@ -13,6 +13,7 @@ import type {
   NativeAreaCleanAction,
   NativeAutoCleanAction,
   ScriptCleanAction,
+  SettingPreset,
   VacuumColor,
   GlobalAction,
   GlobalActionCall,
@@ -80,6 +81,7 @@ export class AnyVacCardEditor extends LitElement {
   // Accordion open state — always create new instances to trigger Lit reactivity
   @state() private _openVac     = new Set<number>();
   @state() private _openSensors = new Set<number>();
+  @state() private _openPresets = new Set<number>();
   @state() private _openAction  = new Set<number>();
   @state() private _openGlobal  = new Set<number>();
   // Per-vacuum: which roomIdx is open (null = none)
@@ -279,6 +281,27 @@ export class AnyVacCardEditor extends LitElement {
   private _setCleanAction(vacIdx: number, updates: Partial<CleanAction>): void {
     const existing = this._config.vacuums[vacIdx].clean_action ?? { type: "native" };
     this._setVacuum(vacIdx, { clean_action: { ...existing, ...updates } as CleanAction });
+  }
+
+  private _togglePresets(vacIdx: number): void {
+    const s = new Set(this._openPresets);
+    if (s.has(vacIdx)) s.delete(vacIdx); else s.add(vacIdx);
+    this._openPresets = s;
+  }
+  private _setPreset(vacIdx: number, presetIdx: number, updates: Partial<SettingPreset>): void {
+    const presets = [...(this._config.vacuums[vacIdx].presets ?? [])];
+    presets[presetIdx] = { ...presets[presetIdx], ...updates };
+    this._setVacuum(vacIdx, { presets });
+  }
+  private _addPreset(vacIdx: number): void {
+    const existing = this._config.vacuums[vacIdx].presets ?? [];
+    const presets = [...existing, { id: "preset" + (existing.length + 1), label: "New preset" }];
+    this._setVacuum(vacIdx, { presets });
+    this._openPresets = new Set([...this._openPresets, vacIdx]);
+  }
+  private _deletePreset(vacIdx: number, presetIdx: number): void {
+    const presets = (this._config.vacuums[vacIdx].presets ?? []).filter((_, i) => i !== presetIdx);
+    this._setVacuum(vacIdx, { presets });
   }
 
   private _setGlobal(idx: number, updates: Partial<GlobalAction>): void {
@@ -725,6 +748,7 @@ export class AnyVacCardEditor extends LitElement {
 
             ${this._renderSensorsSection(idx, vac)}
             ${this._renderCleanActionSection(idx, vac)}
+            ${this._renderPresetsSection(idx, vac)}
 
             <div class="section-title">Rooms (${(vac.rooms ?? []).length})</div>
             ${(vac.rooms ?? []).map((r, ri) => this._renderRoomAccordion(r, idx, ri))}
@@ -769,6 +793,55 @@ export class AnyVacCardEditor extends LitElement {
               v => this._setVacuum(vacIdx, { current_room_entity: v || undefined }))}
             ${this._entityPicker("Error", vac.error_entity, ["sensor"],
               v => this._setVacuum(vacIdx, { error_entity: v || undefined }))}
+          </div>
+        ` : nothing}
+      </div>`;
+  }
+
+  private _renderPresetsSection(vacIdx: number, vac: VacuumConfig) {
+    const isOpen = this._openPresets.has(vacIdx);
+    const presets = vac.presets ?? [];
+    const speeds: string[] = (this.hass.states[vac.entity]?.attributes["fan_speed_list"] as string[]) ?? [];
+    const ca = vac.clean_action as Partial<NativeAutoCleanAction> | undefined;
+    const mopModeEnt = ca?.mop_mode_entity;
+    const mopIntEnt = ca?.mop_intensity_entity;
+    return html`
+      <div class="collapsible">
+        <div class="collapsible-header" @click=${() => this._togglePresets(vacIdx)}>
+          <span class="collapsible-title">Setting presets</span>
+          ${presets.length ? html`<span class="badge">${presets.length}</span>` : nothing}
+          <ha-icon icon=${isOpen ? "mdi:chevron-up" : "mdi:chevron-down"} class="acc-chevron"></ha-icon>
+        </div>
+        ${isOpen ? html`
+          <div class="collapsible-body">
+            <p class="hint">Named "how" bundles for Manual mode — the user picks one on the controller, then picks rooms. Mop entities come from Clean action above; presets only set the values. With fewer than 2 presets the controller shows no chips (a default from Clean action is used).</p>
+            ${presets.map((p, pi) => html`
+              <div class="sub-section">
+                <div class="sub-title" style="display:flex;align-items:center;justify-content:space-between">
+                  <span>${p.label || p.id}</span>
+                  <button class="icon-btn icon-btn--danger" title="Delete preset"
+                    @click=${() => this._deletePreset(vacIdx, pi)}>
+                    <ha-icon icon="mdi:delete"></ha-icon>
+                  </button>
+                </div>
+                ${this._textField("Label", p.label, v => this._setPreset(vacIdx, pi, { label: v }), "e.g. Suchý")}
+                ${this._textField("Icon", p.icon, v => this._setPreset(vacIdx, pi, { icon: v || undefined }), "mdi:broom")}
+                ${speeds.length
+                  ? this._optionSelectFromList("Suction", speeds, p.suction_level,
+                      v => this._setPreset(vacIdx, pi, { suction_level: v || undefined }))
+                  : this._textField("Suction", p.suction_level,
+                      v => this._setPreset(vacIdx, pi, { suction_level: v || undefined }), "e.g. max")}
+                ${mopModeEnt ? this._optionSelect("Mop mode", mopModeEnt, p.mop_mode,
+                  v => this._setPreset(vacIdx, pi, { mop_mode: v || undefined })) : nothing}
+                ${mopIntEnt ? this._optionSelect("Mop intensity", mopIntEnt, p.mop_intensity,
+                  v => this._setPreset(vacIdx, pi, { mop_intensity: v || undefined })) : nothing}
+                ${this._numberSlider("Repeat passes", p.repeat ?? 1, 1, 3, 1,
+                  v => this._setPreset(vacIdx, pi, { repeat: v }))}
+              </div>
+            `)}
+            <button class="btn btn--add" @click=${() => this._addPreset(vacIdx)}>
+              <ha-icon icon="mdi:plus"></ha-icon> Add preset
+            </button>
           </div>
         ` : nothing}
       </div>`;

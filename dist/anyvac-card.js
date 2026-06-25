@@ -87,7 +87,7 @@ const t={ATTRIBUTE:1},e=t=>(...e)=>({_$litDirective$:t,values:e});let i$1 = clas
 
 const CARD_NAME = "anyvac-card";
 const EDITOR_NAME = "anyvac-card-editor";
-const CARD_VERSION = "0.22.0";
+const CARD_VERSION = "0.23.0";
 /** Server-side tracking blueprint */
 const BLUEPRINT_VERSION = "1.0.0";
 const BLUEPRINT_PATH = "anyvac_card/cleaning_tracker.yaml";
@@ -2812,6 +2812,7 @@ let AnyVacCardEditor = class AnyVacCardEditor extends i$2 {
         // Accordion open state — always create new instances to trigger Lit reactivity
         this._openVac = new Set();
         this._openSensors = new Set();
+        this._openPresets = new Set();
         this._openAction = new Set();
         this._openGlobal = new Set();
         // Per-vacuum: which roomIdx is open (null = none)
@@ -3028,6 +3029,29 @@ let AnyVacCardEditor = class AnyVacCardEditor extends i$2 {
     _setCleanAction(vacIdx, updates) {
         const existing = this._config.vacuums[vacIdx].clean_action ?? { type: "native" };
         this._setVacuum(vacIdx, { clean_action: { ...existing, ...updates } });
+    }
+    _togglePresets(vacIdx) {
+        const s = new Set(this._openPresets);
+        if (s.has(vacIdx))
+            s.delete(vacIdx);
+        else
+            s.add(vacIdx);
+        this._openPresets = s;
+    }
+    _setPreset(vacIdx, presetIdx, updates) {
+        const presets = [...(this._config.vacuums[vacIdx].presets ?? [])];
+        presets[presetIdx] = { ...presets[presetIdx], ...updates };
+        this._setVacuum(vacIdx, { presets });
+    }
+    _addPreset(vacIdx) {
+        const existing = this._config.vacuums[vacIdx].presets ?? [];
+        const presets = [...existing, { id: "preset" + (existing.length + 1), label: "New preset" }];
+        this._setVacuum(vacIdx, { presets });
+        this._openPresets = new Set([...this._openPresets, vacIdx]);
+    }
+    _deletePreset(vacIdx, presetIdx) {
+        const presets = (this._config.vacuums[vacIdx].presets ?? []).filter((_, i) => i !== presetIdx);
+        this._setVacuum(vacIdx, { presets });
     }
     _setGlobal(idx, updates) {
         const global_actions = [...(this._config.global_actions ?? [])];
@@ -3461,6 +3485,7 @@ let AnyVacCardEditor = class AnyVacCardEditor extends i$2 {
 
             ${this._renderSensorsSection(idx, vac)}
             ${this._renderCleanActionSection(idx, vac)}
+            ${this._renderPresetsSection(idx, vac)}
 
             <div class="section-title">Rooms (${(vac.rooms ?? []).length})</div>
             ${(vac.rooms ?? []).map((r, ri) => this._renderRoomAccordion(r, idx, ri))}
@@ -3498,6 +3523,49 @@ let AnyVacCardEditor = class AnyVacCardEditor extends i$2 {
             ${this._entityPicker("Progress", vac.progress_entity, ["sensor"], v => this._setVacuum(vacIdx, { progress_entity: v || undefined }))}
             ${this._entityPicker("Current room", vac.current_room_entity, ["sensor"], v => this._setVacuum(vacIdx, { current_room_entity: v || undefined }))}
             ${this._entityPicker("Error", vac.error_entity, ["sensor"], v => this._setVacuum(vacIdx, { error_entity: v || undefined }))}
+          </div>
+        ` : A}
+      </div>`;
+    }
+    _renderPresetsSection(vacIdx, vac) {
+        const isOpen = this._openPresets.has(vacIdx);
+        const presets = vac.presets ?? [];
+        const speeds = this.hass.states[vac.entity]?.attributes["fan_speed_list"] ?? [];
+        const ca = vac.clean_action;
+        const mopModeEnt = ca?.mop_mode_entity;
+        const mopIntEnt = ca?.mop_intensity_entity;
+        return b `
+      <div class="collapsible">
+        <div class="collapsible-header" @click=${() => this._togglePresets(vacIdx)}>
+          <span class="collapsible-title">Setting presets</span>
+          ${presets.length ? b `<span class="badge">${presets.length}</span>` : A}
+          <ha-icon icon=${isOpen ? "mdi:chevron-up" : "mdi:chevron-down"} class="acc-chevron"></ha-icon>
+        </div>
+        ${isOpen ? b `
+          <div class="collapsible-body">
+            <p class="hint">Named "how" bundles for Manual mode — the user picks one on the controller, then picks rooms. Mop entities come from Clean action above; presets only set the values. With fewer than 2 presets the controller shows no chips (a default from Clean action is used).</p>
+            ${presets.map((p, pi) => b `
+              <div class="sub-section">
+                <div class="sub-title" style="display:flex;align-items:center;justify-content:space-between">
+                  <span>${p.label || p.id}</span>
+                  <button class="icon-btn icon-btn--danger" title="Delete preset"
+                    @click=${() => this._deletePreset(vacIdx, pi)}>
+                    <ha-icon icon="mdi:delete"></ha-icon>
+                  </button>
+                </div>
+                ${this._textField("Label", p.label, v => this._setPreset(vacIdx, pi, { label: v }), "e.g. Suchý")}
+                ${this._textField("Icon", p.icon, v => this._setPreset(vacIdx, pi, { icon: v || undefined }), "mdi:broom")}
+                ${speeds.length
+            ? this._optionSelectFromList("Suction", speeds, p.suction_level, v => this._setPreset(vacIdx, pi, { suction_level: v || undefined }))
+            : this._textField("Suction", p.suction_level, v => this._setPreset(vacIdx, pi, { suction_level: v || undefined }), "e.g. max")}
+                ${mopModeEnt ? this._optionSelect("Mop mode", mopModeEnt, p.mop_mode, v => this._setPreset(vacIdx, pi, { mop_mode: v || undefined })) : A}
+                ${mopIntEnt ? this._optionSelect("Mop intensity", mopIntEnt, p.mop_intensity, v => this._setPreset(vacIdx, pi, { mop_intensity: v || undefined })) : A}
+                ${this._numberSlider("Repeat passes", p.repeat ?? 1, 1, 3, 1, v => this._setPreset(vacIdx, pi, { repeat: v }))}
+              </div>
+            `)}
+            <button class="btn btn--add" @click=${() => this._addPreset(vacIdx)}>
+              <ha-icon icon="mdi:plus"></ha-icon> Add preset
+            </button>
           </div>
         ` : A}
       </div>`;
@@ -4730,6 +4798,9 @@ __decorate([
 __decorate([
     r()
 ], AnyVacCardEditor.prototype, "_openSensors", void 0);
+__decorate([
+    r()
+], AnyVacCardEditor.prototype, "_openPresets", void 0);
 __decorate([
     r()
 ], AnyVacCardEditor.prototype, "_openAction", void 0);

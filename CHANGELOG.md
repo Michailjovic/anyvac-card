@@ -11,6 +11,15 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Rooms from the integration (real room polygons / names) for clickable cleaning on the floorplan.
 - Milestone 3b: companion `anyvac` integration data layers (clean-history, statistics).
 
+## [0.23.0] - 2026-06-25
+
+### Added
+
+- **Setting presets are editable in the GUI editor** (Vacuums tab → new "Setting presets" section).
+  Add / edit / remove named presets per vacuum with Label, Icon, Suction (from the vacuum's
+  `fan_speed_list`), Mop mode / Mop intensity (options pulled from the Clean action's mop entities),
+  and Repeat passes. Previously presets could only be set via YAML.
+
 ## [0.22.0] - 2026-06-25
 
 ### Added
