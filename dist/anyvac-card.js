@@ -87,7 +87,7 @@ const t={ATTRIBUTE:1},e=t=>(...e)=>({_$litDirective$:t,values:e});let i$1 = clas
 
 const CARD_NAME = "anyvac-card";
 const EDITOR_NAME = "anyvac-card-editor";
-const CARD_VERSION = "0.23.0";
+const CARD_VERSION = "0.24.0";
 /** Server-side tracking blueprint */
 const BLUEPRINT_VERSION = "1.0.0";
 const BLUEPRINT_PATH = "anyvac_card/cleaning_tracker.yaml";
@@ -495,12 +495,23 @@ let AnyVacCard = class AnyVacCard extends i$2 {
      *  follows the actual water mode), then the configured clean_action. This is
      *  what makes a dual-capable vacuum (clean_type: both) pick the right estimate. */
     _liveCleanType(vac) {
+        // 1) When the vacuum has selectable presets, the active one is the user's
+        //    current intent — derive its mode from its values (so picking "Mokrý"
+        //    flips the estimate to wet immediately, before the clean even starts).
+        if ((vac.presets?.length ?? 0) >= 2) {
+            const ap = this._activePreset(vac);
+            const wet = (ap.mop_intensity != null && ap.mop_intensity !== "" && ap.mop_intensity !== "off")
+                || (ap.mop_mode != null && ap.mop_mode !== "");
+            return wet ? "wet" : "dry";
+        }
+        // 2) Live backend signal (follows the actual water mode).
         const ent = vac.integration_entity;
         const ct = ent
             ? this.hass.states[ent]?.attributes?.clean_type
             : undefined;
         if (ct === "wet" || ct === "dry")
             return ct;
+        // 3) Fallback: derive from the clean action.
         return this._deriveCleanType(vac);
     }
     /** Self-calibrated clean-time estimate learned by the backend integration,
@@ -3272,6 +3283,20 @@ let AnyVacCardEditor = class AnyVacCardEditor extends i$2 {
         if (this._mapRoom === roomIdx)
             this._mapRoom = null;
     }
+    _setGlobalPreset(idx, updates) {
+        const global_presets = [...(this._config.global_presets ?? [])];
+        global_presets[idx] = { ...global_presets[idx], ...updates };
+        this._setConfig({ global_presets });
+    }
+    _addGlobalPreset() {
+        const existing = this._config.global_presets ?? [];
+        const global_presets = [...existing, { id: "gp" + (existing.length + 1), label: "New clean", scope: "select" }];
+        this._setConfig({ global_presets });
+    }
+    _deleteGlobalPreset(idx) {
+        const global_presets = (this._config.global_presets ?? []).filter((_, i) => i !== idx);
+        this._setConfig({ global_presets });
+    }
     _addGlobal() {
         const global_actions = [...(this._config.global_actions ?? []), { ...DEFAULT_GLOBAL }];
         const next = { ...this._config, global_actions };
@@ -4108,7 +4133,31 @@ let AnyVacCardEditor = class AnyVacCardEditor extends i$2 {
         return b `
       <div class="tab-body">
 
-        <div class="section-title">Global actions</div>
+        <div class="section-title">Controller</div>
+        ${this._selectField("Mode", this._config.ui_mode ?? "auto", [{ value: "auto", label: "Auto — one orchestrated controller" },
+            { value: "manual", label: "Manual — per-robot controllers" }], v => this._setConfig({ ui_mode: v }))}
+
+        <div class="section-title" style="margin-top:4px">Global presets (Auto mode)</div>
+        <p class="hint">Targeted whole-home cleans for Auto mode (e.g. "Po večeři", "Celý byt"). The integration decides which robots and the order; you pick the scope.</p>
+        ${(this._config.global_presets ?? []).map((gp, i) => b `
+          <div class="sub-section">
+            <div class="sub-title" style="display:flex;align-items:center;justify-content:space-between">
+              <span>${gp.label || gp.id}</span>
+              <button class="icon-btn icon-btn--danger" title="Delete preset"
+                @click=${() => this._deleteGlobalPreset(i)}>
+                <ha-icon icon="mdi:delete"></ha-icon>
+              </button>
+            </div>
+            ${this._textField("Label", gp.label, v => this._setGlobalPreset(i, { label: v }), "e.g. Po večeři")}
+            ${this._textField("Icon", gp.icon, v => this._setGlobalPreset(i, { icon: v || undefined }), "mdi:silverware-fork-knife")}
+            ${this._selectField("Scope", (gp.scope === "all" ? "all" : "select"), [{ value: "all", label: "Whole flat" }, { value: "select", label: "Pick rooms on map" }], v => this._setGlobalPreset(i, { scope: v }))}
+          </div>
+        `)}
+        <button class="btn btn--add" @click=${() => this._addGlobalPreset()}>
+          <ha-icon icon="mdi:plus"></ha-icon> Add global preset
+        </button>
+
+        <div class="section-title" style="margin-top:4px">Global actions</div>
         <p class="hint">Badges that trigger a script across all vacuums (e.g. "Clean whole flat").</p>
         ${globals.length === 0
             ? b `<p class="hint">None configured.</p>`

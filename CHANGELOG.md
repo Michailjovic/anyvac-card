@@ -11,6 +11,21 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Rooms from the integration (real room polygons / names) for clickable cleaning on the floorplan.
 - Milestone 3b: companion `anyvac` integration data layers (clean-history, statistics).
 
+## [0.24.0] - 2026-06-25
+
+### Added
+
+- **Auto/Manual controller mode + global presets config (step A, config side).** The Global tab gains
+  a **Controller Mode** select (Auto / Manual) and a **Global presets** section to add/edit/remove
+  card-level targeted cleans (`global_presets`: id, label, icon, scope = whole flat / pick on map).
+  These feed the upcoming Auto-mode orchestrated controller (runtime to follow).
+
+### Changed
+
+- **Active preset now drives the time estimate immediately.** For a vacuum with 2+ setting presets,
+  picking one flips the shown estimate to that preset's mode (dry/wet) right away, instead of waiting
+  for the live water mode to change after the clean starts.
+
 ## [0.23.0] - 2026-06-25
 
 ### Added

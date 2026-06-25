@@ -14,6 +14,7 @@ import type {
   NativeAutoCleanAction,
   ScriptCleanAction,
   SettingPreset,
+  GlobalPreset,
   VacuumColor,
   GlobalAction,
   GlobalActionCall,
@@ -520,6 +521,21 @@ export class AnyVacCardEditor extends LitElement {
       this._openRoom = m;
     }
     if (this._mapRoom === roomIdx) this._mapRoom = null;
+  }
+
+  private _setGlobalPreset(idx: number, updates: Partial<GlobalPreset>): void {
+    const global_presets = [...(this._config.global_presets ?? [])];
+    global_presets[idx] = { ...global_presets[idx], ...updates };
+    this._setConfig({ global_presets });
+  }
+  private _addGlobalPreset(): void {
+    const existing = this._config.global_presets ?? [];
+    const global_presets = [...existing, { id: "gp" + (existing.length + 1), label: "New clean", scope: "select" as const }];
+    this._setConfig({ global_presets });
+  }
+  private _deleteGlobalPreset(idx: number): void {
+    const global_presets = (this._config.global_presets ?? []).filter((_, i) => i !== idx);
+    this._setConfig({ global_presets });
   }
 
   private _addGlobal(): void {
@@ -1422,7 +1438,35 @@ export class AnyVacCardEditor extends LitElement {
     return html`
       <div class="tab-body">
 
-        <div class="section-title">Global actions</div>
+        <div class="section-title">Controller</div>
+        ${this._selectField<"auto" | "manual">("Mode", this._config.ui_mode ?? "auto",
+          [{ value: "auto", label: "Auto — one orchestrated controller" },
+           { value: "manual", label: "Manual — per-robot controllers" }],
+          v => this._setConfig({ ui_mode: v }))}
+
+        <div class="section-title" style="margin-top:4px">Global presets (Auto mode)</div>
+        <p class="hint">Targeted whole-home cleans for Auto mode (e.g. "Po večeři", "Celý byt"). The integration decides which robots and the order; you pick the scope.</p>
+        ${(this._config.global_presets ?? []).map((gp, i) => html`
+          <div class="sub-section">
+            <div class="sub-title" style="display:flex;align-items:center;justify-content:space-between">
+              <span>${gp.label || gp.id}</span>
+              <button class="icon-btn icon-btn--danger" title="Delete preset"
+                @click=${() => this._deleteGlobalPreset(i)}>
+                <ha-icon icon="mdi:delete"></ha-icon>
+              </button>
+            </div>
+            ${this._textField("Label", gp.label, v => this._setGlobalPreset(i, { label: v }), "e.g. Po večeři")}
+            ${this._textField("Icon", gp.icon, v => this._setGlobalPreset(i, { icon: v || undefined }), "mdi:silverware-fork-knife")}
+            ${this._selectField<"all" | "select">("Scope", (gp.scope === "all" ? "all" : "select"),
+              [{ value: "all", label: "Whole flat" }, { value: "select", label: "Pick rooms on map" }],
+              v => this._setGlobalPreset(i, { scope: v }))}
+          </div>
+        `)}
+        <button class="btn btn--add" @click=${() => this._addGlobalPreset()}>
+          <ha-icon icon="mdi:plus"></ha-icon> Add global preset
+        </button>
+
+        <div class="section-title" style="margin-top:4px">Global actions</div>
         <p class="hint">Badges that trigger a script across all vacuums (e.g. "Clean whole flat").</p>
         ${globals.length === 0
           ? html`<p class="hint">None configured.</p>`

@@ -365,11 +365,22 @@ export class AnyVacCard extends LitElement {
    *  follows the actual water mode), then the configured clean_action. This is
    *  what makes a dual-capable vacuum (clean_type: both) pick the right estimate. */
   private _liveCleanType(vac: VacuumConfig): "dry" | "wet" {
+    // 1) When the vacuum has selectable presets, the active one is the user's
+    //    current intent — derive its mode from its values (so picking "Mokrý"
+    //    flips the estimate to wet immediately, before the clean even starts).
+    if ((vac.presets?.length ?? 0) >= 2) {
+      const ap = this._activePreset(vac);
+      const wet = (ap.mop_intensity != null && ap.mop_intensity !== "" && ap.mop_intensity !== "off")
+        || (ap.mop_mode != null && ap.mop_mode !== "");
+      return wet ? "wet" : "dry";
+    }
+    // 2) Live backend signal (follows the actual water mode).
     const ent = vac.integration_entity;
     const ct = ent
       ? (this.hass.states[ent]?.attributes?.clean_type as string | undefined)
       : undefined;
     if (ct === "wet" || ct === "dry") return ct;
+    // 3) Fallback: derive from the clean action.
     return this._deriveCleanType(vac);
   }
 
