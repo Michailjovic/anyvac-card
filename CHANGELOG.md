@@ -11,6 +11,17 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Rooms from the integration (real room polygons / names) for clickable cleaning on the floorplan.
 - Milestone 3b: companion `anyvac` integration data layers (clean-history, statistics).
 
+## [0.21.0] - 2026-06-25
+
+### Added
+
+- **Separate mop (wet) trace as a "wet sheen" band.** The integration overlay now draws the dry
+  vacuum trace (`path`) and the wet mop trace (`mop_path`) independently: the vacuum path stays a thin
+  line, the mop path is rendered as a wider, translucent band beneath it. A run that vacuums *and*
+  mops shows the thin line riding on the band, so a combined run is visually obvious. The dry layer
+  toggle controls the line, the wet layer toggle controls the band. Band colour can be set with the
+  new optional `mop_path_color` (defaults to a wet blue).
+
 ## [0.20.0] - 2026-06-25
 
 ### Added

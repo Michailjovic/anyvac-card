@@ -87,7 +87,7 @@ const t={ATTRIBUTE:1},e=t=>(...e)=>({_$litDirective$:t,values:e});let i$1 = clas
 
 const CARD_NAME = "anyvac-card";
 const EDITOR_NAME = "anyvac-card-editor";
-const CARD_VERSION = "0.20.0";
+const CARD_VERSION = "0.21.0";
 /** Server-side tracking blueprint */
 const BLUEPRINT_VERSION = "1.0.0";
 const BLUEPRINT_PATH = "anyvac_card/cleaning_tracker.yaml";
@@ -1590,8 +1590,13 @@ let AnyVacCard = class AnyVacCard extends i$2 {
         const rr = Math.max(NW, NH) / 55;
         const toPts = (arr) => (Array.isArray(arr) ? arr : []).map((p) => { const q = toPx(p.x, p.y); return q.x.toFixed(1) + "," + q.y.toFixed(1); }).join(" ");
         const ct = this._vacCleanType(vac);
-        const showTrace = (this._layers.dry && ct.dry) || (this._layers.wet && ct.wet);
-        const traceStr = showTrace ? toPts(at.path) : "";
+        // Dry layer draws the vacuum trace (path); wet layer draws the mop trace
+        // (mop_path) as a wider translucent "wet sheen" band under the line. A run that
+        // both vacuums and mops therefore shows the thin line riding on the band.
+        const showDry = this._layers.dry && ct.dry;
+        const showWet = this._layers.wet && ct.wet;
+        const dryStr = showDry ? toPts(at.path) : "";
+        const wetStr = showWet ? toPts(at.mop_path) : "";
         const vp = at.vacuum_position;
         const rob = vp ? toPx(vp.x, vp.y) : null;
         let head = null;
@@ -1606,9 +1611,15 @@ let AnyVacCard = class AnyVacCard extends i$2 {
             aspectRatio: NW + " / " + NH,
             transform: "translate(-50%,-50%) rotate(" + (m?.rotation ?? 0) + "deg)",
         };
-        const sw = (rr * 0.35 * ((vac.path_width ?? 100) / 100)).toFixed(2);
-        const traceT = traceStr
-            ? w `<polyline points=${traceStr} fill="none" stroke=${vac.path_color || color} stroke-width=${sw} stroke-linejoin="round" stroke-linecap="round" opacity="0.85"></polyline>`
+        const pw = rr * 0.35 * ((vac.path_width ?? 100) / 100);
+        const sw = pw.toFixed(2);
+        const bw = (pw * 2.6).toFixed(2);
+        const wetColor = vac.mop_path_color || "#40a9ff";
+        const mopBand = wetStr
+            ? w `<polyline points=${wetStr} fill="none" stroke=${wetColor} stroke-width=${bw} stroke-linejoin="round" stroke-linecap="round" opacity="0.28"></polyline>`
+            : A;
+        const traceT = dryStr
+            ? w `<polyline points=${dryStr} fill="none" stroke=${vac.path_color || color} stroke-width=${sw} stroke-linejoin="round" stroke-linecap="round" opacity="0.85"></polyline>`
             : A;
         const useImg = !!(vac.robot_image_on_map && vac.image);
         const robSize = rr * 2.6 * ((vac.robot_size ?? 100) / 100);
@@ -1618,7 +1629,7 @@ let AnyVacCard = class AnyVacCard extends i$2 {
                 ? w `<image href=${vac.image} x=${(rob.x - robSize / 2).toFixed(1)} y=${(rob.y - robSize / 2).toFixed(1)} width=${robSize.toFixed(1)} height=${robSize.toFixed(1)} preserveAspectRatio="xMidYMid meet" transform=${"rotate(" + robA + " " + rob.x.toFixed(1) + " " + rob.y.toFixed(1) + ")"}></image>`
                 : w `${head ? w `<line x1=${rob.x.toFixed(1)} y1=${rob.y.toFixed(1)} x2=${head.x.toFixed(1)} y2=${head.y.toFixed(1)} stroke="#ffffff" stroke-width=${(rr * 0.3).toFixed(2)} stroke-linecap="round"></line>` : A}<circle cx=${rob.x.toFixed(1)} cy=${rob.y.toFixed(1)} r=${rr.toFixed(1)} fill=${color} stroke="#ffffff" stroke-width=${(rr * 0.18).toFixed(2)}></circle>`)
             : A;
-        return b `<svg class="map-vector" viewBox="0 0 ${NW} ${NH}" preserveAspectRatio="none" style=${o(seat)}>${traceT}${robotT}</svg>`;
+        return b `<svg class="map-vector" viewBox="0 0 ${NW} ${NH}" preserveAspectRatio="none" style=${o(seat)}>${mopBand}${traceT}${robotT}</svg>`;
     }
     _onLayerDown(type) {
         this._layerHeld = false;
