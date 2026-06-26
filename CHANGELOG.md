@@ -11,6 +11,48 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Rooms from the integration (real room polygons / names) for clickable cleaning on the floorplan.
 - Milestone 3b: companion `anyvac` integration data layers (clean-history, statistics).
 
+## [0.28.0] - 2026-06-26
+
+### Fixed
+
+- **A both-capable vacuum in an orchestrated `both` clean now finishes its dry pass before its wet
+  pass.** It is assigned to both passes (e.g. S7 = dry+wet runs in the dry group with S6 and the wet
+  group with S8), but its wet task now waits for its **own dry session to complete**
+  (`anyvac_clean_finished` for itself), since one robot cannot clean dry and wet at the same time.
+  Rooms cleaned dry by *other* robots are still gated per room via `anyvac_room_done`.
+
+## [0.27.3] - 2026-06-26
+
+### Fixed
+
+- **A dry orchestrated pass now forces the mop off.** It previously took the mop intensity from the
+  matched preset, so a vacuum whose only setting preset is a wet one would turn the water on during a
+  dry pass (showing up as `clean_type: wet` on the backend). A dry pass now always sets mop intensity
+  to `off` (and skips mop mode), so a `clean_type: dry` vacuum actually cleans dry.
+
+## [0.27.2] - 2026-06-26
+
+### Fixed
+
+- **Work splits across robots even with no time estimates set.** The LPT balancer used a room's
+  estimate as its weight; with no estimates configured every weight was 0, so the balancer collapsed
+  back onto the first owner. Each room now counts at least 1, giving a round-robin split when
+  estimates are absent.
+
+## [0.27.1] - 2026-06-26
+
+### Fixed
+
+- **Orchestrated cleans now split the work across robots.** The assignment dumped every owned room on
+  the first capable vacuum (so only one robot ran). It now distributes rooms across the capable owners
+  by balancing estimated time (LPT greedy: biggest room → least-loaded robot), so e.g. bathroom + hall
+  + kitchen are shared between S6 and S7 instead of all going to S6.
+
+### Changed
+
+- **Global preset tiles activate on hold**, with the same fill-ring animation as the vacuum
+  controllers — so an orchestrated whole-home clean isn't triggered by an accidental tap.
+
 ## [0.27.0] - 2026-06-26
 
 ### Added

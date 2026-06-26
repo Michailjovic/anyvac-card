@@ -884,15 +884,34 @@ export class AnyVacCard extends LitElement {
   private _intRoomName(vac: VacuumConfig, key: string): string {
     return this._roomsFor(vac).find((r) => r.key === key)?.name ?? key;
   }
-  /** Assign each room key to the first vacuum that passes `cap` AND owns the room. */
+  /** Largest per-room estimate across vacuums (for LPT ordering). */
+  private _roomEstMax(key: string): number {
+    let m = 0;
+    for (const v of this._config.vacuums) {
+      const r = this._roomsFor(v).find((x) => x.key === key);
+      if (r) m = Math.max(m, this._roomCleanMins(r, v));
+    }
+    return m;
+  }
+  /** Distribute rooms across the capable owners to balance estimated time (LPT greedy:
+   *  biggest room first → least-loaded capable owner), so the work is actually split
+   *  between robots instead of dumped on the first owner. */
   private _assignByCap(roomKeys: string[], cap: (v: VacuumConfig) => boolean): Map<string, string[]> {
     const out = new Map<string, string[]>();
-    for (const key of roomKeys) {
-      const owner = this._config.vacuums.find((v) => cap(v) && this._roomsFor(v).some((r) => r.key === key));
-      if (!owner) continue;
-      const arr = out.get(owner.entity) ?? [];
+    const load = new Map<string, number>();
+    const sorted = [...roomKeys].sort((a, b) => this._roomEstMax(b) - this._roomEstMax(a));
+    for (const key of sorted) {
+      const owners = this._config.vacuums.filter((v) => cap(v) && this._roomsFor(v).some((r) => r.key === key));
+      if (!owners.length) continue;
+      let best = owners[0];
+      for (const v of owners) if ((load.get(v.entity) ?? 0) < (load.get(best.entity) ?? 0)) best = v;
+      const arr = out.get(best.entity) ?? [];
       arr.push(key);
-      out.set(owner.entity, arr);
+      out.set(best.entity, arr);
+      const r = this._roomsFor(best).find((x) => x.key === key);
+      // min weight 1 per room: with no estimates configured, this still round-robins
+      // the rooms across robots instead of collapsing onto the first owner.
+      load.set(best.entity, (load.get(best.entity) ?? 0) + Math.max(r ? this._roomCleanMins(r, best) : 0, 1));
     }
     return out;
   }
@@ -933,9 +952,13 @@ export class AnyVacCard extends LitElement {
     const pick = presets.find((p) => (kind === "wet" ? isWet(p) : !isWet(p))) ?? presets[0];
     const ca = vac.clean_action as Partial<NativeAutoCleanAction> | undefined;
     const selects: Array<{ entity_id: string; option: string }> = [];
-    if (ca?.mop_mode_entity && pick.mop_mode) selects.push({ entity_id: ca.mop_mode_entity, option: pick.mop_mode });
+    // A dry pass forces the mop off regardless of the preset, so a dry-typed vacuum
+    // always cleans dry even when its only preset happens to be a wet one.
+    if (kind === "wet" && ca?.mop_mode_entity && pick.mop_mode) {
+      selects.push({ entity_id: ca.mop_mode_entity, option: pick.mop_mode });
+    }
     if (ca?.mop_intensity_entity) {
-      const opt = kind === "dry" ? (pick.mop_intensity ?? "off") : pick.mop_intensity;
+      const opt = kind === "dry" ? "off" : pick.mop_intensity;
       if (opt) selects.push({ entity_id: ca.mop_intensity_entity, option: opt });
     }
     return { selects, fan_speed: pick.suction_level };
@@ -946,16 +969,17 @@ export class AnyVacCard extends LitElement {
     if (!roomKeys.length) return;
     const tasks: Array<Record<string, unknown>> = [];
     const roomToDryDuid = new Map<string, string | undefined>();
-    if (mode !== "wet") {
-      let i = 0;
-      for (const [entity, keys] of this._assignByCap(roomKeys, (v) => this._vacCleanType(v).dry)) {
-        const vac = this._config.vacuums.find((v) => v.entity === entity);
-        const cmd = vac ? this._cleanCmdFor(vac, keys) : null;
-        if (!vac || !cmd) continue;
-        tasks.push({ id: "dry" + i++, vacuum: entity, ...this._settingsForKind(vac, "dry"), service: cmd.service, service_data: cmd.service_data });
-        const duid = this._duidOf(vac);
-        for (const k of keys) roomToDryDuid.set(k, duid);
-      }
+    const dryAssign = mode !== "wet"
+      ? this._assignByCap(roomKeys, (v) => this._vacCleanType(v).dry)
+      : new Map<string, string[]>();
+    let i = 0;
+    for (const [entity, keys] of dryAssign) {
+      const vac = this._config.vacuums.find((v) => v.entity === entity);
+      const cmd = vac ? this._cleanCmdFor(vac, keys) : null;
+      if (!vac || !cmd) continue;
+      tasks.push({ id: "dry" + i++, vacuum: entity, ...this._settingsForKind(vac, "dry"), service: cmd.service, service_data: cmd.service_data });
+      const duid = this._duidOf(vac);
+      for (const k of keys) roomToDryDuid.set(k, duid);
     }
     if (mode === "wet" || mode === "both") {
       let j = 0;
@@ -963,10 +987,16 @@ export class AnyVacCard extends LitElement {
         const vac = this._config.vacuums.find((v) => v.entity === entity);
         const cmd = vac ? this._cleanCmdFor(vac, keys) : null;
         if (!vac || !cmd) continue;
-        const after = mode === "both"
+        const after: Array<{ duid: string; room?: string }> = mode === "both"
           ? keys.map((k) => { const duid = roomToDryDuid.get(k); return duid ? { duid, room: this._intRoomName(vac, k) } : null; })
               .filter((a): a is { duid: string; room: string } => a != null)
           : [];
+        // A both-capable robot does its dry pass first; its wet pass must wait for its
+        // OWN dry session to finish — it can't clean wet while still cleaning dry.
+        if (mode === "both" && dryAssign.has(entity)) {
+          const selfDuid = this._duidOf(vac);
+          if (selfDuid) after.push({ duid: selfDuid });
+        }
         tasks.push({ id: "wet" + j++, vacuum: entity, ...this._settingsForKind(vac, "wet"), service: cmd.service, service_data: cmd.service_data, after });
       }
     }
@@ -986,16 +1016,23 @@ export class AnyVacCard extends LitElement {
     if (!gps.length) return nothing;
     return html`
       <div style="display:flex;flex-wrap:wrap;gap:8px;padding:0 4px 4px">
-        ${gps.map((gp) => html`
-          <button @click=${() => this._runGlobalPreset(gp)}
-            style="flex:1;min-width:120px;display:flex;flex-direction:column;align-items:center;gap:2px;padding:12px 10px;border-radius:14px;cursor:pointer;border:1px solid rgba(255,255,255,0.12);background:rgba(255,255,255,0.05);color:white;font-family:inherit">
+        ${gps.map((gp) => {
+          const hid = "gp-" + gp.id;
+          return html`<button
+            class="action-btn ${this._holdId === hid ? "action-btn--holding" : ""}"
+            style="flex:1;min-width:120px;flex-direction:column;gap:2px;padding:12px 10px;background:rgba(255,255,255,0.05);border:1px solid rgba(255,255,255,0.12);color:white"
+            @pointerdown=${this._holdStart(hid, () => this._runGlobalPreset(gp))}
+            @pointerup=${this._holdEnd}
+            @pointerleave=${this._holdEnd}
+            @pointercancel=${this._holdEnd}>
+            <div class="hold-ring"></div>
             ${gp.icon ? html`<ha-icon icon=${gp.icon} style="--mdc-icon-size:26px"></ha-icon>` : nothing}
-            <span style="font-size:13px;font-weight:700">${gp.label}</span>
-            <small style="font-size:10px;color:rgba(255,255,255,0.4)">${
-              gp.scope === "all" ? "celý byt" : gp.scope === "select" ? "vybrané místnosti" : "místnosti"
+            <span>${gp.label}</span>
+            <small style="font-size:10px;color:rgba(255,255,255,0.4);position:relative;z-index:1">${
+              gp.scope === "all" ? "celý byt · podrž" : gp.scope === "select" ? "vybrané · podrž" : "podrž"
             }</small>
-          </button>
-        `)}
+          </button>`;
+        })}
       </div>
     `;
   }
