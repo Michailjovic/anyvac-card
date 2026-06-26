@@ -11,6 +11,18 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Rooms from the integration (real room polygons / names) for clickable cleaning on the floorplan.
 - Milestone 3b: companion `anyvac` integration data layers (clean-history, statistics).
 
+## [0.25.0] - 2026-06-25
+
+### Added
+
+- **Auto-mode runtime (orchestrated cleans, v1).** When `ui_mode: auto`, a bar of global-preset tiles
+  appears at the top of the card. Tapping a tile resolves its scope (whole flat / currently selected
+  rooms / fixed room keys) and **fans the rooms out across vacuums**: each room is assigned to the
+  first vacuum that owns it, those vacuums are selected and started in parallel. This is the naive v1
+  allocation — the smart optimiser (capability match, wet-after-dry timing, collision avoidance) is
+  the Level-3 backend orchestrator to follow. Per-vacuum controllers remain visible for room
+  selection and manual control.
+
 ## [0.24.0] - 2026-06-25
 
 ### Added

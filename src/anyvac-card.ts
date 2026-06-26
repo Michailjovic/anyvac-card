@@ -13,6 +13,7 @@ import type {
   NativeAutoCleanAction,
   ScriptCleanAction,
   SettingPreset,
+  GlobalPreset,
   GlobalAction,
   GlobalActionCall,
   NotifyTemplates,
@@ -865,6 +866,70 @@ export class AnyVacCard extends LitElement {
     for (const r of this._roomsFor(vac)) next.delete(vac.entity + ":" + r.key);
     this._localRoomSel = next;
     this._saveRoomSel(vac.entity);
+  }
+
+  // ── Auto mode: orchestrated cleans (naive fan-out v1) ─────────────────────
+  /** All distinct room keys across vacuums. */
+  private _allRoomKeys(): string[] {
+    const keys = new Set<string>();
+    for (const v of this._config.vacuums) for (const r of this._roomsFor(v)) keys.add(r.key);
+    return [...keys];
+  }
+  /** Naive assignment: each room key → the first vacuum (config order) that owns it.
+   *  The smart optimiser (capability match, wet-after-dry, timing) is the Level-3
+   *  backend orchestrator; this v1 just fans rooms out by ownership in parallel. */
+  private _autoAssign(roomKeys: string[]): Map<string, string[]> {
+    const out = new Map<string, string[]>();
+    for (const key of roomKeys) {
+      const owner = this._config.vacuums.find((v) => this._roomsFor(v).some((r) => r.key === key));
+      if (!owner) continue;
+      const arr = out.get(owner.entity) ?? [];
+      arr.push(key);
+      out.set(owner.entity, arr);
+    }
+    return out;
+  }
+  private async _runAutoClean(roomKeys: string[]): Promise<void> {
+    if (!roomKeys.length) return;
+    const assignment = this._autoAssign(roomKeys);
+    const sel = new Map(this._localRoomSel);
+    for (const v of this._config.vacuums) {
+      const keys = assignment.get(v.entity);
+      if (!keys) continue;
+      for (const r of this._roomsFor(v)) sel.delete(v.entity + ":" + r.key);
+      for (const k of keys) sel.set(v.entity + ":" + k, true);
+    }
+    this._localRoomSel = sel;
+    for (const v of this._config.vacuums) this._saveRoomSel(v.entity);
+    for (const v of this._config.vacuums) {
+      if (assignment.has(v.entity)) await this._startClean(v);
+    }
+  }
+  private _runGlobalPreset(gp: GlobalPreset): void {
+    let keys: string[];
+    if (Array.isArray(gp.scope)) keys = gp.scope;
+    else if (gp.scope === "all") keys = this._allRoomKeys();
+    else keys = this._allRoomKeys().filter((k) => this._isRoomSelectedAny(k, this._config.vacuums));
+    this._runAutoClean(keys);
+  }
+  private _renderAutoBar() {
+    if (this._config.ui_mode !== "auto") return nothing;
+    const gps = this._config.global_presets ?? [];
+    if (!gps.length) return nothing;
+    return html`
+      <div style="display:flex;flex-wrap:wrap;gap:8px;padding:0 4px 4px">
+        ${gps.map((gp) => html`
+          <button @click=${() => this._runGlobalPreset(gp)}
+            style="flex:1;min-width:120px;display:flex;flex-direction:column;align-items:center;gap:2px;padding:12px 10px;border-radius:14px;cursor:pointer;border:1px solid rgba(255,255,255,0.12);background:rgba(255,255,255,0.05);color:white;font-family:inherit">
+            ${gp.icon ? html`<ha-icon icon=${gp.icon} style="--mdc-icon-size:26px"></ha-icon>` : nothing}
+            <span style="font-size:13px;font-weight:700">${gp.label}</span>
+            <small style="font-size:10px;color:rgba(255,255,255,0.4)">${
+              gp.scope === "all" ? "celý byt" : gp.scope === "select" ? "vybrané místnosti" : "místnosti"
+            }</small>
+          </button>
+        `)}
+      </div>
+    `;
   }
 
   /** Setting presets for a vacuum; falls back to a single default synthesized from clean_action. */
@@ -2016,6 +2081,7 @@ export class AnyVacCard extends LitElement {
           ${this._config.vacuums.map((v, i) => this._renderBadge(v, i))}
           ${(this._config.global_actions ?? []).map((ga, i) => this._renderGlobalBadge(ga, i))}
         </div>
+        ${this._renderAutoBar()}
         ${this._config.map_mode === "merged"
           ? html`
               ${this._renderMergedMap()}
