@@ -1508,6 +1508,11 @@ export class AnyVacCardEditor extends LitElement {
             ${this._selectField<"all" | "select">("Scope", (gp.scope === "all" ? "all" : "select"),
               [{ value: "all", label: "Whole flat" }, { value: "select", label: "Pick rooms on map" }],
               v => this._setGlobalPreset(i, { scope: v }))}
+            ${this._selectField<"dry" | "wet" | "both">("Mode", gp.mode ?? "dry",
+              [{ value: "dry", label: "Dry only" },
+               { value: "wet", label: "Wet only" },
+               { value: "both", label: "Dry then wet (wet follows dry)" }],
+              v => this._setGlobalPreset(i, { mode: v }))}
           </div>
         `)}
         <button class="btn btn--add" @click=${() => this._addGlobalPreset()}>

@@ -174,6 +174,8 @@ export interface GlobalPreset {
   icon?: string;
   /** "all" = whole flat, "select" = pick rooms on the map at run time, or fixed room keys. */
   scope: "all" | "select" | string[];
+  /** dry pass only / wet pass only / dry then wet (wet follows dry per room). Default "dry". */
+  mode?: "dry" | "wet" | "both";
   /** Optional ordered steps (e.g. a dry pass then a wet pass). */
   steps?: CleanStep[];
   /** Per-preset override of the orchestrator policy. */

@@ -87,7 +87,7 @@ const t={ATTRIBUTE:1},e=t=>(...e)=>({_$litDirective$:t,values:e});let i$1 = clas
 
 const CARD_NAME = "anyvac-card";
 const EDITOR_NAME = "anyvac-card-editor";
-const CARD_VERSION = "0.26.0";
+const CARD_VERSION = "0.27.0";
 /** Server-side tracking blueprint */
 const BLUEPRINT_VERSION = "1.0.0";
 const BLUEPRINT_PATH = "anyvac_card/cleaning_tracker.yaml";
@@ -1004,13 +1004,20 @@ let AnyVacCard = class AnyVacCard extends i$2 {
                 keys.add(r.key);
         return [...keys];
     }
-    /** Naive assignment: each room key → the first vacuum (config order) that owns it.
-     *  The smart optimiser (capability match, wet-after-dry, timing) is the Level-3
-     *  backend orchestrator; this v1 just fans rooms out by ownership in parallel. */
-    _autoAssign(roomKeys) {
+    /** duid of a vacuum (from its integration sensor) — used to gate wet tasks. */
+    _duidOf(vac) {
+        const ent = vac.integration_entity;
+        return ent ? this.hass.states[ent]?.attributes?.duid : undefined;
+    }
+    /** Room name a vacuum reports for a key (must match anyvac_room_done's room). */
+    _intRoomName(vac, key) {
+        return this._roomsFor(vac).find((r) => r.key === key)?.name ?? key;
+    }
+    /** Assign each room key to the first vacuum that passes `cap` AND owns the room. */
+    _assignByCap(roomKeys, cap) {
         const out = new Map();
         for (const key of roomKeys) {
-            const owner = this._config.vacuums.find((v) => this._roomsFor(v).some((r) => r.key === key));
+            const owner = this._config.vacuums.find((v) => cap(v) && this._roomsFor(v).some((r) => r.key === key));
             if (!owner)
                 continue;
             const arr = out.get(owner.entity) ?? [];
@@ -1019,27 +1026,92 @@ let AnyVacCard = class AnyVacCard extends i$2 {
         }
         return out;
     }
-    async _runAutoClean(roomKeys) {
+    _segmentFor(vac, key) {
+        const r = this._roomsFor(vac).find((x) => x.key === key);
+        if (r?.segment_id != null)
+            return r.segment_id;
+        const ent = vac.integration_entity;
+        const rooms = ent ? this.hass.states[ent]?.attributes?.rooms : undefined;
+        const match = rooms?.find((ir) => ir.name === r?.name);
+        return match?.segment_id ?? null;
+    }
+    /** Build the clean service call for a vacuum + rooms, mirroring _startClean's strategy. */
+    _cleanCmdFor(vac, roomKeys) {
+        const ca = vac.clean_action;
+        if (!ca)
+            return null;
+        if (ca.type === "native-area") {
+            return { service: "vacuum.clean_area", service_data: {
+                    entity_id: vac.entity,
+                    cleaning_area_id: roomKeys.map((k) => {
+                        const r = this._roomsFor(vac).find((x) => x.key === k);
+                        return r?.area_id ?? this._config.area_mappings?.[k] ?? k;
+                    }),
+                } };
+        }
+        if (ca.type === "native" || ca.type === "native-auto") {
+            const segs = roomKeys.map((k) => this._segmentFor(vac, k)).filter((s) => s != null);
+            if (!segs.length)
+                return null;
+            return { service: "vacuum.send_command", service_data: {
+                    entity_id: vac.entity, command: "app_segment_clean", params: segs,
+                } };
+        }
+        return null; // script strategy is not orchestrated in v1
+    }
+    /** Pre-clean settings (mop selects + fan speed) for a kind, from the matching preset. */
+    _settingsForKind(vac, kind) {
+        const presets = this._settingPresets(vac);
+        const isWet = (p) => (p.mop_intensity != null && p.mop_intensity !== "" && p.mop_intensity !== "off") || !!p.mop_mode;
+        const pick = presets.find((p) => (kind === "wet" ? isWet(p) : !isWet(p))) ?? presets[0];
+        const ca = vac.clean_action;
+        const selects = [];
+        if (ca?.mop_mode_entity && pick.mop_mode)
+            selects.push({ entity_id: ca.mop_mode_entity, option: pick.mop_mode });
+        if (ca?.mop_intensity_entity) {
+            const opt = kind === "dry" ? (pick.mop_intensity ?? "off") : pick.mop_intensity;
+            if (opt)
+                selects.push({ entity_id: ca.mop_intensity_entity, option: opt });
+        }
+        return { selects, fan_speed: pick.suction_level };
+    }
+    /** Build a job (capability-aware assignment + dry→wet gating) and hand it to the
+     *  backend anyvac.run_job service, which executes it server-side. */
+    async _runOrchestrated(roomKeys, mode) {
         if (!roomKeys.length)
             return;
-        const assignment = this._autoAssign(roomKeys);
-        const sel = new Map(this._localRoomSel);
-        for (const v of this._config.vacuums) {
-            const keys = assignment.get(v.entity);
-            if (!keys)
-                continue;
-            for (const r of this._roomsFor(v))
-                sel.delete(v.entity + ":" + r.key);
-            for (const k of keys)
-                sel.set(v.entity + ":" + k, true);
+        const tasks = [];
+        const roomToDryDuid = new Map();
+        if (mode !== "wet") {
+            let i = 0;
+            for (const [entity, keys] of this._assignByCap(roomKeys, (v) => this._vacCleanType(v).dry)) {
+                const vac = this._config.vacuums.find((v) => v.entity === entity);
+                const cmd = vac ? this._cleanCmdFor(vac, keys) : null;
+                if (!vac || !cmd)
+                    continue;
+                tasks.push({ id: "dry" + i++, vacuum: entity, ...this._settingsForKind(vac, "dry"), service: cmd.service, service_data: cmd.service_data });
+                const duid = this._duidOf(vac);
+                for (const k of keys)
+                    roomToDryDuid.set(k, duid);
+            }
         }
-        this._localRoomSel = sel;
-        for (const v of this._config.vacuums)
-            this._saveRoomSel(v.entity);
-        for (const v of this._config.vacuums) {
-            if (assignment.has(v.entity))
-                await this._startClean(v);
+        if (mode === "wet" || mode === "both") {
+            let j = 0;
+            for (const [entity, keys] of this._assignByCap(roomKeys, (v) => this._vacCleanType(v).wet)) {
+                const vac = this._config.vacuums.find((v) => v.entity === entity);
+                const cmd = vac ? this._cleanCmdFor(vac, keys) : null;
+                if (!vac || !cmd)
+                    continue;
+                const after = mode === "both"
+                    ? keys.map((k) => { const duid = roomToDryDuid.get(k); return duid ? { duid, room: this._intRoomName(vac, k) } : null; })
+                        .filter((a) => a != null)
+                    : [];
+                tasks.push({ id: "wet" + j++, vacuum: entity, ...this._settingsForKind(vac, "wet"), service: cmd.service, service_data: cmd.service_data, after });
+            }
         }
+        if (!tasks.length)
+            return;
+        await this._call("anyvac", "run_job", { tasks });
     }
     _runGlobalPreset(gp) {
         let keys;
@@ -1049,7 +1121,7 @@ let AnyVacCard = class AnyVacCard extends i$2 {
             keys = this._allRoomKeys();
         else
             keys = this._allRoomKeys().filter((k) => this._isRoomSelectedAny(k, this._config.vacuums));
-        this._runAutoClean(keys);
+        this._runOrchestrated(keys, gp.mode ?? "dry");
     }
     _renderAutoBar() {
         if (this._config.ui_mode !== "auto")
@@ -4276,6 +4348,9 @@ let AnyVacCardEditor = class AnyVacCardEditor extends i$2 {
             ${this._textField("Label", gp.label, v => this._setGlobalPreset(i, { label: v }), "e.g. Po večeři")}
             ${this._textField("Icon", gp.icon, v => this._setGlobalPreset(i, { icon: v || undefined }), "mdi:silverware-fork-knife")}
             ${this._selectField("Scope", (gp.scope === "all" ? "all" : "select"), [{ value: "all", label: "Whole flat" }, { value: "select", label: "Pick rooms on map" }], v => this._setGlobalPreset(i, { scope: v }))}
+            ${this._selectField("Mode", gp.mode ?? "dry", [{ value: "dry", label: "Dry only" },
+            { value: "wet", label: "Wet only" },
+            { value: "both", label: "Dry then wet (wet follows dry)" }], v => this._setGlobalPreset(i, { mode: v }))}
           </div>
         `)}
         <button class="btn btn--add" @click=${() => this._addGlobalPreset()}>
