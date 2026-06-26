@@ -11,6 +11,16 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Rooms from the integration (real room polygons / names) for clickable cleaning on the floorplan.
 - Milestone 3b: companion `anyvac` integration data layers (clean-history, statistics).
 
+## [0.30.0] - 2026-06-26
+
+### Added
+
+- **Plan preview is now interactive.** The PLÁN ÚKLIDU panel gains a **Sucho / Mokro / Obojí** mode
+  toggle (shows only the relevant dry/wet rows and builds the plan for that mode) and a **hold-to-run**
+  "Spustit" button that runs exactly the previewed plan.
+- **Plan reacts to the selected vacuums.** The orchestrator and the plan now only assign rooms to the
+  vacuums whose badge is currently held/shown at the top, so you control which robots take part.
+
 ## [0.29.0] - 2026-06-26
 
 ### Added

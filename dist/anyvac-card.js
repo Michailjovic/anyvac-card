@@ -87,7 +87,7 @@ const t={ATTRIBUTE:1},e=t=>(...e)=>({_$litDirective$:t,values:e});let i$1 = clas
 
 const CARD_NAME = "anyvac-card";
 const EDITOR_NAME = "anyvac-card-editor";
-const CARD_VERSION = "0.29.0";
+const CARD_VERSION = "0.30.0";
 /** Server-side tracking blueprint */
 const BLUEPRINT_VERSION = "1.0.0";
 const BLUEPRINT_PATH = "anyvac_card/cleaning_tracker.yaml";
@@ -216,6 +216,8 @@ let AnyVacCard = class AnyVacCard extends i$2 {
         this._localRoomSel = new Map();
         /** Active setting preset per vacuum (Manual mode): vac.entity -> preset id. */
         this._activePresets = new Map();
+        /** Plan preview mode (Auto): which passes to plan/run. */
+        this._planMode = "both";
         /** Aktivní úklidy — sledování průběhu pro vyhodnocení úspěchu */
         this._inFlight = new Map();
         this._prevVacStates = new Map();
@@ -1004,6 +1006,11 @@ let AnyVacCard = class AnyVacCard extends i$2 {
                 keys.add(r.key);
         return [...keys];
     }
+    /** Vacuums the plan/orchestrator may use = the currently shown (held) badges. */
+    _planVacuums() {
+        const shown = this._config.vacuums.filter((_, i) => this._shownSet.has(i));
+        return shown.length ? shown : this._config.vacuums;
+    }
     /** duid of a vacuum (from its integration sensor) — used to gate wet tasks. */
     _duidOf(vac) {
         const ent = vac.integration_entity;
@@ -1026,12 +1033,12 @@ let AnyVacCard = class AnyVacCard extends i$2 {
     /** Distribute rooms across the capable owners to balance estimated time (LPT greedy:
      *  biggest room first → least-loaded capable owner), so the work is actually split
      *  between robots instead of dumped on the first owner. */
-    _assignByCap(roomKeys, cap) {
+    _assignByCap(roomKeys, cap, vacuums = this._config.vacuums) {
         const out = new Map();
         const load = new Map();
         const sorted = [...roomKeys].sort((a, b) => this._roomEstMax(b) - this._roomEstMax(a));
         for (const key of sorted) {
-            const owners = this._config.vacuums.filter((v) => cap(v) && this._roomsFor(v).some((r) => r.key === key));
+            const owners = vacuums.filter((v) => cap(v) && this._roomsFor(v).some((r) => r.key === key));
             if (!owners.length)
                 continue;
             let best = owners[0];
@@ -1108,7 +1115,7 @@ let AnyVacCard = class AnyVacCard extends i$2 {
         const tasks = [];
         const roomToDryDuid = new Map();
         const dryAssign = mode !== "wet"
-            ? this._assignByCap(roomKeys, (v) => this._vacCleanType(v).dry)
+            ? this._assignByCap(roomKeys, (v) => this._vacCleanType(v).dry, this._planVacuums())
             : new Map();
         let i = 0;
         for (const [entity, keys] of dryAssign) {
@@ -1123,7 +1130,7 @@ let AnyVacCard = class AnyVacCard extends i$2 {
         }
         if (mode === "wet" || mode === "both") {
             let j = 0;
-            for (const [entity, keys] of this._assignByCap(roomKeys, (v) => this._vacCleanType(v).wet)) {
+            for (const [entity, keys] of this._assignByCap(roomKeys, (v) => this._vacCleanType(v).wet, this._planVacuums())) {
                 const vac = this._config.vacuums.find((v) => v.entity === entity);
                 const cmd = vac ? this._cleanCmdFor(vac, keys) : null;
                 if (!vac || !cmd)
@@ -1161,13 +1168,19 @@ let AnyVacCard = class AnyVacCard extends i$2 {
         const n = vac.name ?? vac.entity.split(".")[1] ?? "";
         return (n.replace(/[^A-Za-z0-9]/g, "").slice(0, 2) || "??").toUpperCase();
     }
-    /** Plan preview: per selected room, which vacuum cleans it dry / wet (3 rows). */
+    /** Plan preview: per selected room, which vacuum cleans it dry / wet, with a
+     *  dry/wet/both mode toggle and a hold-to-run button. Reacts to the selected
+     *  (held) vacuum badges and the currently selected rooms. */
     _renderPlanPreview() {
         if (this._config.ui_mode !== "auto")
             return A;
         const selKeys = this._allRoomKeys().filter((k) => this._isRoomSelectedAny(k, this._config.vacuums));
         if (!selKeys.length)
             return A;
+        const mode = this._planMode;
+        const showDry = mode === "dry" || mode === "both";
+        const showWet = mode === "wet" || mode === "both";
+        const vacs = this._planVacuums();
         const invert = (m) => {
             const out = new Map();
             for (const [e, ks] of m)
@@ -1175,8 +1188,8 @@ let AnyVacCard = class AnyVacCard extends i$2 {
                     out.set(k, e);
             return out;
         };
-        const dryOf = invert(this._assignByCap(selKeys, (v) => this._vacCleanType(v).dry));
-        const wetOf = invert(this._assignByCap(selKeys, (v) => this._vacCleanType(v).wet));
+        const dryOf = invert(this._assignByCap(selKeys, (v) => this._vacCleanType(v).dry, vacs));
+        const wetOf = invert(this._assignByCap(selKeys, (v) => this._vacCleanType(v).wet, vacs));
         const roomDef = (k) => {
             for (const v of this._config.vacuums) {
                 const r = this._roomsFor(v).find((x) => x.key === k);
@@ -1192,24 +1205,43 @@ let AnyVacCard = class AnyVacCard extends i$2 {
             const c = this._color(v);
             return b `<span style="display:inline-flex;align-items:center;justify-content:center;min-width:24px;height:17px;padding:0 5px;border-radius:9px;font-size:10px;font-weight:700;color:#fff;background:${c}30;border:1px solid ${c}">${this._vacAbbrev(v)}</span>`;
         };
+        const modeBtn = (m, label) => {
+            const on = mode === m;
+            return b `<button @click=${(e) => { e.stopPropagation(); this._planMode = m; }}
+        style="padding:2px 8px;border-radius:8px;font-size:10px;font-weight:700;cursor:pointer;font-family:inherit;border:1px solid ${on ? "rgba(255,255,255,0.5)" : "rgba(255,255,255,0.15)"};background:${on ? "rgba(255,255,255,0.12)" : "transparent"};color:${on ? "#fff" : "rgba(255,255,255,0.5)"}">${label}</button>`;
+        };
+        const runHid = "plan-run";
         return b `
-      <div style="margin:0 4px 4px;padding:6px 8px;background:rgba(255,255,255,0.03);border:1px solid rgba(255,255,255,0.08);border-radius:12px">
-        <div style="font-size:9px;font-weight:600;letter-spacing:.6px;color:rgba(255,255,255,.35);margin-bottom:4px">PLÁN ÚKLIDU</div>
+      <div style="margin:0 4px 6px;padding:6px 8px;background:rgba(255,255,255,0.03);border:1px solid rgba(255,255,255,0.08);border-radius:12px;display:flex;flex-direction:column;gap:6px">
+        <div style="display:flex;align-items:center;justify-content:space-between">
+          <span style="font-size:9px;font-weight:600;letter-spacing:.6px;color:rgba(255,255,255,.35)">PLÁN ÚKLIDU</span>
+          <div style="display:flex;gap:4px">${modeBtn("dry", "Sucho")}${modeBtn("wet", "Mokro")}${modeBtn("both", "Obojí")}</div>
+        </div>
         <div style="display:flex;gap:6px;overflow-x:auto;align-items:center">
           <div style="display:flex;flex-direction:column;gap:3px;align-items:center;flex-shrink:0;padding-right:2px">
             <span style="height:18px"></span>
-            <ha-icon icon="mdi:broom" style="--mdc-icon-size:14px;color:rgba(255,255,255,.4)"></ha-icon>
-            <ha-icon icon="mdi:water" style="--mdc-icon-size:14px;color:rgba(64,169,255,.7)"></ha-icon>
+            ${showDry ? b `<ha-icon icon="mdi:broom" style="--mdc-icon-size:14px;color:rgba(255,255,255,.4)"></ha-icon>` : A}
+            ${showWet ? b `<ha-icon icon="mdi:water" style="--mdc-icon-size:14px;color:rgba(64,169,255,.7)"></ha-icon>` : A}
           </div>
           ${selKeys.map((k) => {
             const r = roomDef(k);
             return b `<div style="display:flex;flex-direction:column;align-items:center;gap:3px;min-width:32px;flex-shrink:0" title=${r?.name ?? k}>
               <ha-icon icon=${r?.icon || "mdi:floor-plan"} style="--mdc-icon-size:18px;color:rgba(255,255,255,.7)"></ha-icon>
-              ${cell(dryOf.get(k))}
-              ${cell(wetOf.get(k))}
+              ${showDry ? cell(dryOf.get(k)) : A}
+              ${showWet ? cell(wetOf.get(k)) : A}
             </div>`;
         })}
         </div>
+        <button class="action-btn ${this._holdId === runHid ? "action-btn--holding" : ""}"
+          style="flex:0 0 auto;align-self:flex-end;flex-direction:row;gap:6px;padding:7px 16px;background:rgba(82,196,26,0.14);border:1px solid rgba(82,196,26,0.55);color:#fff"
+          @pointerdown=${this._holdStart(runHid, () => this._runOrchestrated(selKeys, this._planMode))}
+          @pointerup=${this._holdEnd}
+          @pointerleave=${this._holdEnd}
+          @pointercancel=${this._holdEnd}>
+          <div class="hold-ring"></div>
+          <ha-icon icon="mdi:play" style="--mdc-icon-size:18px"></ha-icon>
+          <span style="font-size:12px">Spustit · podrž</span>
+        </button>
       </div>
     `;
     }
@@ -2856,6 +2888,9 @@ __decorate([
 __decorate([
     r()
 ], AnyVacCard.prototype, "_activePresets", void 0);
+__decorate([
+    r()
+], AnyVacCard.prototype, "_planMode", void 0);
 AnyVacCard = __decorate([
     t$1(CARD_NAME)
 ], AnyVacCard);
