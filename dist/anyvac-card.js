@@ -87,7 +87,7 @@ const t={ATTRIBUTE:1},e=t=>(...e)=>({_$litDirective$:t,values:e});let i$1 = clas
 
 const CARD_NAME = "anyvac-card";
 const EDITOR_NAME = "anyvac-card-editor";
-const CARD_VERSION = "0.33.0";
+const CARD_VERSION = "0.33.1";
 /** Server-side tracking blueprint */
 const BLUEPRINT_VERSION = "1.0.0";
 const BLUEPRINT_PATH = "anyvac_card/cleaning_tracker.yaml";
@@ -2175,7 +2175,12 @@ let AnyVacCard = class AnyVacCard extends i$2 {
     }
     /** Narrow (mobile) card → rotate the map to portrait (auto, unless disabled). */
     get _narrow() {
-        return this._config.mobile_rotate !== "off" && this._cardW > 0 && this._cardW < 500;
+        const mr = this._config.mobile_rotate;
+        if (mr === "off")
+            return false;
+        if (mr === "always" || mr === "on")
+            return true; // force (good for testing)
+        return this._cardW > 0 && this._cardW < 500; // auto: by card width
     }
     /** Wrap a map render in a 90° portrait rotation when the card is narrow. The map
      *  fills the card width and goes tall (capped), so the floorplan is readable on a
@@ -2184,7 +2189,7 @@ let AnyVacCard = class AnyVacCard extends i$2 {
         if (!this._narrow)
             return mapHtml;
         const ar = this._mapAR > 0.1 ? this._mapAR : 3.636;
-        const W = this._cardW;
+        const W = this._cardW || this.clientWidth || 360;
         const capH = (typeof window !== "undefined" ? window.innerHeight : 800) * 1.4;
         const visH = W * ar;
         const scale = visH > capH ? capH / visH : 1;
@@ -2557,7 +2562,7 @@ let AnyVacCard = class AnyVacCard extends i$2 {
             return A;
         return b `
       <ha-card>
-        ${this.editMode ? b `<div class="version-chip">v${CARD_VERSION}</div>` : A}
+        ${this.editMode ? b `<div class="version-chip">v${CARD_VERSION} · ${Math.round(this._cardW)}w</div>` : A}
         <div class="badges-row">
           ${this._config.vacuums.map((v, i) => this._renderBadge(v, i))}
           ${(this._config.global_actions ?? []).map((ga, i) => this._renderGlobalBadge(ga, i))}
@@ -2583,7 +2588,6 @@ let AnyVacCard = class AnyVacCard extends i$2 {
     `;
     }
 };
-// ── Styles ──────────────────────────────────────────────────────────────
 AnyVacCard.styles = i$5 `
     ha-card {
       position: relative;

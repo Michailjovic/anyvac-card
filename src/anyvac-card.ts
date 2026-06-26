@@ -1920,7 +1920,10 @@ export class AnyVacCard extends LitElement {
 
   /** Narrow (mobile) card → rotate the map to portrait (auto, unless disabled). */
   private get _narrow(): boolean {
-    return this._config.mobile_rotate !== "off" && this._cardW > 0 && this._cardW < 500;
+    const mr = this._config.mobile_rotate as string | undefined;
+    if (mr === "off") return false;
+    if (mr === "always" || mr === "on") return true;  // force (good for testing)
+    return this._cardW > 0 && this._cardW < 500;       // auto: by card width
   }
   /** Learn the floorplan's aspect ratio once it loads, for the rotation maths. */
   private _onFloorplanLoad = (e: Event): void => {
@@ -1936,7 +1939,7 @@ export class AnyVacCard extends LitElement {
   private _renderResponsive(mapHtml: unknown) {
     if (!this._narrow) return mapHtml;
     const ar = this._mapAR > 0.1 ? this._mapAR : 3.636;
-    const W = this._cardW;
+    const W = this._cardW || this.clientWidth || 360;
     const capH = (typeof window !== "undefined" ? window.innerHeight : 800) * 1.4;
     const visH = W * ar;
     const scale = visH > capH ? capH / visH : 1;
@@ -2328,7 +2331,7 @@ export class AnyVacCard extends LitElement {
 
     return html`
       <ha-card>
-        ${this.editMode ? html`<div class="version-chip">v${CARD_VERSION}</div>` : nothing}
+        ${this.editMode ? html`<div class="version-chip">v${CARD_VERSION} · ${Math.round(this._cardW)}w</div>` : nothing}
         <div class="badges-row">
           ${this._config.vacuums.map((v, i) => this._renderBadge(v, i))}
           ${(this._config.global_actions ?? []).map((ga, i) => this._renderGlobalBadge(ga, i))}

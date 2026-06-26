@@ -11,6 +11,15 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Rooms from the integration (real room polygons / names) for clickable cleaning on the floorplan.
 - Milestone 3b: companion `anyvac` integration data layers (clean-history, statistics).
 
+## [0.33.1] - 2026-06-26
+
+### Added
+
+- **`mobile_rotate: always`** forces the portrait rotation regardless of card width (good for testing
+  on desktop), alongside `auto` (default, width-based) and `off`. `on` is treated as `always`.
+- The edit-mode version chip now shows the **measured card width** (e.g. `v0.33.1 · 412w`), so you can
+  see what the responsive detector reads and why auto did/didn't trigger.
+
 ## [0.33.0] - 2026-06-26
 
 ### Added
