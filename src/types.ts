@@ -253,6 +253,10 @@ export interface VacuumConfig {
   path_color?: string;
   /** Integration vector: mop (wet) trace band colour (defaults to a wet blue). */
   mop_path_color?: string;
+  /** Integration vector: mop band opacity 0-100 (default 28). */
+  mop_band_opacity?: number;
+  /** Integration vector: mop band width, percent of default (default 100). */
+  mop_band_width?: number;
   /** Integration vector: path stroke width, percent of default (default 100). */
   path_width?: number;
   /** Integration vector: draw the configured robot image (vac.image) as the map marker. */

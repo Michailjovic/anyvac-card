@@ -11,6 +11,18 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Rooms from the integration (real room polygons / names) for clickable cleaning on the floorplan.
 - Milestone 3b: companion `anyvac` integration data layers (clean-history, statistics).
 
+## [0.32.0] - 2026-06-26
+
+### Added
+
+- **Mop band appearance is configurable in the GUI** (Maps tab, integration mode): Mop band colour,
+  **opacity** and **width**. Drives the wet "sheen" on the map (config keys `mop_path_color`,
+  `mop_band_opacity`, `mop_band_width`).
+- **Debug tab shows calibration diagnostics** from the integration (v0.8.0+): raw path-point counts
+  (`path pts (raw)`, `mop pts (raw)`) and `calib` — the last single-room calibration decision
+  (confirmed rooms, clean type, duration, whether it wrote and the reason), so you can see exactly
+  why an estimate did or didn't get recorded.
+
 ## [0.31.0] - 2026-06-26
 
 ### Changed

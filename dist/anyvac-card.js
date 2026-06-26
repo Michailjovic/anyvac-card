@@ -87,7 +87,7 @@ const t={ATTRIBUTE:1},e=t=>(...e)=>({_$litDirective$:t,values:e});let i$1 = clas
 
 const CARD_NAME = "anyvac-card";
 const EDITOR_NAME = "anyvac-card-editor";
-const CARD_VERSION = "0.31.0";
+const CARD_VERSION = "0.32.0";
 /** Server-side tracking blueprint */
 const BLUEPRINT_VERSION = "1.0.0";
 const BLUEPRINT_PATH = "anyvac_card/cleaning_tracker.yaml";
@@ -1989,10 +1989,11 @@ let AnyVacCard = class AnyVacCard extends i$2 {
         };
         const pw = rr * 0.35 * ((vac.path_width ?? 100) / 100);
         const sw = pw.toFixed(2);
-        const bw = (pw * 2.6).toFixed(2);
+        const bw = (pw * 2.6 * ((vac.mop_band_width ?? 100) / 100)).toFixed(2);
+        const bandOp = ((vac.mop_band_opacity ?? 28) / 100).toFixed(2);
         const wetColor = vac.mop_path_color || "#40a9ff";
         const mopBand = wetStr
-            ? w `<polyline points=${wetStr} fill="none" stroke=${wetColor} stroke-width=${bw} stroke-linejoin="round" stroke-linecap="round" opacity="0.28"></polyline>`
+            ? w `<polyline points=${wetStr} fill="none" stroke=${wetColor} stroke-width=${bw} stroke-linejoin="round" stroke-linecap="round" opacity=${bandOp}></polyline>`
             : A;
         // Thin centre line down the mop band, so the wet trace reads as a path inside the sheen.
         const mopLine = wetStr
@@ -4139,6 +4140,9 @@ let AnyVacCardEditor = class AnyVacCardEditor extends i$2 {
         ${vac.integration_entity ? b `
           ${this._textField("Path colour (hex)", vac.path_color, v => this._setVacuum(mapVac, { path_color: v || undefined }), "#69d2ff")}
           ${this._numberSlider("Path width", vac.path_width ?? 100, 20, 300, 10, v => this._setVacuum(mapVac, { path_width: v }), "%")}
+          ${this._textField("Mop band colour (hex)", vac.mop_path_color, v => this._setVacuum(mapVac, { mop_path_color: v || undefined }), "#40a9ff")}
+          ${this._numberSlider("Mop band opacity", vac.mop_band_opacity ?? 28, 0, 100, 5, v => this._setVacuum(mapVac, { mop_band_opacity: v }), "%")}
+          ${this._numberSlider("Mop band width", vac.mop_band_width ?? 100, 20, 400, 10, v => this._setVacuum(mapVac, { mop_band_width: v }), "%")}
           ${vac.image ? this._selectField("Robot image on map (uses status image)", vac.robot_image_on_map ? "yes" : "no", [{ value: "no", label: "no" }, { value: "yes", label: "yes" }], v => this._setVacuum(mapVac, { robot_image_on_map: v === "yes" })) : A}
           ${vac.robot_image_on_map ? this._numberSlider("Robot image size", vac.robot_size ?? 100, 40, 220, 10, v => this._setVacuum(mapVac, { robot_size: v }), "%") : A}
           ${vac.robot_image_on_map ? this._numberSlider("Robot image rotation", vac.robot_image_rotation ?? 0, -180, 180, 15, v => this._setVacuum(mapVac, { robot_image_rotation: v }), "°") : A}
@@ -4469,8 +4473,11 @@ let AnyVacCardEditor = class AnyVacCardEditor extends i$2 {
                     ${this._dbgRow("vacuum_room_name", at.vacuum_room_name)}
                     ${this._dbgRow("water_mode_name", ms.water_mode_name)}
                     ${this._dbgRow("fan_speed_name", ms.fan_speed_name)}
-                    ${this._dbgRow("path pts", Array.isArray(at.path) ? at.path.length : "—")}
-                    ${this._dbgRow("mop_path pts", Array.isArray(at.mop_path) ? at.mop_path.length : "—")}
+                    ${this._dbgRow("path pts (decimated)", Array.isArray(at.path) ? at.path.length : "—")}
+                    ${this._dbgRow("path pts (raw)", at.path_points)}
+                    ${this._dbgRow("mop pts (raw)", at.mop_path_points)}
+                    <div class="sub-title">calib — last single-room decision</div>
+                    <pre style=${pre}>${fmt(at.calib_debug)}</pre>
                     <div class="sub-title">rooms_estimate (per vacuum)</div>
                     <pre style=${pre}>${fmt(at.rooms_estimate)}</pre>
                     <div class="sub-title">rooms_last_cleaned (cross-vacuum)</div>

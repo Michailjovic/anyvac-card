@@ -1132,6 +1132,9 @@ export class AnyVacCardEditor extends LitElement {
         ${vac.integration_entity ? html`
           ${this._textField("Path colour (hex)", vac.path_color, v => this._setVacuum(mapVac, { path_color: v || undefined }), "#69d2ff")}
           ${this._numberSlider("Path width", vac.path_width ?? 100, 20, 300, 10, v => this._setVacuum(mapVac, { path_width: v }), "%")}
+          ${this._textField("Mop band colour (hex)", vac.mop_path_color, v => this._setVacuum(mapVac, { mop_path_color: v || undefined }), "#40a9ff")}
+          ${this._numberSlider("Mop band opacity", vac.mop_band_opacity ?? 28, 0, 100, 5, v => this._setVacuum(mapVac, { mop_band_opacity: v }), "%")}
+          ${this._numberSlider("Mop band width", vac.mop_band_width ?? 100, 20, 400, 10, v => this._setVacuum(mapVac, { mop_band_width: v }), "%")}
           ${vac.image ? this._selectField("Robot image on map (uses status image)", vac.robot_image_on_map ? "yes" : "no",
             [{ value: "no", label: "no" }, { value: "yes", label: "yes" }],
             v => this._setVacuum(mapVac, { robot_image_on_map: v === "yes" })) : nothing}
@@ -1466,8 +1469,11 @@ export class AnyVacCardEditor extends LitElement {
                     ${this._dbgRow("vacuum_room_name", at.vacuum_room_name)}
                     ${this._dbgRow("water_mode_name", ms.water_mode_name)}
                     ${this._dbgRow("fan_speed_name", ms.fan_speed_name)}
-                    ${this._dbgRow("path pts", Array.isArray(at.path) ? at.path.length : "—")}
-                    ${this._dbgRow("mop_path pts", Array.isArray(at.mop_path) ? at.mop_path.length : "—")}
+                    ${this._dbgRow("path pts (decimated)", Array.isArray(at.path) ? at.path.length : "—")}
+                    ${this._dbgRow("path pts (raw)", at.path_points)}
+                    ${this._dbgRow("mop pts (raw)", at.mop_path_points)}
+                    <div class="sub-title">calib — last single-room decision</div>
+                    <pre style=${pre}>${fmt(at.calib_debug)}</pre>
                     <div class="sub-title">rooms_estimate (per vacuum)</div>
                     <pre style=${pre}>${fmt(at.rooms_estimate)}</pre>
                     <div class="sub-title">rooms_last_cleaned (cross-vacuum)</div>

@@ -1762,10 +1762,11 @@ export class AnyVacCard extends LitElement {
     };
     const pw = rr * 0.35 * ((vac.path_width ?? 100) / 100);
     const sw = pw.toFixed(2);
-    const bw = (pw * 2.6).toFixed(2);
+    const bw = (pw * 2.6 * ((vac.mop_band_width ?? 100) / 100)).toFixed(2);
+    const bandOp = ((vac.mop_band_opacity ?? 28) / 100).toFixed(2);
     const wetColor = vac.mop_path_color || "#40a9ff";
     const mopBand = wetStr
-      ? svg`<polyline points=${wetStr} fill="none" stroke=${wetColor} stroke-width=${bw} stroke-linejoin="round" stroke-linecap="round" opacity="0.28"></polyline>`
+      ? svg`<polyline points=${wetStr} fill="none" stroke=${wetColor} stroke-width=${bw} stroke-linejoin="round" stroke-linecap="round" opacity=${bandOp}></polyline>`
       : nothing;
     // Thin centre line down the mop band, so the wet trace reads as a path inside the sheen.
     const mopLine = wetStr
