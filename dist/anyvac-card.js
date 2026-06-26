@@ -87,7 +87,7 @@ const t={ATTRIBUTE:1},e=t=>(...e)=>({_$litDirective$:t,values:e});let i$1 = clas
 
 const CARD_NAME = "anyvac-card";
 const EDITOR_NAME = "anyvac-card-editor";
-const CARD_VERSION = "0.34.1";
+const CARD_VERSION = "0.34.2";
 /** Server-side tracking blueprint */
 const BLUEPRINT_VERSION = "1.0.0";
 const BLUEPRINT_PATH = "anyvac_card/cleaning_tracker.yaml";
@@ -347,7 +347,8 @@ let AnyVacCard = class AnyVacCard extends i$2 {
         for (const vac of this._config?.vacuums ?? []) {
             for (const id of [vac.entity, vac.status_entity, vac.battery_entity,
                 vac.last_clean_entity, vac.progress_entity, vac.current_room_entity,
-                vac.error_entity, vac.map?.entity, ...Object.values(this._autoEntities(vac))]) {
+                vac.error_entity, vac.map?.entity, vac.integration_entity,
+                ...Object.values(this._autoEntities(vac))]) {
                 if (id)
                     s.add(id);
             }

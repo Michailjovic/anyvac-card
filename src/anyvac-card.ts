@@ -205,7 +205,8 @@ export class AnyVacCard extends LitElement {
     for (const vac of this._config?.vacuums ?? []) {
       for (const id of [vac.entity, vac.status_entity, vac.battery_entity,
         vac.last_clean_entity, vac.progress_entity, vac.current_room_entity,
-        vac.error_entity, vac.map?.entity, ...Object.values(this._autoEntities(vac))]) {
+        vac.error_entity, vac.map?.entity, vac.integration_entity,
+        ...Object.values(this._autoEntities(vac))]) {
         if (id) s.add(id);
       }
       for (const r of this._roomsFor(vac)) {

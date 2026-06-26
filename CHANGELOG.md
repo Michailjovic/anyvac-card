@@ -11,6 +11,16 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Rooms from the integration (real room polygons / names) for clickable cleaning on the floorplan.
 - Milestone 3b: companion `anyvac` integration data layers (clean-history, statistics).
 
+## [0.34.2] - 2026-06-27
+
+### Fixed
+
+- **Backend room selection did not redraw the card live.** The integration map sensor (which now
+  carries `selected_rooms`) was not in the card's watched-entity set, so `shouldUpdate` ignored its
+  state changes and the selection only reflected after some other watched entity changed (e.g.
+  clicking an active control). The integration entity is now watched, so a selection made on the phone
+  or PC redraws everywhere immediately.
+
 ## [0.34.1] - 2026-06-27
 
 ### Fixed
