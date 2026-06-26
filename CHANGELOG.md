@@ -11,6 +11,25 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Rooms from the integration (real room polygons / names) for clickable cleaning on the floorplan.
 - Milestone 3b: companion `anyvac` integration data layers (clean-history, statistics).
 
+## [0.29.0] - 2026-06-26
+
+### Added
+
+- **Orchestration plan preview (Auto mode).** When rooms are selected in Auto mode, a compact
+  "PLÁN ÚKLIDU" panel shows the plan as three rows: room icons (top), the vacuum assigned to the
+  **dry** pass (broom row), and the vacuum assigned to the **wet** pass (water row). Each vacuum is a
+  colour-coded 2-letter chip matching its accent, so you can see who cleans what — and judge the split
+  — before holding a tile to run.
+
+## [0.28.2] - 2026-06-26
+
+### Fixed
+
+- **Status card (the per-vacuum controller) layout restored.** A build-tooling bug dropped the
+  `.status-left` / `.vac-img` / `.status-right` / `.status-row` CSS rules, so the controller lost its
+  two-column grid (robot image left, status right) and rendered with an oversized image and stacked
+  content. The CSS is now intact again.
+
 ## [0.28.1] - 2026-06-26
 
 ### Fixed

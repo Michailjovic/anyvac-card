@@ -87,7 +87,7 @@ const t={ATTRIBUTE:1},e=t=>(...e)=>({_$litDirective$:t,values:e});let i$1 = clas
 
 const CARD_NAME = "anyvac-card";
 const EDITOR_NAME = "anyvac-card-editor";
-const CARD_VERSION = "0.28.1";
+const CARD_VERSION = "0.29.0";
 /** Server-side tracking blueprint */
 const BLUEPRINT_VERSION = "1.0.0";
 const BLUEPRINT_PATH = "anyvac_card/cleaning_tracker.yaml";
@@ -1155,6 +1155,63 @@ let AnyVacCard = class AnyVacCard extends i$2 {
         else
             keys = this._allRoomKeys().filter((k) => this._isRoomSelectedAny(k, this._config.vacuums));
         this._runOrchestrated(keys, gp.mode ?? "dry");
+    }
+    /** Two-letter abbreviation for a vacuum (fallback when no icon). */
+    _vacAbbrev(vac) {
+        const n = vac.name ?? vac.entity.split(".")[1] ?? "";
+        return (n.replace(/[^A-Za-z0-9]/g, "").slice(0, 2) || "??").toUpperCase();
+    }
+    /** Plan preview: per selected room, which vacuum cleans it dry / wet (3 rows). */
+    _renderPlanPreview() {
+        if (this._config.ui_mode !== "auto")
+            return A;
+        const selKeys = this._allRoomKeys().filter((k) => this._isRoomSelectedAny(k, this._config.vacuums));
+        if (!selKeys.length)
+            return A;
+        const invert = (m) => {
+            const out = new Map();
+            for (const [e, ks] of m)
+                for (const k of ks)
+                    out.set(k, e);
+            return out;
+        };
+        const dryOf = invert(this._assignByCap(selKeys, (v) => this._vacCleanType(v).dry));
+        const wetOf = invert(this._assignByCap(selKeys, (v) => this._vacCleanType(v).wet));
+        const roomDef = (k) => {
+            for (const v of this._config.vacuums) {
+                const r = this._roomsFor(v).find((x) => x.key === k);
+                if (r)
+                    return r;
+            }
+            return undefined;
+        };
+        const cell = (entity) => {
+            const v = this._config.vacuums.find((x) => x.entity === entity);
+            if (!v)
+                return b `<span style="font-size:11px;opacity:.25">—</span>`;
+            const c = this._color(v);
+            return b `<span style="display:inline-flex;align-items:center;justify-content:center;min-width:24px;height:17px;padding:0 5px;border-radius:9px;font-size:10px;font-weight:700;color:#fff;background:${c}30;border:1px solid ${c}">${this._vacAbbrev(v)}</span>`;
+        };
+        return b `
+      <div style="margin:0 4px 4px;padding:6px 8px;background:rgba(255,255,255,0.03);border:1px solid rgba(255,255,255,0.08);border-radius:12px">
+        <div style="font-size:9px;font-weight:600;letter-spacing:.6px;color:rgba(255,255,255,.35);margin-bottom:4px">PLÁN ÚKLIDU</div>
+        <div style="display:flex;gap:6px;overflow-x:auto;align-items:center">
+          <div style="display:flex;flex-direction:column;gap:3px;align-items:center;flex-shrink:0;padding-right:2px">
+            <span style="height:18px"></span>
+            <ha-icon icon="mdi:broom" style="--mdc-icon-size:14px;color:rgba(255,255,255,.4)"></ha-icon>
+            <ha-icon icon="mdi:water" style="--mdc-icon-size:14px;color:rgba(64,169,255,.7)"></ha-icon>
+          </div>
+          ${selKeys.map((k) => {
+            const r = roomDef(k);
+            return b `<div style="display:flex;flex-direction:column;align-items:center;gap:3px;min-width:32px;flex-shrink:0" title=${r?.name ?? k}>
+              <ha-icon icon=${r?.icon || "mdi:floor-plan"} style="--mdc-icon-size:18px;color:rgba(255,255,255,.7)"></ha-icon>
+              ${cell(dryOf.get(k))}
+              ${cell(wetOf.get(k))}
+            </div>`;
+        })}
+        </div>
+      </div>
+    `;
     }
     _renderAutoBar() {
         if (this._config.ui_mode !== "auto")
@@ -2403,6 +2460,7 @@ let AnyVacCard = class AnyVacCard extends i$2 {
           ${(this._config.global_actions ?? []).map((ga, i) => this._renderGlobalBadge(ga, i))}
         </div>
         ${this._renderAutoBar()}
+        ${this._renderPlanPreview()}
         ${this._config.map_mode === "merged"
             ? b `
               ${this._renderMergedMap()}
@@ -2594,6 +2652,66 @@ AnyVacCard.styles = i$5 `
       -webkit-backdrop-filter: blur(12px);
       border-radius: 20px;
       overflow: hidden;
+      transition: border 0.4s, box-shadow 0.4s;
+    }
+
+    .status-left {
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: flex-start;
+      padding: 4px 0 0;
+    }
+
+    .model-label {
+      font-size: 10px;
+      letter-spacing: 3px;
+      color: rgba(255, 255, 255, 0.3);
+      text-transform: uppercase;
+      text-align: center;
+      margin-bottom: -10px;
+    }
+
+    .vac-img {
+      width: 110%;
+      margin-bottom: -15px;
+      object-fit: contain;
+      display: block;
+      transition: opacity 0.5s, filter 0.5s;
+    }
+
+    .status-right {
+      display: flex;
+      flex-direction: column;
+      gap: 4px;
+    }
+
+    /* ── Status row ──────────────────────────────────────────────────── */
+    .status-row {
+      display: flex;
+      align-items: flex-start;
+      justify-content: space-between;
+      padding: 8px 12px 4px 16px;
+    }
+
+    .error-row {
+      display: flex; align-items: center; gap: 6px;
+      padding: 4px 12px 0 16px; animation: pulse-error 2s ease-in-out infinite;
+    }
+    @keyframes pulse-error { 0%,100% { opacity:1; } 50% { opacity:0.6; } }
+
+    .status-main { display: flex; flex-direction: column; gap: 2px; }
+    .status-label { font-size: 20px; font-weight: 700; }
+    .current-room { display: flex; align-items: center; gap: 3px; font-size: 11px; color: rgba(255,255,255,0.45); }
+
+    .status-meta {
+      display: flex;
+      flex-direction: column;
+      align-items: flex-end;
+      gap: 3px;
+      flex-shrink: 0;
+    }
+
     .battery { display: flex; align-items: center; gap: 3px; font-size: 11px; font-weight: 600; }
     .battery ha-icon { --mdc-icon-size: 15px; }
 

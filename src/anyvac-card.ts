@@ -1010,6 +1010,54 @@ export class AnyVacCard extends LitElement {
     else keys = this._allRoomKeys().filter((k) => this._isRoomSelectedAny(k, this._config.vacuums));
     this._runOrchestrated(keys, gp.mode ?? "dry");
   }
+  /** Two-letter abbreviation for a vacuum (fallback when no icon). */
+  private _vacAbbrev(vac: VacuumConfig): string {
+    const n = vac.name ?? vac.entity.split(".")[1] ?? "";
+    return (n.replace(/[^A-Za-z0-9]/g, "").slice(0, 2) || "??").toUpperCase();
+  }
+  /** Plan preview: per selected room, which vacuum cleans it dry / wet (3 rows). */
+  private _renderPlanPreview() {
+    if (this._config.ui_mode !== "auto") return nothing;
+    const selKeys = this._allRoomKeys().filter((k) => this._isRoomSelectedAny(k, this._config.vacuums));
+    if (!selKeys.length) return nothing;
+    const invert = (m: Map<string, string[]>) => {
+      const out = new Map<string, string>();
+      for (const [e, ks] of m) for (const k of ks) out.set(k, e);
+      return out;
+    };
+    const dryOf = invert(this._assignByCap(selKeys, (v) => this._vacCleanType(v).dry));
+    const wetOf = invert(this._assignByCap(selKeys, (v) => this._vacCleanType(v).wet));
+    const roomDef = (k: string) => {
+      for (const v of this._config.vacuums) { const r = this._roomsFor(v).find((x) => x.key === k); if (r) return r; }
+      return undefined;
+    };
+    const cell = (entity?: string) => {
+      const v = this._config.vacuums.find((x) => x.entity === entity);
+      if (!v) return html`<span style="font-size:11px;opacity:.25">—</span>`;
+      const c = this._color(v);
+      return html`<span style="display:inline-flex;align-items:center;justify-content:center;min-width:24px;height:17px;padding:0 5px;border-radius:9px;font-size:10px;font-weight:700;color:#fff;background:${c}30;border:1px solid ${c}">${this._vacAbbrev(v)}</span>`;
+    };
+    return html`
+      <div style="margin:0 4px 4px;padding:6px 8px;background:rgba(255,255,255,0.03);border:1px solid rgba(255,255,255,0.08);border-radius:12px">
+        <div style="font-size:9px;font-weight:600;letter-spacing:.6px;color:rgba(255,255,255,.35);margin-bottom:4px">PLÁN ÚKLIDU</div>
+        <div style="display:flex;gap:6px;overflow-x:auto;align-items:center">
+          <div style="display:flex;flex-direction:column;gap:3px;align-items:center;flex-shrink:0;padding-right:2px">
+            <span style="height:18px"></span>
+            <ha-icon icon="mdi:broom" style="--mdc-icon-size:14px;color:rgba(255,255,255,.4)"></ha-icon>
+            <ha-icon icon="mdi:water" style="--mdc-icon-size:14px;color:rgba(64,169,255,.7)"></ha-icon>
+          </div>
+          ${selKeys.map((k) => {
+            const r = roomDef(k);
+            return html`<div style="display:flex;flex-direction:column;align-items:center;gap:3px;min-width:32px;flex-shrink:0" title=${r?.name ?? k}>
+              <ha-icon icon=${r?.icon || "mdi:floor-plan"} style="--mdc-icon-size:18px;color:rgba(255,255,255,.7)"></ha-icon>
+              ${cell(dryOf.get(k))}
+              ${cell(wetOf.get(k))}
+            </div>`;
+          })}
+        </div>
+      </div>
+    `;
+  }
   private _renderAutoBar() {
     if (this._config.ui_mode !== "auto") return nothing;
     const gps = this._config.global_presets ?? [];
@@ -2189,6 +2237,7 @@ export class AnyVacCard extends LitElement {
           ${(this._config.global_actions ?? []).map((ga, i) => this._renderGlobalBadge(ga, i))}
         </div>
         ${this._renderAutoBar()}
+        ${this._renderPlanPreview()}
         ${this._config.map_mode === "merged"
           ? html`
               ${this._renderMergedMap()}
