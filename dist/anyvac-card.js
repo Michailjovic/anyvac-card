@@ -87,7 +87,7 @@ const t={ATTRIBUTE:1},e=t=>(...e)=>({_$litDirective$:t,values:e});let i$1 = clas
 
 const CARD_NAME = "anyvac-card";
 const EDITOR_NAME = "anyvac-card-editor";
-const CARD_VERSION = "0.28.0";
+const CARD_VERSION = "0.28.1";
 /** Server-side tracking blueprint */
 const BLUEPRINT_VERSION = "1.0.0";
 const BLUEPRINT_PATH = "anyvac_card/cleaning_tracker.yaml";
@@ -1163,20 +1163,22 @@ let AnyVacCard = class AnyVacCard extends i$2 {
         if (!gps.length)
             return A;
         return b `
-      <div style="display:flex;flex-wrap:wrap;gap:8px;padding:0 4px 4px">
+      <div style="display:flex;flex-wrap:wrap;gap:8px;padding:2px 4px 4px">
         ${gps.map((gp) => {
             const hid = "gp-" + gp.id;
             return b `<button
             class="action-btn ${this._holdId === hid ? "action-btn--holding" : ""}"
-            style="flex:1;min-width:120px;flex-direction:column;gap:2px;padding:12px 10px;background:rgba(255,255,255,0.05);border:1px solid rgba(255,255,255,0.12);color:white"
+            style="flex:0 1 auto;min-width:128px;flex-direction:row;justify-content:flex-start;gap:10px;padding:9px 14px;background:rgba(255,255,255,0.05);border:1px solid rgba(255,255,255,0.12);color:white"
             @pointerdown=${this._holdStart(hid, () => this._runGlobalPreset(gp))}
             @pointerup=${this._holdEnd}
             @pointerleave=${this._holdEnd}
             @pointercancel=${this._holdEnd}>
             <div class="hold-ring"></div>
-            ${gp.icon ? b `<ha-icon icon=${gp.icon} style="--mdc-icon-size:26px"></ha-icon>` : A}
-            <span>${gp.label}</span>
-            <small style="font-size:10px;color:rgba(255,255,255,0.4);position:relative;z-index:1">${gp.scope === "all" ? "celý byt · podrž" : gp.scope === "select" ? "vybrané · podrž" : "podrž"}</small>
+            <ha-icon icon=${gp.icon || "mdi:robot-vacuum-variant"} style="--mdc-icon-size:24px"></ha-icon>
+            <div style="display:flex;flex-direction:column;align-items:flex-start;line-height:1.15;position:relative;z-index:1">
+              <span>${gp.label}</span>
+              <small style="font-size:9px;font-weight:600;letter-spacing:.4px;color:rgba(255,255,255,0.4)">${gp.scope === "all" ? "CELÝ BYT · PODRŽ" : gp.scope === "select" ? "VYBRANÉ · PODRŽ" : "PODRŽ"}</small>
+            </div>
           </button>`;
         })}
       </div>
@@ -2592,14 +2594,6 @@ AnyVacCard.styles = i$5 `
       -webkit-backdrop-filter: blur(12px);
       border-radius: 20px;
       overflow: hidden;
-      transition: border 0.4s, box-shadow 0.4s;
-    }
-
-    .status-left {
-      display: flex;
-      flex-direction: column;
-      align-items: center;
-      justify-content: flex-start;
     .battery { display: flex; align-items: center; gap: 3px; font-size: 11px; font-weight: 600; }
     .battery ha-icon { --mdc-icon-size: 15px; }
 

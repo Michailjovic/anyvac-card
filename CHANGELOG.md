@@ -11,6 +11,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Rooms from the integration (real room polygons / names) for clickable cleaning on the floorplan.
 - Milestone 3b: companion `anyvac` integration data layers (clean-history, statistics).
 
+## [0.28.1] - 2026-06-26
+
+### Fixed
+
+- **Auto global-preset tiles no longer stretch into a full-width banner.** They had `flex: 1`, so a
+  single global preset filled the whole row and looked broken. They are now compact, content-sized
+  tiles (icon + label + hold hint) that wrap, keeping the controller area tidy.
+
 ## [0.28.0] - 2026-06-26
 
 ### Fixed
