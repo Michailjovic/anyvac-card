@@ -11,6 +11,17 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Rooms from the integration (real room polygons / names) for clickable cleaning on the floorplan.
 - Milestone 3b: companion `anyvac` integration data layers (clean-history, statistics).
 
+## [0.33.0] - 2026-06-26
+
+### Added
+
+- **Responsive mobile map (experimental).** On a narrow card width (< 500 px, auto-detected via a
+  ResizeObserver) the wide floorplan is **rotated to portrait** so it fills the card width and is
+  readable on a phone instead of a thin letterbox. The map aspect is learned from the floorplan image
+  (falls back to the default landscape ratio); the rotated height is capped so it can't run away on
+  small screens. Disable with `mobile_rotate: off`. Controls outside the map (tools, status) stay
+  upright; the in-map layer toggles rotate with the map for now (polish to follow).
+
 ## [0.32.0] - 2026-06-26
 
 ### Added

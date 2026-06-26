@@ -93,6 +93,10 @@ export class AnyVacCard extends LitElement {
   @state() private _planMode: "dry" | "wet" | "both" = "both";
   /** Currently selected global preset id (Auto): tiles select, the plan runs. */
   @state() private _activeGlobalPreset: string | null = null;
+  /** Responsive: measured card width + map aspect ratio (W/H) for portrait rotation. */
+  @state() private _cardW = 0;
+  @state() private _mapAR = 3.636;
+  private _ro: ResizeObserver | null = null;
   /** Aktivní úklidy — sledování průběhu pro vyhodnocení úspěchu */
   private _inFlight = new Map<string, InFlightCleaning>();
   private _prevVacStates = new Map<string, string>();
@@ -155,11 +159,19 @@ export class AnyVacCard extends LitElement {
     super.connectedCallback();
     this.style.setProperty("--hold-ms", HOLD_DURATION_MS + "ms");
     this._ensureSubscribed();
+    if (!this._ro && typeof ResizeObserver !== "undefined") {
+      this._ro = new ResizeObserver((entries) => {
+        const w = Math.round(entries[0]?.contentRect.width ?? 0);
+        if (w && Math.abs(w - this._cardW) >= 2) this._cardW = w;
+      });
+      this._ro.observe(this);
+    }
   }
 
   disconnectedCallback(): void {
     super.disconnectedCallback();
     this._cancelHold();
+    if (this._ro) { this._ro.disconnect(); this._ro = null; }
     if (this._unsubEvents) {
       this._unsubEvents.then((unsub) => unsub()).catch(() => { /* connection gone */ });
       this._unsubEvents = null;
@@ -1906,6 +1918,39 @@ export class AnyVacCard extends LitElement {
     return this._mergedRoomDefs(shown).map(({ r, v }) => this._renderRoomOverlay(r, v, { vacs: shown }));
   }
 
+  /** Narrow (mobile) card → rotate the map to portrait (auto, unless disabled). */
+  private get _narrow(): boolean {
+    return this._config.mobile_rotate !== "off" && this._cardW > 0 && this._cardW < 500;
+  }
+  /** Learn the floorplan's aspect ratio once it loads, for the rotation maths. */
+  private _onFloorplanLoad = (e: Event): void => {
+    const img = e.target as HTMLImageElement;
+    if (img?.naturalWidth && img.naturalHeight) {
+      const ar = img.naturalWidth / img.naturalHeight;
+      if (ar > 0.1 && Math.abs(ar - this._mapAR) > 0.01) this._mapAR = ar;
+    }
+  };
+  /** Wrap a map render in a 90° portrait rotation when the card is narrow. The map
+   *  fills the card width and goes tall (capped), so the floorplan is readable on a
+   *  phone instead of a thin letterbox. Controls outside the map-wrap stay upright. */
+  private _renderResponsive(mapHtml: unknown) {
+    if (!this._narrow) return mapHtml;
+    const ar = this._mapAR > 0.1 ? this._mapAR : 3.636;
+    const W = this._cardW;
+    const capH = (typeof window !== "undefined" ? window.innerHeight : 800) * 1.4;
+    const visH = W * ar;
+    const scale = visH > capH ? capH / visH : 1;
+    const rW = Math.round(W * scale);
+    const rH = Math.round(visH * scale);
+    return html`
+      <div style="position:relative;width:${rW}px;height:${rH}px;margin:0 auto;overflow:hidden">
+        <div style="position:absolute;top:0;left:0;width:${rH}px;height:${rW}px;transform-origin:top left;transform:translateX(${rW}px) rotate(90deg)">
+          ${mapHtml}
+        </div>
+      </div>
+    `;
+  }
+
   private _renderMergedMap() {
     const shown = [...this._shownSet].filter((i) => i < this._config.vacuums.length).map((i) => this._config.vacuums[i]);
     if (!shown.length) return nothing;
@@ -1920,7 +1965,7 @@ export class AnyVacCard extends LitElement {
     return html`
       <div class="map-wrap ${wrapClass}" style=${wrapStyle}>
         ${hasImage ? html`
-          <img class="${imgClass}" src=${ib!.src!} alt="Floorplan"
+          <img class="${imgClass}" src=${ib!.src!} alt="Floorplan" @load=${this._onFloorplanLoad}
             style=${styleMap({
               transform: "translate(" + (ib?.offset_x ?? 0) + "%," + (ib?.offset_y ?? 0) + "%) rotate(" + (ib?.rotation ?? 0) + "deg) scale(" + ((ib?.scale ?? 100) / 100) + ")",
             })} />
@@ -1965,7 +2010,7 @@ export class AnyVacCard extends LitElement {
     return html`
       <div class="map-wrap ${wrapClass}" style=${wrapStyle}>
         ${showImage ? html`
-          <img class="${imgClass}" src=${imgSrc!} alt="Floorplan"
+          <img class="${imgClass}" src=${imgSrc!} alt="Floorplan" @load=${this._onFloorplanLoad}
             style=${styleMap({
               transform: "translate(" + (ib?.offset_x ?? 0) + "%," + (ib?.offset_y ?? 0) + "%) rotate(" + (ib?.rotation ?? 0) + "deg) scale(" + ((ib?.scale ?? 100) / 100) + ")",
             })} />
@@ -2292,7 +2337,7 @@ export class AnyVacCard extends LitElement {
         ${this._renderPlanPreview()}
         ${this._config.map_mode === "merged"
           ? html`
-              ${this._renderMergedMap()}
+              ${this._renderResponsive(this._renderMergedMap())}
               ${[...this._shownSet].filter(i => i < this._config.vacuums.length).map(i => html`
                 ${this._renderMapTools(this._config.vacuums[i])}
                 ${this._renderStatusCard(this._config.vacuums[i], i)}
@@ -2301,7 +2346,7 @@ export class AnyVacCard extends LitElement {
           : [...this._shownSet]
               .filter(i => i < this._config.vacuums.length)
               .map(i => html`
-                ${this._renderMap(this._config.vacuums[i])}
+                ${this._renderResponsive(this._renderMap(this._config.vacuums[i]))}
                 ${this._renderMapTools(this._config.vacuums[i])}
                 ${this._renderStatusCard(this._config.vacuums[i], i)}
               `)}

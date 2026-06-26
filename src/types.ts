@@ -373,6 +373,8 @@ export interface AnyVacCardConfig {
   backend?: BackendConfig;
   /** Controller surface: "auto" = single orchestrated controller, "manual" = per-robot controllers. Default auto. */
   ui_mode?: "auto" | "manual";
+  /** On a narrow (mobile) card width, rotate the map to portrait. "auto" (default) / "off". */
+  mobile_rotate?: "auto" | "off";
   /** Card-level targeted cleans for Auto mode (orchestrated across robots). */
   global_presets?: GlobalPreset[];
   /** Default orchestrator policy (overridable per global preset). */
