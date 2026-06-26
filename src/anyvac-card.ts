@@ -178,6 +178,13 @@ export class AnyVacCard extends LitElement {
     }
   }
 
+  protected firstUpdated(): void {
+    // Seed the width immediately; the ResizeObserver may not fire before the
+    // first paint (and never fires if the host has no layout box yet).
+    const w = Math.round(this.getBoundingClientRect().width);
+    if (w) this._cardW = w;
+  }
+
   /**
    * Re-render only when a relevant entity changed — the hass object is
    * replaced on every state change anywhere in HA.
@@ -2397,6 +2404,11 @@ export class AnyVacCard extends LitElement {
   // ── Styles ──────────────────────────────────────────────────────────────
 
   static styles = css`
+    :host {
+      display: block;
+      width: 100%;
+    }
+
     ha-card {
       position: relative;
       background: transparent;

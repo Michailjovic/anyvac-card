@@ -11,6 +11,15 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Rooms from the integration (real room polygons / names) for clickable cleaning on the floorplan.
 - Milestone 3b: companion `anyvac` integration data layers (clean-history, statistics).
 
+## [0.34.1] - 2026-06-27
+
+### Fixed
+
+- **Card width measured 0 (`0w` chip, `mobile_rotate: auto` never triggering).** The host element had
+  no block layout box, so the `ResizeObserver` read a `contentRect` width of 0. The host is now
+  `display: block` and the width is also seeded from `getBoundingClientRect()` on first render, so the
+  measured width is correct and width-based portrait auto-rotation works.
+
 ## [0.34.0] - 2026-06-26
 
 ### Changed

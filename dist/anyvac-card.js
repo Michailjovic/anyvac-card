@@ -87,7 +87,7 @@ const t={ATTRIBUTE:1},e=t=>(...e)=>({_$litDirective$:t,values:e});let i$1 = clas
 
 const CARD_NAME = "anyvac-card";
 const EDITOR_NAME = "anyvac-card-editor";
-const CARD_VERSION = "0.34.0";
+const CARD_VERSION = "0.34.1";
 /** Server-side tracking blueprint */
 const BLUEPRINT_VERSION = "1.0.0";
 const BLUEPRINT_PATH = "anyvac_card/cleaning_tracker.yaml";
@@ -316,6 +316,13 @@ let AnyVacCard = class AnyVacCard extends i$2 {
             this._unsubEvents.then((unsub) => unsub()).catch(() => { });
             this._unsubEvents = null;
         }
+    }
+    firstUpdated() {
+        // Seed the width immediately; the ResizeObserver may not fire before the
+        // first paint (and never fires if the host has no layout box yet).
+        const w = Math.round(this.getBoundingClientRect().width);
+        if (w)
+            this._cardW = w;
     }
     /**
      * Re-render only when a relevant entity changed — the hass object is
@@ -2638,6 +2645,11 @@ let AnyVacCard = class AnyVacCard extends i$2 {
 };
 // ── Styles ──────────────────────────────────────────────────────────────
 AnyVacCard.styles = i$5 `
+    :host {
+      display: block;
+      width: 100%;
+    }
+
     ha-card {
       position: relative;
       background: transparent;
