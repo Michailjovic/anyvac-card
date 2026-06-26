@@ -87,7 +87,7 @@ const t={ATTRIBUTE:1},e=t=>(...e)=>({_$litDirective$:t,values:e});let i$1 = clas
 
 const CARD_NAME = "anyvac-card";
 const EDITOR_NAME = "anyvac-card-editor";
-const CARD_VERSION = "0.25.0";
+const CARD_VERSION = "0.26.0";
 /** Server-side tracking blueprint */
 const BLUEPRINT_VERSION = "1.0.0";
 const BLUEPRINT_PATH = "anyvac_card/cleaning_tracker.yaml";
@@ -4203,6 +4203,55 @@ let AnyVacCardEditor = class AnyVacCardEditor extends i$2 {
         return lines.join("\n");
     }
     // ── Tab: Global ───────────────────────────────────────────────────────────
+    _dbgRow(label, value) {
+        return b `<div class="field field--row">
+      <label>${label}</label>
+      <span style="font-size:12px;font-family:monospace;word-break:break-all">${value === undefined || value === null || value === "" ? "—" : String(value)}</span>
+    </div>`;
+    }
+    _renderDebugTab() {
+        const fmt = (v) => { try {
+            return JSON.stringify(v, null, 1);
+        }
+        catch {
+            return String(v);
+        } };
+        const pre = "font-size:11px;font-family:monospace;white-space:pre-wrap;word-break:break-all;background:rgba(127,127,127,0.12);padding:6px;border-radius:6px;margin:0;max-height:220px;overflow:auto";
+        return b `
+      <div class="tab-body">
+        <p class="hint">Live values from Home Assistant, read-only — to check the integration is writing data correctly.</p>
+        ${this._config.vacuums.map((vac) => {
+            const ie = vac.integration_entity;
+            const st = ie ? this.hass.states[ie] : undefined;
+            const at = (st?.attributes ?? {});
+            const ms = (at.mop_signal ?? {});
+            return b `
+            <div class="section-title">${vac.name ?? vac.entity}</div>
+            <div class="sub-section">
+              ${!ie
+                ? b `<p class="hint">No <code>integration_entity</code> set — backend values unavailable.</p>`
+                : !st
+                    ? b `<p class="hint">Sensor <code>${ie}</code> not found.</p>`
+                    : b `
+                    ${this._dbgRow("sensor", `${ie} = ${st.state}`)}
+                    ${this._dbgRow("clean_type", at.clean_type)}
+                    ${this._dbgRow("in_cleaning", at.in_cleaning)}
+                    ${this._dbgRow("vacuum_room_name", at.vacuum_room_name)}
+                    ${this._dbgRow("water_mode_name", ms.water_mode_name)}
+                    ${this._dbgRow("fan_speed_name", ms.fan_speed_name)}
+                    ${this._dbgRow("path pts", Array.isArray(at.path) ? at.path.length : "—")}
+                    ${this._dbgRow("mop_path pts", Array.isArray(at.mop_path) ? at.mop_path.length : "—")}
+                    <div class="sub-title">rooms_estimate (per vacuum)</div>
+                    <pre style=${pre}>${fmt(at.rooms_estimate)}</pre>
+                    <div class="sub-title">rooms_last_cleaned (cross-vacuum)</div>
+                    <pre style=${pre}>${fmt(at.rooms_last_cleaned)}</pre>
+                    <details><summary class="hint" style="cursor:pointer">Raw attributes</summary><pre style=${pre}>${fmt(at)}</pre></details>
+                  `}
+            </div>`;
+        })}
+      </div>
+    `;
+    }
     _renderGlobalTab() {
         const globals = this._config.global_actions ?? [];
         const ths = this._config.room_thresholds ?? DEFAULT_THRESHOLDS;
@@ -4639,15 +4688,16 @@ let AnyVacCardEditor = class AnyVacCardEditor extends i$2 {
       <datalist id="ha-entities"></datalist>
       <div class="editor-root">
         <div class="tabs-bar">
-          ${["vacuums", "maps", "global"].map(t => b `
+          ${["vacuums", "maps", "global", "debug"].map(t => b `
             <button class="tab-btn ${this._tab === t ? "tab-btn--active" : ""}"
               @click=${() => { this._tab = t; }}>
-              ${{ vacuums: "🤖 Vacuums", maps: "🗺 Maps", global: "⚙ Global" }[t]}
+              ${{ vacuums: "🤖 Vacuums", maps: "🗺 Maps", global: "⚙ Global", debug: "🐞 Debug" }[t]}
             </button>`)}
         </div>
         ${this._tab === "vacuums" ? this._renderVacuumsTab()
             : this._tab === "maps" ? this._renderMapsTab()
-                : this._renderGlobalTab()}
+                : this._tab === "debug" ? this._renderDebugTab()
+                    : this._renderGlobalTab()}
         <div class="editor-footer">anyvac-card v${CARD_VERSION}</div>
       </div>`;
     }

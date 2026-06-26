@@ -11,6 +11,16 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Rooms from the integration (real room polygons / names) for clickable cleaning on the floorplan.
 - Milestone 3b: companion `anyvac` integration data layers (clean-history, statistics).
 
+## [0.26.0] - 2026-06-26
+
+### Added
+
+- **Debug tab in the editor.** A new "🐞 Debug" tab shows the live, read-only values each vacuum's
+  integration sensor is publishing — `clean_type`, `in_cleaning`, `vacuum_room_name`,
+  `water_mode_name`, `fan_speed_name`, path / mop_path point counts, and the full `rooms_estimate` and
+  `rooms_last_cleaned` payloads (plus a raw-attributes dump) — so you can verify the backend is
+  writing data correctly without digging through Developer Tools.
+
 ## [0.25.0] - 2026-06-25
 
 ### Added
