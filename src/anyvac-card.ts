@@ -91,6 +91,8 @@ export class AnyVacCard extends LitElement {
   @state() private _activePresets = new Map<string, string>();
   /** Plan preview mode (Auto): which passes to plan/run. */
   @state() private _planMode: "dry" | "wet" | "both" = "both";
+  /** Currently selected global preset id (Auto): tiles select, the plan runs. */
+  @state() private _activeGlobalPreset: string | null = null;
   /** Aktivní úklidy — sledování průběhu pro vyhodnocení úspěchu */
   private _inFlight = new Map<string, InFlightCleaning>();
   private _prevVacStates = new Map<string, string>();
@@ -935,9 +937,10 @@ export class AnyVacCard extends LitElement {
     return (match?.segment_id as number | undefined) ?? null;
   }
   /** Build the clean service call for a vacuum + rooms, mirroring _startClean's strategy. */
-  private _cleanCmdFor(vac: VacuumConfig, roomKeys: string[]): { service: string; service_data: Record<string, unknown> } | null {
+  private _cleanCmdFor(vac: VacuumConfig, roomKeys: string[], repeat = 1): { service: string; service_data: Record<string, unknown> } | null {
     const ca = vac.clean_action;
     if (!ca) return null;
+    const rep = Math.max(1, Math.round(repeat));
     if (ca.type === "native-area") {
       return { service: "vacuum.clean_area", service_data: {
         entity_id: vac.entity,
@@ -951,13 +954,14 @@ export class AnyVacCard extends LitElement {
       const segs = roomKeys.map((k) => this._segmentFor(vac, k)).filter((s): s is number => s != null);
       if (!segs.length) return null;
       return { service: "vacuum.send_command", service_data: {
-        entity_id: vac.entity, command: "app_segment_clean", params: segs,
+        entity_id: vac.entity, command: "app_segment_clean",
+        params: [{ segments: segs, repeat: rep }],
       }};
     }
     return null; // script strategy is not orchestrated in v1
   }
   /** Pre-clean settings (mop selects + fan speed) for a kind, from the matching preset. */
-  private _settingsForKind(vac: VacuumConfig, kind: "dry" | "wet"): { selects: Array<{ entity_id: string; option: string }>; fan_speed?: string } {
+  private _settingsForKind(vac: VacuumConfig, kind: "dry" | "wet"): { selects: Array<{ entity_id: string; option: string }>; fan_speed?: string; repeat: number } {
     const presets = this._settingPresets(vac);
     const isWet = (p: SettingPreset) => (p.mop_intensity != null && p.mop_intensity !== "" && p.mop_intensity !== "off") || !!p.mop_mode;
     const pick = presets.find((p) => (kind === "wet" ? isWet(p) : !isWet(p))) ?? presets[0];
@@ -972,7 +976,8 @@ export class AnyVacCard extends LitElement {
       const opt = kind === "dry" ? "off" : pick.mop_intensity;
       if (opt) selects.push({ entity_id: ca.mop_intensity_entity, option: opt });
     }
-    return { selects, fan_speed: pick.suction_level };
+    const ca2 = vac.clean_action as Partial<NativeAutoCleanAction> | undefined;
+    return { selects, fan_speed: pick.suction_level, repeat: pick.repeat ?? ca2?.repeat ?? 1 };
   }
   /** Build a job (capability-aware assignment + dry→wet gating) and hand it to the
    *  backend anyvac.run_job service, which executes it server-side. */
@@ -986,9 +991,11 @@ export class AnyVacCard extends LitElement {
     let i = 0;
     for (const [entity, keys] of dryAssign) {
       const vac = this._config.vacuums.find((v) => v.entity === entity);
-      const cmd = vac ? this._cleanCmdFor(vac, keys) : null;
-      if (!vac || !cmd) continue;
-      tasks.push({ id: "dry" + i++, vacuum: entity, ...this._settingsForKind(vac, "dry"), service: cmd.service, service_data: cmd.service_data });
+      if (!vac) continue;
+      const s = this._settingsForKind(vac, "dry");
+      const cmd = this._cleanCmdFor(vac, keys, s.repeat);
+      if (!cmd) continue;
+      tasks.push({ id: "dry" + i++, vacuum: entity, selects: s.selects, fan_speed: s.fan_speed, service: cmd.service, service_data: cmd.service_data });
       const duid = this._duidOf(vac);
       for (const k of keys) roomToDryDuid.set(k, duid);
     }
@@ -996,8 +1003,10 @@ export class AnyVacCard extends LitElement {
       let j = 0;
       for (const [entity, keys] of this._assignByCap(roomKeys, (v) => this._vacCleanType(v).wet, this._planVacuums())) {
         const vac = this._config.vacuums.find((v) => v.entity === entity);
-        const cmd = vac ? this._cleanCmdFor(vac, keys) : null;
-        if (!vac || !cmd) continue;
+        if (!vac) continue;
+        const s = this._settingsForKind(vac, "wet");
+        const cmd = this._cleanCmdFor(vac, keys, s.repeat);
+        if (!cmd) continue;
         const after: Array<{ duid: string; room?: string }> = mode === "both"
           ? keys.map((k) => { const duid = roomToDryDuid.get(k); return duid ? { duid, room: this._intRoomName(vac, k) } : null; })
               .filter((a): a is { duid: string; room: string } => a != null)
@@ -1008,18 +1017,28 @@ export class AnyVacCard extends LitElement {
           const selfDuid = this._duidOf(vac);
           if (selfDuid) after.push({ duid: selfDuid });
         }
-        tasks.push({ id: "wet" + j++, vacuum: entity, ...this._settingsForKind(vac, "wet"), service: cmd.service, service_data: cmd.service_data, after });
+        tasks.push({ id: "wet" + j++, vacuum: entity, selects: s.selects, fan_speed: s.fan_speed, service: cmd.service, service_data: cmd.service_data, after });
       }
     }
     if (!tasks.length) return;
     await this._call("anyvac", "run_job", { tasks });
   }
-  private _runGlobalPreset(gp: GlobalPreset): void {
-    let keys: string[];
-    if (Array.isArray(gp.scope)) keys = gp.scope;
-    else if (gp.scope === "all") keys = this._allRoomKeys();
-    else keys = this._allRoomKeys().filter((k) => this._isRoomSelectedAny(k, this._config.vacuums));
-    this._runOrchestrated(keys, gp.mode ?? "dry");
+  /** Select a global preset (does NOT run): set the plan mode + apply its room scope,
+   *  so the plan preview reflects it. The user runs it via the plan's "Spustit". */
+  private _selectGlobalPreset(gp: GlobalPreset): void {
+    this._activeGlobalPreset = gp.id;
+    if (gp.mode) this._planMode = gp.mode;
+    if (gp.scope === "all" || Array.isArray(gp.scope)) {
+      const keys = gp.scope === "all" ? this._allRoomKeys() : gp.scope;
+      const sel = new Map(this._localRoomSel);
+      for (const v of this._config.vacuums) for (const r of this._roomsFor(v)) sel.delete(v.entity + ":" + r.key);
+      for (const k of keys) for (const v of this._config.vacuums) {
+        if (this._roomsFor(v).some((r) => r.key === k)) sel.set(v.entity + ":" + k, true);
+      }
+      this._localRoomSel = sel;
+      for (const v of this._config.vacuums) this._saveRoomSel(v.entity);
+    }
+    // scope "select" → keep the user's current room selection
   }
   /** Two-letter abbreviation for a vacuum (fallback when no icon). */
   private _vacAbbrev(vac: VacuumConfig): string {
@@ -1034,6 +1053,7 @@ export class AnyVacCard extends LitElement {
     const selKeys = this._allRoomKeys().filter((k) => this._isRoomSelectedAny(k, this._config.vacuums));
     if (!selKeys.length) return nothing;
     const mode = this._planMode;
+    const apLabel = (this._config.global_presets ?? []).find((g) => g.id === this._activeGlobalPreset)?.label;
     const showDry = mode === "dry" || mode === "both";
     const showWet = mode === "wet" || mode === "both";
     const vacs = this._planVacuums();
@@ -1063,7 +1083,7 @@ export class AnyVacCard extends LitElement {
     return html`
       <div style="margin:0 4px 6px;padding:6px 8px;background:rgba(255,255,255,0.03);border:1px solid rgba(255,255,255,0.08);border-radius:12px;display:flex;flex-direction:column;gap:6px">
         <div style="display:flex;align-items:center;justify-content:space-between">
-          <span style="font-size:9px;font-weight:600;letter-spacing:.6px;color:rgba(255,255,255,.35)">PLÁN ÚKLIDU</span>
+          <span style="font-size:9px;font-weight:600;letter-spacing:.6px;color:rgba(255,255,255,.35)">PLÁN ÚKLIDU${apLabel ? " · " + apLabel.toUpperCase() : ""}</span>
           <div style="display:flex;gap:4px">${modeBtn("dry", "Sucho")}${modeBtn("wet", "Mokro")}${modeBtn("both", "Obojí")}</div>
         </div>
         <div style="display:flex;gap:6px;overflow-x:auto;align-items:center">
@@ -1101,21 +1121,16 @@ export class AnyVacCard extends LitElement {
     return html`
       <div style="display:flex;flex-wrap:wrap;gap:8px;padding:2px 4px 4px">
         ${gps.map((gp) => {
-          const hid = "gp-" + gp.id;
+          const active = this._activeGlobalPreset === gp.id;
           return html`<button
-            class="action-btn ${this._holdId === hid ? "action-btn--holding" : ""}"
-            style="flex:0 1 auto;min-width:128px;flex-direction:row;justify-content:flex-start;gap:10px;padding:9px 14px;background:rgba(255,255,255,0.05);border:1px solid rgba(255,255,255,0.12);color:white"
-            @pointerdown=${this._holdStart(hid, () => this._runGlobalPreset(gp))}
-            @pointerup=${this._holdEnd}
-            @pointerleave=${this._holdEnd}
-            @pointercancel=${this._holdEnd}>
-            <div class="hold-ring"></div>
+            @click=${() => this._selectGlobalPreset(gp)}
+            style="flex:0 1 auto;min-width:128px;display:flex;flex-direction:row;align-items:center;justify-content:flex-start;gap:10px;padding:9px 14px;border-radius:14px;cursor:pointer;font-family:inherit;color:white;background:${active ? "rgba(82,196,26,0.14)" : "rgba(255,255,255,0.05)"};border:1px solid ${active ? "rgba(82,196,26,0.6)" : "rgba(255,255,255,0.12)"}">
             <ha-icon icon=${gp.icon || "mdi:robot-vacuum-variant"} style="--mdc-icon-size:24px"></ha-icon>
-            <div style="display:flex;flex-direction:column;align-items:flex-start;line-height:1.15;position:relative;z-index:1">
-              <span>${gp.label}</span>
+            <div style="display:flex;flex-direction:column;align-items:flex-start;line-height:1.15">
+              <span style="font-size:13px;font-weight:700">${gp.label}</span>
               <small style="font-size:9px;font-weight:600;letter-spacing:.4px;color:rgba(255,255,255,0.4)">${
-                gp.scope === "all" ? "CELÝ BYT · PODRŽ" : gp.scope === "select" ? "VYBRANÉ · PODRŽ" : "PODRŽ"
-              }</small>
+                gp.scope === "all" ? "CELÝ BYT" : gp.scope === "select" ? "VYBRANÉ" : "MÍSTNOSTI"
+              }${gp.mode ? " · " + (gp.mode === "dry" ? "SUCHO" : gp.mode === "wet" ? "MOKRO" : "OBOJÍ") : ""}</small>
             </div>
           </button>`;
         })}

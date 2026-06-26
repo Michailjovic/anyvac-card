@@ -11,6 +11,21 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Rooms from the integration (real room polygons / names) for clickable cleaning on the floorplan.
 - Milestone 3b: companion `anyvac` integration data layers (clean-history, statistics).
 
+## [0.31.0] - 2026-06-26
+
+### Changed
+
+- **Global preset tiles now select, they don't run.** Tapping a tile selects it (highlights it, sets
+  the plan mode and applies its room scope) and the plan preview shows the active preset's name; the
+  clean is started from the plan's "Spustit · podrž" button. Cleaner separation of choosing vs running.
+
+### Fixed
+
+- **Orchestrated cleans now honour the repeat count.** The `app_segment_clean` command was sent
+  without a repeat, so every orchestrated clean did a single pass. It now sends
+  `params: [{ segments, repeat }]` with the pass count taken from the matching setting preset (or the
+  clean action), so multi-pass cleans work. (native/native-auto; native-area repeat stays software.)
+
 ## [0.30.0] - 2026-06-26
 
 ### Added
