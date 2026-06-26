@@ -11,6 +11,16 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Rooms from the integration (real room polygons / names) for clickable cleaning on the floorplan.
 - Milestone 3b: companion `anyvac` integration data layers (clean-history, statistics).
 
+## [0.34.0] - 2026-06-26
+
+### Changed
+
+- **Room selection is now shared via the backend** (integration v0.9.0+). When the companion
+  integration is present, selecting rooms reads/writes the backend `selected_rooms` (via the
+  `anyvac.select_rooms` service) instead of per-browser local state, so phone and PC show the same
+  selection and it feeds the orchestrator. Falls back to local per-browser state when no integration
+  is configured.
+
 ## [0.33.1] - 2026-06-26
 
 ### Added

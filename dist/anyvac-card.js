@@ -87,7 +87,7 @@ const t={ATTRIBUTE:1},e=t=>(...e)=>({_$litDirective$:t,values:e});let i$1 = clas
 
 const CARD_NAME = "anyvac-card";
 const EDITOR_NAME = "anyvac-card-editor";
-const CARD_VERSION = "0.33.1";
+const CARD_VERSION = "0.34.0";
 /** Server-side tracking blueprint */
 const BLUEPRINT_VERSION = "1.0.0";
 const BLUEPRINT_PATH = "anyvac_card/cleaning_tracker.yaml";
@@ -509,7 +509,30 @@ let AnyVacCard = class AnyVacCard extends i$2 {
         const n = parseInt(this.hass.states[pid]?.state ?? "");
         return isNaN(n) || n === 0 ? null : n;
     }
+    /** First integration sensor that exposes the shared (backend) selection. */
+    _selSensor() {
+        for (const v of this._config.vacuums) {
+            const ent = v.integration_entity;
+            if (ent && Array.isArray(this.hass.states[ent]?.attributes?.selected_rooms))
+                return ent;
+        }
+        return undefined;
+    }
+    /** Shared room selection (card-level, by room key) from the backend, or null when
+     *  no integration is available (then the card falls back to local state). */
+    _backendSel() {
+        const ent = this._selSensor();
+        if (!ent)
+            return null;
+        return new Set(this.hass.states[ent]?.attributes?.selected_rooms ?? []);
+    }
+    _setBackendSel(rooms, mode) {
+        this._call("anyvac", "select_rooms", { rooms, mode });
+    }
     _isRoomSelected(room, vac) {
+        const be = this._backendSel();
+        if (be)
+            return be.has(room.key);
         return this._localRoomSel.get(vac.entity + ":" + room.key) ?? false;
     }
     /** Rooms for a vacuum: card-level `rooms` if defined (merged config), else the vacuum's own. */
@@ -989,6 +1012,10 @@ let AnyVacCard = class AnyVacCard extends i$2 {
         this._call("vacuum", "return_to_base", { entity_id: vac.entity });
     }
     _toggleRoom(room, vac) {
+        if (this._backendSel()) {
+            this._setBackendSel([room.key], "toggle");
+            return;
+        }
         const k = vac.entity + ":" + room.key;
         const next = new Map(this._localRoomSel);
         next.set(k, !(next.get(k) ?? false));
@@ -996,10 +1023,17 @@ let AnyVacCard = class AnyVacCard extends i$2 {
         this._saveRoomSel(vac.entity);
     }
     _isRoomSelectedAny(key, vacs) {
+        const be = this._backendSel();
+        if (be)
+            return be.has(key);
         return vacs.some((v) => this._localRoomSel.get(v.entity + ":" + key) ?? false);
     }
     /** Merged mode: toggle a room across every shown vacuum that has it (one rectangle -> both controllers). */
     _toggleRoomAcross(key, vacs) {
+        if (this._backendSel()) {
+            this._setBackendSel([key], "toggle");
+            return;
+        }
         const target = !this._isRoomSelectedAny(key, vacs);
         const next = new Map(this._localRoomSel);
         for (const v of vacs) {
@@ -1011,6 +1045,13 @@ let AnyVacCard = class AnyVacCard extends i$2 {
             this._saveRoomSel(v.entity);
     }
     _selectAll(vac) {
+        const be = this._backendSel();
+        if (be) {
+            for (const r of this._roomsFor(vac))
+                be.add(r.key);
+            this._setBackendSel([...be], "set");
+            return;
+        }
         const next = new Map(this._localRoomSel);
         for (const r of this._roomsFor(vac))
             next.set(vac.entity + ":" + r.key, true);
@@ -1018,6 +1059,13 @@ let AnyVacCard = class AnyVacCard extends i$2 {
         this._saveRoomSel(vac.entity);
     }
     _deselectAll(vac) {
+        const be = this._backendSel();
+        if (be) {
+            for (const r of this._roomsFor(vac))
+                be.delete(r.key);
+            this._setBackendSel([...be], "set");
+            return;
+        }
         const next = new Map(this._localRoomSel);
         for (const r of this._roomsFor(vac))
             next.delete(vac.entity + ":" + r.key);
@@ -2588,6 +2636,7 @@ let AnyVacCard = class AnyVacCard extends i$2 {
     `;
     }
 };
+// ── Styles ──────────────────────────────────────────────────────────────
 AnyVacCard.styles = i$5 `
     ha-card {
       position: relative;

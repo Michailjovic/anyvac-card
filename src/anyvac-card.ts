@@ -365,7 +365,28 @@ export class AnyVacCard extends LitElement {
     return isNaN(n) || n === 0 ? null : n;
   }
 
+  /** First integration sensor that exposes the shared (backend) selection. */
+  private _selSensor(): string | undefined {
+    for (const v of this._config.vacuums) {
+      const ent = v.integration_entity;
+      if (ent && Array.isArray(this.hass.states[ent]?.attributes?.selected_rooms)) return ent;
+    }
+    return undefined;
+  }
+  /** Shared room selection (card-level, by room key) from the backend, or null when
+   *  no integration is available (then the card falls back to local state). */
+  private _backendSel(): Set<string> | null {
+    const ent = this._selSensor();
+    if (!ent) return null;
+    return new Set((this.hass.states[ent]?.attributes?.selected_rooms as string[]) ?? []);
+  }
+  private _setBackendSel(rooms: string[], mode: "set" | "toggle" | "clear"): void {
+    this._call("anyvac", "select_rooms", { rooms, mode });
+  }
+
   private _isRoomSelected(room: RoomConfig, vac: VacuumConfig): boolean {
+    const be = this._backendSel();
+    if (be) return be.has(room.key);
     return this._localRoomSel.get(vac.entity + ":" + room.key) ?? false;
   }
 
@@ -850,6 +871,7 @@ export class AnyVacCard extends LitElement {
   }
 
   private _toggleRoom(room: RoomConfig, vac: VacuumConfig): void {
+    if (this._backendSel()) { this._setBackendSel([room.key], "toggle"); return; }
     const k = vac.entity + ":" + room.key;
     const next = new Map(this._localRoomSel);
     next.set(k, !(next.get(k) ?? false));
@@ -857,10 +879,13 @@ export class AnyVacCard extends LitElement {
     this._saveRoomSel(vac.entity);
   }
   private _isRoomSelectedAny(key: string, vacs: VacuumConfig[]): boolean {
+    const be = this._backendSel();
+    if (be) return be.has(key);
     return vacs.some((v) => this._localRoomSel.get(v.entity + ":" + key) ?? false);
   }
   /** Merged mode: toggle a room across every shown vacuum that has it (one rectangle -> both controllers). */
   private _toggleRoomAcross(key: string, vacs: VacuumConfig[]): void {
+    if (this._backendSel()) { this._setBackendSel([key], "toggle"); return; }
     const target = !this._isRoomSelectedAny(key, vacs);
     const next = new Map(this._localRoomSel);
     for (const v of vacs) {
@@ -871,6 +896,12 @@ export class AnyVacCard extends LitElement {
   }
 
   private _selectAll(vac: VacuumConfig): void {
+    const be = this._backendSel();
+    if (be) {
+      for (const r of this._roomsFor(vac)) be.add(r.key);
+      this._setBackendSel([...be], "set");
+      return;
+    }
     const next = new Map(this._localRoomSel);
     for (const r of this._roomsFor(vac)) next.set(vac.entity + ":" + r.key, true);
     this._localRoomSel = next;
@@ -878,6 +909,12 @@ export class AnyVacCard extends LitElement {
   }
 
   private _deselectAll(vac: VacuumConfig): void {
+    const be = this._backendSel();
+    if (be) {
+      for (const r of this._roomsFor(vac)) be.delete(r.key);
+      this._setBackendSel([...be], "set");
+      return;
+    }
     const next = new Map(this._localRoomSel);
     for (const r of this._roomsFor(vac)) next.delete(vac.entity + ":" + r.key);
     this._localRoomSel = next;
