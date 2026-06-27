@@ -87,7 +87,7 @@ const t={ATTRIBUTE:1},e=t=>(...e)=>({_$litDirective$:t,values:e});let i$1 = clas
 
 const CARD_NAME = "anyvac-card";
 const EDITOR_NAME = "anyvac-card-editor";
-const CARD_VERSION = "0.36.2";
+const CARD_VERSION = "0.36.3";
 /** Server-side tracking blueprint */
 const BLUEPRINT_VERSION = "1.0.0";
 const BLUEPRINT_PATH = "anyvac_card/cleaning_tracker.yaml";
@@ -4579,6 +4579,16 @@ let AnyVacCardEditor = class AnyVacCardEditor extends i$2 {
               ${this._config.map_mode === "merged" ? b `
                 ${this._textField("Key (= Roborock room name)", rooms[this._mapRoom]?.key, v => this._setEditedRoom(this._mapRoom, { key: v }), "Kitchen")}
                 ${this._textField("Name", rooms[this._mapRoom]?.name, v => this._setEditedRoom(this._mapRoom, { name: v }), "Kitchen")}
+                <div class="field field--row">
+                  <label>Cleaning order</label>
+                  <input class="text-input text-input--sm" type="number" min="1"
+                    .value=${String(rooms[this._mapRoom]?.seq ?? "")} placeholder="e.g. 1"
+                    @change=${(e) => {
+            const v = parseInt(e.target.value);
+            this._setEditedRoom(this._mapRoom, { seq: isNaN(v) || v < 1 ? undefined : v });
+        }} />
+                </div>
+                <p class="hint">Order this room is cleaned in (match your Roborock app sequence).</p>
                 ${this._numberSlider("Dry clean time", rooms[this._mapRoom]?.clean_time_dry ?? 0, 0, 120, 1, v => this._setEditedRoom(this._mapRoom, { clean_time_dry: v > 0 ? v : undefined }), " min")}
                 ${this._numberSlider("Wet clean time", rooms[this._mapRoom]?.clean_time_wet ?? 0, 0, 180, 1, v => this._setEditedRoom(this._mapRoom, { clean_time_wet: v > 0 ? v : undefined }), " min")}
               ` : A}

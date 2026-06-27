@@ -1235,6 +1235,16 @@ export class AnyVacCardEditor extends LitElement {
               ${this._config.map_mode === "merged" ? html`
                 ${this._textField("Key (= Roborock room name)", rooms[this._mapRoom]?.key, v => this._setEditedRoom(this._mapRoom!, { key: v }), "Kitchen")}
                 ${this._textField("Name", rooms[this._mapRoom]?.name, v => this._setEditedRoom(this._mapRoom!, { name: v }), "Kitchen")}
+                <div class="field field--row">
+                  <label>Cleaning order</label>
+                  <input class="text-input text-input--sm" type="number" min="1"
+                    .value=${String(rooms[this._mapRoom]?.seq ?? "")} placeholder="e.g. 1"
+                    @change=${(e: Event) => {
+                      const v = parseInt((e.target as HTMLInputElement).value);
+                      this._setEditedRoom(this._mapRoom!, { seq: isNaN(v) || v < 1 ? undefined : v });
+                    }} />
+                </div>
+                <p class="hint">Order this room is cleaned in (match your Roborock app sequence).</p>
                 ${this._numberSlider("Dry clean time", rooms[this._mapRoom]?.clean_time_dry ?? 0, 0, 120, 1, v => this._setEditedRoom(this._mapRoom!, { clean_time_dry: v > 0 ? v : undefined }), " min")}
                 ${this._numberSlider("Wet clean time", rooms[this._mapRoom]?.clean_time_wet ?? 0, 0, 180, 1, v => this._setEditedRoom(this._mapRoom!, { clean_time_wet: v > 0 ? v : undefined }), " min")}
               ` : nothing}

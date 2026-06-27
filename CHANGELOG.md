@@ -11,6 +11,15 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Rooms from the integration (real room polygons / names) for clickable cleaning on the floorplan.
 - Milestone 3b: companion `anyvac` integration data layers (clean-history, statistics).
 
+## [0.36.3] - 2026-06-27
+
+### Fixed
+
+- **"Cleaning order" field now also in the merged-map room editor.** In `map_mode: merged` rooms are
+  defined at the card level (top-level `rooms:`) and edited in the Maps tab, not the per-vacuum
+  accordion — so the order field added in 0.36.2 was invisible there. It is now shown in the Maps-tab
+  room editor too.
+
 ## [0.36.2] - 2026-06-27
 
 ### Added
