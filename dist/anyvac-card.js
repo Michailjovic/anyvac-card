@@ -87,7 +87,7 @@ const t={ATTRIBUTE:1},e=t=>(...e)=>({_$litDirective$:t,values:e});let i$1 = clas
 
 const CARD_NAME = "anyvac-card";
 const EDITOR_NAME = "anyvac-card-editor";
-const CARD_VERSION = "0.35.4";
+const CARD_VERSION = "0.36.0";
 /** Server-side tracking blueprint */
 const BLUEPRINT_VERSION = "1.0.0";
 const BLUEPRINT_PATH = "anyvac_card/cleaning_tracker.yaml";
@@ -226,6 +226,10 @@ let AnyVacCard = class AnyVacCard extends i$2 {
         this._ro = null;
         this._onWinResize = null;
         this._measureRaf = 0;
+        /** Per-second clock for the debug progress timers (mm:ss). Only ticks while a vacuum is
+         *  cleaning/paused and debug_room_progress is on, so it does not re-render otherwise. */
+        this._now = Date.now();
+        this._tickTimer = null;
         /** Aktivní úklidy — sledování průběhu pro vyhodnocení úspěchu */
         this._inFlight = new Map();
         this._prevVacStates = new Map();
@@ -307,6 +311,16 @@ let AnyVacCard = class AnyVacCard extends i$2 {
             window.addEventListener("resize", this._onWinResize, { passive: true });
         }
         this._scheduleMeasure();
+        if (!this._tickTimer) {
+            this._tickTimer = window.setInterval(() => {
+                // Only re-render (update the clock) when debug progress is on AND a vacuum is
+                // mid-clean or paused — otherwise stay idle to avoid needless re-renders.
+                if (this._config?.debug_room_progress &&
+                    (this._config.vacuums ?? []).some((v) => this._isCleaning(v) || this._isPaused(v))) {
+                    this._now = Date.now();
+                }
+            }, 1000);
+        }
     }
     /** Coalesce all width re-measures into one rAF tick (RO + window resize). */
     _scheduleMeasure() {
@@ -325,6 +339,10 @@ let AnyVacCard = class AnyVacCard extends i$2 {
         if (this._measureRaf) {
             cancelAnimationFrame(this._measureRaf);
             this._measureRaf = 0;
+        }
+        if (this._tickTimer) {
+            clearInterval(this._tickTimer);
+            this._tickTimer = null;
         }
         if (this._onWinResize) {
             window.removeEventListener("resize", this._onWinResize);
@@ -740,34 +758,34 @@ let AnyVacCard = class AnyVacCard extends i$2 {
             return { pct: p.time_pct, kind: "T", title };
         return null;
     }
-    /** Progress for a room from the vacuums matching a clean type (dry/wet), coloured by
-     *  the vacuum that did it, and only while that vacuum is actively cleaning. A "both"
-     *  vacuum counts for both layers. Used by the per-layer (dry/wet) room menus. */
+    /** Per-clean-type coverage for a room (dry from the vacuum trace, wet from the mop
+     *  trace), taken from whichever vacuum has the highest value and coloured by it. Used
+     *  by the per-layer (dry/wet) room menus. */
     _roomProgForType(room, vacs, type) {
         let best = null;
         let bestVac = null;
+        let bestCal = false;
         for (const v of vacs) {
-            if (!this._isCleaning(v))
+            const p = this._roomProgress(v, room);
+            if (!p)
                 continue;
-            const ct = this._vacCleanType(v);
-            if (type === "dry" && !ct.dry)
-                continue;
-            if (type === "wet" && !ct.wet)
-                continue;
-            const p = this._roomProgPct(v, room);
-            if (p && (!best || p.pct > best.pct)) {
-                best = p;
+            const val = type === "dry" ? p.dry_pct : p.wet_pct;
+            if (val !== null && val !== undefined && (best === null || val > best)) {
+                best = val;
                 bestVac = v;
+                bestCal = !!(type === "dry" ? p.dry_calibrating : p.wet_calibrating);
             }
         }
-        return best && bestVac ? { ...best, color: this._color(bestVac) } : null;
+        if (best === null || !bestVac)
+            return null;
+        return { pct: best, kind: "S", title: `${type} coverage ${best}%`, color: this._color(bestVac), calibrating: bestCal };
     }
     _progColor(pct) {
         return pct >= 90 ? "#52c41a" : pct >= 50 ? "#faad14" : "#40a9ff";
     }
     /** Small circular % gauge drawn on a room overlay when debug_room_progress is on. */
     _renderRoomGauge(vac, room) {
-        if (!this._config.debug_room_progress || !this._isCleaning(vac))
+        if (!this._config.debug_room_progress)
             return A;
         const p = this._roomProgPct(vac, room);
         if (!p)
@@ -785,7 +803,7 @@ let AnyVacCard = class AnyVacCard extends i$2 {
         if (!this._config.debug_room_progress || !p)
             return A;
         return b `<span class="rl-prog" title=${p.title}
-      style=${o({ color: p.color ?? this._progColor(p.pct) })}>${p.pct}%<small>${p.kind}</small></span>`;
+      style=${o({ color: p.color ?? this._progColor(p.pct) })}>${p.pct}${p.calibrating ? "~" : ""}%<small>${p.kind}</small></span>`;
     }
     _batIcon(pct) {
         if (pct > 80)
@@ -2708,29 +2726,66 @@ let AnyVacCard = class AnyVacCard extends i$2 {
       </div>
     `;
     }
-    /** Debug strip inside the status card: per-room cleaning progress (spatial % and the
-     *  live time spent). Only shown with debug_room_progress on AND while this vacuum is
-     *  actively cleaning (so a docked robot does not show stale numbers). */
+    /** Small circular gauge for the debug strip (dry / wet coverage). `calibrating` adds a
+     *  ~ to mark that it is still the raw bbox % (no learned baseline yet). */
+    _renderMiniGauge(pct, color, icon, calibrating) {
+        return b `
+      <span class="mini-gauge-wrap">
+        <ha-icon class="mini-gauge-ico" icon=${icon} style=${o({ color })}></ha-icon>
+        <span class="mini-gauge" style=${o({ background: `conic-gradient(${color} ${pct * 3.6}deg, rgba(255,255,255,0.12) 0)` })}>
+          <span>${pct}${calibrating ? "~" : ""}</span>
+        </span>
+      </span>`;
+    }
+    /** Room the vacuum is currently in, per the integration (for live-ticking its timer). */
+    _currentRoomName(vac) {
+        const ent = vac.integration_entity;
+        return ent ? this.hass.states[ent]?.attributes?.vacuum_room_name : undefined;
+    }
+    _mmss(sec) {
+        const s = Math.max(0, Math.round(sec));
+        return `${Math.floor(s / 60)}:${String(s % 60).padStart(2, "0")}`;
+    }
+    /** Debug strip inside the status card: per-room dry + wet coverage gauges and the live
+     *  time spent (mm:ss / mm:ss estimate). Shown whenever debug_room_progress is on. */
     _renderDebugProgress(vac) {
-        if (!this._config.debug_room_progress || !this._isCleaning(vac))
+        if (!this._config.debug_room_progress)
             return A;
         const rows = (this._roomsFor(vac))
-            .map((r) => ({ r, raw: this._roomProgress(vac, r), p: this._roomProgPct(vac, r) }))
-            .filter((x) => x.raw && (x.p || x.raw.elapsed_s != null));
+            .map((r) => ({ r, p: this._roomProgress(vac, r) }))
+            .filter((x) => x.p && (x.p.dry_pct != null || x.p.wet_pct != null || x.p.elapsed_s != null));
         if (!rows.length)
             return A;
         const color = this._color(vac);
-        const fmtSec = (s) => s >= 60 ? `${Math.floor(s / 60)}m${String(Math.round(s % 60)).padStart(2, "0")}s` : `${Math.round(s)}s`;
+        const ent = vac.integration_entity;
+        const sensorTs = ent ? Date.parse(this.hass.states[ent]?.last_updated ?? "") : NaN;
+        const curRoom = this._currentRoomName(vac);
+        const cleaning = this._isCleaning(vac);
+        const paused = this._isPaused(vac);
+        // Seconds since the sensor last updated — while cleaning this is live cleaning time;
+        // while paused the sensor is frozen so it measures the pause length.
+        const since = (cleaning || paused) && !isNaN(sensorTs) ? Math.max(0, (this._now - sensorTs) / 1000) : 0;
         return b `
       <div class="dbg-prog">
-        ${rows.map(({ r, raw, p }) => b `
-          <span class="dbg-prog-item" title=${p?.title ?? ""}>
-            ${r.icon ? b `<ha-icon icon=${r.icon}></ha-icon>` : A}
-            <span class="dbg-prog-name">${r.name ?? r.key}</span>
-            ${p ? b `<b style=${o({ color })}>${p.pct}%${p.kind}</b>` : A}
-            ${raw.elapsed_s != null ? b `<small>${fmtSec(raw.elapsed_s)}</small>` : A}
-          </span>
-        `)}
+        ${rows.map(({ r, p }) => {
+            const isCur = (r.name ?? r.key) === curRoom && (cleaning || paused);
+            // Elapsed ticks every second for the active room (and keeps moving while paused);
+            // the estimate grows equally during a pause so "remaining" stays put.
+            const elapsed = (p.elapsed_s ?? 0) + (isCur ? since : 0);
+            let est = p.est_s ?? null;
+            if (isCur && paused && est != null)
+                est = est + since;
+            const timeStr = est != null ? `${this._mmss(elapsed)}/${this._mmss(est)}` : this._mmss(elapsed);
+            return b `
+            <span class="dbg-prog-item" title=${`dry ${p.dry_pct ?? "—"}% · wet ${p.wet_pct ?? "—"}%`}>
+              ${r.icon ? b `<ha-icon icon=${r.icon}></ha-icon>` : A}
+              <span class="dbg-prog-name">${r.name ?? r.key}</span>
+              ${p.dry_pct != null ? this._renderMiniGauge(p.dry_pct, color, "mdi:broom", !!p.dry_calibrating) : A}
+              ${p.wet_pct != null ? this._renderMiniGauge(p.wet_pct, "#40a9ff", "mdi:water", !!p.wet_calibrating) : A}
+              ${p.elapsed_s != null ? b `<small>${timeStr}</small>` : A}
+            </span>
+          `;
+        })}
       </div>
     `;
     }
@@ -3056,6 +3111,10 @@ AnyVacCard.styles = i$5 `
     .dbg-prog-name { color: rgba(255,255,255,0.45); }
     .dbg-prog-item b { font-weight: 700; }
     .dbg-prog-item small { color: rgba(255,255,255,0.4); font-size: 10px; }
+    .mini-gauge-wrap { display: inline-flex; align-items: center; gap: 2px; }
+    .mini-gauge-ico { --mdc-icon-size: 12px; opacity: 0.8; }
+    .mini-gauge { width: 22px; height: 22px; border-radius: 50%; display: inline-flex; align-items: center; justify-content: center; }
+    .mini-gauge span { width: 16px; height: 16px; border-radius: 50%; background: rgba(0,0,0,0.82); color: #fff; font-size: 8px; font-weight: 700; display: flex; align-items: center; justify-content: center; }
 
     /* ── Action buttons ──────────────────────────────────────────────── */
     .actions { display: flex; gap: 8px; padding: 0 12px 14px; }
@@ -3195,6 +3254,9 @@ __decorate([
 __decorate([
     r()
 ], AnyVacCard.prototype, "_mapAR", void 0);
+__decorate([
+    r()
+], AnyVacCard.prototype, "_now", void 0);
 AnyVacCard = __decorate([
     t$1(CARD_NAME)
 ], AnyVacCard);

@@ -99,6 +99,10 @@ export class AnyVacCard extends LitElement {
   private _ro: ResizeObserver | null = null;
   private _onWinResize: (() => void) | null = null;
   private _measureRaf = 0;
+  /** Per-second clock for the debug progress timers (mm:ss). Only ticks while a vacuum is
+   *  cleaning/paused and debug_room_progress is on, so it does not re-render otherwise. */
+  @state() private _now = Date.now();
+  private _tickTimer: number | null = null;
   /** Aktivní úklidy — sledování průběhu pro vyhodnocení úspěchu */
   private _inFlight = new Map<string, InFlightCleaning>();
   private _prevVacStates = new Map<string, string>();
@@ -170,6 +174,16 @@ export class AnyVacCard extends LitElement {
       window.addEventListener("resize", this._onWinResize, { passive: true });
     }
     this._scheduleMeasure();
+    if (!this._tickTimer) {
+      this._tickTimer = window.setInterval(() => {
+        // Only re-render (update the clock) when debug progress is on AND a vacuum is
+        // mid-clean or paused — otherwise stay idle to avoid needless re-renders.
+        if (this._config?.debug_room_progress &&
+            (this._config.vacuums ?? []).some((v) => this._isCleaning(v) || this._isPaused(v))) {
+          this._now = Date.now();
+        }
+      }, 1000);
+    }
   }
 
   /** Coalesce all width re-measures into one rAF tick (RO + window resize). */
@@ -186,6 +200,7 @@ export class AnyVacCard extends LitElement {
     super.disconnectedCallback();
     this._cancelHold();
     if (this._measureRaf) { cancelAnimationFrame(this._measureRaf); this._measureRaf = 0; }
+    if (this._tickTimer) { clearInterval(this._tickTimer); this._tickTimer = null; }
     if (this._onWinResize) { window.removeEventListener("resize", this._onWinResize); this._onWinResize = null; }
     if (this._ro) { this._ro.disconnect(); this._ro = null; }
     if (this._unsubEvents) {
@@ -551,6 +566,8 @@ export class AnyVacCard extends LitElement {
   /** Debug: per-room cleaning progress from the integration (rooms_progress). */
   private _roomProgress(vac: VacuumConfig, room: RoomConfig): {
     spatial_pct: number | null; time_pct: number | null;
+    dry_pct?: number | null; wet_pct?: number | null;
+    dry_calibrating?: boolean; wet_calibrating?: boolean;
     visited_cells?: number; total_cells?: number; elapsed_s?: number | null; est_s?: number | null;
   } | null {
     const ent = vac.integration_entity;
@@ -571,23 +588,25 @@ export class AnyVacCard extends LitElement {
     return null;
   }
 
-  /** Progress for a room from the vacuums matching a clean type (dry/wet), coloured by
-   *  the vacuum that did it, and only while that vacuum is actively cleaning. A "both"
-   *  vacuum counts for both layers. Used by the per-layer (dry/wet) room menus. */
+  /** Per-clean-type coverage for a room (dry from the vacuum trace, wet from the mop
+   *  trace), taken from whichever vacuum has the highest value and coloured by it. Used
+   *  by the per-layer (dry/wet) room menus. */
   private _roomProgForType(
     room: RoomConfig, vacs: VacuumConfig[], type: "dry" | "wet",
-  ): { pct: number; kind: "S" | "T"; title: string; color: string } | null {
-    let best: { pct: number; kind: "S" | "T"; title: string } | null = null;
+  ): { pct: number; kind: "S" | "T"; title: string; color: string; calibrating: boolean } | null {
+    let best: number | null = null;
     let bestVac: VacuumConfig | null = null;
+    let bestCal = false;
     for (const v of vacs) {
-      if (!this._isCleaning(v)) continue;
-      const ct = this._vacCleanType(v);
-      if (type === "dry" && !ct.dry) continue;
-      if (type === "wet" && !ct.wet) continue;
-      const p = this._roomProgPct(v, room);
-      if (p && (!best || p.pct > best.pct)) { best = p; bestVac = v; }
+      const p = this._roomProgress(v, room);
+      if (!p) continue;
+      const val = type === "dry" ? p.dry_pct : p.wet_pct;
+      if (val !== null && val !== undefined && (best === null || val > best)) {
+        best = val; bestVac = v; bestCal = !!(type === "dry" ? p.dry_calibrating : p.wet_calibrating);
+      }
     }
-    return best && bestVac ? { ...best, color: this._color(bestVac) } : null;
+    if (best === null || !bestVac) return null;
+    return { pct: best, kind: "S", title: `${type} coverage ${best}%`, color: this._color(bestVac), calibrating: bestCal };
   }
 
   private _progColor(pct: number): string {
@@ -596,7 +615,7 @@ export class AnyVacCard extends LitElement {
 
   /** Small circular % gauge drawn on a room overlay when debug_room_progress is on. */
   private _renderRoomGauge(vac: VacuumConfig, room: RoomConfig) {
-    if (!this._config.debug_room_progress || !this._isCleaning(vac)) return nothing;
+    if (!this._config.debug_room_progress) return nothing;
     const p = this._roomProgPct(vac, room);
     if (!p) return nothing;
     const ring = this._progColor(p.pct);
@@ -609,10 +628,10 @@ export class AnyVacCard extends LitElement {
   }
 
   /** Inline % chip for the room menus (debug only). Coloured by the vacuum when provided. */
-  private _renderProgChip(p: { pct: number; kind: "S" | "T"; title: string; color?: string } | null) {
+  private _renderProgChip(p: { pct: number; kind: "S" | "T"; title: string; color?: string; calibrating?: boolean } | null) {
     if (!this._config.debug_room_progress || !p) return nothing;
     return html`<span class="rl-prog" title=${p.title}
-      style=${styleMap({ color: p.color ?? this._progColor(p.pct) })}>${p.pct}%<small>${p.kind}</small></span>`;
+      style=${styleMap({ color: p.color ?? this._progColor(p.pct) })}>${p.pct}${p.calibrating ? "~" : ""}%<small>${p.kind}</small></span>`;
   }
 
   private _batIcon(pct: number): string {
@@ -2456,28 +2475,66 @@ export class AnyVacCard extends LitElement {
     `;
   }
 
-  /** Debug strip inside the status card: per-room cleaning progress (spatial % and the
-   *  live time spent). Only shown with debug_room_progress on AND while this vacuum is
-   *  actively cleaning (so a docked robot does not show stale numbers). */
+  /** Small circular gauge for the debug strip (dry / wet coverage). `calibrating` adds a
+   *  ~ to mark that it is still the raw bbox % (no learned baseline yet). */
+  private _renderMiniGauge(pct: number, color: string, icon: string, calibrating: boolean) {
+    return html`
+      <span class="mini-gauge-wrap">
+        <ha-icon class="mini-gauge-ico" icon=${icon} style=${styleMap({ color })}></ha-icon>
+        <span class="mini-gauge" style=${styleMap({ background: `conic-gradient(${color} ${pct * 3.6}deg, rgba(255,255,255,0.12) 0)` })}>
+          <span>${pct}${calibrating ? "~" : ""}</span>
+        </span>
+      </span>`;
+  }
+
+  /** Room the vacuum is currently in, per the integration (for live-ticking its timer). */
+  private _currentRoomName(vac: VacuumConfig): string | undefined {
+    const ent = vac.integration_entity;
+    return ent ? (this.hass.states[ent]?.attributes?.vacuum_room_name as string | undefined) : undefined;
+  }
+
+  private _mmss(sec: number): string {
+    const s = Math.max(0, Math.round(sec));
+    return `${Math.floor(s / 60)}:${String(s % 60).padStart(2, "0")}`;
+  }
+
+  /** Debug strip inside the status card: per-room dry + wet coverage gauges and the live
+   *  time spent (mm:ss / mm:ss estimate). Shown whenever debug_room_progress is on. */
   private _renderDebugProgress(vac: VacuumConfig) {
-    if (!this._config.debug_room_progress || !this._isCleaning(vac)) return nothing;
+    if (!this._config.debug_room_progress) return nothing;
     const rows = (this._roomsFor(vac))
-      .map((r) => ({ r, raw: this._roomProgress(vac, r), p: this._roomProgPct(vac, r) }))
-      .filter((x) => x.raw && (x.p || x.raw!.elapsed_s != null));
+      .map((r) => ({ r, p: this._roomProgress(vac, r) }))
+      .filter((x) => x.p && (x.p!.dry_pct != null || x.p!.wet_pct != null || x.p!.elapsed_s != null));
     if (!rows.length) return nothing;
     const color = this._color(vac);
-    const fmtSec = (s: number) =>
-      s >= 60 ? `${Math.floor(s / 60)}m${String(Math.round(s % 60)).padStart(2, "0")}s` : `${Math.round(s)}s`;
+    const ent = vac.integration_entity;
+    const sensorTs = ent ? Date.parse(this.hass.states[ent]?.last_updated ?? "") : NaN;
+    const curRoom = this._currentRoomName(vac);
+    const cleaning = this._isCleaning(vac);
+    const paused = this._isPaused(vac);
+    // Seconds since the sensor last updated — while cleaning this is live cleaning time;
+    // while paused the sensor is frozen so it measures the pause length.
+    const since = (cleaning || paused) && !isNaN(sensorTs) ? Math.max(0, (this._now - sensorTs) / 1000) : 0;
     return html`
       <div class="dbg-prog">
-        ${rows.map(({ r, raw, p }) => html`
-          <span class="dbg-prog-item" title=${p?.title ?? ""}>
-            ${r.icon ? html`<ha-icon icon=${r.icon}></ha-icon>` : nothing}
-            <span class="dbg-prog-name">${r.name ?? r.key}</span>
-            ${p ? html`<b style=${styleMap({ color })}>${p.pct}%${p.kind}</b>` : nothing}
-            ${raw!.elapsed_s != null ? html`<small>${fmtSec(raw!.elapsed_s)}</small>` : nothing}
-          </span>
-        `)}
+        ${rows.map(({ r, p }) => {
+          const isCur = (r.name ?? r.key) === curRoom && (cleaning || paused);
+          // Elapsed ticks every second for the active room (and keeps moving while paused);
+          // the estimate grows equally during a pause so "remaining" stays put.
+          const elapsed = (p!.elapsed_s ?? 0) + (isCur ? since : 0);
+          let est = p!.est_s ?? null;
+          if (isCur && paused && est != null) est = est + since;
+          const timeStr = est != null ? `${this._mmss(elapsed)}/${this._mmss(est)}` : this._mmss(elapsed);
+          return html`
+            <span class="dbg-prog-item" title=${`dry ${p!.dry_pct ?? "—"}% · wet ${p!.wet_pct ?? "—"}%`}>
+              ${r.icon ? html`<ha-icon icon=${r.icon}></ha-icon>` : nothing}
+              <span class="dbg-prog-name">${r.name ?? r.key}</span>
+              ${p!.dry_pct != null ? this._renderMiniGauge(p!.dry_pct, color, "mdi:broom", !!p!.dry_calibrating) : nothing}
+              ${p!.wet_pct != null ? this._renderMiniGauge(p!.wet_pct, "#40a9ff", "mdi:water", !!p!.wet_calibrating) : nothing}
+              ${p!.elapsed_s != null ? html`<small>${timeStr}</small>` : nothing}
+            </span>
+          `;
+        })}
       </div>
     `;
   }
@@ -2806,6 +2863,10 @@ export class AnyVacCard extends LitElement {
     .dbg-prog-name { color: rgba(255,255,255,0.45); }
     .dbg-prog-item b { font-weight: 700; }
     .dbg-prog-item small { color: rgba(255,255,255,0.4); font-size: 10px; }
+    .mini-gauge-wrap { display: inline-flex; align-items: center; gap: 2px; }
+    .mini-gauge-ico { --mdc-icon-size: 12px; opacity: 0.8; }
+    .mini-gauge { width: 22px; height: 22px; border-radius: 50%; display: inline-flex; align-items: center; justify-content: center; }
+    .mini-gauge span { width: 16px; height: 16px; border-radius: 50%; background: rgba(0,0,0,0.82); color: #fff; font-size: 8px; font-weight: 700; display: flex; align-items: center; justify-content: center; }
 
     /* ── Action buttons ──────────────────────────────────────────────── */
     .actions { display: flex; gap: 8px; padding: 0 12px 14px; }

@@ -11,6 +11,29 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Rooms from the integration (real room polygons / names) for clickable cleaning on the floorplan.
 - Milestone 3b: companion `anyvac` integration data layers (clean-history, statistics).
 
+## [0.36.0] - 2026-06-27
+
+### Added
+
+- **Normalised coverage % (~100 % for a fully cleaned room).** The gauges now read the integration's
+  baseline-normalised `dry_pct` / `wet_pct` (v0.11.0+). Until a room has been fully cleaned once, the
+  raw bbox % is shown with a `~` marker (e.g. `73~`) to flag it is still calibrating.
+- **Per-second live timer in `mm:ss / mm:ss` (elapsed / estimate).** The debug strip ticks every
+  second (instead of jumping every 30 s) for the room being cleaned. While paused or stuck, both the
+  elapsed and the estimate keep ticking up equally, so the timer keeps moving but the progress doesn't
+  advance. The clock only runs (and only re-renders this card) while a vacuum is cleaning/paused.
+
+## [0.35.5] - 2026-06-27
+
+### Changed
+
+- **Two coverage gauges per room: dry and wet, side by side.** The debug strip now shows a separate
+  dry gauge (vacuum trace, in the vacuum's colour) and wet gauge (mop trace, blue) per room, plus the
+  live time spent — reading the new `dry_pct` / `wet_pct` from the integration (v0.10.3+). The per-layer
+  menus likewise show the matching layer's coverage.
+- **Debug progress is shown permanently again** (no longer hidden when the vacuum is docked) — it is a
+  debug aid for now.
+
 ## [0.35.4] - 2026-06-27
 
 ### Changed
