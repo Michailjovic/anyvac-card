@@ -87,7 +87,7 @@ const t={ATTRIBUTE:1},e=t=>(...e)=>({_$litDirective$:t,values:e});let i$1 = clas
 
 const CARD_NAME = "anyvac-card";
 const EDITOR_NAME = "anyvac-card-editor";
-const CARD_VERSION = "0.34.3";
+const CARD_VERSION = "0.35.0";
 /** Server-side tracking blueprint */
 const BLUEPRINT_VERSION = "1.0.0";
 const BLUEPRINT_PATH = "anyvac_card/cleaning_tracker.yaml";
@@ -716,6 +716,32 @@ let AnyVacCard = class AnyVacCard extends i$2 {
     }
     _roomBorderColor(room, vac) {
         return this._colorForAgeDays(this._roomAgeDays(room, vac));
+    }
+    /** Debug: per-room cleaning progress from the integration (rooms_progress). */
+    _roomProgress(vac, room) {
+        const ent = vac.integration_entity;
+        if (!ent)
+            return null;
+        const rp = this.hass.states[ent]?.attributes?.rooms_progress;
+        if (!rp)
+            return null;
+        return (rp[room.key] ?? rp[room.name ?? ""] ?? null);
+    }
+    /** Small circular % gauge drawn on a room overlay when debug_room_progress is on. */
+    _renderRoomGauge(vac, room) {
+        if (!this._config.debug_room_progress)
+            return A;
+        const p = this._roomProgress(vac, room);
+        const pct = p?.spatial_pct;
+        if (pct === null || pct === undefined)
+            return A;
+        const ring = pct >= 90 ? "#52c41a" : pct >= 50 ? "#faad14" : "#40a9ff";
+        return b `
+      <div class="room-gauge" style=${o({ background: `conic-gradient(${ring} ${pct * 3.6}deg, rgba(255,255,255,0.12) 0)` })}
+        title=${`spatial ${pct}% · time ${p?.time_pct ?? "—"}%`}>
+        <span>${pct}</span>
+      </div>
+    `;
     }
     _batIcon(pct) {
         if (pct > 80)
@@ -2418,6 +2444,7 @@ let AnyVacCard = class AnyVacCard extends i$2 {
               style=${o({ color: selected ? "white" : ageColor, "--mdc-icon-size": "16px" })}>
             </ha-icon>
           ` : A}
+          ${this._renderRoomGauge(vac, room)}
         </button>
       `;
         }
@@ -2442,6 +2469,7 @@ let AnyVacCard = class AnyVacCard extends i$2 {
             style=${o({ color: selected ? "white" : "rgba(255,255,255,0.5)" })}>
           </ha-icon>
         ` : A}
+        ${this._renderRoomGauge(vac, room)}
       </button>
     `;
     }
@@ -2832,6 +2860,33 @@ AnyVacCard.styles = i$5 `
       display: flex;
       padding: 3px;
       transition: background 0.2s, border 0.3s, box-shadow 0.3s;
+    }
+
+    /* ── Debug per-room progress gauge ───────────────────────────────── */
+    .room-gauge {
+      position: absolute;
+      top: 2px;
+      right: 2px;
+      width: 26px;
+      height: 26px;
+      border-radius: 50%;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      pointer-events: none;
+      z-index: 4;
+    }
+    .room-gauge span {
+      width: 19px;
+      height: 19px;
+      border-radius: 50%;
+      background: rgba(0, 0, 0, 0.82);
+      color: #fff;
+      font-size: 9px;
+      font-weight: 700;
+      display: flex;
+      align-items: center;
+      justify-content: center;
     }
 
     /* ── Status card ─────────────────────────────────────────────────── */
@@ -4598,6 +4653,16 @@ let AnyVacCardEditor = class AnyVacCardEditor extends i$2 {
         return b `
       <div class="tab-body">
         <p class="hint">Live values from Home Assistant, read-only — to check the integration is writing data correctly.</p>
+        <div class="field field--row">
+          <label>Room progress gauges on map</label>
+          <label class="toggle-wrap">
+            <input type="checkbox" class="toggle-input"
+              .checked=${this._config.debug_room_progress ?? false}
+              @change=${(e) => this._setConfig({ debug_room_progress: e.target.checked || undefined })} />
+            <span class="toggle-track"></span>
+          </label>
+        </div>
+        <p class="hint">Draws a small % gauge on each room (spatial coverage). Spatial % is approximate — the room box includes furniture, so it plateaus below 100%.</p>
         ${this._config.vacuums.map((vac) => {
             const ie = vac.integration_entity;
             const st = ie ? this.hass.states[ie] : undefined;
@@ -4626,6 +4691,8 @@ let AnyVacCardEditor = class AnyVacCardEditor extends i$2 {
                     <pre style=${pre}>${fmt(at.rooms_estimate)}</pre>
                     <div class="sub-title">rooms_last_cleaned (cross-vacuum)</div>
                     <pre style=${pre}>${fmt(at.rooms_last_cleaned)}</pre>
+                    <div class="sub-title">rooms_progress — spatial % + time ratio (live)</div>
+                    <pre style=${pre}>${fmt(at.rooms_progress)}</pre>
                     <details><summary class="hint" style="cursor:pointer">Raw attributes</summary><pre style=${pre}>${fmt(at)}</pre></details>
                   `}
             </div>`;

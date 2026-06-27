@@ -548,6 +548,33 @@ export class AnyVacCard extends LitElement {
     return this._colorForAgeDays(this._roomAgeDays(room, vac));
   }
 
+  /** Debug: per-room cleaning progress from the integration (rooms_progress). */
+  private _roomProgress(vac: VacuumConfig, room: RoomConfig): {
+    spatial_pct: number | null; time_pct: number | null;
+    visited_cells?: number; total_cells?: number; elapsed_s?: number | null; est_s?: number | null;
+  } | null {
+    const ent = vac.integration_entity;
+    if (!ent) return null;
+    const rp = this.hass.states[ent]?.attributes?.rooms_progress as Record<string, any> | undefined;
+    if (!rp) return null;
+    return (rp[room.key] ?? rp[room.name ?? ""] ?? null) as any;
+  }
+
+  /** Small circular % gauge drawn on a room overlay when debug_room_progress is on. */
+  private _renderRoomGauge(vac: VacuumConfig, room: RoomConfig) {
+    if (!this._config.debug_room_progress) return nothing;
+    const p = this._roomProgress(vac, room);
+    const pct = p?.spatial_pct;
+    if (pct === null || pct === undefined) return nothing;
+    const ring = pct >= 90 ? "#52c41a" : pct >= 50 ? "#faad14" : "#40a9ff";
+    return html`
+      <div class="room-gauge" style=${styleMap({ background: `conic-gradient(${ring} ${pct * 3.6}deg, rgba(255,255,255,0.12) 0)` })}
+        title=${`spatial ${pct}% · time ${p?.time_pct ?? "—"}%`}>
+        <span>${pct}</span>
+      </div>
+    `;
+  }
+
   private _batIcon(pct: number): string {
     if (pct > 80) return "mdi:battery";
     if (pct > 50) return "mdi:battery-60";
@@ -2153,6 +2180,7 @@ export class AnyVacCard extends LitElement {
               style=${styleMap({ color: selected ? "white" : ageColor, "--mdc-icon-size": "16px" })}>
             </ha-icon>
           ` : nothing}
+          ${this._renderRoomGauge(vac, room)}
         </button>
       `;
     }
@@ -2178,6 +2206,7 @@ export class AnyVacCard extends LitElement {
             style=${styleMap({ color: selected ? "white" : "rgba(255,255,255,0.5)" })}>
           </ha-icon>
         ` : nothing}
+        ${this._renderRoomGauge(vac, room)}
       </button>
     `;
   }
@@ -2585,6 +2614,33 @@ export class AnyVacCard extends LitElement {
       display: flex;
       padding: 3px;
       transition: background 0.2s, border 0.3s, box-shadow 0.3s;
+    }
+
+    /* ── Debug per-room progress gauge ───────────────────────────────── */
+    .room-gauge {
+      position: absolute;
+      top: 2px;
+      right: 2px;
+      width: 26px;
+      height: 26px;
+      border-radius: 50%;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      pointer-events: none;
+      z-index: 4;
+    }
+    .room-gauge span {
+      width: 19px;
+      height: 19px;
+      border-radius: 50%;
+      background: rgba(0, 0, 0, 0.82);
+      color: #fff;
+      font-size: 9px;
+      font-weight: 700;
+      display: flex;
+      align-items: center;
+      justify-content: center;
     }
 
     /* ── Status card ─────────────────────────────────────────────────── */

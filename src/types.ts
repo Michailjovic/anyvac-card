@@ -379,4 +379,7 @@ export interface AnyVacCardConfig {
   global_presets?: GlobalPreset[];
   /** Default orchestrator policy (overridable per global preset). */
   orchestrator?: OrchestratorPolicy;
+  /** Debug: draw a per-room cleaning-progress gauge on the map (reads the integration's
+   *  rooms_progress). Off by default — a testing aid, not for everyday cards. */
+  debug_room_progress?: boolean;
 }

@@ -1450,6 +1450,16 @@ export class AnyVacCardEditor extends LitElement {
     return html`
       <div class="tab-body">
         <p class="hint">Live values from Home Assistant, read-only — to check the integration is writing data correctly.</p>
+        <div class="field field--row">
+          <label>Room progress gauges on map</label>
+          <label class="toggle-wrap">
+            <input type="checkbox" class="toggle-input"
+              .checked=${this._config.debug_room_progress ?? false}
+              @change=${(e: Event) => this._setConfig({ debug_room_progress: (e.target as HTMLInputElement).checked || undefined })} />
+            <span class="toggle-track"></span>
+          </label>
+        </div>
+        <p class="hint">Draws a small % gauge on each room (spatial coverage). Spatial % is approximate — the room box includes furniture, so it plateaus below 100%.</p>
         ${this._config.vacuums.map((vac) => {
           const ie = vac.integration_entity;
           const st = ie ? this.hass.states[ie] : undefined;
@@ -1478,6 +1488,8 @@ export class AnyVacCardEditor extends LitElement {
                     <pre style=${pre}>${fmt(at.rooms_estimate)}</pre>
                     <div class="sub-title">rooms_last_cleaned (cross-vacuum)</div>
                     <pre style=${pre}>${fmt(at.rooms_last_cleaned)}</pre>
+                    <div class="sub-title">rooms_progress — spatial % + time ratio (live)</div>
+                    <pre style=${pre}>${fmt(at.rooms_progress)}</pre>
                     <details><summary class="hint" style="cursor:pointer">Raw attributes</summary><pre style=${pre}>${fmt(at)}</pre></details>
                   `}
             </div>`;
