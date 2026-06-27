@@ -1144,8 +1144,10 @@ export class AnyVacCard extends LitElement {
     if (!roomKeys.length) return;
     const tasks: Array<Record<string, unknown>> = [];
     const roomToDryDuid = new Map<string, string | undefined>();
+    // Orchestration spans ALL configured vacuums (not just the shown tab) — every
+    // capable robot should take part in a whole-home clean.
     const dryAssign = mode !== "wet"
-      ? this._assignByCap(roomKeys, (v) => this._vacCleanType(v).dry, this._planVacuums())
+      ? this._assignByCap(roomKeys, (v) => this._vacCleanType(v).dry, this._config.vacuums)
       : new Map<string, string[]>();
     let i = 0;
     for (const [entity, keys] of dryAssign) {
@@ -1160,14 +1162,17 @@ export class AnyVacCard extends LitElement {
     }
     if (mode === "wet" || mode === "both") {
       let j = 0;
-      for (const [entity, keys] of this._assignByCap(roomKeys, (v) => this._vacCleanType(v).wet, this._planVacuums())) {
+      for (const [entity, keys] of this._assignByCap(roomKeys, (v) => this._vacCleanType(v).wet, this._config.vacuums)) {
         const vac = this._config.vacuums.find((v) => v.entity === entity);
         if (!vac) continue;
         const s = this._settingsForKind(vac, "wet");
         const cmd = this._cleanCmdFor(vac, keys, s.repeat);
         if (!cmd) continue;
+        // Gate on the dry vacuum finishing each room. The room in anyvac_room_done is the
+        // integration's room name (= the card room KEY, kept identical to the Roborock app
+        // name), NOT the display name — so gate by key, else the wet pass never releases.
         const after: Array<{ duid: string; room?: string }> = mode === "both"
-          ? keys.map((k) => { const duid = roomToDryDuid.get(k); return duid ? { duid, room: this._intRoomName(vac, k) } : null; })
+          ? keys.map((k) => { const duid = roomToDryDuid.get(k); return duid ? { duid, room: k } : null; })
               .filter((a): a is { duid: string; room: string } => a != null)
           : [];
         // A both-capable robot does its dry pass first; its wet pass must wait for its
@@ -1215,7 +1220,7 @@ export class AnyVacCard extends LitElement {
     const apLabel = (this._config.global_presets ?? []).find((g) => g.id === this._activeGlobalPreset)?.label;
     const showDry = mode === "dry" || mode === "both";
     const showWet = mode === "wet" || mode === "both";
-    const vacs = this._planVacuums();
+    const vacs = this._config.vacuums;  // plan across all robots, not just the shown tab
     const invert = (m: Map<string, string[]>) => {
       const out = new Map<string, string>();
       for (const [e, ks] of m) for (const k of ks) out.set(k, e);

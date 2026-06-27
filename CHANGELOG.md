@@ -11,6 +11,17 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Rooms from the integration (real room polygons / names) for clickable cleaning on the floorplan.
 - Milestone 3b: companion `anyvac` integration data layers (clean-history, statistics).
 
+## [0.36.4] - 2026-06-27
+
+### Fixed
+
+- **Orchestration only ran the first vacuum.** Two bugs: (1) the plan was built only across the
+  *shown* tab's vacuum (`_planVacuums`) instead of all configured robots, so other robots — incl. the
+  wet one in a `both` clean — were never assigned; orchestration now spans **all** vacuums. (2) The
+  wet pass was gated on each room by its **display name**, but `anyvac_room_done` reports the room by
+  its integration name (= the room `key`), so the gate never released; it now gates by `key`. With
+  both fixed, a `both` clean splits dry across dry robots and releases the wet robot per room.
+
 ## [0.36.3] - 2026-06-27
 
 ### Fixed
