@@ -11,6 +11,17 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Rooms from the integration (real room polygons / names) for clickable cleaning on the floorplan.
 - Milestone 3b: companion `anyvac` integration data layers (clean-history, statistics).
 
+## [0.35.1] - 2026-06-27
+
+### Changed
+
+- **Debug room progress is now visible without map room overlays.** The progress % chip is now also
+  shown in the room menus (the hold-to-expand layer menu and the room list), next to the dry/wet ages,
+  so it appears even when rooms are not placed as overlays on the map. The gauge/chip now **falls back
+  to the time ratio** when spatial coverage is unavailable (e.g. the parser does not expose room
+  bounding boxes), with an `S`/`T` marker showing which metric is displayed. Still gated behind
+  `debug_room_progress`.
+
 ## [0.35.0] - 2026-06-27
 
 ### Added

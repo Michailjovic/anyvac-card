@@ -87,7 +87,7 @@ const t={ATTRIBUTE:1},e=t=>(...e)=>({_$litDirective$:t,values:e});let i$1 = clas
 
 const CARD_NAME = "anyvac-card";
 const EDITOR_NAME = "anyvac-card-editor";
-const CARD_VERSION = "0.35.0";
+const CARD_VERSION = "0.35.1";
 /** Server-side tracking blueprint */
 const BLUEPRINT_VERSION = "1.0.0";
 const BLUEPRINT_PATH = "anyvac_card/cleaning_tracker.yaml";
@@ -727,21 +727,53 @@ let AnyVacCard = class AnyVacCard extends i$2 {
             return null;
         return (rp[room.key] ?? rp[room.name ?? ""] ?? null);
     }
+    /** Best progress % for a room: spatial coverage if available, else the time ratio.
+     *  kind = "S" (spatial) / "T" (time). null when no data at all. */
+    _roomProgPct(vac, room) {
+        const p = this._roomProgress(vac, room);
+        if (!p)
+            return null;
+        const title = `spatial ${p.spatial_pct ?? "—"}% · time ${p.time_pct ?? "—"}%`;
+        if (p.spatial_pct !== null && p.spatial_pct !== undefined)
+            return { pct: p.spatial_pct, kind: "S", title };
+        if (p.time_pct !== null && p.time_pct !== undefined)
+            return { pct: p.time_pct, kind: "T", title };
+        return null;
+    }
+    /** Best progress across several vacuums (max %), for the deduped room menus. */
+    _roomProgPctAcross(room, vacs) {
+        let best = null;
+        for (const v of vacs) {
+            const p = this._roomProgPct(v, room);
+            if (p && (!best || p.pct > best.pct))
+                best = p;
+        }
+        return best;
+    }
+    _progColor(pct) {
+        return pct >= 90 ? "#52c41a" : pct >= 50 ? "#faad14" : "#40a9ff";
+    }
     /** Small circular % gauge drawn on a room overlay when debug_room_progress is on. */
     _renderRoomGauge(vac, room) {
         if (!this._config.debug_room_progress)
             return A;
-        const p = this._roomProgress(vac, room);
-        const pct = p?.spatial_pct;
-        if (pct === null || pct === undefined)
+        const p = this._roomProgPct(vac, room);
+        if (!p)
             return A;
-        const ring = pct >= 90 ? "#52c41a" : pct >= 50 ? "#faad14" : "#40a9ff";
+        const ring = this._progColor(p.pct);
         return b `
-      <div class="room-gauge" style=${o({ background: `conic-gradient(${ring} ${pct * 3.6}deg, rgba(255,255,255,0.12) 0)` })}
-        title=${`spatial ${pct}% · time ${p?.time_pct ?? "—"}%`}>
-        <span>${pct}</span>
+      <div class="room-gauge" style=${o({ background: `conic-gradient(${ring} ${p.pct * 3.6}deg, rgba(255,255,255,0.12) 0)` })}
+        title=${p.title}>
+        <span>${p.pct}</span>
       </div>
     `;
+    }
+    /** Inline % chip for the room menus (debug only). */
+    _renderProgChip(p) {
+        if (!this._config.debug_room_progress || !p)
+            return A;
+        return b `<span class="rl-prog" title=${p.title}
+      style=${o({ color: this._progColor(p.pct) })}>${p.pct}%<small>${p.kind}</small></span>`;
     }
     _batIcon(pct) {
         if (pct > 80)
@@ -2180,6 +2212,7 @@ let AnyVacCard = class AnyVacCard extends i$2 {
             <button class="layer-menu-row ${sel ? "on" : ""}" @click=${() => this._toggleRoomAcross(r.key, vacs)}>
               <ha-icon icon=${r.icon ?? "mdi:square"}></ha-icon>
               <span class="lm-name">${r.name ?? r.key}</span>
+              ${this._renderProgChip(this._roomProgPctAcross(r, vacs))}
               <b style=${o({ color: this._colorForAgeDays(d) })}>${badge(d)}</b>
             </button>
           `;
@@ -2249,6 +2282,7 @@ let AnyVacCard = class AnyVacCard extends i$2 {
             <button class="room-row ${sel ? "on" : ""}" @click=${() => this._toggleRoomAcross(r.key, shown)}>
               <ha-icon class="rl-icon" icon=${r.icon ?? "mdi:square"}></ha-icon>
               <span class="rl-name">${r.name ?? r.key}</span>
+              ${this._renderProgChip(this._roomProgPctAcross(r, shown))}
               <span class="rl-age"><ha-icon icon="mdi:broom"></ha-icon><b style=${o({ color: this._colorForAgeDays(dry) })}>${badge(dry)}</b></span>
               <span class="rl-age"><ha-icon icon="mdi:water"></ha-icon><b style=${o({ color: this._colorForAgeDays(wet) })}>${badge(wet)}</b></span>
             </button>
@@ -2831,6 +2865,8 @@ AnyVacCard.styles = i$5 `
     .rl-name { flex: 1; text-align: left; font-size: 13px; }
     .rl-age { display: flex; align-items: center; gap: 3px; font-size: 12px; --mdc-icon-size: 14px; color: rgba(255,255,255,0.45); }
     .rl-age b { font-weight: 700; }
+    .rl-prog { font-size: 12px; font-weight: 700; display: flex; align-items: baseline; gap: 1px; }
+    .rl-prog small { font-size: 8px; opacity: 0.55; }
     .map-wrap--fixed { padding-top: 0; }
     .image-base-img--fit { position: absolute; inset: 0; width: 100%; height: 100%; object-fit: contain; }
 
@@ -2972,7 +3008,6 @@ AnyVacCard.styles = i$5 `
     .progress-track {
       flex: 1; height: 3px;
       background: rgba(255, 255, 255, 0.08); border-radius: 2px; overflow: hidden;
-    }
     .progress-fill { height: 100%; border-radius: 2px; transition: width 0.5s ease; }
     .progress-label { font-size: 11px; font-weight: 600; flex-shrink: 0; }
 

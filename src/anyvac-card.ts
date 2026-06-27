@@ -560,19 +560,50 @@ export class AnyVacCard extends LitElement {
     return (rp[room.key] ?? rp[room.name ?? ""] ?? null) as any;
   }
 
+  /** Best progress % for a room: spatial coverage if available, else the time ratio.
+   *  kind = "S" (spatial) / "T" (time). null when no data at all. */
+  private _roomProgPct(vac: VacuumConfig, room: RoomConfig): { pct: number; kind: "S" | "T"; title: string } | null {
+    const p = this._roomProgress(vac, room);
+    if (!p) return null;
+    const title = `spatial ${p.spatial_pct ?? "—"}% · time ${p.time_pct ?? "—"}%`;
+    if (p.spatial_pct !== null && p.spatial_pct !== undefined) return { pct: p.spatial_pct, kind: "S", title };
+    if (p.time_pct !== null && p.time_pct !== undefined) return { pct: p.time_pct, kind: "T", title };
+    return null;
+  }
+
+  /** Best progress across several vacuums (max %), for the deduped room menus. */
+  private _roomProgPctAcross(room: RoomConfig, vacs: VacuumConfig[]): { pct: number; kind: "S" | "T"; title: string } | null {
+    let best: { pct: number; kind: "S" | "T"; title: string } | null = null;
+    for (const v of vacs) {
+      const p = this._roomProgPct(v, room);
+      if (p && (!best || p.pct > best.pct)) best = p;
+    }
+    return best;
+  }
+
+  private _progColor(pct: number): string {
+    return pct >= 90 ? "#52c41a" : pct >= 50 ? "#faad14" : "#40a9ff";
+  }
+
   /** Small circular % gauge drawn on a room overlay when debug_room_progress is on. */
   private _renderRoomGauge(vac: VacuumConfig, room: RoomConfig) {
     if (!this._config.debug_room_progress) return nothing;
-    const p = this._roomProgress(vac, room);
-    const pct = p?.spatial_pct;
-    if (pct === null || pct === undefined) return nothing;
-    const ring = pct >= 90 ? "#52c41a" : pct >= 50 ? "#faad14" : "#40a9ff";
+    const p = this._roomProgPct(vac, room);
+    if (!p) return nothing;
+    const ring = this._progColor(p.pct);
     return html`
-      <div class="room-gauge" style=${styleMap({ background: `conic-gradient(${ring} ${pct * 3.6}deg, rgba(255,255,255,0.12) 0)` })}
-        title=${`spatial ${pct}% · time ${p?.time_pct ?? "—"}%`}>
-        <span>${pct}</span>
+      <div class="room-gauge" style=${styleMap({ background: `conic-gradient(${ring} ${p.pct * 3.6}deg, rgba(255,255,255,0.12) 0)` })}
+        title=${p.title}>
+        <span>${p.pct}</span>
       </div>
     `;
+  }
+
+  /** Inline % chip for the room menus (debug only). */
+  private _renderProgChip(p: { pct: number; kind: "S" | "T"; title: string } | null) {
+    if (!this._config.debug_room_progress || !p) return nothing;
+    return html`<span class="rl-prog" title=${p.title}
+      style=${styleMap({ color: this._progColor(p.pct) })}>${p.pct}%<small>${p.kind}</small></span>`;
   }
 
   private _batIcon(pct: number): string {
@@ -1919,6 +1950,7 @@ export class AnyVacCard extends LitElement {
             <button class="layer-menu-row ${sel ? "on" : ""}" @click=${() => this._toggleRoomAcross(r.key, vacs)}>
               <ha-icon icon=${r.icon ?? "mdi:square"}></ha-icon>
               <span class="lm-name">${r.name ?? r.key}</span>
+              ${this._renderProgChip(this._roomProgPctAcross(r, vacs))}
               <b style=${styleMap({ color: this._colorForAgeDays(d) })}>${badge(d)}</b>
             </button>
           `;
@@ -1981,6 +2013,7 @@ export class AnyVacCard extends LitElement {
             <button class="room-row ${sel ? "on" : ""}" @click=${() => this._toggleRoomAcross(r.key, shown)}>
               <ha-icon class="rl-icon" icon=${r.icon ?? "mdi:square"}></ha-icon>
               <span class="rl-name">${r.name ?? r.key}</span>
+              ${this._renderProgChip(this._roomProgPctAcross(r, shown))}
               <span class="rl-age"><ha-icon icon="mdi:broom"></ha-icon><b style=${styleMap({ color: this._colorForAgeDays(dry) })}>${badge(dry)}</b></span>
               <span class="rl-age"><ha-icon icon="mdi:water"></ha-icon><b style=${styleMap({ color: this._colorForAgeDays(wet) })}>${badge(wet)}</b></span>
             </button>
@@ -2585,6 +2618,8 @@ export class AnyVacCard extends LitElement {
     .rl-name { flex: 1; text-align: left; font-size: 13px; }
     .rl-age { display: flex; align-items: center; gap: 3px; font-size: 12px; --mdc-icon-size: 14px; color: rgba(255,255,255,0.45); }
     .rl-age b { font-weight: 700; }
+    .rl-prog { font-size: 12px; font-weight: 700; display: flex; align-items: baseline; gap: 1px; }
+    .rl-prog small { font-size: 8px; opacity: 0.55; }
     .map-wrap--fixed { padding-top: 0; }
     .image-base-img--fit { position: absolute; inset: 0; width: 100%; height: 100%; object-fit: contain; }
 
