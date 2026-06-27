@@ -2452,19 +2452,28 @@ export class AnyVacCard extends LitElement {
    *  unavailable, the time ratio). Only shown with debug_room_progress on. */
   private _renderDebugProgress(vac: VacuumConfig) {
     if (!this._config.debug_room_progress) return nothing;
-    const items = (this._roomsFor(vac))
-      .map((r) => ({ r, p: this._roomProgPct(vac, r) }))
-      .filter((x) => x.p);
-    if (!items.length) return nothing;
+    const rows = (this._roomsFor(vac))
+      .map((r) => ({ r, raw: this._roomProgress(vac, r) }))
+      .filter((x) => x.raw);
+    if (!rows.length) return nothing;
+    const fmtSec = (s: number) =>
+      s >= 60 ? `${Math.floor(s / 60)}m${String(Math.round(s % 60)).padStart(2, "0")}s` : `${Math.round(s)}s`;
     return html`
       <div class="dbg-prog">
-        ${items.map(({ r, p }) => html`
-          <span class="dbg-prog-item" title=${p!.title}>
-            ${r.icon ? html`<ha-icon icon=${r.icon}></ha-icon>` : nothing}
-            <span class="dbg-prog-name">${r.name ?? r.key}</span>
-            <b style=${styleMap({ color: this._progColor(p!.pct) })}>${p!.pct}%${p!.kind}</b>
-          </span>
-        `)}
+        ${rows.map(({ r, raw }) => {
+          const p = this._roomProgPct(vac, r);
+          return html`
+            <span class="dbg-prog-item" title=${p?.title ?? ""}>
+              ${r.icon ? html`<ha-icon icon=${r.icon}></ha-icon>` : nothing}
+              <span class="dbg-prog-name">${r.name ?? r.key}</span>
+              ${p
+                ? html`<b style=${styleMap({ color: this._progColor(p.pct) })}>${p.pct}%${p.kind}</b>`
+                : raw!.elapsed_s != null
+                  ? html`<b style="color:rgba(255,255,255,0.6)">${fmtSec(raw!.elapsed_s)}</b>`
+                  : nothing}
+            </span>
+          `;
+        })}
       </div>
     `;
   }

@@ -11,6 +11,17 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Rooms from the integration (real room polygons / names) for clickable cleaning on the floorplan.
 - Milestone 3b: companion `anyvac` integration data layers (clean-history, statistics).
 
+## [0.35.3] - 2026-06-27
+
+### Added
+
+- **Elapsed-time fallback in the debug progress strip.** When a room has neither spatial coverage nor
+  a time ratio (e.g. no learned estimate yet), the strip now shows the live elapsed cleaning time
+  (`25m01s`) so the currently-cleaned room still shows a value that changes during a clean.
+- **Room geometry in the Debug tab.** A `rooms (geometry)` block lists each room's `x0/y0/x1/y1` +
+  `pos_x/pos_y`, to diagnose why spatial coverage is unavailable (the spatial % needs room bounding
+  boxes from the parser).
+
 ## [0.35.2] - 2026-06-27
 
 ### Fixed

@@ -87,7 +87,7 @@ const t={ATTRIBUTE:1},e=t=>(...e)=>({_$litDirective$:t,values:e});let i$1 = clas
 
 const CARD_NAME = "anyvac-card";
 const EDITOR_NAME = "anyvac-card-editor";
-const CARD_VERSION = "0.35.2";
+const CARD_VERSION = "0.35.3";
 /** Server-side tracking blueprint */
 const BLUEPRINT_VERSION = "1.0.0";
 const BLUEPRINT_PATH = "anyvac_card/cleaning_tracker.yaml";
@@ -2702,20 +2702,28 @@ let AnyVacCard = class AnyVacCard extends i$2 {
     _renderDebugProgress(vac) {
         if (!this._config.debug_room_progress)
             return A;
-        const items = (this._roomsFor(vac))
-            .map((r) => ({ r, p: this._roomProgPct(vac, r) }))
-            .filter((x) => x.p);
-        if (!items.length)
+        const rows = (this._roomsFor(vac))
+            .map((r) => ({ r, raw: this._roomProgress(vac, r) }))
+            .filter((x) => x.raw);
+        if (!rows.length)
             return A;
+        const fmtSec = (s) => s >= 60 ? `${Math.floor(s / 60)}m${String(Math.round(s % 60)).padStart(2, "0")}s` : `${Math.round(s)}s`;
         return b `
       <div class="dbg-prog">
-        ${items.map(({ r, p }) => b `
-          <span class="dbg-prog-item" title=${p.title}>
-            ${r.icon ? b `<ha-icon icon=${r.icon}></ha-icon>` : A}
-            <span class="dbg-prog-name">${r.name ?? r.key}</span>
-            <b style=${o({ color: this._progColor(p.pct) })}>${p.pct}%${p.kind}</b>
-          </span>
-        `)}
+        ${rows.map(({ r, raw }) => {
+            const p = this._roomProgPct(vac, r);
+            return b `
+            <span class="dbg-prog-item" title=${p?.title ?? ""}>
+              ${r.icon ? b `<ha-icon icon=${r.icon}></ha-icon>` : A}
+              <span class="dbg-prog-name">${r.name ?? r.key}</span>
+              ${p
+                ? b `<b style=${o({ color: this._progColor(p.pct) })}>${p.pct}%${p.kind}</b>`
+                : raw.elapsed_s != null
+                    ? b `<b style="color:rgba(255,255,255,0.6)">${fmtSec(raw.elapsed_s)}</b>`
+                    : A}
+            </span>
+          `;
+        })}
       </div>
     `;
     }
@@ -4758,6 +4766,8 @@ let AnyVacCardEditor = class AnyVacCardEditor extends i$2 {
                     <pre style=${pre}>${fmt(at.rooms_last_cleaned)}</pre>
                     <div class="sub-title">rooms_progress — spatial % + time ratio (live)</div>
                     <pre style=${pre}>${fmt(at.rooms_progress)}</pre>
+                    <div class="sub-title">rooms (geometry — for spatial coverage)</div>
+                    <pre style=${pre}>${fmt((at.rooms ?? []).map((r) => ({ name: r.name, x0: r.x0, y0: r.y0, x1: r.x1, y1: r.y1, pos_x: r.pos_x, pos_y: r.pos_y })))}</pre>
                     <details><summary class="hint" style="cursor:pointer">Raw attributes</summary><pre style=${pre}>${fmt(at)}</pre></details>
                   `}
             </div>`;

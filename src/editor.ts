@@ -1490,6 +1490,8 @@ export class AnyVacCardEditor extends LitElement {
                     <pre style=${pre}>${fmt(at.rooms_last_cleaned)}</pre>
                     <div class="sub-title">rooms_progress — spatial % + time ratio (live)</div>
                     <pre style=${pre}>${fmt(at.rooms_progress)}</pre>
+                    <div class="sub-title">rooms (geometry — for spatial coverage)</div>
+                    <pre style=${pre}>${fmt((at.rooms ?? []).map((r: any) => ({ name: r.name, x0: r.x0, y0: r.y0, x1: r.x1, y1: r.y1, pos_x: r.pos_x, pos_y: r.pos_y })))}</pre>
                     <details><summary class="hint" style="cursor:pointer">Raw attributes</summary><pre style=${pre}>${fmt(at)}</pre></details>
                   `}
             </div>`;
