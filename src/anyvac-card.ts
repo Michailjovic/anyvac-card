@@ -2442,7 +2442,29 @@ export class AnyVacCard extends LitElement {
           ${this._renderStatusRow(vac)}
           ${this._renderProgress(vac)}
           ${this._renderActions(vac, vacIdx)}
+          ${this._renderDebugProgress(vac)}
         </div>
+      </div>
+    `;
+  }
+
+  /** Debug strip inside the status card: per-room cleaning progress (spatial % or, when
+   *  unavailable, the time ratio). Only shown with debug_room_progress on. */
+  private _renderDebugProgress(vac: VacuumConfig) {
+    if (!this._config.debug_room_progress) return nothing;
+    const items = (this._roomsFor(vac))
+      .map((r) => ({ r, p: this._roomProgPct(vac, r) }))
+      .filter((x) => x.p);
+    if (!items.length) return nothing;
+    return html`
+      <div class="dbg-prog">
+        ${items.map(({ r, p }) => html`
+          <span class="dbg-prog-item" title=${p!.title}>
+            ${r.icon ? html`<ha-icon icon=${r.icon}></ha-icon>` : nothing}
+            <span class="dbg-prog-name">${r.name ?? r.key}</span>
+            <b style=${styleMap({ color: this._progColor(p!.pct) })}>${p!.pct}%${p!.kind}</b>
+          </span>
+        `)}
       </div>
     `;
   }
@@ -2764,6 +2786,12 @@ export class AnyVacCard extends LitElement {
     }
     .progress-fill { height: 100%; border-radius: 2px; transition: width 0.5s ease; }
     .progress-label { font-size: 11px; font-weight: 600; flex-shrink: 0; }
+
+    /* ── Debug per-room progress strip ───────────────────────────────── */
+    .dbg-prog { display: flex; flex-wrap: wrap; gap: 6px 12px; padding: 0 16px 12px; }
+    .dbg-prog-item { display: flex; align-items: center; gap: 3px; font-size: 11px; color: rgba(255,255,255,0.55); --mdc-icon-size: 14px; }
+    .dbg-prog-name { color: rgba(255,255,255,0.45); }
+    .dbg-prog-item b { font-weight: 700; }
 
     /* ── Action buttons ──────────────────────────────────────────────── */
     .actions { display: flex; gap: 8px; padding: 0 12px 14px; }

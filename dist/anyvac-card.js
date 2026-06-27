@@ -87,7 +87,7 @@ const t={ATTRIBUTE:1},e=t=>(...e)=>({_$litDirective$:t,values:e});let i$1 = clas
 
 const CARD_NAME = "anyvac-card";
 const EDITOR_NAME = "anyvac-card-editor";
-const CARD_VERSION = "0.35.1";
+const CARD_VERSION = "0.35.2";
 /** Server-side tracking blueprint */
 const BLUEPRINT_VERSION = "1.0.0";
 const BLUEPRINT_PATH = "anyvac_card/cleaning_tracker.yaml";
@@ -2692,7 +2692,30 @@ let AnyVacCard = class AnyVacCard extends i$2 {
           ${this._renderStatusRow(vac)}
           ${this._renderProgress(vac)}
           ${this._renderActions(vac, vacIdx)}
+          ${this._renderDebugProgress(vac)}
         </div>
+      </div>
+    `;
+    }
+    /** Debug strip inside the status card: per-room cleaning progress (spatial % or, when
+     *  unavailable, the time ratio). Only shown with debug_room_progress on. */
+    _renderDebugProgress(vac) {
+        if (!this._config.debug_room_progress)
+            return A;
+        const items = (this._roomsFor(vac))
+            .map((r) => ({ r, p: this._roomProgPct(vac, r) }))
+            .filter((x) => x.p);
+        if (!items.length)
+            return A;
+        return b `
+      <div class="dbg-prog">
+        ${items.map(({ r, p }) => b `
+          <span class="dbg-prog-item" title=${p.title}>
+            ${r.icon ? b `<ha-icon icon=${r.icon}></ha-icon>` : A}
+            <span class="dbg-prog-name">${r.name ?? r.key}</span>
+            <b style=${o({ color: this._progColor(p.pct) })}>${p.pct}%${p.kind}</b>
+          </span>
+        `)}
       </div>
     `;
     }
@@ -3008,8 +3031,15 @@ AnyVacCard.styles = i$5 `
     .progress-track {
       flex: 1; height: 3px;
       background: rgba(255, 255, 255, 0.08); border-radius: 2px; overflow: hidden;
+    }
     .progress-fill { height: 100%; border-radius: 2px; transition: width 0.5s ease; }
     .progress-label { font-size: 11px; font-weight: 600; flex-shrink: 0; }
+
+    /* ── Debug per-room progress strip ───────────────────────────────── */
+    .dbg-prog { display: flex; flex-wrap: wrap; gap: 6px 12px; padding: 0 16px 12px; }
+    .dbg-prog-item { display: flex; align-items: center; gap: 3px; font-size: 11px; color: rgba(255,255,255,0.55); --mdc-icon-size: 14px; }
+    .dbg-prog-name { color: rgba(255,255,255,0.45); }
+    .dbg-prog-item b { font-weight: 700; }
 
     /* ── Action buttons ──────────────────────────────────────────────── */
     .actions { display: flex; gap: 8px; padding: 0 12px 14px; }

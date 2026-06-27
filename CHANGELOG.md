@@ -11,6 +11,20 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Rooms from the integration (real room polygons / names) for clickable cleaning on the floorplan.
 - Milestone 3b: companion `anyvac` integration data layers (clean-history, statistics).
 
+## [0.35.2] - 2026-06-27
+
+### Fixed
+
+- **Broken status-card styling (a build regression in 0.35.1).** A missing CSS brace left the progress
+  bar rule unclosed, which cascaded into the status/controller layout. Restored.
+
+### Added
+
+- **Per-room progress strip inside the status card.** With `debug_room_progress` on, the controller
+  now shows a per-room % line (spatial coverage, or the time ratio with an `S`/`T` marker when spatial
+  is unavailable) — visible right where you watch a vacuum during a clean, not only in the map room
+  menus.
+
 ## [0.35.1] - 2026-06-27
 
 ### Changed
