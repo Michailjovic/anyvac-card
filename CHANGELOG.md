@@ -11,6 +11,25 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Rooms from the integration (real room polygons / names) for clickable cleaning on the floorplan.
 - Milestone 3b: companion `anyvac` integration data layers (clean-history, statistics).
 
+## [0.36.2] - 2026-06-27
+
+### Added
+
+- **Per-room "Cleaning order" field** in the room editor (Vacuums tab). A 1-based sequence number,
+  set per room to match the Roborock app's cleaning order. Stored as `seq` on the room config — the
+  foundation for sequence-aware multi-room progress and target-aware calibration (it does not change
+  behaviour yet).
+
+## [0.36.1] - 2026-06-27
+
+### Fixed
+
+- **Per-second timer didn't tick (jumped every 30 s).** The live interpolation only applied to the
+  "current" room, matched by display name against the integration's room — but a room whose card name
+  differs from the integration name (e.g. card "Hall" = integration "Corridor") never matched, so the
+  timer fell back to the raw 30 s-poll value. The current room is now matched by `key` or `name`, so
+  the `mm:ss` clock ticks every second again.
+
 ## [0.36.0] - 2026-06-27
 
 ### Added

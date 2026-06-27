@@ -87,7 +87,7 @@ const t={ATTRIBUTE:1},e=t=>(...e)=>({_$litDirective$:t,values:e});let i$1 = clas
 
 const CARD_NAME = "anyvac-card";
 const EDITOR_NAME = "anyvac-card-editor";
-const CARD_VERSION = "0.36.0";
+const CARD_VERSION = "0.36.2";
 /** Server-side tracking blueprint */
 const BLUEPRINT_VERSION = "1.0.0";
 const BLUEPRINT_PATH = "anyvac_card/cleaning_tracker.yaml";
@@ -2768,7 +2768,7 @@ let AnyVacCard = class AnyVacCard extends i$2 {
         return b `
       <div class="dbg-prog">
         ${rows.map(({ r, p }) => {
-            const isCur = (r.name ?? r.key) === curRoom && (cleaning || paused);
+            const isCur = (r.key === curRoom || r.name === curRoom) && (cleaning || paused);
             // Elapsed ticks every second for the active room (and keeps moving while paused);
             // the estimate grows equally during a pause so "remaining" stays put.
             const elapsed = (p.elapsed_s ?? 0) + (isCur ? since : 0);
@@ -4385,6 +4385,16 @@ let AnyVacCardEditor = class AnyVacCardEditor extends i$2 {
             ${this._textField("Key (unique ID)", room.key, v => this._setRoom(vacIdx, roomIdx, { key: v }), "e.g. bedroom")}
             <p class="hint">Tip: keep this identical to the room's name in the Roborock app — the <code>native-auto</code> strategy pairs rooms by this name.</p>
             ${this._textField("Display name", room.name, v => this._setRoom(vacIdx, roomIdx, { name: v }), "e.g. Bedroom")}
+            <div class="field field--row">
+              <label>Cleaning order</label>
+              <input class="text-input text-input--sm" type="number" min="1"
+                .value=${String(room.seq ?? "")} placeholder="e.g. 1"
+                @change=${(e) => {
+            const v = parseInt(e.target.value);
+            this._setRoom(vacIdx, roomIdx, { seq: isNaN(v) || v < 1 ? undefined : v });
+        }} />
+            </div>
+            <p class="hint">The order this room is cleaned in (match your Roborock app's room sequence). Used for multi-room progress and calibration.</p>
             ${(this._config.vacuums[vacIdx]?.clean_action?.type === "native-area" ||
             this._config.vacuums[vacIdx]?.clean_action?.type === "native-auto")
             ? b `

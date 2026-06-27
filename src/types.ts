@@ -58,6 +58,9 @@ export interface RoomThreshold {
 export interface RoomConfig {
   key: string;
   name: string;
+  /** Cleaning order (1-based) — the sequence this room is cleaned in, matching the
+   *  Roborock app's room order. Drives multi-room progress + target-aware calibration. */
+  seq?: number;
   icon?: string;                     // volitelné v rectangle módu
   icon_anchor?: "none"|"tl"|"t"|"tr"|"l"|"c"|"r"|"bl"|"b"|"br";
   segment_id?: number;

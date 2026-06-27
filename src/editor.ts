@@ -1021,6 +1021,16 @@ export class AnyVacCardEditor extends LitElement {
             <p class="hint">Tip: keep this identical to the room's name in the Roborock app — the <code>native-auto</code> strategy pairs rooms by this name.</p>
             ${this._textField("Display name", room.name,
               v => this._setRoom(vacIdx, roomIdx, { name: v }), "e.g. Bedroom")}
+            <div class="field field--row">
+              <label>Cleaning order</label>
+              <input class="text-input text-input--sm" type="number" min="1"
+                .value=${String(room.seq ?? "")} placeholder="e.g. 1"
+                @change=${(e: Event) => {
+                  const v = parseInt((e.target as HTMLInputElement).value);
+                  this._setRoom(vacIdx, roomIdx, { seq: isNaN(v) || v < 1 ? undefined : v });
+                }} />
+            </div>
+            <p class="hint">The order this room is cleaned in (match your Roborock app's room sequence). Used for multi-room progress and calibration.</p>
             ${(this._config.vacuums[vacIdx]?.clean_action?.type === "native-area" ||
                this._config.vacuums[vacIdx]?.clean_action?.type === "native-auto")
               ? html`

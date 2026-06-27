@@ -2518,7 +2518,7 @@ export class AnyVacCard extends LitElement {
     return html`
       <div class="dbg-prog">
         ${rows.map(({ r, p }) => {
-          const isCur = (r.name ?? r.key) === curRoom && (cleaning || paused);
+          const isCur = (r.key === curRoom || r.name === curRoom) && (cleaning || paused);
           // Elapsed ticks every second for the active room (and keeps moving while paused);
           // the estimate grows equally during a pause so "remaining" stays put.
           const elapsed = (p!.elapsed_s ?? 0) + (isCur ? since : 0);
