@@ -87,7 +87,7 @@ const t={ATTRIBUTE:1},e=t=>(...e)=>({_$litDirective$:t,values:e});let i$1 = clas
 
 const CARD_NAME = "anyvac-card";
 const EDITOR_NAME = "anyvac-card-editor";
-const CARD_VERSION = "0.36.4";
+const CARD_VERSION = "0.36.5";
 /** Server-side tracking blueprint */
 const BLUEPRINT_VERSION = "1.0.0";
 const BLUEPRINT_PATH = "anyvac_card/cleaning_tracker.yaml";
@@ -1231,7 +1231,7 @@ let AnyVacCard = class AnyVacCard extends i$2 {
         const load = new Map();
         const sorted = [...roomKeys].sort((a, b) => this._roomEstMax(b) - this._roomEstMax(a));
         for (const key of sorted) {
-            const owners = vacuums.filter((v) => cap(v) && this._roomsFor(v).some((r) => r.key === key));
+            const owners = vacuums.filter((v) => cap(v) && this._roomCleanableBy(v, key));
             if (!owners.length)
                 continue;
             let best = owners[0];
@@ -1254,8 +1254,27 @@ let AnyVacCard = class AnyVacCard extends i$2 {
             return r.segment_id;
         const ent = vac.integration_entity;
         const rooms = ent ? this.hass.states[ent]?.attributes?.rooms : undefined;
-        const match = rooms?.find((ir) => ir.name === r?.name);
+        // The integration names rooms by the Roborock app name (== the card room KEY); match
+        // by key first, then the display name as a fallback, then a numeric segment key.
+        const match = rooms?.find((ir) => ir.name === key || ir.name === r?.name || String(ir.segment_id) === key);
         return match?.segment_id ?? null;
+    }
+    /** Whether this vacuum can actually clean a room — its map contains it. In merged mode
+     *  every vacuum nominally "has" all card rooms, but a robot on a different map (or a
+     *  different home) can't, so orchestration must not assign it that room. */
+    _roomCleanableBy(vac, key) {
+        const t = vac.clean_action?.type;
+        if (t === "native" || t === "native-auto")
+            return this._segmentFor(vac, key) != null;
+        if (t === "native-area") {
+            const ent = vac.integration_entity;
+            const name = this._roomsFor(vac).find((x) => x.key === key)?.name ?? key;
+            const rooms = ent ? this.hass.states[ent]?.attributes?.rooms : undefined;
+            if (rooms)
+                return rooms.some((ir) => ir.name === key || ir.name === name);
+            return this._roomsFor(vac).some((x) => x.key === key); // best-effort when no sensor
+        }
+        return false;
     }
     /** Build the clean service call for a vacuum + rooms, mirroring _startClean's strategy. */
     _cleanCmdFor(vac, roomKeys, repeat = 1) {

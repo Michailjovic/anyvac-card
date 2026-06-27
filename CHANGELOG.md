@@ -11,6 +11,19 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Rooms from the integration (real room polygons / names) for clickable cleaning on the floorplan.
 - Milestone 3b: companion `anyvac` integration data layers (clean-history, statistics).
 
+## [0.36.5] - 2026-06-27
+
+### Fixed
+
+- **Orchestration assigned rooms to vacuums that can't clean them.** In merged mode every vacuum
+  nominally "owns" all card-level rooms, so a robot on a different map / home (e.g. an `s6_kitchen`
+  robot vs the `jirsikova` apartment) was assigned a room it has no segment for — its task produced no
+  command and was silently dropped, so only the other robot ran. Assignment now only picks vacuums
+  that can actually clean the room (a resolvable segment, or the room present on the vacuum's own map).
+- **Segment lookup matched by display name instead of key.** `_segmentFor` paired the integration's
+  room (named by the Roborock app name = the card `key`) against the card *display name*, so a renamed
+  room (key `Corridor`, name `Hall`) resolved to no segment. It now matches by `key` first.
+
 ## [0.36.4] - 2026-06-27
 
 ### Fixed

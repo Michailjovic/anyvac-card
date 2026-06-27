@@ -1073,7 +1073,7 @@ export class AnyVacCard extends LitElement {
     const load = new Map<string, number>();
     const sorted = [...roomKeys].sort((a, b) => this._roomEstMax(b) - this._roomEstMax(a));
     for (const key of sorted) {
-      const owners = vacuums.filter((v) => cap(v) && this._roomsFor(v).some((r) => r.key === key));
+      const owners = vacuums.filter((v) => cap(v) && this._roomCleanableBy(v, key));
       if (!owners.length) continue;
       let best = owners[0];
       for (const v of owners) if ((load.get(v.entity) ?? 0) < (load.get(best.entity) ?? 0)) best = v;
@@ -1092,8 +1092,25 @@ export class AnyVacCard extends LitElement {
     if (r?.segment_id != null) return r.segment_id;
     const ent = vac.integration_entity;
     const rooms = ent ? (this.hass.states[ent]?.attributes?.rooms as Array<Record<string, any>> | undefined) : undefined;
-    const match = rooms?.find((ir) => ir.name === r?.name);
+    // The integration names rooms by the Roborock app name (== the card room KEY); match
+    // by key first, then the display name as a fallback, then a numeric segment key.
+    const match = rooms?.find((ir) => ir.name === key || ir.name === r?.name || String(ir.segment_id) === key);
     return (match?.segment_id as number | undefined) ?? null;
+  }
+  /** Whether this vacuum can actually clean a room — its map contains it. In merged mode
+   *  every vacuum nominally "has" all card rooms, but a robot on a different map (or a
+   *  different home) can't, so orchestration must not assign it that room. */
+  private _roomCleanableBy(vac: VacuumConfig, key: string): boolean {
+    const t = vac.clean_action?.type;
+    if (t === "native" || t === "native-auto") return this._segmentFor(vac, key) != null;
+    if (t === "native-area") {
+      const ent = vac.integration_entity;
+      const name = this._roomsFor(vac).find((x) => x.key === key)?.name ?? key;
+      const rooms = ent ? (this.hass.states[ent]?.attributes?.rooms as Array<Record<string, any>> | undefined) : undefined;
+      if (rooms) return rooms.some((ir) => ir.name === key || ir.name === name);
+      return this._roomsFor(vac).some((x) => x.key === key);  // best-effort when no sensor
+    }
+    return false;
   }
   /** Build the clean service call for a vacuum + rooms, mirroring _startClean's strategy. */
   private _cleanCmdFor(vac: VacuumConfig, roomKeys: string[], repeat = 1): { service: string; service_data: Record<string, unknown> } | null {
