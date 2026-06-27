@@ -87,7 +87,7 @@ const t={ATTRIBUTE:1},e=t=>(...e)=>({_$litDirective$:t,values:e});let i$1 = clas
 
 const CARD_NAME = "anyvac-card";
 const EDITOR_NAME = "anyvac-card-editor";
-const CARD_VERSION = "0.35.3";
+const CARD_VERSION = "0.35.4";
 /** Server-side tracking blueprint */
 const BLUEPRINT_VERSION = "1.0.0";
 const BLUEPRINT_PATH = "anyvac_card/cleaning_tracker.yaml";
@@ -740,22 +740,34 @@ let AnyVacCard = class AnyVacCard extends i$2 {
             return { pct: p.time_pct, kind: "T", title };
         return null;
     }
-    /** Best progress across several vacuums (max %), for the deduped room menus. */
-    _roomProgPctAcross(room, vacs) {
+    /** Progress for a room from the vacuums matching a clean type (dry/wet), coloured by
+     *  the vacuum that did it, and only while that vacuum is actively cleaning. A "both"
+     *  vacuum counts for both layers. Used by the per-layer (dry/wet) room menus. */
+    _roomProgForType(room, vacs, type) {
         let best = null;
+        let bestVac = null;
         for (const v of vacs) {
+            if (!this._isCleaning(v))
+                continue;
+            const ct = this._vacCleanType(v);
+            if (type === "dry" && !ct.dry)
+                continue;
+            if (type === "wet" && !ct.wet)
+                continue;
             const p = this._roomProgPct(v, room);
-            if (p && (!best || p.pct > best.pct))
+            if (p && (!best || p.pct > best.pct)) {
                 best = p;
+                bestVac = v;
+            }
         }
-        return best;
+        return best && bestVac ? { ...best, color: this._color(bestVac) } : null;
     }
     _progColor(pct) {
         return pct >= 90 ? "#52c41a" : pct >= 50 ? "#faad14" : "#40a9ff";
     }
     /** Small circular % gauge drawn on a room overlay when debug_room_progress is on. */
     _renderRoomGauge(vac, room) {
-        if (!this._config.debug_room_progress)
+        if (!this._config.debug_room_progress || !this._isCleaning(vac))
             return A;
         const p = this._roomProgPct(vac, room);
         if (!p)
@@ -768,12 +780,12 @@ let AnyVacCard = class AnyVacCard extends i$2 {
       </div>
     `;
     }
-    /** Inline % chip for the room menus (debug only). */
+    /** Inline % chip for the room menus (debug only). Coloured by the vacuum when provided. */
     _renderProgChip(p) {
         if (!this._config.debug_room_progress || !p)
             return A;
         return b `<span class="rl-prog" title=${p.title}
-      style=${o({ color: this._progColor(p.pct) })}>${p.pct}%<small>${p.kind}</small></span>`;
+      style=${o({ color: p.color ?? this._progColor(p.pct) })}>${p.pct}%<small>${p.kind}</small></span>`;
     }
     _batIcon(pct) {
         if (pct > 80)
@@ -2212,7 +2224,7 @@ let AnyVacCard = class AnyVacCard extends i$2 {
             <button class="layer-menu-row ${sel ? "on" : ""}" @click=${() => this._toggleRoomAcross(r.key, vacs)}>
               <ha-icon icon=${r.icon ?? "mdi:square"}></ha-icon>
               <span class="lm-name">${r.name ?? r.key}</span>
-              ${this._renderProgChip(this._roomProgPctAcross(r, vacs))}
+              ${this._renderProgChip(this._roomProgForType(r, vacs, type))}
               <b style=${o({ color: this._colorForAgeDays(d) })}>${badge(d)}</b>
             </button>
           `;
@@ -2282,9 +2294,8 @@ let AnyVacCard = class AnyVacCard extends i$2 {
             <button class="room-row ${sel ? "on" : ""}" @click=${() => this._toggleRoomAcross(r.key, shown)}>
               <ha-icon class="rl-icon" icon=${r.icon ?? "mdi:square"}></ha-icon>
               <span class="rl-name">${r.name ?? r.key}</span>
-              ${this._renderProgChip(this._roomProgPctAcross(r, shown))}
-              <span class="rl-age"><ha-icon icon="mdi:broom"></ha-icon><b style=${o({ color: this._colorForAgeDays(dry) })}>${badge(dry)}</b></span>
-              <span class="rl-age"><ha-icon icon="mdi:water"></ha-icon><b style=${o({ color: this._colorForAgeDays(wet) })}>${badge(wet)}</b></span>
+              <span class="rl-age">${this._renderProgChip(this._roomProgForType(r, shown, "dry"))}<ha-icon icon="mdi:broom"></ha-icon><b style=${o({ color: this._colorForAgeDays(dry) })}>${badge(dry)}</b></span>
+              <span class="rl-age">${this._renderProgChip(this._roomProgForType(r, shown, "wet"))}<ha-icon icon="mdi:water"></ha-icon><b style=${o({ color: this._colorForAgeDays(wet) })}>${badge(wet)}</b></span>
             </button>
           `;
         })}
@@ -2697,33 +2708,29 @@ let AnyVacCard = class AnyVacCard extends i$2 {
       </div>
     `;
     }
-    /** Debug strip inside the status card: per-room cleaning progress (spatial % or, when
-     *  unavailable, the time ratio). Only shown with debug_room_progress on. */
+    /** Debug strip inside the status card: per-room cleaning progress (spatial % and the
+     *  live time spent). Only shown with debug_room_progress on AND while this vacuum is
+     *  actively cleaning (so a docked robot does not show stale numbers). */
     _renderDebugProgress(vac) {
-        if (!this._config.debug_room_progress)
+        if (!this._config.debug_room_progress || !this._isCleaning(vac))
             return A;
         const rows = (this._roomsFor(vac))
-            .map((r) => ({ r, raw: this._roomProgress(vac, r) }))
-            .filter((x) => x.raw);
+            .map((r) => ({ r, raw: this._roomProgress(vac, r), p: this._roomProgPct(vac, r) }))
+            .filter((x) => x.raw && (x.p || x.raw.elapsed_s != null));
         if (!rows.length)
             return A;
+        const color = this._color(vac);
         const fmtSec = (s) => s >= 60 ? `${Math.floor(s / 60)}m${String(Math.round(s % 60)).padStart(2, "0")}s` : `${Math.round(s)}s`;
         return b `
       <div class="dbg-prog">
-        ${rows.map(({ r, raw }) => {
-            const p = this._roomProgPct(vac, r);
-            return b `
-            <span class="dbg-prog-item" title=${p?.title ?? ""}>
-              ${r.icon ? b `<ha-icon icon=${r.icon}></ha-icon>` : A}
-              <span class="dbg-prog-name">${r.name ?? r.key}</span>
-              ${p
-                ? b `<b style=${o({ color: this._progColor(p.pct) })}>${p.pct}%${p.kind}</b>`
-                : raw.elapsed_s != null
-                    ? b `<b style="color:rgba(255,255,255,0.6)">${fmtSec(raw.elapsed_s)}</b>`
-                    : A}
-            </span>
-          `;
-        })}
+        ${rows.map(({ r, raw, p }) => b `
+          <span class="dbg-prog-item" title=${p?.title ?? ""}>
+            ${r.icon ? b `<ha-icon icon=${r.icon}></ha-icon>` : A}
+            <span class="dbg-prog-name">${r.name ?? r.key}</span>
+            ${p ? b `<b style=${o({ color })}>${p.pct}%${p.kind}</b>` : A}
+            ${raw.elapsed_s != null ? b `<small>${fmtSec(raw.elapsed_s)}</small>` : A}
+          </span>
+        `)}
       </div>
     `;
     }
@@ -3048,6 +3055,7 @@ AnyVacCard.styles = i$5 `
     .dbg-prog-item { display: flex; align-items: center; gap: 3px; font-size: 11px; color: rgba(255,255,255,0.55); --mdc-icon-size: 14px; }
     .dbg-prog-name { color: rgba(255,255,255,0.45); }
     .dbg-prog-item b { font-weight: 700; }
+    .dbg-prog-item small { color: rgba(255,255,255,0.4); font-size: 10px; }
 
     /* ── Action buttons ──────────────────────────────────────────────── */
     .actions { display: flex; gap: 8px; padding: 0 12px 14px; }

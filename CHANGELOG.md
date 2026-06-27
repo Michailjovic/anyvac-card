@@ -11,6 +11,19 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Rooms from the integration (real room polygons / names) for clickable cleaning on the floorplan.
 - Milestone 3b: companion `anyvac` integration data layers (clean-history, statistics).
 
+## [0.35.4] - 2026-06-27
+
+### Changed
+
+- **Debug room progress only shows while a vacuum is actively cleaning.** A docked / idle robot no
+  longer shows a stale coverage % (e.g. "Hall 69%" after the clean finished). The chip, the controller
+  strip and the map gauge all hide when the vacuum is not cleaning.
+- **Per-layer (dry/wet) menus show only the matching clean type, coloured by the vacuum.** The dry
+  menu shows progress from dry-capable vacuums and the wet menu from wet-capable ones (a dual vacuum
+  shows in both), and the % is now coloured with the vacuum's own colour instead of a generic scale —
+  so wet pass-throughs no longer bleed into the dry list and vice versa.
+- **Controller strip shows the time spent in the room again, next to the %** (e.g. `Living room 24%S · 12m30s`).
+
 ## [0.35.3] - 2026-06-27
 
 ### Added

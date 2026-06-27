@@ -571,14 +571,23 @@ export class AnyVacCard extends LitElement {
     return null;
   }
 
-  /** Best progress across several vacuums (max %), for the deduped room menus. */
-  private _roomProgPctAcross(room: RoomConfig, vacs: VacuumConfig[]): { pct: number; kind: "S" | "T"; title: string } | null {
+  /** Progress for a room from the vacuums matching a clean type (dry/wet), coloured by
+   *  the vacuum that did it, and only while that vacuum is actively cleaning. A "both"
+   *  vacuum counts for both layers. Used by the per-layer (dry/wet) room menus. */
+  private _roomProgForType(
+    room: RoomConfig, vacs: VacuumConfig[], type: "dry" | "wet",
+  ): { pct: number; kind: "S" | "T"; title: string; color: string } | null {
     let best: { pct: number; kind: "S" | "T"; title: string } | null = null;
+    let bestVac: VacuumConfig | null = null;
     for (const v of vacs) {
+      if (!this._isCleaning(v)) continue;
+      const ct = this._vacCleanType(v);
+      if (type === "dry" && !ct.dry) continue;
+      if (type === "wet" && !ct.wet) continue;
       const p = this._roomProgPct(v, room);
-      if (p && (!best || p.pct > best.pct)) best = p;
+      if (p && (!best || p.pct > best.pct)) { best = p; bestVac = v; }
     }
-    return best;
+    return best && bestVac ? { ...best, color: this._color(bestVac) } : null;
   }
 
   private _progColor(pct: number): string {
@@ -587,7 +596,7 @@ export class AnyVacCard extends LitElement {
 
   /** Small circular % gauge drawn on a room overlay when debug_room_progress is on. */
   private _renderRoomGauge(vac: VacuumConfig, room: RoomConfig) {
-    if (!this._config.debug_room_progress) return nothing;
+    if (!this._config.debug_room_progress || !this._isCleaning(vac)) return nothing;
     const p = this._roomProgPct(vac, room);
     if (!p) return nothing;
     const ring = this._progColor(p.pct);
@@ -599,11 +608,11 @@ export class AnyVacCard extends LitElement {
     `;
   }
 
-  /** Inline % chip for the room menus (debug only). */
-  private _renderProgChip(p: { pct: number; kind: "S" | "T"; title: string } | null) {
+  /** Inline % chip for the room menus (debug only). Coloured by the vacuum when provided. */
+  private _renderProgChip(p: { pct: number; kind: "S" | "T"; title: string; color?: string } | null) {
     if (!this._config.debug_room_progress || !p) return nothing;
     return html`<span class="rl-prog" title=${p.title}
-      style=${styleMap({ color: this._progColor(p.pct) })}>${p.pct}%<small>${p.kind}</small></span>`;
+      style=${styleMap({ color: p.color ?? this._progColor(p.pct) })}>${p.pct}%<small>${p.kind}</small></span>`;
   }
 
   private _batIcon(pct: number): string {
@@ -1950,7 +1959,7 @@ export class AnyVacCard extends LitElement {
             <button class="layer-menu-row ${sel ? "on" : ""}" @click=${() => this._toggleRoomAcross(r.key, vacs)}>
               <ha-icon icon=${r.icon ?? "mdi:square"}></ha-icon>
               <span class="lm-name">${r.name ?? r.key}</span>
-              ${this._renderProgChip(this._roomProgPctAcross(r, vacs))}
+              ${this._renderProgChip(this._roomProgForType(r, vacs, type))}
               <b style=${styleMap({ color: this._colorForAgeDays(d) })}>${badge(d)}</b>
             </button>
           `;
@@ -2013,9 +2022,8 @@ export class AnyVacCard extends LitElement {
             <button class="room-row ${sel ? "on" : ""}" @click=${() => this._toggleRoomAcross(r.key, shown)}>
               <ha-icon class="rl-icon" icon=${r.icon ?? "mdi:square"}></ha-icon>
               <span class="rl-name">${r.name ?? r.key}</span>
-              ${this._renderProgChip(this._roomProgPctAcross(r, shown))}
-              <span class="rl-age"><ha-icon icon="mdi:broom"></ha-icon><b style=${styleMap({ color: this._colorForAgeDays(dry) })}>${badge(dry)}</b></span>
-              <span class="rl-age"><ha-icon icon="mdi:water"></ha-icon><b style=${styleMap({ color: this._colorForAgeDays(wet) })}>${badge(wet)}</b></span>
+              <span class="rl-age">${this._renderProgChip(this._roomProgForType(r, shown, "dry"))}<ha-icon icon="mdi:broom"></ha-icon><b style=${styleMap({ color: this._colorForAgeDays(dry) })}>${badge(dry)}</b></span>
+              <span class="rl-age">${this._renderProgChip(this._roomProgForType(r, shown, "wet"))}<ha-icon icon="mdi:water"></ha-icon><b style=${styleMap({ color: this._colorForAgeDays(wet) })}>${badge(wet)}</b></span>
             </button>
           `;
         })}
@@ -2448,32 +2456,28 @@ export class AnyVacCard extends LitElement {
     `;
   }
 
-  /** Debug strip inside the status card: per-room cleaning progress (spatial % or, when
-   *  unavailable, the time ratio). Only shown with debug_room_progress on. */
+  /** Debug strip inside the status card: per-room cleaning progress (spatial % and the
+   *  live time spent). Only shown with debug_room_progress on AND while this vacuum is
+   *  actively cleaning (so a docked robot does not show stale numbers). */
   private _renderDebugProgress(vac: VacuumConfig) {
-    if (!this._config.debug_room_progress) return nothing;
+    if (!this._config.debug_room_progress || !this._isCleaning(vac)) return nothing;
     const rows = (this._roomsFor(vac))
-      .map((r) => ({ r, raw: this._roomProgress(vac, r) }))
-      .filter((x) => x.raw);
+      .map((r) => ({ r, raw: this._roomProgress(vac, r), p: this._roomProgPct(vac, r) }))
+      .filter((x) => x.raw && (x.p || x.raw!.elapsed_s != null));
     if (!rows.length) return nothing;
+    const color = this._color(vac);
     const fmtSec = (s: number) =>
       s >= 60 ? `${Math.floor(s / 60)}m${String(Math.round(s % 60)).padStart(2, "0")}s` : `${Math.round(s)}s`;
     return html`
       <div class="dbg-prog">
-        ${rows.map(({ r, raw }) => {
-          const p = this._roomProgPct(vac, r);
-          return html`
-            <span class="dbg-prog-item" title=${p?.title ?? ""}>
-              ${r.icon ? html`<ha-icon icon=${r.icon}></ha-icon>` : nothing}
-              <span class="dbg-prog-name">${r.name ?? r.key}</span>
-              ${p
-                ? html`<b style=${styleMap({ color: this._progColor(p.pct) })}>${p.pct}%${p.kind}</b>`
-                : raw!.elapsed_s != null
-                  ? html`<b style="color:rgba(255,255,255,0.6)">${fmtSec(raw!.elapsed_s)}</b>`
-                  : nothing}
-            </span>
-          `;
-        })}
+        ${rows.map(({ r, raw, p }) => html`
+          <span class="dbg-prog-item" title=${p?.title ?? ""}>
+            ${r.icon ? html`<ha-icon icon=${r.icon}></ha-icon>` : nothing}
+            <span class="dbg-prog-name">${r.name ?? r.key}</span>
+            ${p ? html`<b style=${styleMap({ color })}>${p.pct}%${p.kind}</b>` : nothing}
+            ${raw!.elapsed_s != null ? html`<small>${fmtSec(raw!.elapsed_s)}</small>` : nothing}
+          </span>
+        `)}
       </div>
     `;
   }
@@ -2801,6 +2805,7 @@ export class AnyVacCard extends LitElement {
     .dbg-prog-item { display: flex; align-items: center; gap: 3px; font-size: 11px; color: rgba(255,255,255,0.55); --mdc-icon-size: 14px; }
     .dbg-prog-name { color: rgba(255,255,255,0.45); }
     .dbg-prog-item b { font-weight: 700; }
+    .dbg-prog-item small { color: rgba(255,255,255,0.4); font-size: 10px; }
 
     /* ── Action buttons ──────────────────────────────────────────────── */
     .actions { display: flex; gap: 8px; padding: 0 12px 14px; }
