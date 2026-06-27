@@ -97,6 +97,8 @@ export class AnyVacCard extends LitElement {
   @state() private _cardW = 0;
   @state() private _mapAR = 3.636;
   private _ro: ResizeObserver | null = null;
+  private _onWinResize: (() => void) | null = null;
+  private _measureRaf = 0;
   /** Aktivní úklidy — sledování průběhu pro vyhodnocení úspěchu */
   private _inFlight = new Map<string, InFlightCleaning>();
   private _prevVacStates = new Map<string, string>();
@@ -160,17 +162,31 @@ export class AnyVacCard extends LitElement {
     this.style.setProperty("--hold-ms", HOLD_DURATION_MS + "ms");
     this._ensureSubscribed();
     if (!this._ro && typeof ResizeObserver !== "undefined") {
-      this._ro = new ResizeObserver((entries) => {
-        const w = Math.round(entries[0]?.contentRect.width ?? 0);
-        if (w && Math.abs(w - this._cardW) >= 2) this._cardW = w;
-      });
+      this._ro = new ResizeObserver(() => this._scheduleMeasure());
       this._ro.observe(this);
     }
+    if (!this._onWinResize) {
+      this._onWinResize = () => this._scheduleMeasure();
+      window.addEventListener("resize", this._onWinResize, { passive: true });
+    }
+    this._scheduleMeasure();
+  }
+
+  /** Coalesce all width re-measures into one rAF tick (RO + window resize). */
+  private _scheduleMeasure(): void {
+    if (this._measureRaf) return;
+    this._measureRaf = requestAnimationFrame(() => {
+      this._measureRaf = 0;
+      const w = Math.round(this.getBoundingClientRect().width);
+      if (w && Math.abs(w - this._cardW) >= 2) this._cardW = w;
+    });
   }
 
   disconnectedCallback(): void {
     super.disconnectedCallback();
     this._cancelHold();
+    if (this._measureRaf) { cancelAnimationFrame(this._measureRaf); this._measureRaf = 0; }
+    if (this._onWinResize) { window.removeEventListener("resize", this._onWinResize); this._onWinResize = null; }
     if (this._ro) { this._ro.disconnect(); this._ro = null; }
     if (this._unsubEvents) {
       this._unsubEvents.then((unsub) => unsub()).catch(() => { /* connection gone */ });

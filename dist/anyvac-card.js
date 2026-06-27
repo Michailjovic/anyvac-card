@@ -87,7 +87,7 @@ const t={ATTRIBUTE:1},e=t=>(...e)=>({_$litDirective$:t,values:e});let i$1 = clas
 
 const CARD_NAME = "anyvac-card";
 const EDITOR_NAME = "anyvac-card-editor";
-const CARD_VERSION = "0.34.2";
+const CARD_VERSION = "0.34.3";
 /** Server-side tracking blueprint */
 const BLUEPRINT_VERSION = "1.0.0";
 const BLUEPRINT_PATH = "anyvac_card/cleaning_tracker.yaml";
@@ -224,6 +224,8 @@ let AnyVacCard = class AnyVacCard extends i$2 {
         this._cardW = 0;
         this._mapAR = 3.636;
         this._ro = null;
+        this._onWinResize = null;
+        this._measureRaf = 0;
         /** Aktivní úklidy — sledování průběhu pro vyhodnocení úspěchu */
         this._inFlight = new Map();
         this._prevVacStates = new Map();
@@ -297,17 +299,37 @@ let AnyVacCard = class AnyVacCard extends i$2 {
         this.style.setProperty("--hold-ms", HOLD_DURATION_MS + "ms");
         this._ensureSubscribed();
         if (!this._ro && typeof ResizeObserver !== "undefined") {
-            this._ro = new ResizeObserver((entries) => {
-                const w = Math.round(entries[0]?.contentRect.width ?? 0);
-                if (w && Math.abs(w - this._cardW) >= 2)
-                    this._cardW = w;
-            });
+            this._ro = new ResizeObserver(() => this._scheduleMeasure());
             this._ro.observe(this);
         }
+        if (!this._onWinResize) {
+            this._onWinResize = () => this._scheduleMeasure();
+            window.addEventListener("resize", this._onWinResize, { passive: true });
+        }
+        this._scheduleMeasure();
+    }
+    /** Coalesce all width re-measures into one rAF tick (RO + window resize). */
+    _scheduleMeasure() {
+        if (this._measureRaf)
+            return;
+        this._measureRaf = requestAnimationFrame(() => {
+            this._measureRaf = 0;
+            const w = Math.round(this.getBoundingClientRect().width);
+            if (w && Math.abs(w - this._cardW) >= 2)
+                this._cardW = w;
+        });
     }
     disconnectedCallback() {
         super.disconnectedCallback();
         this._cancelHold();
+        if (this._measureRaf) {
+            cancelAnimationFrame(this._measureRaf);
+            this._measureRaf = 0;
+        }
+        if (this._onWinResize) {
+            window.removeEventListener("resize", this._onWinResize);
+            this._onWinResize = null;
+        }
         if (this._ro) {
             this._ro.disconnect();
             this._ro = null;
