@@ -8,8 +8,57 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Planned
 
+- Backend contract v2 (docs/14 Phase 2): px-space geometry attributes, `anyvac.clean` /
+  `anyvac.goto` / `anyvac.zone_clean` / `anyvac.plan` / `anyvac.cancel`; plan building and
+  software repeat move server-side, native-auto segment resolution removed from the card.
 - Rooms from the integration (real room polygons / names) for clickable cleaning on the floorplan.
-- Milestone 3b: companion `anyvac` integration data layers (clean-history, statistics).
+
+## [0.37.0] - 2026-07-02
+
+Backend-first purge (docs/14 canon, Phase 1 + frontend part of Phase 3). The card no longer
+tracks cleaning sessions — the `anyvac` integration (≥0.12.0) is the single source of truth.
+
+### Removed (**breaking** — superseded by the integration)
+
+- **Client-side in-flight cleaning tracking.** The card treated the vacuum entity's
+  `docked` transition as end-of-clean, but a mid-clean mop wash reports `docked`
+  (HA roborock `STATE_CODE_TO_STATE`), so every mop wash prematurely "finished" the
+  session — writing timestamps, mis-calibrating room times, clearing the selection and,
+  worst, restarting `vacuum.clean_area` repeat passes mid-wash. Session tracking now
+  lives in the integration (`in_cleaning` + raw status, mop-wash aware).
+- **Software repeat for `native-area`** (unsafe, see above). Configured `repeat` values
+  are ignored for `native-area` until server-side repeat lands with `anyvac.clean`.
+- **Manual 3-point map calibration** (localStorage, goto-probing). It assumed the dock at
+  map origin and trusted commanded targets over the robot's real position. Pin & Go and
+  Zone now require the integration sensor (`calibration_points`) plus a map entity.
+- **Helper writes**: the card never writes `input_datetime` / `input_number` room helpers
+  anymore; they remain read-only display fallbacks. `single_room_time` option removed.
+- **Ticker notifications, notify-script caller and the cleaning-tracker blueprint**
+  (including the editor deploy UI and helper creators). Build notifications from the
+  integration events (`anyvac_clean_started/finished/room_done`) and its bundled
+  blueprints. `notify`, `notify_script` and `backend` config keys are ignored.
+- The card no longer fires or subscribes to `roborock_card_event`.
+
+### Fixed
+
+- **Click-to-mm used the wrong map with multiple vacuums.** `_clickToContent` grabbed the
+  first `.map-img` in the DOM, so Pin & Go / Zone clicks for robot B were computed in robot
+  A's map space (different seating). The click now targets the clicked vacuum's own map
+  element (`data-entity`), and the floorplan is no longer used as a (geometrically wrong)
+  fallback.
+- **Merged mode + `hide_map` broke click geometry**: the hidden map is now rendered at
+  opacity 0 instead of being skipped, so it can anchor the click transform.
+- **Map tools are disabled in the rotated (narrow/mobile) view** — the click inversion
+  does not account for the wrapper rotation yet, so commands were misplaced there.
+- **Auto-resolved sensors could stay unwatched forever**: the watched-entity cache is no
+  longer frozen before the entity registry is loaded.
+- Dry trace now prefers the integration's segmented `path_dry` (cleaning-only points; no
+  transit / mop-wash / goto driving mixed into the dry layer), falling back to `path` on
+  older integrations; wet trace prefers `path_wet`.
+- Global preset scope now applies to the backend-shared selection when the integration
+  provides one (previously it silently only set the local selection).
+- Live clean-type fallback derives from the vacuum's configured role instead of guessing
+  "wet" from the mere presence of mop entities.
 
 ## [0.36.5] - 2026-06-27
 

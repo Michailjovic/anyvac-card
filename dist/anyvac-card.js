@@ -32,13 +32,20 @@ typeof SuppressedError === "function" ? SuppressedError : function (error, suppr
  * Copyright 2019 Google LLC
  * SPDX-License-Identifier: BSD-3-Clause
  */
-const t$3=globalThis,e$3=t$3.ShadowRoot&&(void 0===t$3.ShadyCSS||t$3.ShadyCSS.nativeShadow)&&"adoptedStyleSheets"in Document.prototype&&"replace"in CSSStyleSheet.prototype,s$2=Symbol(),o$5=new WeakMap;let n$4 = class n{constructor(t,e,o){if(this._$cssResult$=true,o!==s$2)throw Error("CSSResult is not constructable. Use `unsafeCSS` or `css` instead.");this.cssText=t,this.t=e;}get styleSheet(){let t=this.o;const s=this.t;if(e$3&&void 0===t){const e=void 0!==s&&1===s.length;e&&(t=o$5.get(s)),void 0===t&&((this.o=t=new CSSStyleSheet).replaceSync(this.cssText),e&&o$5.set(s,t));}return t}toString(){return this.cssText}};const r$4=t=>new n$4("string"==typeof t?t:t+"",void 0,s$2),i$5=(t,...e)=>{const o=1===t.length?t[0]:e.reduce((e,s,o)=>e+(t=>{if(true===t._$cssResult$)return t.cssText;if("number"==typeof t)return t;throw Error("Value passed to 'css' function must be a 'css' function result: "+t+". Use 'unsafeCSS' to pass non-literal values, but take care to ensure page security.")})(s)+t[o+1],t[0]);return new n$4(o,t,s$2)},S$1=(s,o)=>{if(e$3)s.adoptedStyleSheets=o.map(t=>t instanceof CSSStyleSheet?t:t.styleSheet);else for(const e of o){const o=document.createElement("style"),n=t$3.litNonce;void 0!==n&&o.setAttribute("nonce",n),o.textContent=e.cssText,s.appendChild(o);}},c$2=e$3?t=>t:t=>t instanceof CSSStyleSheet?(t=>{let e="";for(const s of t.cssRules)e+=s.cssText;return r$4(e)})(t):t;
+const t$4=globalThis,e$4=t$4.ShadowRoot&&(void 0===t$4.ShadyCSS||t$4.ShadyCSS.nativeShadow)&&"adoptedStyleSheets"in Document.prototype&&"replace"in CSSStyleSheet.prototype,s$3=Symbol(),o$6=new WeakMap;let n$5 = class n{constructor(t,e,o){if(this._$cssResult$=true,o!==s$3)throw Error("CSSResult is not constructable. Use `unsafeCSS` or `css` instead.");this.cssText=t,this.t=e;}get styleSheet(){let t=this.o;const s=this.t;if(e$4&&void 0===t){const e=void 0!==s&&1===s.length;e&&(t=o$6.get(s)),void 0===t&&((this.o=t=new CSSStyleSheet).replaceSync(this.cssText),e&&o$6.set(s,t));}return t}toString(){return this.cssText}};const r$5=t=>new n$5("string"==typeof t?t:t+"",void 0,s$3),i$6=(t,...e)=>{const o=1===t.length?t[0]:e.reduce((e,s,o)=>e+(t=>{if(true===t._$cssResult$)return t.cssText;if("number"==typeof t)return t;throw Error("Value passed to 'css' function must be a 'css' function result: "+t+". Use 'unsafeCSS' to pass non-literal values, but take care to ensure page security.")})(s)+t[o+1],t[0]);return new n$5(o,t,s$3)},S$2=(s,o)=>{if(e$4)s.adoptedStyleSheets=o.map(t=>t instanceof CSSStyleSheet?t:t.styleSheet);else for(const e of o){const o=document.createElement("style"),n=t$4.litNonce;void 0!==n&&o.setAttribute("nonce",n),o.textContent=e.cssText,s.appendChild(o);}},c$3=e$4?t=>t:t=>t instanceof CSSStyleSheet?(t=>{let e="";for(const s of t.cssRules)e+=s.cssText;return r$5(e)})(t):t;
 
 /**
  * @license
  * Copyright 2017 Google LLC
  * SPDX-License-Identifier: BSD-3-Clause
- */const{is:i$4,defineProperty:e$2,getOwnPropertyDescriptor:h$1,getOwnPropertyNames:r$3,getOwnPropertySymbols:o$4,getPrototypeOf:n$3}=Object,a$1=globalThis,c$1=a$1.trustedTypes,l$1=c$1?c$1.emptyScript:"",p$1=a$1.reactiveElementPolyfillSupport,d$1=(t,s)=>t,u$1={toAttribute(t,s){switch(s){case Boolean:t=t?l$1:null;break;case Object:case Array:t=null==t?t:JSON.stringify(t);}return t},fromAttribute(t,s){let i=t;switch(s){case Boolean:i=null!==t;break;case Number:i=null===t?null:Number(t);break;case Object:case Array:try{i=JSON.parse(t);}catch(t){i=null;}}return i}},f$1=(t,s)=>!i$4(t,s),b$1={attribute:true,type:String,converter:u$1,reflect:false,useDefault:false,hasChanged:f$1};Symbol.metadata??=Symbol("metadata"),a$1.litPropertyMetadata??=new WeakMap;let y$1 = class y extends HTMLElement{static addInitializer(t){this._$Ei(),(this.l??=[]).push(t);}static get observedAttributes(){return this.finalize(),this._$Eh&&[...this._$Eh.keys()]}static createProperty(t,s=b$1){if(s.state&&(s.attribute=false),this._$Ei(),this.prototype.hasOwnProperty(t)&&((s=Object.create(s)).wrapped=true),this.elementProperties.set(t,s),!s.noAccessor){const i=Symbol(),h=this.getPropertyDescriptor(t,i,s);void 0!==h&&e$2(this.prototype,t,h);}}static getPropertyDescriptor(t,s,i){const{get:e,set:r}=h$1(this.prototype,t)??{get(){return this[s]},set(t){this[s]=t;}};return {get:e,set(s){const h=e?.call(this);r?.call(this,s),this.requestUpdate(t,h,i);},configurable:true,enumerable:true}}static getPropertyOptions(t){return this.elementProperties.get(t)??b$1}static _$Ei(){if(this.hasOwnProperty(d$1("elementProperties")))return;const t=n$3(this);t.finalize(),void 0!==t.l&&(this.l=[...t.l]),this.elementProperties=new Map(t.elementProperties);}static finalize(){if(this.hasOwnProperty(d$1("finalized")))return;if(this.finalized=true,this._$Ei(),this.hasOwnProperty(d$1("properties"))){const t=this.properties,s=[...r$3(t),...o$4(t)];for(const i of s)this.createProperty(i,t[i]);}const t=this[Symbol.metadata];if(null!==t){const s=litPropertyMetadata.get(t);if(void 0!==s)for(const[t,i]of s)this.elementProperties.set(t,i);}this._$Eh=new Map;for(const[t,s]of this.elementProperties){const i=this._$Eu(t,s);void 0!==i&&this._$Eh.set(i,t);}this.elementStyles=this.finalizeStyles(this.styles);}static finalizeStyles(s){const i=[];if(Array.isArray(s)){const e=new Set(s.flat(1/0).reverse());for(const s of e)i.unshift(c$2(s));}else void 0!==s&&i.push(c$2(s));return i}static _$Eu(t,s){const i=s.attribute;return  false===i?void 0:"string"==typeof i?i:"string"==typeof t?t.toLowerCase():void 0}constructor(){super(),this._$Ep=void 0,this.isUpdatePending=false,this.hasUpdated=false,this._$Em=null,this._$Ev();}_$Ev(){this._$ES=new Promise(t=>this.enableUpdating=t),this._$AL=new Map,this._$E_(),this.requestUpdate(),this.constructor.l?.forEach(t=>t(this));}addController(t){(this._$EO??=new Set).add(t),void 0!==this.renderRoot&&this.isConnected&&t.hostConnected?.();}removeController(t){this._$EO?.delete(t);}_$E_(){const t=new Map,s=this.constructor.elementProperties;for(const i of s.keys())this.hasOwnProperty(i)&&(t.set(i,this[i]),delete this[i]);t.size>0&&(this._$Ep=t);}createRenderRoot(){const t=this.shadowRoot??this.attachShadow(this.constructor.shadowRootOptions);return S$1(t,this.constructor.elementStyles),t}connectedCallback(){this.renderRoot??=this.createRenderRoot(),this.enableUpdating(true),this._$EO?.forEach(t=>t.hostConnected?.());}enableUpdating(t){}disconnectedCallback(){this._$EO?.forEach(t=>t.hostDisconnected?.());}attributeChangedCallback(t,s,i){this._$AK(t,i);}_$ET(t,s){const i=this.constructor.elementProperties.get(t),e=this.constructor._$Eu(t,i);if(void 0!==e&&true===i.reflect){const h=(void 0!==i.converter?.toAttribute?i.converter:u$1).toAttribute(s,i.type);this._$Em=t,null==h?this.removeAttribute(e):this.setAttribute(e,h),this._$Em=null;}}_$AK(t,s){const i=this.constructor,e=i._$Eh.get(t);if(void 0!==e&&this._$Em!==e){const t=i.getPropertyOptions(e),h="function"==typeof t.converter?{fromAttribute:t.converter}:void 0!==t.converter?.fromAttribute?t.converter:u$1;this._$Em=e;const r=h.fromAttribute(s,t.type);this[e]=r??this._$Ej?.get(e)??r,this._$Em=null;}}requestUpdate(t,s,i,e=false,h){if(void 0!==t){const r=this.constructor;if(false===e&&(h=this[t]),i??=r.getPropertyOptions(t),!((i.hasChanged??f$1)(h,s)||i.useDefault&&i.reflect&&h===this._$Ej?.get(t)&&!this.hasAttribute(r._$Eu(t,i))))return;this.C(t,s,i);} false===this.isUpdatePending&&(this._$ES=this._$EP());}C(t,s,{useDefault:i,reflect:e,wrapped:h},r){i&&!(this._$Ej??=new Map).has(t)&&(this._$Ej.set(t,r??s??this[t]),true!==h||void 0!==r)||(this._$AL.has(t)||(this.hasUpdated||i||(s=void 0),this._$AL.set(t,s)),true===e&&this._$Em!==t&&(this._$Eq??=new Set).add(t));}async _$EP(){this.isUpdatePending=true;try{await this._$ES;}catch(t){Promise.reject(t);}const t=this.scheduleUpdate();return null!=t&&await t,!this.isUpdatePending}scheduleUpdate(){return this.performUpdate()}performUpdate(){if(!this.isUpdatePending)return;if(!this.hasUpdated){if(this.renderRoot??=this.createRenderRoot(),this._$Ep){for(const[t,s]of this._$Ep)this[t]=s;this._$Ep=void 0;}const t=this.constructor.elementProperties;if(t.size>0)for(const[s,i]of t){const{wrapped:t}=i,e=this[s];true!==t||this._$AL.has(s)||void 0===e||this.C(s,void 0,i,e);}}let t=false;const s=this._$AL;try{t=this.shouldUpdate(s),t?(this.willUpdate(s),this._$EO?.forEach(t=>t.hostUpdate?.()),this.update(s)):this._$EM();}catch(s){throw t=false,this._$EM(),s}t&&this._$AE(s);}willUpdate(t){}_$AE(t){this._$EO?.forEach(t=>t.hostUpdated?.()),this.hasUpdated||(this.hasUpdated=true,this.firstUpdated(t)),this.updated(t);}_$EM(){this._$AL=new Map,this.isUpdatePending=false;}get updateComplete(){return this.getUpdateComplete()}getUpdateComplete(){return this._$ES}shouldUpdate(t){return  true}update(t){this._$Eq&&=this._$Eq.forEach(t=>this._$ET(t,this[t])),this._$EM();}updated(t){}firstUpdated(t){}};y$1.elementStyles=[],y$1.shadowRootOptions={mode:"open"},y$1[d$1("elementProperties")]=new Map,y$1[d$1("finalized")]=new Map,p$1?.({ReactiveElement:y$1}),(a$1.reactiveElementVersions??=[]).push("2.1.2");
+ */const{is:i$5,defineProperty:e$3,getOwnPropertyDescriptor:h$2,getOwnPropertyNames:r$4,getOwnPropertySymbols:o$5,getPrototypeOf:n$4}=Object,a$2=globalThis,c$2=a$2.trustedTypes,l$2=c$2?c$2.emptyScript:"",p$2=a$2.reactiveElementPolyfillSupport,d$2=(t,s)=>t,u$2={toAttribute(t,s){switch(s){case Boolean:t=t?l$2:null;break;case Object:case Array:t=null==t?t:JSON.stringify(t);}return t},fromAttribute(t,s){let i=t;switch(s){case Boolean:i=null!==t;break;case Number:i=null===t?null:Number(t);break;case Object:case Array:try{i=JSON.parse(t);}catch(t){i=null;}}return i}},f$2=(t,s)=>!i$5(t,s),b$1={attribute:true,type:String,converter:u$2,reflect:false,useDefault:false,hasChanged:f$2};Symbol.metadata??=Symbol("metadata"),a$2.litPropertyMetadata??=new WeakMap;let y$2 = class y extends HTMLElement{static addInitializer(t){this._$Ei(),(this.l??=[]).push(t);}static get observedAttributes(){return this.finalize(),this._$Eh&&[...this._$Eh.keys()]}static createProperty(t,s=b$1){if(s.state&&(s.attribute=false),this._$Ei(),this.prototype.hasOwnProperty(t)&&((s=Object.create(s)).wrapped=true),this.elementProperties.set(t,s),!s.noAccessor){const i=Symbol(),h=this.getPropertyDescriptor(t,i,s);void 0!==h&&e$3(this.prototype,t,h);}}static getPropertyDescriptor(t,s,i){const{get:e,set:r}=h$2(this.prototype,t)??{get(){return this[s]},set(t){this[s]=t;}};return {get:e,set(s){const h=e?.call(this);r?.call(this,s),this.requestUpdate(t,h,i);},configurable:true,enumerable:true}}static getPropertyOptions(t){return this.elementProperties.get(t)??b$1}static _$Ei(){if(this.hasOwnProperty(d$2("elementProperties")))return;const t=n$4(this);t.finalize(),void 0!==t.l&&(this.l=[...t.l]),this.elementProperties=new Map(t.elementProperties);}static finalize(){if(this.hasOwnProperty(d$2("finalized")))return;if(this.finalized=true,this._$Ei(),this.hasOwnProperty(d$2("properties"))){const t=this.properties,s=[...r$4(t),...o$5(t)];for(const i of s)this.createProperty(i,t[i]);}const t=this[Symbol.metadata];if(null!==t){const s=litPropertyMetadata.get(t);if(void 0!==s)for(const[t,i]of s)this.elementProperties.set(t,i);}this._$Eh=new Map;for(const[t,s]of this.elementProperties){const i=this._$Eu(t,s);void 0!==i&&this._$Eh.set(i,t);}this.elementStyles=this.finalizeStyles(this.styles);}static finalizeStyles(s){const i=[];if(Array.isArray(s)){const e=new Set(s.flat(1/0).reverse());for(const s of e)i.unshift(c$3(s));}else void 0!==s&&i.push(c$3(s));return i}static _$Eu(t,s){const i=s.attribute;return  false===i?void 0:"string"==typeof i?i:"string"==typeof t?t.toLowerCase():void 0}constructor(){super(),this._$Ep=void 0,this.isUpdatePending=false,this.hasUpdated=false,this._$Em=null,this._$Ev();}_$Ev(){this._$ES=new Promise(t=>this.enableUpdating=t),this._$AL=new Map,this._$E_(),this.requestUpdate(),this.constructor.l?.forEach(t=>t(this));}addController(t){(this._$EO??=new Set).add(t),void 0!==this.renderRoot&&this.isConnected&&t.hostConnected?.();}removeController(t){this._$EO?.delete(t);}_$E_(){const t=new Map,s=this.constructor.elementProperties;for(const i of s.keys())this.hasOwnProperty(i)&&(t.set(i,this[i]),delete this[i]);t.size>0&&(this._$Ep=t);}createRenderRoot(){const t=this.shadowRoot??this.attachShadow(this.constructor.shadowRootOptions);return S$2(t,this.constructor.elementStyles),t}connectedCallback(){this.renderRoot??=this.createRenderRoot(),this.enableUpdating(true),this._$EO?.forEach(t=>t.hostConnected?.());}enableUpdating(t){}disconnectedCallback(){this._$EO?.forEach(t=>t.hostDisconnected?.());}attributeChangedCallback(t,s,i){this._$AK(t,i);}_$ET(t,s){const i=this.constructor.elementProperties.get(t),e=this.constructor._$Eu(t,i);if(void 0!==e&&true===i.reflect){const h=(void 0!==i.converter?.toAttribute?i.converter:u$2).toAttribute(s,i.type);this._$Em=t,null==h?this.removeAttribute(e):this.setAttribute(e,h),this._$Em=null;}}_$AK(t,s){const i=this.constructor,e=i._$Eh.get(t);if(void 0!==e&&this._$Em!==e){const t=i.getPropertyOptions(e),h="function"==typeof t.converter?{fromAttribute:t.converter}:void 0!==t.converter?.fromAttribute?t.converter:u$2;this._$Em=e;const r=h.fromAttribute(s,t.type);this[e]=r??this._$Ej?.get(e)??r,this._$Em=null;}}requestUpdate(t,s,i,e=false,h){if(void 0!==t){const r=this.constructor;if(false===e&&(h=this[t]),i??=r.getPropertyOptions(t),!((i.hasChanged??f$2)(h,s)||i.useDefault&&i.reflect&&h===this._$Ej?.get(t)&&!this.hasAttribute(r._$Eu(t,i))))return;this.C(t,s,i);} false===this.isUpdatePending&&(this._$ES=this._$EP());}C(t,s,{useDefault:i,reflect:e,wrapped:h},r){i&&!(this._$Ej??=new Map).has(t)&&(this._$Ej.set(t,r??s??this[t]),true!==h||void 0!==r)||(this._$AL.has(t)||(this.hasUpdated||i||(s=void 0),this._$AL.set(t,s)),true===e&&this._$Em!==t&&(this._$Eq??=new Set).add(t));}async _$EP(){this.isUpdatePending=true;try{await this._$ES;}catch(t){Promise.reject(t);}const t=this.scheduleUpdate();return null!=t&&await t,!this.isUpdatePending}scheduleUpdate(){return this.performUpdate()}performUpdate(){if(!this.isUpdatePending)return;if(!this.hasUpdated){if(this.renderRoot??=this.createRenderRoot(),this._$Ep){for(const[t,s]of this._$Ep)this[t]=s;this._$Ep=void 0;}const t=this.constructor.elementProperties;if(t.size>0)for(const[s,i]of t){const{wrapped:t}=i,e=this[s];true!==t||this._$AL.has(s)||void 0===e||this.C(s,void 0,i,e);}}let t=false;const s=this._$AL;try{t=this.shouldUpdate(s),t?(this.willUpdate(s),this._$EO?.forEach(t=>t.hostUpdate?.()),this.update(s)):this._$EM();}catch(s){throw t=false,this._$EM(),s}t&&this._$AE(s);}willUpdate(t){}_$AE(t){this._$EO?.forEach(t=>t.hostUpdated?.()),this.hasUpdated||(this.hasUpdated=true,this.firstUpdated(t)),this.updated(t);}_$EM(){this._$AL=new Map,this.isUpdatePending=false;}get updateComplete(){return this.getUpdateComplete()}getUpdateComplete(){return this._$ES}shouldUpdate(t){return  true}update(t){this._$Eq&&=this._$Eq.forEach(t=>this._$ET(t,this[t])),this._$EM();}updated(t){}firstUpdated(t){}};y$2.elementStyles=[],y$2.shadowRootOptions={mode:"open"},y$2[d$2("elementProperties")]=new Map,y$2[d$2("finalized")]=new Map,p$2?.({ReactiveElement:y$2}),(a$2.reactiveElementVersions??=[]).push("2.1.2");
+
+/**
+ * @license
+ * Copyright 2017 Google LLC
+ * SPDX-License-Identifier: BSD-3-Clause
+ */
+const t$3=globalThis,i$4=t=>t,s$2=t$3.trustedTypes,e$2=s$2?s$2.createPolicy("lit-html",{createHTML:t=>t}):void 0,h$1="$lit$",o$4=`lit$${Math.random().toFixed(9).slice(2)}$`,n$3="?"+o$4,r$3=`<${n$3}>`,l$1=document,c$1=()=>l$1.createComment(""),a$1=t=>null===t||"object"!=typeof t&&"function"!=typeof t,u$1=Array.isArray,d$1=t=>u$1(t)||"function"==typeof t?.[Symbol.iterator],f$1="[ \t\n\f\r]",v$1=/<(?:(!--|\/[^a-zA-Z])|(\/?[a-zA-Z][^>\s]*)|(\/?$))/g,_$1=/-->/g,m$1=/>/g,p$1=RegExp(`>|${f$1}(?:([^\\s"'>=/]+)(${f$1}*=${f$1}*(?:[^ \t\n\f\r"'\`<>=]|("|')|))|$)`,"g"),g$1=/'/g,$$1=/"/g,y$1=/^(?:script|style|textarea|title)$/i,E$1=Symbol.for("lit-noChange"),A$1=Symbol.for("lit-nothing"),C$1=new WeakMap,P$1=l$1.createTreeWalker(l$1,129);function V$1(t,i){if(!u$1(t)||!t.hasOwnProperty("raw"))throw Error("invalid template strings array");return void 0!==e$2?e$2.createHTML(i):i}const N$1=(t,i)=>{const s=t.length-1,e=[];let n,l=2===i?"<svg>":3===i?"<math>":"",c=v$1;for(let i=0;i<s;i++){const s=t[i];let a,u,d=-1,f=0;for(;f<s.length&&(c.lastIndex=f,u=c.exec(s),null!==u);)f=c.lastIndex,c===v$1?"!--"===u[1]?c=_$1:void 0!==u[1]?c=m$1:void 0!==u[2]?(y$1.test(u[2])&&(n=RegExp("</"+u[2],"g")),c=p$1):void 0!==u[3]&&(c=p$1):c===p$1?">"===u[0]?(c=n??v$1,d=-1):void 0===u[1]?d=-2:(d=c.lastIndex-u[2].length,a=u[1],c=void 0===u[3]?p$1:'"'===u[3]?$$1:g$1):c===$$1||c===g$1?c=p$1:c===_$1||c===m$1?c=v$1:(c=p$1,n=void 0);const x=c===p$1&&t[i+1].startsWith("/>")?" ":"";l+=c===v$1?s+r$3:d>=0?(e.push(a),s.slice(0,d)+h$1+s.slice(d)+o$4+x):s+o$4+(-2===d?i:x);}return [V$1(t,l+(t[s]||"<?>")+(2===i?"</svg>":3===i?"</math>":"")),e]};let S$1 = class S{constructor({strings:t,_$litType$:i},e){let r;this.parts=[];let l=0,a=0;const u=t.length-1,d=this.parts,[f,v]=N$1(t,i);if(this.el=S.createElement(f,e),P$1.currentNode=this.el.content,2===i||3===i){const t=this.el.content.firstChild;t.replaceWith(...t.childNodes);}for(;null!==(r=P$1.nextNode())&&d.length<u;){if(1===r.nodeType){if(r.hasAttributes())for(const t of r.getAttributeNames())if(t.endsWith(h$1)){const i=v[a++],s=r.getAttribute(t).split(o$4),e=/([.?@])?(.*)/.exec(i);d.push({type:1,index:l,name:e[2],strings:s,ctor:"."===e[1]?I$1:"?"===e[1]?L$1:"@"===e[1]?z$1:H$1}),r.removeAttribute(t);}else t.startsWith(o$4)&&(d.push({type:6,index:l}),r.removeAttribute(t));if(y$1.test(r.tagName)){const t=r.textContent.split(o$4),i=t.length-1;if(i>0){r.textContent=s$2?s$2.emptyScript:"";for(let s=0;s<i;s++)r.append(t[s],c$1()),P$1.nextNode(),d.push({type:2,index:++l});r.append(t[i],c$1());}}}else if(8===r.nodeType)if(r.data===n$3)d.push({type:2,index:l});else {let t=-1;for(;-1!==(t=r.data.indexOf(o$4,t+1));)d.push({type:7,index:l}),t+=o$4.length-1;}l++;}}static createElement(t,i){const s=l$1.createElement("template");return s.innerHTML=t,s}};function M$1(t,i,s=t,e){if(i===E$1)return i;let h=void 0!==e?s._$Co?.[e]:s._$Cl;const o=a$1(i)?void 0:i._$litDirective$;return h?.constructor!==o&&(h?._$AO?.(false),void 0===o?h=void 0:(h=new o(t),h._$AT(t,s,e)),void 0!==e?(s._$Co??=[])[e]=h:s._$Cl=h),void 0!==h&&(i=M$1(t,h._$AS(t,i.values),h,e)),i}let R$1 = class R{constructor(t,i){this._$AV=[],this._$AN=void 0,this._$AD=t,this._$AM=i;}get parentNode(){return this._$AM.parentNode}get _$AU(){return this._$AM._$AU}u(t){const{el:{content:i},parts:s}=this._$AD,e=(t?.creationScope??l$1).importNode(i,true);P$1.currentNode=e;let h=P$1.nextNode(),o=0,n=0,r=s[0];for(;void 0!==r;){if(o===r.index){let i;2===r.type?i=new k$1(h,h.nextSibling,this,t):1===r.type?i=new r.ctor(h,r.name,r.strings,this,t):6===r.type&&(i=new Z$1(h,this,t)),this._$AV.push(i),r=s[++n];}o!==r?.index&&(h=P$1.nextNode(),o++);}return P$1.currentNode=l$1,e}p(t){let i=0;for(const s of this._$AV) void 0!==s&&(void 0!==s.strings?(s._$AI(t,s,i),i+=s.strings.length-2):s._$AI(t[i])),i++;}};let k$1 = class k{get _$AU(){return this._$AM?._$AU??this._$Cv}constructor(t,i,s,e){this.type=2,this._$AH=A$1,this._$AN=void 0,this._$AA=t,this._$AB=i,this._$AM=s,this.options=e,this._$Cv=e?.isConnected??true;}get parentNode(){let t=this._$AA.parentNode;const i=this._$AM;return void 0!==i&&11===t?.nodeType&&(t=i.parentNode),t}get startNode(){return this._$AA}get endNode(){return this._$AB}_$AI(t,i=this){t=M$1(this,t,i),a$1(t)?t===A$1||null==t||""===t?(this._$AH!==A$1&&this._$AR(),this._$AH=A$1):t!==this._$AH&&t!==E$1&&this._(t):void 0!==t._$litType$?this.$(t):void 0!==t.nodeType?this.T(t):d$1(t)?this.k(t):this._(t);}O(t){return this._$AA.parentNode.insertBefore(t,this._$AB)}T(t){this._$AH!==t&&(this._$AR(),this._$AH=this.O(t));}_(t){this._$AH!==A$1&&a$1(this._$AH)?this._$AA.nextSibling.data=t:this.T(l$1.createTextNode(t)),this._$AH=t;}$(t){const{values:i,_$litType$:s}=t,e="number"==typeof s?this._$AC(t):(void 0===s.el&&(s.el=S$1.createElement(V$1(s.h,s.h[0]),this.options)),s);if(this._$AH?._$AD===e)this._$AH.p(i);else {const t=new R$1(e,this),s=t.u(this.options);t.p(i),this.T(s),this._$AH=t;}}_$AC(t){let i=C$1.get(t.strings);return void 0===i&&C$1.set(t.strings,i=new S$1(t)),i}k(t){u$1(this._$AH)||(this._$AH=[],this._$AR());const i=this._$AH;let s,e=0;for(const h of t)e===i.length?i.push(s=new k(this.O(c$1()),this.O(c$1()),this,this.options)):s=i[e],s._$AI(h),e++;e<i.length&&(this._$AR(s&&s._$AB.nextSibling,e),i.length=e);}_$AR(t=this._$AA.nextSibling,s){for(this._$AP?.(false,true,s);t!==this._$AB;){const s=i$4(t).nextSibling;i$4(t).remove(),t=s;}}setConnected(t){ void 0===this._$AM&&(this._$Cv=t,this._$AP?.(t));}};let H$1 = class H{get tagName(){return this.element.tagName}get _$AU(){return this._$AM._$AU}constructor(t,i,s,e,h){this.type=1,this._$AH=A$1,this._$AN=void 0,this.element=t,this.name=i,this._$AM=e,this.options=h,s.length>2||""!==s[0]||""!==s[1]?(this._$AH=Array(s.length-1).fill(new String),this.strings=s):this._$AH=A$1;}_$AI(t,i=this,s,e){const h=this.strings;let o=false;if(void 0===h)t=M$1(this,t,i,0),o=!a$1(t)||t!==this._$AH&&t!==E$1,o&&(this._$AH=t);else {const e=t;let n,r;for(t=h[0],n=0;n<h.length-1;n++)r=M$1(this,e[s+n],i,n),r===E$1&&(r=this._$AH[n]),o||=!a$1(r)||r!==this._$AH[n],r===A$1?t=A$1:t!==A$1&&(t+=(r??"")+h[n+1]),this._$AH[n]=r;}o&&!e&&this.j(t);}j(t){t===A$1?this.element.removeAttribute(this.name):this.element.setAttribute(this.name,t??"");}};let I$1 = class I extends H$1{constructor(){super(...arguments),this.type=3;}j(t){this.element[this.name]=t===A$1?void 0:t;}};let L$1 = class L extends H$1{constructor(){super(...arguments),this.type=4;}j(t){this.element.toggleAttribute(this.name,!!t&&t!==A$1);}};let z$1 = class z extends H$1{constructor(t,i,s,e,h){super(t,i,s,e,h),this.type=5;}_$AI(t,i=this){if((t=M$1(this,t,i,0)??A$1)===E$1)return;const s=this._$AH,e=t===A$1&&s!==A$1||t.capture!==s.capture||t.once!==s.once||t.passive!==s.passive,h=t!==A$1&&(s===A$1||e);e&&this.element.removeEventListener(this.name,this,s),h&&this.element.addEventListener(this.name,this,t),this._$AH=t;}handleEvent(t){"function"==typeof this._$AH?this._$AH.call(this.options?.host??this.element,t):this._$AH.handleEvent(t);}};let Z$1 = class Z{constructor(t,i,s){this.element=t,this.type=6,this._$AN=void 0,this._$AM=i,this.options=s;}get _$AU(){return this._$AM._$AU}_$AI(t){M$1(this,t);}};const B$1=t$3.litHtmlPolyfillSupport;B$1?.(S$1,k$1),(t$3.litHtmlVersions??=[]).push("3.3.3");
 
 /**
  * @license
@@ -51,7 +58,7 @@ const t$2=globalThis,i$3=t=>t,s$1=t$2.trustedTypes,e$1=s$1?s$1.createPolicy("lit
  * @license
  * Copyright 2017 Google LLC
  * SPDX-License-Identifier: BSD-3-Clause
- */const s=globalThis;let i$2 = class i extends y$1{constructor(){super(...arguments),this.renderOptions={host:this},this._$Do=void 0;}createRenderRoot(){const t=super.createRenderRoot();return this.renderOptions.renderBefore??=t.firstChild,t}update(t){const r=this.render();this.hasUpdated||(this.renderOptions.isConnected=this.isConnected),super.update(t),this._$Do=D(r,this.renderRoot,this.renderOptions);}connectedCallback(){super.connectedCallback(),this._$Do?.setConnected(true);}disconnectedCallback(){super.disconnectedCallback(),this._$Do?.setConnected(false);}render(){return E}};i$2._$litElement$=true,i$2["finalized"]=true,s.litElementHydrateSupport?.({LitElement:i$2});const o$2=s.litElementPolyfillSupport;o$2?.({LitElement:i$2});(s.litElementVersions??=[]).push("4.2.2");
+ */const s=globalThis;let i$2 = class i extends y$2{constructor(){super(...arguments),this.renderOptions={host:this},this._$Do=void 0;}createRenderRoot(){const t=super.createRenderRoot();return this.renderOptions.renderBefore??=t.firstChild,t}update(t){const r=this.render();this.hasUpdated||(this.renderOptions.isConnected=this.isConnected),super.update(t),this._$Do=D(r,this.renderRoot,this.renderOptions);}connectedCallback(){super.connectedCallback(),this._$Do?.setConnected(true);}disconnectedCallback(){super.disconnectedCallback(),this._$Do?.setConnected(false);}render(){return E}};i$2._$litElement$=true,i$2["finalized"]=true,s.litElementHydrateSupport?.({LitElement:i$2});const o$2=s.litElementPolyfillSupport;o$2?.({LitElement:i$2});(s.litElementVersions??=[]).push("4.2.2");
 
 /**
  * @license
@@ -64,7 +71,7 @@ const t$1=t=>(e,o)=>{ void 0!==o?o.addInitializer(()=>{customElements.define(t,e
  * @license
  * Copyright 2017 Google LLC
  * SPDX-License-Identifier: BSD-3-Clause
- */const o$1={attribute:true,type:String,converter:u$1,reflect:false,hasChanged:f$1},r$1=(t=o$1,e,r)=>{const{kind:n,metadata:i}=r;let s=globalThis.litPropertyMetadata.get(i);if(void 0===s&&globalThis.litPropertyMetadata.set(i,s=new Map),"setter"===n&&((t=Object.create(t)).wrapped=true),s.set(r.name,t),"accessor"===n){const{name:o}=r;return {set(r){const n=e.get.call(this);e.set.call(this,r),this.requestUpdate(o,n,t,true,r);},init(e){return void 0!==e&&this.C(o,void 0,t,e),e}}}if("setter"===n){const{name:o}=r;return function(r){const n=this[o];e.call(this,r),this.requestUpdate(o,n,t,true,r);}}throw Error("Unsupported decorator location: "+n)};function n$1(t){return (e,o)=>"object"==typeof o?r$1(t,e,o):((t,e,o)=>{const r=e.hasOwnProperty(o);return e.constructor.createProperty(o,t),r?Object.getOwnPropertyDescriptor(e,o):void 0})(t,e,o)}
+ */const o$1={attribute:true,type:String,converter:u$2,reflect:false,hasChanged:f$2},r$1=(t=o$1,e,r)=>{const{kind:n,metadata:i}=r;let s=globalThis.litPropertyMetadata.get(i);if(void 0===s&&globalThis.litPropertyMetadata.set(i,s=new Map),"setter"===n&&((t=Object.create(t)).wrapped=true),s.set(r.name,t),"accessor"===n){const{name:o}=r;return {set(r){const n=e.get.call(this);e.set.call(this,r),this.requestUpdate(o,n,t,true,r);},init(e){return void 0!==e&&this.C(o,void 0,t,e),e}}}if("setter"===n){const{name:o}=r;return function(r){const n=this[o];e.call(this,r),this.requestUpdate(o,n,t,true,r);}}throw Error("Unsupported decorator location: "+n)};function n$1(t){return (e,o)=>"object"==typeof o?r$1(t,e,o):((t,e,o)=>{const r=e.hasOwnProperty(o);return e.constructor.createProperty(o,t),r?Object.getOwnPropertyDescriptor(e,o):void 0})(t,e,o)}
 
 /**
  * @license
@@ -83,15 +90,11 @@ const t={ATTRIBUTE:1},e=t=>(...e)=>({_$litDirective$:t,values:e});let i$1 = clas
  * @license
  * Copyright 2018 Google LLC
  * SPDX-License-Identifier: BSD-3-Clause
- */const n="important",i=" !"+n,o=e(class extends i$1{constructor(t$1){if(super(t$1),t$1.type!==t.ATTRIBUTE||"style"!==t$1.name||t$1.strings?.length>2)throw Error("The `styleMap` directive must be used in the `style` attribute and must be the only part in the attribute.")}render(t){return Object.keys(t).reduce((e,r)=>{const s=t[r];return null==s?e:e+`${r=r.includes("-")?r:r.replace(/(?:^(webkit|moz|ms|o)|)(?=[A-Z])/g,"-$&").toLowerCase()}:${s};`},"")}update(e,[r]){const{style:s}=e.element;if(void 0===this.ft)return this.ft=new Set(Object.keys(r)),this.render(r);for(const t of this.ft)null==r[t]&&(this.ft.delete(t),t.includes("-")?s.removeProperty(t):s[t]=null);for(const t in r){const e=r[t];if(null!=e){this.ft.add(t);const r="string"==typeof e&&e.endsWith(i);t.includes("-")||r?s.setProperty(t,r?e.slice(0,-11):e,r?n:""):s[t]=e;}}return E}});
+ */const n="important",i=" !"+n,o=e(class extends i$1{constructor(t$1){if(super(t$1),t$1.type!==t.ATTRIBUTE||"style"!==t$1.name||t$1.strings?.length>2)throw Error("The `styleMap` directive must be used in the `style` attribute and must be the only part in the attribute.")}render(t){return Object.keys(t).reduce((e,r)=>{const s=t[r];return null==s?e:e+`${r=r.includes("-")?r:r.replace(/(?:^(webkit|moz|ms|o)|)(?=[A-Z])/g,"-$&").toLowerCase()}:${s};`},"")}update(e,[r]){const{style:s}=e.element;if(void 0===this.ft)return this.ft=new Set(Object.keys(r)),this.render(r);for(const t of this.ft)null==r[t]&&(this.ft.delete(t),t.includes("-")?s.removeProperty(t):s[t]=null);for(const t in r){const e=r[t];if(null!=e){this.ft.add(t);const r="string"==typeof e&&e.endsWith(i);t.includes("-")||r?s.setProperty(t,r?e.slice(0,-11):e,r?n:""):s[t]=e;}}return E$1}});
 
 const CARD_NAME = "anyvac-card";
 const EDITOR_NAME = "anyvac-card-editor";
-const CARD_VERSION = "0.36.5";
-/** Server-side tracking blueprint */
-const BLUEPRINT_VERSION = "1.0.0";
-const BLUEPRINT_PATH = "anyvac_card/cleaning_tracker.yaml";
-const TRACKER_AUTOMATION_ID = "roborock_card_cleaning_tracker";
+const CARD_VERSION = "0.37.0";
 /** Hold duration in ms required to trigger START / PAUSE actions */
 const HOLD_DURATION_MS = 600;
 /**
@@ -164,7 +167,14 @@ const COLOR_BG_ACTIVE = {
     blue: "rgba(33,150,243,0.30)",
     orange: "rgba(250,173,20,0.30)",
 };
-/** Vacuum entity states that count as "actively cleaning" */
+/**
+ * States that count as "actively cleaning".
+ * NOTE (docs/14 rule 4): since HA 2025 the VACUUM ENTITY state is only ever a
+ * VacuumActivity enum value — of these entries it can only match "cleaning", and a
+ * mid-clean mop wash even reports "docked". Never use the vacuum entity state for
+ * end-of-clean detection. The raw Roborock states below remain for STATUS SENSORS
+ * watched via global_actions.watch_entities.
+ */
 const CLEANING_STATES = new Set([
     "cleaning",
     "segment_cleaning",
@@ -182,7 +192,7 @@ const CLEANING_STATES = new Set([
 ]);
 
 var _a;
-console.info(`%c ROBOROCK-VACUUM-CARD %c v${CARD_VERSION} `, "background:#2196F3;color:#fff;font-weight:700;padding:2px 4px;border-radius:3px 0 0 3px", "background:#1a1a1a;color:#fff;font-weight:400;padding:2px 4px;border-radius:0 3px 3px 0");
+console.info(`%c ANYVAC-CARD %c v${CARD_VERSION} `, "background:#2196F3;color:#fff;font-weight:700;padding:2px 4px;border-radius:3px 0 0 3px", "background:#1a1a1a;color:#fff;font-weight:400;padding:2px 4px;border-radius:0 3px 3px 0");
 let AnyVacCard = class AnyVacCard extends i$2 {
     constructor() {
         super(...arguments);
@@ -193,18 +203,6 @@ let AnyVacCard = class AnyVacCard extends i$2 {
         this._holdId = null;
         this._mapMode = "normal";
         this._modeEntity = null;
-        this._calibStep = 0;
-        this._calibPts = [];
-        this._calibTargets = [
-            { x: 25500, y: 25500 },
-            { x: 27000, y: 25500 },
-            { x: 25500, y: 26500 },
-        ];
-        this._calibMsg = "";
-        this._calibCur = { x: 25500, y: 25500 };
-        this._calibCandIdx = 0;
-        this._calibCircle = { x: 50, y: 50 };
-        this._calibContent = { x: 50, y: 50 };
         this._dbg = "";
         this._zoneDrag = null;
         this._zonePending = null;
@@ -230,18 +228,13 @@ let AnyVacCard = class AnyVacCard extends i$2 {
          *  cleaning/paused and debug_room_progress is on, so it does not re-render otherwise. */
         this._now = Date.now();
         this._tickTimer = null;
-        /** Aktivní úklidy — sledování průběhu pro vyhodnocení úspěchu */
-        this._inFlight = new Map();
-        this._prevVacStates = new Map();
-        this._prevRoomStates = new Map();
-        /** Auto-calibration: timestamp when vacuum entered each room (key = vacEntity:roomName) */
-        this._roomEnterTimes = new Map();
+        // NOTE (docs/14 canon): the card holds NO cleaning-session state. Tracking, history,
+        // estimates and room detection live in the anyvac integration — the card only renders
+        // sensor data and sends intents.
         this._holdTimer = null;
         this._initialized = false;
         /** Entities whose state changes should trigger a re-render */
         this._watched = null;
-        /** roborock_card_event subscription (blueprint → card sync) */
-        this._unsubEvents = null;
         this._autoCache = new Map();
         this._holdEnd = () => {
             this._cancelHold();
@@ -301,7 +294,6 @@ let AnyVacCard = class AnyVacCard extends i$2 {
     connectedCallback() {
         super.connectedCallback();
         this.style.setProperty("--hold-ms", HOLD_DURATION_MS + "ms");
-        this._ensureSubscribed();
         if (!this._ro && typeof ResizeObserver !== "undefined") {
             this._ro = new ResizeObserver(() => this._scheduleMeasure());
             this._ro.observe(this);
@@ -352,10 +344,6 @@ let AnyVacCard = class AnyVacCard extends i$2 {
             this._ro.disconnect();
             this._ro = null;
         }
-        if (this._unsubEvents) {
-            this._unsubEvents.then((unsub) => unsub()).catch(() => { });
-            this._unsubEvents = null;
-        }
     }
     firstUpdated() {
         // Seed the width immediately; the ResizeObserver may not fire before the
@@ -404,83 +392,11 @@ let AnyVacCard = class AnyVacCard extends i$2 {
                 if (e)
                     s.add(e);
         }
-        this._watched = s;
+        // Don't freeze the list before the entity registry is loaded — the auto-resolved
+        // sibling sensors (status/battery/room/error) would otherwise never be watched.
+        if (this.hass?.entities)
+            this._watched = s;
         return s;
-    }
-    _ensureSubscribed() {
-        if (this._unsubEvents || !this.hass?.connection?.subscribeEvents)
-            return;
-        try {
-            this._unsubEvents = this.hass.connection.subscribeEvents((ev) => this._onCardEvent(ev.data ?? {}), "roborock_card_event");
-        }
-        catch {
-            this._unsubEvents = null;
-        }
-    }
-    /**
-     * Blueprint fired cleaning_finished — clear the room selection for that
-     * vacuum on every device with an open dashboard, and drop any stale
-     * in-flight record (e.g. when this tab missed the docked transition).
-     */
-    _onCardEvent(data) {
-        if (data["action"] !== "cleaning_finished" || data["source"] !== "blueprint")
-            return;
-        const vacEntity = String(data["vacuum_entity"] ?? "");
-        if (!this._config?.vacuums.some((v) => v.entity === vacEntity))
-            return;
-        this._inFlight.delete(vacEntity);
-        const keys = Array.isArray(data["rooms"]) ? data["rooms"].map(String) : [];
-        if (!keys.length)
-            return;
-        const next = new Map(this._localRoomSel);
-        for (const k of keys)
-            next.delete(vacEntity + ":" + k);
-        this._localRoomSel = next;
-        this._saveRoomSel(vacEntity);
-    }
-    updated(changed) {
-        this._ensureSubscribed();
-        if (!changed.has("hass") || !this.hass || !this._config)
-            return;
-        for (const vac of this._config.vacuums) {
-            const newState = this.hass.states[vac.entity]?.state ?? "";
-            const prevState = this._prevVacStates.get(vac.entity) ?? newState;
-            // Přechod do docked/charging při aktivním úklidu → vyhodnoť
-            if (prevState !== newState &&
-                (newState === "docked" || newState === "charging") &&
-                this._inFlight.has(vac.entity)) {
-                const flight = this._inFlight.get(vac.entity);
-                this._inFlight.delete(vac.entity);
-                this._evalCleaningComplete(vac.entity, flight);
-            }
-            this._prevVacStates.set(vac.entity, newState);
-            // room_entered event + auto-calibration tracking
-            if (vac.current_room_entity && this._inFlight.has(vac.entity)) {
-                const newRoom = this.hass.states[vac.current_room_entity]?.state ?? "";
-                const prevRoom = this._prevRoomStates.get(vac.entity) ?? "";
-                if (newRoom && newRoom !== prevRoom &&
-                    newRoom !== "unknown" && newRoom !== "unavailable") {
-                    if (prevRoom) {
-                        const enterKey = vac.entity + ":" + prevRoom;
-                        const enterTime = this._roomEnterTimes.get(enterKey);
-                        if (enterTime) {
-                            const elapsedMins = (Date.now() - enterTime) / 60000;
-                            this._updateRoomCleanTime(vac, prevRoom, elapsedMins);
-                            this._roomEnterTimes.delete(enterKey);
-                        }
-                    }
-                    this._roomEnterTimes.set(vac.entity + ":" + newRoom, Date.now());
-                    this._fireHAEvent({
-                        action: "room_entered",
-                        vacuum_entity: vac.entity,
-                        vacuum_label: vac.name ?? vac.entity,
-                        clean_type: this._deriveCleanType(vac),
-                        room_name: newRoom,
-                    });
-                }
-                this._prevRoomStates.set(vac.entity, newRoom);
-            }
-        }
     }
     // ── Helpers ─────────────────────────────────────────────────────────────
     _color(vac) {
@@ -611,8 +527,9 @@ let AnyVacCard = class AnyVacCard extends i$2 {
             : undefined;
         if (ct === "wet" || ct === "dry")
             return ct;
-        // 3) Fallback: derive from the clean action.
-        return this._deriveCleanType(vac);
+        // 3) Fallback: the vacuum's configured role (wet-only robots default to wet).
+        const role = this._vacCleanType(vac);
+        return role.wet && !role.dry ? "wet" : "dry";
     }
     /** Self-calibrated clean-time estimate learned by the backend integration,
      *  per room name + type (dry/wet). Null when no integration / no learned value. */
@@ -917,128 +834,6 @@ let AnyVacCard = class AnyVacCard extends i$2 {
             bubbles: true, composed: true, detail: { entityId },
         }));
     }
-    _deriveCleanType(vac) {
-        if (vac.clean_action?.type === "native" ||
-            vac.clean_action?.type === "native-area" ||
-            vac.clean_action?.type === "native-auto") {
-            const na = vac.clean_action;
-            if (na.mop_mode_entity || na.mop_intensity_entity)
-                return "wet";
-        }
-        return "dry";
-    }
-    _fireHAEvent(data) {
-        try {
-            this.hass.connection.sendMessage({
-                type: "fire_event",
-                event_type: "roborock_card_event",
-                event_data: data,
-            });
-        }
-        catch (err) {
-            console.error("[anyvac-card] fire_event failed:", err);
-        }
-    }
-    async _updateRoomCleanTime(vac, roomName, elapsedMins) {
-        if (elapsedMins < 0.5 || elapsedMins > 120)
-            return;
-        const room = (this._roomsFor(vac)).find(r => r.name === roomName || r.key === roomName);
-        if (!room?.clean_time_entity)
-            return;
-        const currentVal = parseFloat(this.hass.states[room.clean_time_entity]?.state ?? "0");
-        const newAvg = currentVal > 0
-            ? Math.round(0.7 * currentVal + 0.3 * elapsedMins)
-            : Math.round(elapsedMins);
-        await this._call("input_number", "set_value", {
-            entity_id: room.clean_time_entity,
-            value: newAvg,
-        });
-    }
-    async _evalCleaningComplete(vacEntity, flight) {
-        const actualMs = Date.now() - flight.startTime;
-        const success = flight.expectedMs === 0 || actualMs >= flight.expectedMs * 0.5;
-        // Software repeat — restart if more passes remaining
-        if (success && flight.repeatRemaining > 0 && flight.areaIds) {
-            try {
-                await this.hass.callService("vacuum", "clean_area", { cleaning_area_id: flight.areaIds }, { entity_id: vacEntity });
-            }
-            catch (err) {
-                console.error("[anyvac-card] repeat restart failed:", err);
-                return;
-            }
-            this._inFlight.set(vacEntity, {
-                ...flight,
-                startTime: Date.now(),
-                repeatRemaining: flight.repeatRemaining - 1,
-            });
-            return; // timestamps + notification fire only after last pass
-        }
-        // Auto-calibration: handle last room (no room_entered transition at session end)
-        const lastRoom = this._prevRoomStates.get(vacEntity) ?? "";
-        if (lastRoom) {
-            const enterKey = vacEntity + ":" + lastRoom;
-            const enterTime = this._roomEnterTimes.get(enterKey);
-            if (enterTime) {
-                const vacConf = this._config.vacuums.find(v => v.entity === vacEntity);
-                if (vacConf) {
-                    const elapsedMins = (Date.now() - enterTime) / 60000;
-                    await this._updateRoomCleanTime(vacConf, lastRoom, elapsedMins);
-                }
-                this._roomEnterTimes.delete(enterKey);
-            }
-        }
-        const totalActualMins = Math.round((Date.now() - flight.originalStartTime) / 60000);
-        if (success) {
-            const dt = new Date().toISOString().replace("T", " ").slice(0, 19);
-            for (const room of flight.rooms) {
-                if (room.last_clean_entity) {
-                    await this._call("input_datetime", "set_datetime", {
-                        entity_id: room.last_clean_entity,
-                        datetime: dt,
-                    });
-                }
-            }
-            // Single-room time calibration: a run with exactly one room measures
-            // that room's real total duration (incl. repeat passes) — store it
-            // directly as the new estimate when the option is enabled.
-            if (this._config.single_room_time && flight.rooms.length === 1) {
-                const only = flight.rooms[0];
-                if (only.clean_time_entity && totalActualMins >= 1 && totalActualMins <= 180) {
-                    await this._call("input_number", "set_value", {
-                        entity_id: only.clean_time_entity,
-                        value: totalActualMins,
-                    });
-                }
-            }
-            // Clear room selection for this vacuum after successful clean
-            const nextSel = new Map(this._localRoomSel);
-            for (const room of flight.rooms)
-                nextSel.delete(vacEntity + ":" + room.key);
-            this._localRoomSel = nextSel;
-            this._saveRoomSel(vacEntity);
-        }
-        this._fireHAEvent({
-            action: "cleaning_finished",
-            vacuum_entity: vacEntity,
-            vacuum_label: flight.vacLabel,
-            clean_type: flight.cleanType,
-            rooms: flight.rooms.map(r => r.key),
-            room_labels: flight.rooms.map(r => r.name).join(", "),
-            estimated_mins: Math.round(flight.expectedMs / 60000),
-            actual_mins: totalActualMins,
-            success,
-        });
-        await this._sendNotify(this._config.notify?.on_finish, {
-            vacuum_label: flight.vacLabel,
-            vacuum_entity: vacEntity,
-            room_labels: flight.rooms.map(r => r.name).join(", "),
-            room_keys: flight.rooms.map(r => r.key).join(", "),
-            estimated_mins: Math.round(flight.expectedMs / 60000),
-            actual_mins: totalActualMins,
-            clean_type: flight.cleanType,
-            success: String(success),
-        });
-    }
     // ── localStorage persistence ──────────────────────────────────────────────
     _saveShown() {
         try {
@@ -1091,30 +886,6 @@ let AnyVacCard = class AnyVacCard extends i$2 {
         catch { /* ignore */ }
         return map;
     }
-    // ── Notifications ──────────────────────────────────────────────────────
-    _resolveTemplate(tmpl, tokens) {
-        return tmpl.replace(/\{\{\s*(\w+)\s*\}\}/g, (_, k) => String(tokens[k] ?? ""));
-    }
-    async _sendNotify(template, tokens) {
-        const cfg = this._config.notify;
-        if (!cfg || !template)
-            return;
-        const isWet = tokens["clean_type"] === "wet";
-        const color = isWet ? (cfg.color_wet ?? "#2196F3") : (cfg.color_dry ?? "#4CAF50");
-        const icon = isWet ? "mdi:mop" : "mdi:robot-vacuum";
-        const tag = (cfg.tag_prefix ?? "roborock") + "-" + String(tokens["vacuum_entity"] ?? "");
-        try {
-            await this.hass.callService("ticker", "notify", {
-                category: cfg.category,
-                title: template.title ? this._resolveTemplate(template.title, tokens) : undefined,
-                message: template.message ? this._resolveTemplate(template.message, tokens) : undefined,
-                data: { data: { notification_icon: icon, color, priority: "high", tag } },
-            });
-        }
-        catch (err) {
-            console.error("[anyvac-card] notify failed:", err);
-        }
-    }
     _pause(vac) {
         this._call("vacuum", "pause", { entity_id: vac.entity });
     }
@@ -1122,11 +893,6 @@ let AnyVacCard = class AnyVacCard extends i$2 {
         this._call("vacuum", "start", { entity_id: vac.entity });
     }
     _dock(vac) {
-        // Manual dock = user cancelled — never restart remaining software-repeat passes
-        const flight = this._inFlight.get(vac.entity);
-        if (flight && flight.repeatRemaining > 0) {
-            this._inFlight.set(vac.entity, { ...flight, repeatRemaining: 0 });
-        }
         this._call("vacuum", "return_to_base", { entity_id: vac.entity });
     }
     _toggleRoom(room, vac) {
@@ -1387,6 +1153,11 @@ let AnyVacCard = class AnyVacCard extends i$2 {
             this._planMode = gp.mode;
         if (gp.scope === "all" || Array.isArray(gp.scope)) {
             const keys = gp.scope === "all" ? this._allRoomKeys() : gp.scope;
+            // Backend-shared selection first (docs/14 §3.11); local only without integration.
+            if (this._backendSel()) {
+                this._setBackendSel(keys, "set");
+                return;
+            }
             const sel = new Map(this._localRoomSel);
             for (const v of this._config.vacuums)
                 for (const r of this._roomsFor(v))
@@ -1605,13 +1376,16 @@ let AnyVacCard = class AnyVacCard extends i$2 {
             await this._call("vacuum", "set_fan_speed", { entity_id: vac.entity, fan_speed: apSuction });
         }
         if (vac.clean_action.type === "native-area") {
-            // Uses HA vacuum.clean_area — area_id resolved via area_mappings
+            // Uses HA vacuum.clean_area — area_id resolved via area_mappings.
+            // NOTE: software repeat was removed (docs/13 A1 — restarting on a "docked"
+            // transition fired during mid-clean mop washes); repeat returns server-side
+            // with the anyvac.clean service (docs/14 §3.8).
             try {
                 await this.hass.callService("vacuum", "clean_area", { cleaning_area_id: selected.map((r) => r.area_id ?? this._config.area_mappings?.[r.key] ?? r.key) }, { entity_id: vac.entity });
             }
             catch (err) {
                 console.error("[anyvac-card] vacuum.clean_area failed:", err);
-                return; // don't register in-flight for a clean that never started
+                return;
             }
         }
         else if (vac.clean_action.type === "native-auto") {
@@ -1675,65 +1449,10 @@ let AnyVacCard = class AnyVacCard extends i$2 {
                 params: [{ segments, repeat: action.repeat ?? 1 }],
             });
         }
-        // Register in-flight + fire event (shared for both native variants)
-        const totalMins = this._totalCleanMins(vac);
-        const vacLabel = vac.name ?? vac.entity.split(".")[1] ?? vac.entity;
-        const isNativeArea = vac.clean_action.type === "native-area";
-        const nativeAreaAct = isNativeArea ? vac.clean_action : null;
-        const areaIds = isNativeArea
-            ? selected.map(r => r.area_id ?? this._config.area_mappings?.[r.key] ?? r.key)
-            : undefined;
-        const repeatRemaining = (nativeAreaAct?.repeat ?? 1) > 1
-            ? (nativeAreaAct.repeat) - 1
-            : 0;
-        const now = Date.now();
-        this._inFlight.set(vac.entity, {
-            rooms: selected.map(r => ({ key: r.key, name: r.name, last_clean_entity: r.last_clean_entity, clean_time_entity: r.clean_time_entity })),
-            expectedMs: totalMins * 60000,
-            startTime: now,
-            originalStartTime: now,
-            vacLabel,
-            cleanType: this._deriveCleanType(vac),
-            repeatRemaining,
-            areaIds,
-        });
-        // Call notify_script if configured
-        const nsCfg = this._config.notify_script;
-        if (nsCfg?.entity) {
-            const nsv = nsCfg.vars ?? {};
-            const scriptVars = { vacuum_entity: vac.entity };
-            if (nsv.vacuum_label !== false)
-                scriptVars.vacuum_label = vacLabel;
-            if (nsv.room_labels !== false)
-                scriptVars.room_labels = selected.map(r => r.name).join(", ");
-            if (nsv.room_keys === true)
-                scriptVars.room_keys = selected.map(r => r.key).join(", ");
-            if (nsv.estimated_mins !== false)
-                scriptVars.estimated_mins = Math.round(totalMins);
-            if (nsv.clean_type !== false)
-                scriptVars.clean_type = this._deriveCleanType(vac);
-            await this._call("script", "turn_on", { entity_id: nsCfg.entity, variables: scriptVars });
-        }
-        this._fireHAEvent({
-            action: "cleaning_started",
-            vacuum_entity: vac.entity,
-            vacuum_label: vacLabel,
-            clean_type: this._deriveCleanType(vac),
-            rooms: selected.map(r => r.key),
-            room_labels: selected.map(r => r.name).join(", "),
-            estimated_mins: Math.round(totalMins),
-            // Helper entity IDs — consumed by the cleaning-tracker blueprint
-            last_clean_entities: selected.map(r => r.last_clean_entity).filter((e) => !!e),
-            clean_time_entities: selected.map(r => r.clean_time_entity).filter((e) => !!e),
-        });
-        await this._sendNotify(this._config.notify?.on_start, {
-            vacuum_label: vacLabel,
-            vacuum_entity: vac.entity,
-            room_labels: selected.map(r => r.name).join(", "),
-            room_keys: selected.map(r => r.key).join(", "),
-            estimated_mins: Math.round(totalMins),
-            clean_type: this._deriveCleanType(vac),
-        });
+        // No in-flight tracking, events or notifications here (docs/14 §3.1, §3.10):
+        // the integration tracks the session (`in_cleaning`, mop-wash aware), fires
+        // anyvac_clean_started/finished/room_done, stamps history and clears the
+        // shared room selection when the clean finishes.
     }
     // ── Render: badges ──────────────────────────────────────────────────────
     _renderBadge(vac, index) {
@@ -1824,25 +1543,11 @@ let AnyVacCard = class AnyVacCard extends i$2 {
     `;
     }
     // ── Render: map ─────────────────────────────────────────────────────────
-    // ── Calibration + pin & go (Milestone 2, v1; localStorage) ───────────────────
-    _calibKey(entity) { return "anyvac_calib_" + entity; }
-    _loadCalib(entity) {
-        if (this._mapMode === "calib" && this._modeEntity === entity && this._calibPts.length >= 3)
-            return this._calibPts;
-        try {
-            const raw = window.localStorage.getItem(this._calibKey(entity));
-            return raw ? JSON.parse(raw) : null;
-        }
-        catch {
-            return null;
-        }
-    }
-    _saveCalib(entity, pts) {
-        try {
-            window.localStorage.setItem(this._calibKey(entity), JSON.stringify(pts));
-        }
-        catch { /* ignore */ }
-    }
+    // ── Pin & go / zone (integration-only; docs/14 §3.6) ─────────────────────────
+    // The manual 3-point calibration (Milestone 2, localStorage) was removed: it assumed
+    // the dock sits at map origin, trusted commanded goto targets over the robot's real
+    // position, and duplicated maths the integration provides for free. Map commands now
+    // require the integration's calibration_points.
     _solve3(m, r) {
         const d = (a) => a[0][0] * (a[1][1] * a[2][2] - a[1][2] * a[2][1]) - a[0][1] * (a[1][0] * a[2][2] - a[1][2] * a[2][0]) + a[0][2] * (a[1][0] * a[2][1] - a[1][1] * a[2][0]);
         const D = d(m);
@@ -1860,15 +1565,6 @@ let AnyVacCard = class AnyVacCard extends i$2 {
         if (!ab || !cd)
             return null;
         return { a: ab[0], b: ab[1], e: ab[2], c: cd[0], d: cd[1], f: cd[2] };
-    }
-    _mapToVac(entity, x, y) {
-        const pts = this._loadCalib(entity);
-        if (!pts)
-            return null;
-        const t = this._affine(pts);
-        if (!t)
-            return null;
-        return { x: t.a * x + t.b * y + t.e, y: t.c * x + t.d * y + t.f };
     }
     async _gotoMm(entity, mm) {
         try {
@@ -1888,108 +1584,34 @@ let AnyVacCard = class AnyVacCard extends i$2 {
             this._modeEntity = entity;
         }
     }
-    _startCalib(vac) {
-        this._calibPts = [];
-        this._calibStep = 0;
-        this._calibMsg = "";
-        this._calibCandIdx = 0;
-        this._calibCircle = { x: 50, y: 50 };
-        this._calibCur = { ...this._calibTargets[0] };
-        this._mapMode = "calib";
-        this._modeEntity = vac.entity;
-    }
     _refreshMap(vac) {
         const ent = vac.map?.entity;
         if (ent)
             void this.hass.callService("homeassistant", "update_entity", { entity_id: ent });
     }
-    _calibCandidate() {
-        const dock = this._calibTargets[0];
-        const radii = [1600, 1100, 2300];
-        let dirs;
-        if (this._calibStep >= 2) {
-            // Point 3: only PERPENDICULAR to point 2's actual direction -> never collinear.
-            const p2 = this._calibPts[1]?.vacuum ?? { x: dock.x + 2200, y: dock.y };
-            let vx = p2.x - dock.x, vy = p2.y - dock.y;
-            const len = Math.hypot(vx, vy) || 1;
-            vx /= len;
-            vy /= len;
-            dirs = [[-vy, vx], [vy, -vx]];
-        }
-        else {
-            dirs = [[1, 0], [0, 1], [-1, 0], [0, -1], [0.71, 0.71], [-0.71, 0.71], [0.71, -0.71], [-0.71, -0.71]];
-        }
-        const total = dirs.length * radii.length;
-        const i = ((this._calibCandIdx % total) + total) % total;
-        const r = radii[Math.floor(i / dirs.length)];
-        const d = dirs[i % dirs.length];
-        return { x: Math.round(dock.x + d[0] * r), y: Math.round(dock.y + d[1] * r) };
-    }
-    _calibProbe(vac) {
-        this._calibCur = this._calibCandidate();
-        void this._gotoMm(vac.entity, this._calibCur);
-        // Auto-refresh the map a few times while the robot drives (no manual Refresh needed).
-        [4000, 8000, 13000, 18000, 24000].forEach((t) => window.setTimeout(() => {
-            if (this._mapMode === "calib" && this._modeEntity === vac.entity)
-                this._refreshMap(vac);
-        }, t));
-    }
-    _calibAnother(vac) {
-        this._calibCandIdx += 1;
-        this._calibProbe(vac);
-    }
-    _calibConfirm(vac) {
-        const newPt = { map: { ...this._calibContent }, vacuum: { ...this._calibCur } };
-        if (this._calibStep >= 2) {
-            const pts = [...this._calibPts, newPt];
-            const [a, b, c] = pts.map((p) => p.vacuum);
-            const area = Math.abs((b.x - a.x) * (c.y - a.y) - (c.x - a.x) * (b.y - a.y)) / 2;
-            if (area < 400000) {
-                this._calibMsg = "Points too aligned - use 'try another spot', then Confirm.";
-                return;
-            }
-            this._calibPts = pts;
-            this._saveCalib(vac.entity, pts);
-            this._calibStep = 3;
-            this._calibMsg = "";
-            this._mapMode = "normal";
-            this._modeEntity = null;
-        }
-        else {
-            this._calibPts = [...this._calibPts, newPt];
-            this._calibStep += 1;
-            this._calibMsg = "";
-            this._calibCircle = { x: 50, y: 50 };
-            this._calibCandIdx = 0;
-            this._calibProbe(vac);
-        }
-    }
     _onMapClick(vac, e) {
-        const el = e.currentTarget;
-        const r = el.getBoundingClientRect();
-        const x = ((e.clientX - r.left) / r.width) * 100;
-        const y = ((e.clientY - r.top) / r.height) * 100;
-        const content = this._clickToContent(vac, e.clientX, e.clientY) ?? { x, y };
+        const content = this._clickToContent(vac, e.clientX, e.clientY);
         if (this._mapMode === "pin") {
-            const mm = this._cmdMm(vac, content);
-            this._dbg = "px " + content.x.toFixed(1) + "%," + content.y.toFixed(1) + "% -> mm " + (mm ? Math.round(mm.x) + "," + Math.round(mm.y) : "(no calib)");
+            const mm = content ? this._intMapToVac(vac, content) : null;
+            this._dbg = content
+                ? "px " + content.x.toFixed(1) + "%," + content.y.toFixed(1) + "% -> mm " + (mm ? Math.round(mm.x) + "," + Math.round(mm.y) : "(no calibration data)")
+                : "(map element not found)";
             if (mm)
                 void this._gotoMm(vac.entity, mm);
             this._mapMode = "normal";
             this._modeEntity = null;
         }
-        else if (this._mapMode === "calib") {
-            this._calibCircle = { x, y };
-            this._calibContent = { ...content };
-        }
     }
-    // Map a viewport click into the clicked layer's own content space (undo its
-    // rotation/scale/offset) so calibration & pin&go are seating-independent and
-    // consistent across the image base and the map overlay (combined mode).
+    // Map a viewport click into THIS vacuum's map content space (undo its
+    // rotation/scale/offset) so pin&go / zones are seating-independent.
     _clickToContent(vac, clientX, clientY) {
-        // The map is the coordinate authority (robot + mm live there); the floorplan is decoration.
-        const mapEl = vac.map?.entity ? this.renderRoot?.querySelector(".map-img") : null;
-        const el = mapEl ?? this.renderRoot?.querySelector(".image-base-img");
+        // The map is the coordinate authority (mm live there). Select this vacuum's own
+        // map element — with several vacuums shown there are several .map-img and the
+        // first one may belong to a different robot with different seating (docs/13 A4).
+        // The floorplan is NOT a valid fallback: its content space has no mm mapping.
+        const el = vac.map?.entity
+            ? this.renderRoot?.querySelector(`.map-img[data-entity="${vac.entity.replace(/"/g, '\\"')}"]`)
+            : null;
         if (!el)
             return null;
         const r = el.getBoundingClientRect();
@@ -2026,15 +1648,6 @@ let AnyVacCard = class AnyVacCard extends i$2 {
         const px = (content.x / 100) * NW, py = (content.y / 100) * NH;
         return { x: t.a * px + t.b * py + t.e, y: t.c * px + t.d * py + t.f };
     }
-    /** mm for a click, preferring the accurate integration calibration over the manual one. */
-    _cmdMm(vac, content) {
-        if (vac.integration_entity) {
-            const m = this._intMapToVac(vac, content);
-            if (m)
-                return m;
-        }
-        return this._mapToVac(vac.entity, content.x, content.y);
-    }
     _onZoneDown(vac, e) {
         if (this._mapMode !== "zone" || this._modeEntity !== vac.entity)
             return;
@@ -2063,8 +1676,8 @@ let AnyVacCard = class AnyVacCard extends i$2 {
         const ay = r.top + (this._zoneDrag.y0 / 100) * r.height;
         const ca = this._clickToContent(vac, ax, ay);
         const cb = this._clickToContent(vac, e.clientX, e.clientY);
-        const ma = ca ? this._cmdMm(vac, ca) : null;
-        const mb = cb ? this._cmdMm(vac, cb) : null;
+        const ma = ca ? this._intMapToVac(vac, ca) : null;
+        const mb = cb ? this._intMapToVac(vac, cb) : null;
         const big = Math.abs(this._zoneDrag.x1 - this._zoneDrag.x0) > 2 || Math.abs(this._zoneDrag.y1 - this._zoneDrag.y0) > 2;
         if (ma && mb && big) {
             this._zonePending = {
@@ -2090,8 +1703,15 @@ let AnyVacCard = class AnyVacCard extends i$2 {
     _renderMapTools(vac) {
         if (!vac.map && !vac.image_base)
             return A;
-        const hasCalib = !!this._loadCalib(vac.entity);
-        const canCmd = hasCalib || !!vac.integration_entity;
+        // Map commands need the integration's calibration AND this vacuum's map element
+        // for the click geometry. Disabled in the rotated (narrow) view — the click
+        // inversion does not account for the wrapper rotation yet (docs/13 A5).
+        const canCmd = !!vac.integration_entity && !!vac.map?.entity && !this._narrow;
+        const cmdTitle = this._narrow
+            ? "Not available in the rotated mobile view"
+            : (!vac.integration_entity || !vac.map?.entity)
+                ? "Requires the AnyVac integration sensor + map entity"
+                : "";
         const mode = this._modeEntity === vac.entity ? this._mapMode : "normal";
         return b `
       <div class="map-tools">
@@ -2099,32 +1719,15 @@ let AnyVacCard = class AnyVacCard extends i$2 {
           <ha-icon icon="mdi:refresh"></ha-icon><span>Refresh</span>
         </button>` : A}
         <button class="mtbtn ${mode === "pin" ? "on" : ""}" ?disabled=${!canCmd}
-          @click=${() => this._toggleMode(vac.entity, "pin")} title="Pin & Go">
+          @click=${() => this._toggleMode(vac.entity, "pin")} title=${cmdTitle || "Pin & Go"}>
           <ha-icon icon="mdi:map-marker-radius"></ha-icon><span>Pin &amp; Go</span>
         </button>
         <button class="mtbtn ${mode === "zone" ? "on" : ""}" ?disabled=${!canCmd}
-          @click=${() => this._toggleMode(vac.entity, "zone")} title="Zone clean">
+          @click=${() => this._toggleMode(vac.entity, "zone")} title=${cmdTitle || "Zone clean"}>
           <ha-icon icon="mdi:select-drag"></ha-icon><span>Zone</span>
-        </button>
-        <button class="mtbtn ${mode === "calib" ? "on" : ""}" @click=${() => this._startCalib(vac)}>
-          <ha-icon icon="mdi:crosshairs-gps"></ha-icon><span>${hasCalib ? "Recalibrate" : "Calibrate"}</span>
         </button>
         ${this._dbg ? b `<span style="font-size:11px;opacity:0.65;align-self:center;font-family:monospace">${this._dbg}</span>` : A}
       </div>
-      ${mode === "calib"
-            ? b `<div class="calib-panel">
-            <div>${this._calibStep === 0
-                ? "Step 1/3: tap to place the circle on the DOCK, align its edges, then Confirm."
-                : "Step " + (this._calibStep + 1) + "/3: tap to place the circle on the ROBOT, align its edges, then Confirm."}</div>
-            <div class="calib-actions">
-              <button class="mtbtn on" @click=${() => this._calibConfirm(vac)}>Confirm point</button>
-              ${this._calibStep > 0 ? b `
-                <button class="mtbtn" @click=${() => this._refreshMap(vac)}>Refresh map</button>
-                <button class="mtbtn" @click=${() => this._calibAnother(vac)}>Didn't reach - try another spot</button>
-              ` : A}
-            </div>
-          </div>`
-            : A}
       ${mode === "pin" ? b `<div class="calib-panel">Tap the map to send the robot there.</div>` : A}
       ${mode === "zone" ? b `<div class="calib-panel">
         ${this._zonePending
@@ -2181,13 +1784,14 @@ let AnyVacCard = class AnyVacCard extends i$2 {
         const rr = Math.max(NW, NH) / 55;
         const toPts = (arr) => (Array.isArray(arr) ? arr : []).map((p) => { const q = toPx(p.x, p.y); return q.x.toFixed(1) + "," + q.y.toFixed(1); }).join(" ");
         const ct = this._vacCleanType(vac);
-        // Dry layer draws the vacuum trace (path); wet layer draws the mop trace
-        // (mop_path) as a wider translucent "wet sheen" band under the line. A run that
-        // both vacuums and mops therefore shows the thin line riding on the band.
+        // Dry layer draws the SEGMENTED dry trace (path_dry — cleaning-only points, no
+        // transit / mop-wash driving; integration ≥0.12). Falls back to the legacy full
+        // trajectory (path) on older integrations. Wet layer draws the mop trace as a
+        // wider translucent "wet sheen" band under the line.
         const showDry = this._layers.dry && ct.dry;
         const showWet = this._layers.wet && ct.wet;
-        const dryStr = showDry ? toPts(at.path) : "";
-        const wetStr = showWet ? toPts(at.mop_path) : "";
+        const dryStr = showDry ? toPts(at.path_dry ?? at.path) : "";
+        const wetStr = showWet ? toPts(at.path_wet ?? at.mop_path) : "";
         const vp = at.vacuum_position;
         const rob = vp ? toPx(vp.x, vp.y) : null;
         let head = null;
@@ -2416,17 +2020,20 @@ let AnyVacCard = class AnyVacCard extends i$2 {
         ` : A}
         ${shown.map((v, idx) => {
             const mUrl = v.map?.entity ? this._mapUrl(v.map.entity) : null;
-            if (!mUrl || v.hide_map)
+            if (!mUrl)
                 return A;
             const mm = v.map;
             const overlay = hasImage || idx > 0;
+            // hide_map renders the element at opacity 0 instead of skipping it — the
+            // element IS the click-geometry anchor for pin&go / zones (docs/13 A4).
             return b `<img class="map-img ${overlay ? "map-img--overlay" : ""}" src=${mUrl} alt="Vacuum map"
+            data-entity=${v.entity}
             style=${o({
                 left: (50 + (mm?.offset_x ?? 0)) + "%",
                 top: (50 + (mm?.offset_y ?? 0)) + "%",
                 width: (mm?.scale ?? 100) + "%",
                 transform: "translate(-50%,-50%) rotate(" + (mm?.rotation ?? 0) + "deg)",
-                opacity: String((v.overlay_opacity ?? (overlay ? 55 : 100)) / 100),
+                opacity: v.hide_map ? "0" : String((v.overlay_opacity ?? (overlay ? 55 : 100)) / 100),
                 mixBlendMode: v.overlay_blend ?? "normal",
             })} />`;
         })}
@@ -2461,6 +2068,7 @@ let AnyVacCard = class AnyVacCard extends i$2 {
         ` : A}
         ${showMap ? b `
           <img class="map-img ${showImage ? "map-img--overlay" : ""}" src=${mapUrl} alt="Vacuum map"
+            data-entity=${vac.entity}
             style=${o({
             left: (50 + (m?.offset_x ?? 0)) + "%",
             top: (50 + (m?.offset_y ?? 0)) + "%",
@@ -2486,9 +2094,6 @@ let AnyVacCard = class AnyVacCard extends i$2 {
                 width: Math.abs(this._zoneDrag.x1 - this._zoneDrag.x0) + "%",
                 height: Math.abs(this._zoneDrag.y1 - this._zoneDrag.y0) + "%",
             })}></div>`
-            : A}
-        ${this._mapMode === "calib" && this._modeEntity === vac.entity
-            ? b `<div class="calib-circle" style=${o({ left: this._calibCircle.x + "%", top: this._calibCircle.y + "%" })}></div>`
             : A}
       </div>
     `;
@@ -2846,7 +2451,7 @@ let AnyVacCard = class AnyVacCard extends i$2 {
     }
 };
 // ── Styles ──────────────────────────────────────────────────────────────
-AnyVacCard.styles = i$5 `
+AnyVacCard.styles = i$6 `
     :host {
       display: block;
       width: 100%;
@@ -3212,8 +2817,6 @@ AnyVacCard.styles = i$5 `
     .calib-panel { margin-top: 4px; font-size: 12px; opacity: 0.9; padding: 6px 8px; background: rgba(59,130,246,0.12); border-radius: 8px; }
     .calib-panel > div { margin-bottom: 4px; }
     .calib-actions { display: flex; gap: 6px; flex-wrap: wrap; }
-    .calib-circle { position: absolute; width: 40px; height: 40px; border: 2px solid #00e5ff; border-radius: 50%; transform: translate(-50%, -50%); box-shadow: 0 0 8px #00e5ff, inset 0 0 6px rgba(0,229,255,0.5); pointer-events: none; z-index: 6; }
-    .calib-circle::after { content: ""; position: absolute; left: 50%; top: 50%; width: 3px; height: 3px; background: #00e5ff; border-radius: 50%; transform: translate(-50%, -50%); }
   `;
 __decorate([
     n$1({ attribute: false })
@@ -3236,15 +2839,6 @@ __decorate([
 __decorate([
     r()
 ], AnyVacCard.prototype, "_modeEntity", void 0);
-__decorate([
-    r()
-], AnyVacCard.prototype, "_calibStep", void 0);
-__decorate([
-    r()
-], AnyVacCard.prototype, "_calibMsg", void 0);
-__decorate([
-    r()
-], AnyVacCard.prototype, "_calibCircle", void 0);
 __decorate([
     r()
 ], AnyVacCard.prototype, "_dbg", void 0);
@@ -3295,175 +2889,6 @@ if (!customCards.some((c) => c["type"] === CARD_NAME)) {
     });
 }
 
-/**
- * Server-side cleaning tracker blueprint.
- *
- * The card fires `roborock_card_event` (action: cleaning_started) with the
- * full context — including the helper entity IDs of the selected rooms — so
- * this blueprint is fully generic: one static blueprint works for every
- * configuration, no per-user YAML generation needed.
- *
- * Flow:
- *  1. (optional) start notification
- *  2. wait until the vacuum leaves the dock (guards against the race where
- *     the event arrives while the state still reads docked/charging)
- *  3. wait until it returns to docked/charging (1-min debounce so brief dock
- *     visits between software-repeat passes don't end the session) or errors
- *  4. write per-room last-clean timestamps (input_datetime)
- *  5. (optional) single-room time calibration (input_number)
- *  6. (optional) finish notification
- *  7. fire cleaning_finished event (source: blueprint) — open cards listen
- *     for it and clear their room selection on every device
- */
-const BLUEPRINT_YAML = `blueprint:
-  name: "AnyVac Card — Cleaning Tracker (v${BLUEPRINT_VERSION})"
-  description: >-
-    Companion automation for anyvac-card. Triggered by the
-    cleaning_started event fired by the card; waits for the vacuum to finish,
-    writes per-room last-clean timestamps, optionally calibrates single-room
-    clean times and sends notifications. Runs server-side, so it works even
-    when no dashboard is open. Managed by the card editor (Global tab).
-  domain: automation
-  source_url: https://github.com/Michailjovic/anyvac-card
-  input:
-    notify_service:
-      name: Notify action
-      description: "e.g. notify.mobile_app_phone — leave empty to disable notifications"
-      default: ""
-      selector:
-        text: {}
-    notify_on_start:
-      name: Notify on start
-      default: true
-      selector:
-        boolean: {}
-    notify_on_finish:
-      name: Notify on finish
-      default: true
-      selector:
-        boolean: {}
-    notify_on_error:
-      name: Notify on error
-      default: true
-      selector:
-        boolean: {}
-    single_room_time:
-      name: Single-room time calibration
-      description: >-
-        When a run cleaned exactly one room, store the measured duration into
-        that room's clean-time helper (input_number).
-      default: false
-      selector:
-        boolean: {}
-mode: parallel
-max: 5
-triggers:
-  - trigger: event
-    event_type: roborock_card_event
-    event_data:
-      action: cleaning_started
-variables:
-  notify_service: !input notify_service
-  notify_on_start: !input notify_on_start
-  notify_on_finish: !input notify_on_finish
-  notify_on_error: !input notify_on_error
-  single_room_time: !input single_room_time
-  vacuum_entity: "{{ trigger.event.data.vacuum_entity }}"
-  vacuum_label: "{{ trigger.event.data.vacuum_label | default(vacuum_entity) }}"
-  room_keys: "{{ trigger.event.data.rooms | default([]) }}"
-  room_labels: "{{ trigger.event.data.room_labels | default('') }}"
-  estimated_mins: "{{ trigger.event.data.estimated_mins | default(0) }}"
-  clean_type: "{{ trigger.event.data.clean_type | default('dry') }}"
-  last_clean_entities: "{{ trigger.event.data.last_clean_entities | default([]) }}"
-  clean_time_entities: "{{ trigger.event.data.clean_time_entities | default([]) }}"
-  emoji: "{{ '\u{1FAE7}' if clean_type == 'wet' else '\u{1F9F9}' }}"
-  started_ts: "{{ now().timestamp() }}"
-actions:
-  - if:
-      - condition: template
-        value_template: "{{ notify_on_start and notify_service != '' }}"
-    then:
-      - action: "{{ notify_service }}"
-        continue_on_error: true
-        data:
-          title: "{{ emoji }} {{ vacuum_label }} — cleaning started"
-          message: "{{ room_labels }} (~{{ estimated_mins }} min)"
-  # Wait until the vacuum actually leaves the dock (max 3 min)
-  - wait_template: "{{ states(vacuum_entity) not in ['docked', 'charging'] }}"
-    timeout: "00:03:00"
-    continue_on_timeout: false
-  # Wait for the vacuum to return; 1-min debounce covers dock visits
-  # between software-repeat passes (native-area strategy)
-  - repeat:
-      sequence:
-        - wait_template: "{{ states(vacuum_entity) in ['docked', 'charging', 'error'] }}"
-          timeout: "04:00:00"
-          continue_on_timeout: false
-        - if:
-            - condition: template
-              value_template: "{{ states(vacuum_entity) == 'error' }}"
-          then:
-            - if:
-                - condition: template
-                  value_template: "{{ notify_on_error and notify_service != '' }}"
-              then:
-                - action: "{{ notify_service }}"
-                  continue_on_error: true
-                  data:
-                    title: "⚠️ {{ vacuum_label }} — problem"
-                    message: "The vacuum reported an error. Please check it."
-            - stop: "Vacuum reported an error"
-        - delay: "00:01:00"
-      until:
-        - condition: template
-          value_template: "{{ states(vacuum_entity) in ['docked', 'charging'] }}"
-  - variables:
-      actual_mins: "{{ ((now().timestamp() - started_ts) / 60) | round(0) | int }}"
-  - repeat:
-      for_each: "{{ last_clean_entities }}"
-      sequence:
-        - action: input_datetime.set_datetime
-          continue_on_error: true
-          target:
-            entity_id: "{{ repeat.item }}"
-          data:
-            datetime: "{{ now().strftime('%Y-%m-%d %H:%M:%S') }}"
-  - if:
-      - condition: template
-        value_template: >-
-          {{ single_room_time and room_keys | length == 1
-             and clean_time_entities | length == 1
-             and actual_mins | int >= 1 }}
-    then:
-      - action: input_number.set_value
-        continue_on_error: true
-        target:
-          entity_id: "{{ clean_time_entities[0] }}"
-        data:
-          value: "{{ [actual_mins | int, 180] | min }}"
-  - if:
-      - condition: template
-        value_template: "{{ notify_on_finish and notify_service != '' }}"
-    then:
-      - action: "{{ notify_service }}"
-        continue_on_error: true
-        data:
-          title: "{{ emoji }} {{ vacuum_label }} — cleaning finished"
-          message: "{{ room_labels }} · took {{ actual_mins }} min"
-  - event: roborock_card_event
-    event_data:
-      action: cleaning_finished
-      source: blueprint
-      vacuum_entity: "{{ vacuum_entity }}"
-      vacuum_label: "{{ vacuum_label }}"
-      rooms: "{{ room_keys }}"
-      room_labels: "{{ room_labels }}"
-      clean_type: "{{ clean_type }}"
-      estimated_mins: "{{ estimated_mins }}"
-      actual_mins: "{{ actual_mins }}"
-      success: true
-`;
-
 // ── Defaults ─────────────────────────────────────────────────────────────────
 const DEFAULT_VACUUM = {
     entity: "", name: "", color: "green", rooms: [],
@@ -3501,21 +2926,13 @@ let AnyVacCardEditor = class AnyVacCardEditor extends i$2 {
         this._openGlobal = new Set();
         // Per-vacuum: which roomIdx is open (null = none)
         this._openRoom = new Map();
-        // Script preview state
-        this._scriptPreviewOpen = false;
         // Maps tab state
         this._mapVac = 0;
         this._mapRoom = null;
         this._alignActive = false;
         this._alignPairs = [];
         this._alignPending = null;
-        // Backend (blueprint) deploy state
-        this._bpStatus = "unknown";
-        this._bpBusy = null;
-        this._bpMsg = null;
-        this._bpYamlOpen = false;
         this._initialized = false;
-        this._bpFetching = false;
     }
     setConfig(config) {
         this._config = config;
@@ -3533,19 +2950,8 @@ let AnyVacCardEditor = class AnyVacCardEditor extends i$2 {
                     .join("");
             }
         }
-        // Lazy blueprint status fetch when the Global tab is visible
-        if (this.hass && this._tab === "global" && this._bpStatus === "unknown") {
-            this._refreshBlueprintStatus();
-        }
     }
     // ── Config helpers ────────────────────────────────────────────────────────
-    _logCleanNow(entityId) {
-        const dt = new Date().toISOString().replace("T", " ").slice(0, 19);
-        this.hass.callService("input_datetime", "set_datetime", {
-            entity_id: entityId,
-            datetime: dt,
-        }).catch((e) => console.error("[editor] log clean now failed:", e));
-    }
     _fire(config) {
         this.dispatchEvent(new CustomEvent("config-changed", {
             detail: { config }, bubbles: true, composed: true,
@@ -3747,157 +3153,6 @@ let AnyVacCardEditor = class AnyVacCardEditor extends i$2 {
     _setGlobalAction(idx, updates) {
         const existing = this._config.global_actions?.[idx]?.action ?? { type: "script", entity_id: "" };
         this._setGlobal(idx, { action: { ...existing, ...updates } });
-    }
-    _setNotify(updates) {
-        const existing = this._config.notify ?? { category: "Cleaning" };
-        const next = { ...existing, ...updates };
-        this._setConfig({ notify: next });
-    }
-    _setNotifyTemplate(event, updates) {
-        const existing = this._config.notify?.[event] ?? {};
-        this._setNotify({ [event]: { ...existing, ...updates } });
-    }
-    _setNotifyScript(updates) {
-        const existing = this._config.notify_script ?? { entity: "" };
-        this._setConfig({ notify_script: { ...existing, ...updates } });
-    }
-    _setBackend(updates) {
-        const existing = this._config.backend ?? {};
-        this._setConfig({ backend: { ...existing, ...updates } });
-    }
-    // ── Backend (blueprint) deploy ────────────────────────────────────────────
-    /** Entity ID of the deployed tracker automation, or null */
-    _trackerAutomation() {
-        for (const [id, st] of Object.entries(this.hass?.states ?? {})) {
-            if (id.startsWith("automation.") && st.attributes["id"] === TRACKER_AUTOMATION_ID) {
-                return id;
-            }
-        }
-        return null;
-    }
-    async _refreshBlueprintStatus() {
-        if (this._bpFetching)
-            return;
-        this._bpFetching = true;
-        try {
-            const res = await this.hass.callWS({
-                type: "blueprint/list", domain: "automation",
-            });
-            const bp = res?.[BLUEPRINT_PATH];
-            if (!bp) {
-                this._bpStatus = "missing";
-                return;
-            }
-            const name = bp?.metadata?.name ?? bp?.name ?? "";
-            this._bpStatus = name.includes("v" + BLUEPRINT_VERSION) ? "current" : "outdated";
-        }
-        catch (err) {
-            console.error("[editor] blueprint/list failed:", err);
-            this._bpStatus = "missing";
-        }
-        finally {
-            this._bpFetching = false;
-        }
-    }
-    async _installBlueprint() {
-        this._bpBusy = "blueprint";
-        this._bpMsg = null;
-        try {
-            await this.hass.callWS({
-                type: "blueprint/save",
-                domain: "automation",
-                path: BLUEPRINT_PATH,
-                yaml: BLUEPRINT_YAML,
-                allow_override: true,
-            });
-            this._bpStatus = "current";
-            this._bpMsg = "✅ Blueprint installed (v" + BLUEPRINT_VERSION + ")";
-        }
-        catch (err) {
-            console.error("[editor] blueprint/save failed:", err);
-            this._bpMsg = "❌ Blueprint install failed (admin required?): " + (err?.message ?? err);
-        }
-        finally {
-            this._bpBusy = null;
-        }
-    }
-    async _deployAutomation() {
-        this._bpBusy = "automation";
-        this._bpMsg = null;
-        const b = this._config.backend ?? {};
-        const automation = {
-            alias: "AnyVac Card — Cleaning Tracker",
-            description: "Managed by anyvac-card v" + CARD_VERSION + ". Recreate from the card editor (Global tab) after changes.",
-            use_blueprint: {
-                path: BLUEPRINT_PATH,
-                input: {
-                    notify_service: b.notify_service ?? "",
-                    notify_on_start: b.notify_on_start !== false,
-                    notify_on_finish: b.notify_on_finish !== false,
-                    notify_on_error: b.notify_on_error !== false,
-                    single_room_time: this._config.single_room_time === true,
-                },
-            },
-        };
-        try {
-            await this.hass.callApi("post", "config/automation/config/" + TRACKER_AUTOMATION_ID, automation);
-            this._bpMsg = "✅ Automation deployed";
-        }
-        catch (err) {
-            console.error("[editor] automation deploy failed:", err);
-            this._bpMsg = "❌ Automation deploy failed (admin required?): " + (err?.message ?? err);
-        }
-        finally {
-            this._bpBusy = null;
-        }
-    }
-    // ── Helper auto-creation ──────────────────────────────────────────────────
-    async _createHelper(vacIdx, roomIdx, kind) {
-        const vac = this._config.vacuums[vacIdx];
-        const room = vac?.rooms?.[roomIdx];
-        if (!vac || !room)
-            return;
-        const vacLabel = vac.name || vac.entity.split(".")[1] || "vacuum";
-        const roomLabel = room.name || room.key || "room " + (roomIdx + 1);
-        try {
-            if (kind === "last_clean") {
-                const res = await this.hass.callWS({
-                    type: "input_datetime/create",
-                    name: vacLabel + " " + roomLabel + " last clean",
-                    has_date: true,
-                    has_time: true,
-                    icon: "mdi:broom",
-                });
-                this._setRoom(vacIdx, roomIdx, { last_clean_entity: "input_datetime." + res.id });
-            }
-            else {
-                const res = await this.hass.callWS({
-                    type: "input_number/create",
-                    name: vacLabel + " " + roomLabel + " clean time",
-                    min: 0, max: 180, step: 1,
-                    unit_of_measurement: "min",
-                    mode: "box",
-                    icon: "mdi:timer-outline",
-                });
-                this._setRoom(vacIdx, roomIdx, { clean_time_entity: "input_number." + res.id });
-            }
-        }
-        catch (err) {
-            console.error("[editor] helper create failed:", err);
-            this._bpMsg = "❌ Helper creation failed (admin required?): " + (err?.message ?? err);
-        }
-    }
-    async _createMissingHelpers(vacIdx) {
-        const count = this._config.vacuums[vacIdx]?.rooms?.length ?? 0;
-        for (let i = 0; i < count; i++) {
-            // re-read on every pass — _setRoom replaces the rooms array
-            let r = this._config.vacuums[vacIdx]?.rooms?.[i];
-            if (r && !r.last_clean_entity)
-                await this._createHelper(vacIdx, i, "last_clean");
-            r = this._config.vacuums[vacIdx]?.rooms?.[i];
-            if (r && !r.clean_time_entity)
-                await this._createHelper(vacIdx, i, "clean_time");
-        }
     }
     // ── List mutations ────────────────────────────────────────────────────────
     _moveVacuum(idx, dir) {
@@ -4190,12 +3445,6 @@ let AnyVacCardEditor = class AnyVacCardEditor extends i$2 {
             <button class="btn btn--add" @click=${() => this._addRoom(idx)}>
               <ha-icon icon="mdi:plus"></ha-icon> Add room
             </button>
-            ${(vac.rooms ?? []).some(r => !r.last_clean_entity || !r.clean_time_entity) ? b `
-              <button class="btn btn--sm" style="align-self:flex-start"
-                @click=${() => this._createMissingHelpers(idx)}>
-                <ha-icon icon="mdi:auto-fix"></ha-icon> Create missing helpers for all rooms
-              </button>
-            ` : A}
 
           </div>
         ` : A}
@@ -4443,28 +3692,11 @@ let AnyVacCardEditor = class AnyVacCardEditor extends i$2 {
                 </div>
                 <p class="hint">Find IDs: Developer Tools → Actions → roborock.get_maps</p>`}
             ${this._numberSlider("Est. clean time (fallback)", room.clean_time_mins ?? 0, 0, 120, 1, v => this._setRoom(vacIdx, roomIdx, { clean_time_mins: v > 0 ? v : undefined }), " min")}
-            ${this._entityPicker("Auto-calibration (input_number)", room.clean_time_entity, ["input_number"], v => this._setRoom(vacIdx, roomIdx, { clean_time_entity: v || undefined }))}
-            ${room.clean_time_entity ? b `
-              <p class="hint">Card measures actual room time and writes rolling average here automatically.</p>
-            ` : b `
-              <button class="btn btn--add btn--sm" style="align-self:flex-start"
-                @click=${() => this._createHelper(vacIdx, roomIdx, "clean_time")}>
-                <ha-icon icon="mdi:plus"></ha-icon> Create input_number helper
-              </button>
-            `}
-            ${this._entityPicker("Last clean (input_datetime)", room.last_clean_entity, ["input_datetime"], v => this._setRoom(vacIdx, roomIdx, { last_clean_entity: v || undefined }))}
-            ${!room.last_clean_entity ? b `
-              <button class="btn btn--add btn--sm" style="align-self:flex-start"
-                @click=${() => this._createHelper(vacIdx, roomIdx, "last_clean")}>
-                <ha-icon icon="mdi:plus"></ha-icon> Create input_datetime helper
-              </button>
-            ` : A}
-            ${room.last_clean_entity ? b `
-              <button class="btn btn--sm" style="align-self:flex-start"
-                @click=${() => this._logCleanNow(room.last_clean_entity)}>
-                ✓ Log clean now
-              </button>
-            ` : A}
+            ${this._entityPicker("Clean time fallback (input_number, legacy)", room.clean_time_entity, ["input_number"], v => this._setRoom(vacIdx, roomIdx, { clean_time_entity: v || undefined }))}
+            ${this._entityPicker("Last clean fallback (input_datetime, legacy)", room.last_clean_entity, ["input_datetime"], v => this._setRoom(vacIdx, roomIdx, { last_clean_entity: v || undefined }))}
+            <p class="hint">Legacy read-only fallbacks for setups without the AnyVac integration.
+              With the integration, clean-time estimates and last-clean history are learned and
+              stored server-side — the card never writes these helpers.</p>
             <p class="hint map-hint" @click=${() => { this._tab = "maps"; this._mapVac = vacIdx; this._mapRoom = roomIdx; }}>
               📍 Set position &amp; icon in the <strong>Maps tab</strong> →
             </p>
@@ -4667,161 +3899,6 @@ let AnyVacCardEditor = class AnyVacCardEditor extends i$2 {
 
       </div>`;
     }
-    // ── Script YAML generator ───────────────────────────────────────────────────
-    _generateNotifyScriptYaml() {
-        const cfg = this._config.notify_script;
-        if (!cfg?.entity)
-            return "";
-        const v = cfg.vars ?? {};
-        const e = cfg.gen_events ?? {};
-        const hasStart = e.on_start !== false;
-        const hasFinish = e.on_finish !== false;
-        const hasError = e.on_error !== false;
-        const inclLabel = v.vacuum_label !== false;
-        const inclRooms = v.room_labels !== false;
-        const inclKeys = v.room_keys === true;
-        const inclMins = v.estimated_mins !== false;
-        const inclType = v.clean_type !== false;
-        const lines = [];
-        const L = (s) => lines.push(s);
-        const scriptName = cfg.entity.startsWith("script.") ? cfg.entity.slice(7) : cfg.entity;
-        L(`alias: ${scriptName}`);
-        L(`description: Generováno z anyvac-card`);
-        L(`mode: parallel`);
-        L(`max: 3`);
-        L(`fields:`);
-        L(`  vacuum_entity:`);
-        L(`    required: true`);
-        L(`    description: "Vysavač entity ID"`);
-        if (inclLabel) {
-            L(`  vacuum_label:`);
-            L(`    required: true`);
-        }
-        if (inclRooms) {
-            L(`  room_labels:`);
-            L(`    required: true`);
-        }
-        if (inclKeys) {
-            L(`  room_keys:`);
-            L(`    required: false`);
-        }
-        if (inclMins) {
-            L(`  estimated_mins:`);
-            L(`    required: true`);
-        }
-        if (inclType) {
-            L(`  clean_type:`);
-            L(`    required: true`);
-        }
-        L(`sequence:`);
-        L(`  - variables:`);
-        L(`      vac_id: "{{ vacuum_entity.split('.')[1] }}"`);
-        if (inclType) {
-            L(`      is_wet: "{{ clean_type == 'wet' }}"`);
-            L(`      emoji: "{{ '\u{1FAE7}' if is_wet else '\u{1F9F9}' }}"`);
-            L(`      clean_word: "{{ 'mopování' if is_wet else 'úklid' }}"`);
-        }
-        if (hasStart) {
-            const title = (inclType ? "{{ emoji }} " : "") +
-                (inclLabel ? "{{ vacuum_label }}" : "Vysavač") +
-                (inclType ? " – {{ clean_word }} zahájen" : " – úklid zahájen");
-            const msgParts = [
-                ...(inclRooms ? ["{{ room_labels }}"] : []),
-                ...(inclMins ? ["(~{{ estimated_mins }} min)"] : []),
-            ];
-            L(``);
-            L(`  # --- Zahájení ---`);
-            L(`  - action: notify.notify  # TODO: nahraď svým notify service`);
-            L(`    data:`);
-            L(`      title: "${title}"`);
-            L(`      message: "${msgParts.join(" ")}"`);
-        }
-        if (hasFinish || hasError) {
-            L(``);
-            L(`  # --- Čekání na výsledek ---`);
-            L(`  - wait_for_trigger:`);
-            if (hasFinish) {
-                L(`      - trigger: state`);
-                L(`        entity_id: "{{ vacuum_entity }}"`);
-                L(`        to:`);
-                L(`          - docked`);
-                L(`          - charging`);
-                L(`        for:`);
-                L(`          minutes: 1`);
-            }
-            if (hasError) {
-                L(`      - trigger: state`);
-                L(`        entity_id: "{{ vacuum_entity }}"`);
-                L(`        to: error`);
-            }
-            L(`    timeout:`);
-            L(`      hours: 4`);
-            L(`    continue_on_timeout: false`);
-            L(``);
-            L(`  - variables:`);
-            L(`      final_state: "{{ wait.trigger.to_state.state if wait.trigger is not none else 'timeout' }}"`);
-            if (hasFinish) {
-                L(`      begin_ts: "{{ states('sensor.' ~ vac_id ~ '_last_clean_begin') }}"`);
-                L(`      end_ts: "{{ states('sensor.' ~ vac_id ~ '_last_clean_end') }}"`);
-                L(`      actual_minutes: >-`);
-                L(`        {% if begin_ts not in ['unknown','unavailable'] and end_ts not in ['unknown','unavailable'] %}`);
-                L(`          {{ (((end_ts | as_datetime) - (begin_ts | as_datetime)).total_seconds() / 60) | round(0) }}`);
-                L(`        {% else %}`);
-                L(`          0`);
-                L(`        {% endif %}`);
-            }
-            const labelPart = inclLabel ? "{{ vacuum_label }}" : "Vysavač";
-            const finishTitle = (inclType ? "{{ emoji }} " : "") + labelPart +
-                (inclType ? " – {{ clean_word }} dokončen" : " – úklid dokončen");
-            const finishMsg = [
-                ...(inclRooms ? ["{{ room_labels }}"] : []),
-                "Trvalo to {{ actual_minutes }} min.",
-            ].join(" ");
-            if (hasFinish && hasError) {
-                L(``);
-                L(`  - choose:`);
-                L(`      - conditions:`);
-                L(`          - condition: template`);
-                L(`            value_template: "{{ final_state == 'error' }}"`);
-                L(`        sequence:`);
-                L(`          - variables:`);
-                L(`              current_room: "{{ states('sensor.' ~ vac_id ~ '_current_room') }}"`);
-                L(`          - action: notify.notify  # TODO`);
-                L(`            data:`);
-                L(`              title: "⚠️ ${labelPart} – problém"`);
-                L(`              message: "Místnost: {{ current_room }}. Zkontroluj vysavač."`);
-                L(`      - conditions:`);
-                L(`          - condition: template`);
-                L(`            value_template: "{{ final_state in ['docked', 'charging'] }}"`);
-                L(`        sequence:`);
-                L(`          - action: notify.notify  # TODO`);
-                L(`            data:`);
-                L(`              title: "${finishTitle}"`);
-                L(`              message: "${finishMsg}"`);
-            }
-            else if (hasError) {
-                L(``);
-                L(`  - condition: template`);
-                L(`    value_template: "{{ final_state == 'error' }}"`);
-                L(`  - variables:`);
-                L(`      current_room: "{{ states('sensor.' ~ vac_id ~ '_current_room') }}"`);
-                L(`  - action: notify.notify  # TODO`);
-                L(`    data:`);
-                L(`      title: "⚠️ ${labelPart} – problém"`);
-                L(`      message: "Místnost: {{ current_room }}. Zkontroluj vysavač."`);
-            }
-            else if (hasFinish) {
-                L(``);
-                L(`  - condition: template`);
-                L(`    value_template: "{{ final_state in ['docked', 'charging'] }}"`);
-                L(`  - action: notify.notify  # TODO`);
-                L(`    data:`);
-                L(`      title: "${finishTitle}"`);
-                L(`      message: "${finishMsg}"`);
-            }
-        }
-        return lines.join("\n");
-    }
     // ── Tab: Global ───────────────────────────────────────────────────────────
     _dbgRow(label, value) {
         return b `<div class="field field--row">
@@ -4983,156 +4060,15 @@ let AnyVacCardEditor = class AnyVacCardEditor extends i$2 {
           ` : A}
         </div>
 
-        ${(() => {
-            const notify = this._config.notify;
-            const START_TOKENS = '{{ vacuum_label }}, {{ room_labels }}, {{ room_keys }}, {{ estimated_mins }}, {{ clean_type }}';
-            const FINISH_TOKENS = START_TOKENS + ', {{ actual_mins }}, {{ success }}';
-            return b `
-            <div class="section-title" style="margin-top:4px">Notifications (Ticker) — legacy</div>
-            <p class="hint">Browser-side; consider the blueprint tracker below instead.</p>
-            <div class="field field--row">
-              <label>Enable</label>
-              <label class="toggle-wrap">
-                <input type="checkbox" class="toggle-input"
-                  .checked=${!!notify}
-                  @change=${(e) => {
-                if (e.target.checked) {
-                    this._setConfig({ notify: { category: 'Cleaning' } });
-                }
-                else {
-                    this._setConfig({ notify: undefined });
-                }
-            }} />
-                <span class="toggle-track"></span>
-              </label>
-            </div>
-            ${notify ? b `
-              ${this._textField('Category', notify.category, v => this._setNotify({ category: v }), 'e.g. Cleaning')}
-              <div class="field field--row">
-                <label>Color (dry)</label>
-                <input type="color" class="threshold-color" .value=${notify.color_dry ?? '#4CAF50'}
-                  @input=${(e) => this._setNotify({ color_dry: e.target.value })} />
-              </div>
-              <div class="field field--row">
-                <label>Color (wet)</label>
-                <input type="color" class="threshold-color" .value=${notify.color_wet ?? '#2196F3'}
-                  @input=${(e) => this._setNotify({ color_wet: e.target.value })} />
-              </div>
-              ${this._textField('Tag prefix', notify.tag_prefix, v => this._setNotify({ tag_prefix: v || undefined }), 'e.g. roborock')}
-              <div class="sub-title">On clean start</div>
-              ${this._textField('Title', notify.on_start?.title, v => this._setNotifyTemplate('on_start', { title: v || undefined }), '🧹 {{ vacuum_label }}')}
-              ${this._textField('Message', notify.on_start?.message, v => this._setNotifyTemplate('on_start', { message: v || undefined }), '{{ room_labels }} · ~{{ estimated_mins }} min')}
-              <p class="hint">Tokens: ${START_TOKENS}</p>
-              <div class="sub-title">On clean finish</div>
-              ${this._textField('Title', notify.on_finish?.title, v => this._setNotifyTemplate('on_finish', { title: v || undefined }), '✅ {{ vacuum_label }} hotovo')}
-              ${this._textField('Message', notify.on_finish?.message, v => this._setNotifyTemplate('on_finish', { message: v || undefined }), '{{ room_labels }} · {{ actual_mins }} min')}
-              <p class="hint">Tokens: ${FINISH_TOKENS}</p>
-            ` : A}
-          `;
-        })()}
-
-        ${(() => {
-            const nsCfg = this._config.notify_script;
-            const nsVars = nsCfg?.vars ?? {};
-            const nsEvts = nsCfg?.gen_events ?? {};
-            const VAR_DEFS = [
-                ["vacuum_label", "Název vysavače", true],
-                ["room_labels", "Místnosti (text)", true],
-                ["room_keys", "Místnosti (klíče)", false],
-                ["estimated_mins", "Odhadovaný čas", true],
-                ["clean_type", "Typ úklidu (wet/dry)", true],
-            ];
-            const EVT_DEFS = [
-                ["on_start", "Zahájení úklidu"],
-                ["on_finish", "Dokončení úklidu"],
-                ["on_error", "Chyba / problém"],
-            ];
-            return b `
-            <div class="section-title" style="margin-top:4px">Script notifikací</div>
-            <p class="hint">
-              Karta při startu úklidu zavolá HA skript a předá mu vybraný kontext.
-              Skript pak běží server-side &mdash; nezávisle na otevřeném dashboardu.
-            </p>
-            <div class="field field--row">
-              <label>Povolit</label>
-              <label class="toggle-wrap">
-                <input type="checkbox" class="toggle-input"
-                  .checked=${!!nsCfg}
-                  @change=${(e) => {
-                if (e.target.checked) {
-                    this._setConfig({ notify_script: { entity: "script.vakuum_notifikace_uklid" } });
-                }
-                else {
-                    this._setConfig({ notify_script: undefined });
-                    this._scriptPreviewOpen = false;
-                }
-            }} />
-                <span class="toggle-track"></span>
-              </label>
-            </div>
-            ${nsCfg ? b `
-              ${this._textField("Script entity", nsCfg.entity, v => this._setNotifyScript({ entity: v }), "script.vakuum_notifikace_uklid")}
-
-              <div class="sub-title">Události v generovaném skriptu</div>
-              ${EVT_DEFS.map(([key, label]) => {
-                const checked = nsEvts[key] !== false;
-                return b `
-                  <div class="field field--row">
-                    <label>${label}</label>
-                    <label class="toggle-wrap">
-                      <input type="checkbox" class="toggle-input"
-                        .checked=${checked}
-                        @change=${(e) => {
-                    const val = e.target.checked;
-                    this._setNotifyScript({ gen_events: { ...nsEvts, [key]: val } });
-                }} />
-                      <span class="toggle-track"></span>
-                    </label>
-                  </div>`;
-            })}
-
-              <div class="sub-title">Proměnné předávané skriptu</div>
-              ${VAR_DEFS.map(([key, label, defaultOn]) => {
-                const checked = defaultOn ? nsVars[key] !== false : nsVars[key] === true;
-                return b `
-                  <div class="field field--row">
-                    <label>${label} <code style="font-size:10px">${key}</code></label>
-                    <label class="toggle-wrap">
-                      <input type="checkbox" class="toggle-input"
-                        .checked=${checked}
-                        @change=${(e) => {
-                    const val = e.target.checked;
-                    this._setNotifyScript({ vars: { ...nsVars, [key]: val } });
-                }} />
-                      <span class="toggle-track"></span>
-                    </label>
-                  </div>`;
-            })}
-
-              <button class="btn btn--sm" style="align-self:flex-start"
-                @click=${() => { this._scriptPreviewOpen = !this._scriptPreviewOpen; }}>
-                <ha-icon icon=${this._scriptPreviewOpen ? "mdi:code-tags-check" : "mdi:code-tags"}></ha-icon>
-                ${this._scriptPreviewOpen ? "Skrýt generovaný skript" : "Zobrazit generovaný skript"}
-              </button>
-              ${this._scriptPreviewOpen ? b `
-                <div style="position:relative">
-                  <pre class="yaml-preview">${this._generateNotifyScriptYaml()}</pre>
-                  <button class="btn btn--sm" style="position:absolute;top:6px;right:6px"
-                    @click=${async () => {
-                try {
-                    await navigator.clipboard.writeText(this._generateNotifyScriptYaml());
-                }
-                catch { /* clipboard unavailable */ }
-            }}>
-                    <ha-icon icon="mdi:content-copy"></ha-icon> Kopírovat
-                  </button>
-                </div>
-              ` : A}
-            ` : A}
-          `;
-        })()}
-
-        ${this._renderBackendSection()}
+        <div class="section-title" style="margin-top:4px">Notifications</div>
+        <p class="hint">
+          Notifications are built from the AnyVac integration's server-side events
+          (<code>anyvac_clean_started</code>, <code>anyvac_clean_finished</code>,
+          <code>anyvac_room_done</code>, <code>anyvac_vacuum_error</code>) — the
+          integration ships ready-made automation blueprints for them
+          (Settings → Automations → Create with blueprint). The card no longer sends
+          notifications itself.
+        </p>
 
         ${(() => {
             const usesAreaMappings = this._config.vacuums.some(v => v.clean_action?.type === "native-area" || v.clean_action?.type === "native-auto");
@@ -5157,110 +4093,6 @@ let AnyVacCardEditor = class AnyVacCardEditor extends i$2 {
         })()}
 
       </div>`;
-    }
-    // ── Backend tracking section ──────────────────────────────────────────────
-    _renderBackendSection() {
-        const b$1 = this._config.backend ?? {};
-        const automationEntity = this._trackerAutomation();
-        const bpLabel = this._bpStatus === "unknown" ? "⏳ checking…" :
-            this._bpStatus === "current" ? "✅ installed (v" + BLUEPRINT_VERSION + ")" :
-                this._bpStatus === "outdated" ? "⚠️ installed — update available (v" + BLUEPRINT_VERSION + ")" :
-                    "❌ not installed";
-        return b `
-      <div class="section-title" style="margin-top:4px">Backend tracking (blueprint)</div>
-      <p class="hint">
-        Server-side cleaning tracker: a blueprint automation listens for the card's
-        <code>cleaning_started</code> event, waits for the vacuum to dock, writes per-room
-        last-clean timestamps and sends notifications — it works even when no dashboard
-        is open. Recommended over the Ticker/script notifications above.
-      </p>
-
-      <div class="field field--row">
-        <label>Blueprint</label>
-        <span style="font-size:13px">${bpLabel}</span>
-      </div>
-      <div class="field field--row">
-        <label>Automation</label>
-        <span style="font-size:13px">${automationEntity
-            ? b `✅ <code>${automationEntity}</code>`
-            : "❌ not created"}</span>
-      </div>
-
-      ${this._textField("Notify action", b$1.notify_service, v => this._setBackend({ notify_service: v || undefined }), "notify.mobile_app_phone")}
-      ${[
-            ["notify_on_start", "Notify on start"],
-            ["notify_on_finish", "Notify on finish"],
-            ["notify_on_error", "Notify on error"],
-        ].map(([key, label]) => b `
-        <div class="field field--row">
-          <label>${label}</label>
-          <label class="toggle-wrap">
-            <input type="checkbox" class="toggle-input"
-              .checked=${b$1[key] !== false}
-              @change=${(e) => this._setBackend({ [key]: e.target.checked })} />
-            <span class="toggle-track"></span>
-          </label>
-        </div>`)}
-      <div class="field field--row">
-        <label>Single-room calibration</label>
-        <label class="toggle-wrap">
-          <input type="checkbox" class="toggle-input"
-            .checked=${this._config.single_room_time ?? false}
-            @change=${(e) => this._setConfig({
-            single_room_time: e.target.checked || undefined
-        })} />
-          <span class="toggle-track"></span>
-        </label>
-      </div>
-      <p class="hint">
-        Single-room calibration: when a run cleaned exactly one room, the measured duration
-        is written into that room's clean-time helper. Applied by the card and by the
-        blueprint (re-deploy the automation after changing).
-      </p>
-
-      <div style="display:flex;gap:8px;flex-wrap:wrap">
-        <button class="btn btn--add btn--sm" ?disabled=${this._bpBusy !== null}
-          @click=${() => this._installBlueprint()}>
-          <ha-icon icon="mdi:download"></ha-icon>
-          ${this._bpBusy === "blueprint" ? "Installing…"
-            : this._bpStatus === "current" ? "Reinstall blueprint"
-                : this._bpStatus === "outdated" ? "Update blueprint"
-                    : "Install blueprint"}
-        </button>
-        <button class="btn btn--add btn--sm"
-          ?disabled=${this._bpBusy !== null || this._bpStatus === "missing"}
-          @click=${() => this._deployAutomation()}>
-          <ha-icon icon="mdi:robot"></ha-icon>
-          ${this._bpBusy === "automation" ? "Deploying…"
-            : automationEntity ? "Update automation" : "Create automation"}
-        </button>
-        <button class="btn btn--sm" ?disabled=${this._bpBusy !== null}
-          @click=${() => { this._bpStatus = "unknown"; this._bpMsg = null; }}>
-          <ha-icon icon="mdi:refresh"></ha-icon> Refresh
-        </button>
-      </div>
-      ${this._bpMsg ? b `<p class="hint">${this._bpMsg}</p>` : A}
-
-      <button class="btn btn--sm" style="align-self:flex-start"
-        @click=${() => { this._bpYamlOpen = !this._bpYamlOpen; }}>
-        <ha-icon icon=${this._bpYamlOpen ? "mdi:code-tags-check" : "mdi:code-tags"}></ha-icon>
-        ${this._bpYamlOpen ? "Hide blueprint YAML" : "Show blueprint YAML (manual install)"}
-      </button>
-      ${this._bpYamlOpen ? b `
-        <div style="position:relative">
-          <pre class="yaml-preview">${BLUEPRINT_YAML}</pre>
-          <button class="btn btn--sm" style="position:absolute;top:6px;right:6px"
-            @click=${async () => {
-            try {
-                await navigator.clipboard.writeText(BLUEPRINT_YAML);
-            }
-            catch { /* clipboard unavailable */ }
-        }}>
-            <ha-icon icon="mdi:content-copy"></ha-icon> Copy
-          </button>
-        </div>
-      ` : A}
-    `;
     }
     _renderGlobalAccordion(ga, idx) {
         const color = COLOR_HEX[ga.color ?? "orange"];
@@ -5343,7 +4175,7 @@ let AnyVacCardEditor = class AnyVacCardEditor extends i$2 {
     }
 };
 // ── Styles ────────────────────────────────────────────────────────────────
-AnyVacCardEditor.styles = i$5 `
+AnyVacCardEditor.styles = i$6 `
     .editor-root { display:flex; flex-direction:column; }
 
     /* ── Tabs ── */
@@ -5627,9 +4459,6 @@ __decorate([
 ], AnyVacCardEditor.prototype, "_openRoom", void 0);
 __decorate([
     r()
-], AnyVacCardEditor.prototype, "_scriptPreviewOpen", void 0);
-__decorate([
-    r()
 ], AnyVacCardEditor.prototype, "_mapVac", void 0);
 __decorate([
     r()
@@ -5643,18 +4472,6 @@ __decorate([
 __decorate([
     r()
 ], AnyVacCardEditor.prototype, "_alignPending", void 0);
-__decorate([
-    r()
-], AnyVacCardEditor.prototype, "_bpStatus", void 0);
-__decorate([
-    r()
-], AnyVacCardEditor.prototype, "_bpBusy", void 0);
-__decorate([
-    r()
-], AnyVacCardEditor.prototype, "_bpMsg", void 0);
-__decorate([
-    r()
-], AnyVacCardEditor.prototype, "_bpYamlOpen", void 0);
 AnyVacCardEditor = __decorate([
     t$1(EDITOR_NAME)
 ], AnyVacCardEditor);

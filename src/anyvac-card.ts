@@ -16,7 +16,6 @@ import type {
   GlobalPreset,
   GlobalAction,
   GlobalActionCall,
-  NotifyTemplates,
 } from "./types";
 import {
   CARD_NAME,
@@ -31,29 +30,10 @@ import {
 } from "./const";
 
 console.info(
-  `%c ROBOROCK-VACUUM-CARD %c v${CARD_VERSION} `,
+  `%c ANYVAC-CARD %c v${CARD_VERSION} `,
   "background:#2196F3;color:#fff;font-weight:700;padding:2px 4px;border-radius:3px 0 0 3px",
   "background:#1a1a1a;color:#fff;font-weight:400;padding:2px 4px;border-radius:0 3px 3px 0"
 );
-
-type InFlightCleaning = {
-  rooms: Array<{
-    key: string;
-    name: string;
-    last_clean_entity?: string;
-    clean_time_entity?: string;
-  }>;
-  expectedMs: number;
-  startTime: number;
-  /** Timestamp of the very first pass — used for total time in notifications */
-  originalStartTime: number;
-  vacLabel: string;
-  cleanType: "wet" | "dry";
-  /** Passes remaining after the current one (native-area software repeat) */
-  repeatRemaining: number;
-  /** Resolved area IDs — stored for restarting repeat passes */
-  areaIds?: string[];
-};
 
 @customElement(CARD_NAME)
 export class AnyVacCard extends LitElement {
@@ -64,20 +44,8 @@ export class AnyVacCard extends LitElement {
   @state() private _shownSet = new Set<number>([0]);
   /** ID of the button currently being held — drives the fill animation */
   @state() private _holdId: string | null = null;
-  @state() private _mapMode: "normal" | "pin" | "calib" | "zone" = "normal";
+  @state() private _mapMode: "normal" | "pin" | "zone" = "normal";
   @state() private _modeEntity: string | null = null;
-  @state() private _calibStep = 0;
-  private _calibPts: Array<{ map: { x: number; y: number }; vacuum: { x: number; y: number } }> = [];
-  private readonly _calibTargets = [
-    { x: 25500, y: 25500 },
-    { x: 27000, y: 25500 },
-    { x: 25500, y: 26500 },
-  ];
-  @state() private _calibMsg = "";
-  private _calibCur = { x: 25500, y: 25500 };
-  private _calibCandIdx = 0;
-  @state() private _calibCircle = { x: 50, y: 50 };
-  private _calibContent = { x: 50, y: 50 };
   @state() private _dbg = "";
   @state() private _zoneDrag: { x0: number; y0: number; x1: number; y1: number } | null = null;
   @state() private _zonePending: { x1: number; y1: number; x2: number; y2: number } | null = null;
@@ -103,19 +71,14 @@ export class AnyVacCard extends LitElement {
    *  cleaning/paused and debug_room_progress is on, so it does not re-render otherwise. */
   @state() private _now = Date.now();
   private _tickTimer: number | null = null;
-  /** Aktivní úklidy — sledování průběhu pro vyhodnocení úspěchu */
-  private _inFlight = new Map<string, InFlightCleaning>();
-  private _prevVacStates = new Map<string, string>();
-  private _prevRoomStates = new Map<string, string>();
-  /** Auto-calibration: timestamp when vacuum entered each room (key = vacEntity:roomName) */
-  private _roomEnterTimes = new Map<string, number>();
+  // NOTE (docs/14 canon): the card holds NO cleaning-session state. Tracking, history,
+  // estimates and room detection live in the anyvac integration — the card only renders
+  // sensor data and sends intents.
 
   private _holdTimer: ReturnType<typeof setTimeout> | null = null;
   private _initialized = false;
   /** Entities whose state changes should trigger a re-render */
   private _watched: Set<string> | null = null;
-  /** roborock_card_event subscription (blueprint → card sync) */
-  private _unsubEvents: Promise<() => void> | null = null;
 
   // ── Lovelace card API ───────────────────────────────────────────────────
 
@@ -164,7 +127,6 @@ export class AnyVacCard extends LitElement {
   connectedCallback(): void {
     super.connectedCallback();
     this.style.setProperty("--hold-ms", HOLD_DURATION_MS + "ms");
-    this._ensureSubscribed();
     if (!this._ro && typeof ResizeObserver !== "undefined") {
       this._ro = new ResizeObserver(() => this._scheduleMeasure());
       this._ro.observe(this);
@@ -203,10 +165,6 @@ export class AnyVacCard extends LitElement {
     if (this._tickTimer) { clearInterval(this._tickTimer); this._tickTimer = null; }
     if (this._onWinResize) { window.removeEventListener("resize", this._onWinResize); this._onWinResize = null; }
     if (this._ro) { this._ro.disconnect(); this._ro = null; }
-    if (this._unsubEvents) {
-      this._unsubEvents.then((unsub) => unsub()).catch(() => { /* connection gone */ });
-      this._unsubEvents = null;
-    }
   }
 
   protected firstUpdated(): void {
@@ -248,82 +206,10 @@ export class AnyVacCard extends LitElement {
     for (const ga of this._config?.global_actions ?? []) {
       for (const e of ga.watch_entities ?? []) if (e) s.add(e);
     }
-    this._watched = s;
+    // Don't freeze the list before the entity registry is loaded — the auto-resolved
+    // sibling sensors (status/battery/room/error) would otherwise never be watched.
+    if ((this.hass as any)?.entities) this._watched = s;
     return s;
-  }
-
-  private _ensureSubscribed(): void {
-    if (this._unsubEvents || !this.hass?.connection?.subscribeEvents) return;
-    try {
-      this._unsubEvents = this.hass.connection.subscribeEvents(
-        (ev) => this._onCardEvent(ev.data ?? {}),
-        "roborock_card_event"
-      );
-    } catch {
-      this._unsubEvents = null;
-    }
-  }
-
-  /**
-   * Blueprint fired cleaning_finished — clear the room selection for that
-   * vacuum on every device with an open dashboard, and drop any stale
-   * in-flight record (e.g. when this tab missed the docked transition).
-   */
-  private _onCardEvent(data: Record<string, unknown>): void {
-    if (data["action"] !== "cleaning_finished" || data["source"] !== "blueprint") return;
-    const vacEntity = String(data["vacuum_entity"] ?? "");
-    if (!this._config?.vacuums.some((v) => v.entity === vacEntity)) return;
-    this._inFlight.delete(vacEntity);
-    const keys = Array.isArray(data["rooms"]) ? (data["rooms"] as unknown[]).map(String) : [];
-    if (!keys.length) return;
-    const next = new Map(this._localRoomSel);
-    for (const k of keys) next.delete(vacEntity + ":" + k);
-    this._localRoomSel = next;
-    this._saveRoomSel(vacEntity);
-  }
-
-  protected updated(changed: PropertyValues): void {
-    this._ensureSubscribed();
-    if (!changed.has("hass") || !this.hass || !this._config) return;
-    for (const vac of this._config.vacuums) {
-      const newState = this.hass.states[vac.entity]?.state ?? "";
-      const prevState = this._prevVacStates.get(vac.entity) ?? newState;
-      // Přechod do docked/charging při aktivním úklidu → vyhodnoť
-      if (prevState !== newState &&
-          (newState === "docked" || newState === "charging") &&
-          this._inFlight.has(vac.entity)) {
-        const flight = this._inFlight.get(vac.entity)!;
-        this._inFlight.delete(vac.entity);
-        this._evalCleaningComplete(vac.entity, flight);
-      }
-      this._prevVacStates.set(vac.entity, newState);
-      // room_entered event + auto-calibration tracking
-      if (vac.current_room_entity && this._inFlight.has(vac.entity)) {
-        const newRoom = this.hass.states[vac.current_room_entity]?.state ?? "";
-        const prevRoom = this._prevRoomStates.get(vac.entity) ?? "";
-        if (newRoom && newRoom !== prevRoom &&
-            newRoom !== "unknown" && newRoom !== "unavailable") {
-          if (prevRoom) {
-            const enterKey = vac.entity + ":" + prevRoom;
-            const enterTime = this._roomEnterTimes.get(enterKey);
-            if (enterTime) {
-              const elapsedMins = (Date.now() - enterTime) / 60_000;
-              this._updateRoomCleanTime(vac, prevRoom, elapsedMins);
-              this._roomEnterTimes.delete(enterKey);
-            }
-          }
-          this._roomEnterTimes.set(vac.entity + ":" + newRoom, Date.now());
-          this._fireHAEvent({
-            action: "room_entered",
-            vacuum_entity: vac.entity,
-            vacuum_label: vac.name ?? vac.entity,
-            clean_type: this._deriveCleanType(vac),
-            room_name: newRoom,
-          });
-        }
-        this._prevRoomStates.set(vac.entity, newRoom);
-      }
-    }
   }
 
   // ── Helpers ─────────────────────────────────────────────────────────────
@@ -457,8 +343,9 @@ export class AnyVacCard extends LitElement {
       ? (this.hass.states[ent]?.attributes?.clean_type as string | undefined)
       : undefined;
     if (ct === "wet" || ct === "dry") return ct;
-    // 3) Fallback: derive from the clean action.
-    return this._deriveCleanType(vac);
+    // 3) Fallback: the vacuum's configured role (wet-only robots default to wet).
+    const role = this._vacCleanType(vac);
+    return role.wet && !role.dry ? "wet" : "dry";
   }
 
   /** Self-calibrated clean-time estimate learned by the backend integration,
@@ -750,141 +637,6 @@ export class AnyVacCard extends LitElement {
     }));
   }
 
-  private _deriveCleanType(vac: VacuumConfig): "wet" | "dry" {
-    if (vac.clean_action?.type === "native" ||
-        vac.clean_action?.type === "native-area" ||
-        vac.clean_action?.type === "native-auto") {
-      const na = vac.clean_action as NativeCleanAction | NativeAreaCleanAction | NativeAutoCleanAction;
-      if (na.mop_mode_entity || na.mop_intensity_entity) return "wet";
-    }
-    return "dry";
-  }
-
-  private _fireHAEvent(data: Record<string, unknown>): void {
-    try {
-      this.hass.connection.sendMessage({
-        type: "fire_event",
-        event_type: "roborock_card_event",
-        event_data: data,
-      });
-    } catch (err) {
-      console.error("[anyvac-card] fire_event failed:", err);
-    }
-  }
-
-  private async _updateRoomCleanTime(
-    vac: VacuumConfig, roomName: string, elapsedMins: number
-  ): Promise<void> {
-    if (elapsedMins < 0.5 || elapsedMins > 120) return;
-    const room = (this._roomsFor(vac)).find(
-      r => r.name === roomName || r.key === roomName
-    );
-    if (!room?.clean_time_entity) return;
-    const currentVal = parseFloat(this.hass.states[room.clean_time_entity]?.state ?? "0");
-    const newAvg = currentVal > 0
-      ? Math.round(0.7 * currentVal + 0.3 * elapsedMins)
-      : Math.round(elapsedMins);
-    await this._call("input_number", "set_value", {
-      entity_id: room.clean_time_entity,
-      value: newAvg,
-    });
-  }
-
-  private async _evalCleaningComplete(
-    vacEntity: string, flight: InFlightCleaning
-  ): Promise<void> {
-    const actualMs = Date.now() - flight.startTime;
-    const actualMins = Math.round(actualMs / 60_000);
-    const success = flight.expectedMs === 0 || actualMs >= flight.expectedMs * 0.5;
-
-    // Software repeat — restart if more passes remaining
-    if (success && flight.repeatRemaining > 0 && flight.areaIds) {
-      try {
-        await this.hass.callService(
-          "vacuum", "clean_area",
-          { cleaning_area_id: flight.areaIds },
-          { entity_id: vacEntity },
-        );
-      } catch (err) {
-        console.error("[anyvac-card] repeat restart failed:", err);
-        return;
-      }
-      this._inFlight.set(vacEntity, {
-        ...flight,
-        startTime: Date.now(),
-        repeatRemaining: flight.repeatRemaining - 1,
-      });
-      return; // timestamps + notification fire only after last pass
-    }
-
-    // Auto-calibration: handle last room (no room_entered transition at session end)
-    const lastRoom = this._prevRoomStates.get(vacEntity) ?? "";
-    if (lastRoom) {
-      const enterKey = vacEntity + ":" + lastRoom;
-      const enterTime = this._roomEnterTimes.get(enterKey);
-      if (enterTime) {
-        const vacConf = this._config.vacuums.find(v => v.entity === vacEntity);
-        if (vacConf) {
-          const elapsedMins = (Date.now() - enterTime) / 60_000;
-          await this._updateRoomCleanTime(vacConf, lastRoom, elapsedMins);
-        }
-        this._roomEnterTimes.delete(enterKey);
-      }
-    }
-
-    const totalActualMins = Math.round((Date.now() - flight.originalStartTime) / 60_000);
-
-    if (success) {
-      const dt = new Date().toISOString().replace("T", " ").slice(0, 19);
-      for (const room of flight.rooms) {
-        if (room.last_clean_entity) {
-          await this._call("input_datetime", "set_datetime", {
-            entity_id: room.last_clean_entity,
-            datetime: dt,
-          });
-        }
-      }
-      // Single-room time calibration: a run with exactly one room measures
-      // that room's real total duration (incl. repeat passes) — store it
-      // directly as the new estimate when the option is enabled.
-      if (this._config.single_room_time && flight.rooms.length === 1) {
-        const only = flight.rooms[0];
-        if (only.clean_time_entity && totalActualMins >= 1 && totalActualMins <= 180) {
-          await this._call("input_number", "set_value", {
-            entity_id: only.clean_time_entity,
-            value: totalActualMins,
-          });
-        }
-      }
-      // Clear room selection for this vacuum after successful clean
-      const nextSel = new Map(this._localRoomSel);
-      for (const room of flight.rooms) nextSel.delete(vacEntity + ":" + room.key);
-      this._localRoomSel = nextSel;
-      this._saveRoomSel(vacEntity);
-    }
-    this._fireHAEvent({
-      action: "cleaning_finished",
-      vacuum_entity: vacEntity,
-      vacuum_label: flight.vacLabel,
-      clean_type: flight.cleanType,
-      rooms: flight.rooms.map(r => r.key),
-      room_labels: flight.rooms.map(r => r.name).join(", "),
-      estimated_mins: Math.round(flight.expectedMs / 60_000),
-      actual_mins: totalActualMins,
-      success,
-    });
-    await this._sendNotify(this._config.notify?.on_finish, {
-      vacuum_label: flight.vacLabel,
-      vacuum_entity: vacEntity,
-      room_labels: flight.rooms.map(r => r.name).join(", "),
-      room_keys: flight.rooms.map(r => r.key).join(", "),
-      estimated_mins: Math.round(flight.expectedMs / 60_000),
-      actual_mins: totalActualMins,
-      clean_type: flight.cleanType,
-      success: String(success),
-    });
-  }
-
   // ── localStorage persistence ──────────────────────────────────────────────
 
   private _saveShown(): void {
@@ -935,34 +687,6 @@ export class AnyVacCard extends LitElement {
     return map;
   }
 
-  // ── Notifications ──────────────────────────────────────────────────────
-
-  private _resolveTemplate(tmpl: string, tokens: Record<string, string | number>): string {
-    return tmpl.replace(/\{\{\s*(\w+)\s*\}\}/g, (_, k) => String(tokens[k] ?? ""));
-  }
-
-  private async _sendNotify(
-    template: NotifyTemplates | undefined,
-    tokens: Record<string, string | number>
-  ): Promise<void> {
-    const cfg = this._config.notify;
-    if (!cfg || !template) return;
-    const isWet = tokens["clean_type"] === "wet";
-    const color = isWet ? (cfg.color_wet ?? "#2196F3") : (cfg.color_dry ?? "#4CAF50");
-    const icon  = isWet ? "mdi:mop" : "mdi:robot-vacuum";
-    const tag   = (cfg.tag_prefix ?? "roborock") + "-" + String(tokens["vacuum_entity"] ?? "");
-    try {
-      await this.hass.callService("ticker", "notify", {
-        category: cfg.category,
-        title:    template.title   ? this._resolveTemplate(template.title,   tokens) : undefined,
-        message:  template.message ? this._resolveTemplate(template.message, tokens) : undefined,
-        data: { data: { notification_icon: icon, color, priority: "high", tag } },
-      });
-    } catch (err) {
-      console.error("[anyvac-card] notify failed:", err);
-    }
-  }
-
   private _pause(vac: VacuumConfig): void {
     this._call("vacuum", "pause", { entity_id: vac.entity });
   }
@@ -972,11 +696,6 @@ export class AnyVacCard extends LitElement {
   }
 
   private _dock(vac: VacuumConfig): void {
-    // Manual dock = user cancelled — never restart remaining software-repeat passes
-    const flight = this._inFlight.get(vac.entity);
-    if (flight && flight.repeatRemaining > 0) {
-      this._inFlight.set(vac.entity, { ...flight, repeatRemaining: 0 });
-    }
     this._call("vacuum", "return_to_base", { entity_id: vac.entity });
   }
 
@@ -1211,6 +930,8 @@ export class AnyVacCard extends LitElement {
     if (gp.mode) this._planMode = gp.mode;
     if (gp.scope === "all" || Array.isArray(gp.scope)) {
       const keys = gp.scope === "all" ? this._allRoomKeys() : gp.scope;
+      // Backend-shared selection first (docs/14 §3.11); local only without integration.
+      if (this._backendSel()) { this._setBackendSel(keys, "set"); return; }
       const sel = new Map(this._localRoomSel);
       for (const v of this._config.vacuums) for (const r of this._roomsFor(v)) sel.delete(v.entity + ":" + r.key);
       for (const k of keys) for (const v of this._config.vacuums) {
@@ -1417,7 +1138,10 @@ export class AnyVacCard extends LitElement {
     }
 
     if (vac.clean_action.type === "native-area") {
-      // Uses HA vacuum.clean_area — area_id resolved via area_mappings
+      // Uses HA vacuum.clean_area — area_id resolved via area_mappings.
+      // NOTE: software repeat was removed (docs/13 A1 — restarting on a "docked"
+      // transition fired during mid-clean mop washes); repeat returns server-side
+      // with the anyvac.clean service (docs/14 §3.8).
       try {
         await this.hass.callService(
           "vacuum", "clean_area",
@@ -1427,7 +1151,7 @@ export class AnyVacCard extends LitElement {
         );
       } catch (err) {
         console.error("[anyvac-card] vacuum.clean_area failed:", err);
-        return; // don't register in-flight for a clean that never started
+        return;
       }
     } else if (vac.clean_action.type === "native-auto") {
       // Dynamically resolve segment IDs from roborock.get_maps, then send_command
@@ -1486,60 +1210,10 @@ export class AnyVacCard extends LitElement {
         params: [{ segments, repeat: action.repeat ?? 1 }],
       });
     }
-    // Register in-flight + fire event (shared for both native variants)
-    const totalMins = this._totalCleanMins(vac);
-    const vacLabel = vac.name ?? vac.entity.split(".")[1] ?? vac.entity;
-    const isNativeArea = vac.clean_action.type === "native-area";
-    const nativeAreaAct = isNativeArea ? vac.clean_action as NativeAreaCleanAction : null;
-    const areaIds = isNativeArea
-      ? selected.map(r => r.area_id ?? this._config.area_mappings?.[r.key] ?? r.key)
-      : undefined;
-    const repeatRemaining = (nativeAreaAct?.repeat ?? 1) > 1
-      ? (nativeAreaAct!.repeat!) - 1
-      : 0;
-    const now = Date.now();
-    this._inFlight.set(vac.entity, {
-      rooms: selected.map(r => ({ key: r.key, name: r.name, last_clean_entity: r.last_clean_entity, clean_time_entity: r.clean_time_entity })),
-      expectedMs: totalMins * 60_000,
-      startTime: now,
-      originalStartTime: now,
-      vacLabel,
-      cleanType: this._deriveCleanType(vac),
-      repeatRemaining,
-      areaIds,
-    });
-    // Call notify_script if configured
-    const nsCfg = this._config.notify_script;
-    if (nsCfg?.entity) {
-      const nsv = nsCfg.vars ?? {};
-      const scriptVars: Record<string, string | number> = { vacuum_entity: vac.entity };
-      if (nsv.vacuum_label   !== false) scriptVars.vacuum_label   = vacLabel;
-      if (nsv.room_labels    !== false) scriptVars.room_labels    = selected.map(r => r.name).join(", ");
-      if (nsv.room_keys      === true ) scriptVars.room_keys      = selected.map(r => r.key).join(", ");
-      if (nsv.estimated_mins !== false) scriptVars.estimated_mins = Math.round(totalMins);
-      if (nsv.clean_type     !== false) scriptVars.clean_type     = this._deriveCleanType(vac);
-      await this._call("script", "turn_on", { entity_id: nsCfg.entity, variables: scriptVars });
-    }
-    this._fireHAEvent({
-      action: "cleaning_started",
-      vacuum_entity: vac.entity,
-      vacuum_label: vacLabel,
-      clean_type: this._deriveCleanType(vac),
-      rooms: selected.map(r => r.key),
-      room_labels: selected.map(r => r.name).join(", "),
-      estimated_mins: Math.round(totalMins),
-      // Helper entity IDs — consumed by the cleaning-tracker blueprint
-      last_clean_entities: selected.map(r => r.last_clean_entity).filter((e): e is string => !!e),
-      clean_time_entities: selected.map(r => r.clean_time_entity).filter((e): e is string => !!e),
-    });
-    await this._sendNotify(this._config.notify?.on_start, {
-      vacuum_label: vacLabel,
-      vacuum_entity: vac.entity,
-      room_labels: selected.map(r => r.name).join(", "),
-      room_keys: selected.map(r => r.key).join(", "),
-      estimated_mins: Math.round(totalMins),
-      clean_type: this._deriveCleanType(vac),
-    });
+    // No in-flight tracking, events or notifications here (docs/14 §3.1, §3.10):
+    // the integration tracks the session (`in_cleaning`, mop-wash aware), fires
+    // anyvac_clean_started/finished/room_done, stamps history and clears the
+    // shared room selection when the clean finishes.
   }
 
   // ── Render: badges ──────────────────────────────────────────────────────
@@ -1638,15 +1312,11 @@ export class AnyVacCard extends LitElement {
 
   // ── Render: map ─────────────────────────────────────────────────────────
 
-  // ── Calibration + pin & go (Milestone 2, v1; localStorage) ───────────────────
-  private _calibKey(entity: string): string { return "anyvac_calib_" + entity; }
-  private _loadCalib(entity: string): Array<{ map: { x: number; y: number }; vacuum: { x: number; y: number } }> | null {
-    if (this._mapMode === "calib" && this._modeEntity === entity && this._calibPts.length >= 3) return this._calibPts;
-    try { const raw = window.localStorage.getItem(this._calibKey(entity)); return raw ? JSON.parse(raw) : null; } catch { return null; }
-  }
-  private _saveCalib(entity: string, pts: Array<{ map: { x: number; y: number }; vacuum: { x: number; y: number } }>): void {
-    try { window.localStorage.setItem(this._calibKey(entity), JSON.stringify(pts)); } catch { /* ignore */ }
-  }
+  // ── Pin & go / zone (integration-only; docs/14 §3.6) ─────────────────────────
+  // The manual 3-point calibration (Milestone 2, localStorage) was removed: it assumed
+  // the dock sits at map origin, trusted commanded goto targets over the robot's real
+  // position, and duplicated maths the integration provides for free. Map commands now
+  // require the integration's calibration_points.
   private _solve3(m: number[][], r: number[]): number[] | null {
     const d = (a: number[][]) => a[0][0]*(a[1][1]*a[2][2]-a[1][2]*a[2][1]) - a[0][1]*(a[1][0]*a[2][2]-a[1][2]*a[2][0]) + a[0][2]*(a[1][0]*a[2][1]-a[1][1]*a[2][0]);
     const D = d(m); if (Math.abs(D) < 1e-9) return null;
@@ -1661,106 +1331,41 @@ export class AnyVacCard extends LitElement {
     if (!ab || !cd) return null;
     return { a: ab[0], b: ab[1], e: ab[2], c: cd[0], d: cd[1], f: cd[2] };
   }
-  private _mapToVac(entity: string, x: number, y: number): { x: number; y: number } | null {
-    const pts = this._loadCalib(entity); if (!pts) return null;
-    const t = this._affine(pts); if (!t) return null;
-    return { x: t.a * x + t.b * y + t.e, y: t.c * x + t.d * y + t.f };
-  }
   private async _gotoMm(entity: string, mm: { x: number; y: number }): Promise<void> {
     try { await this.hass.callService("vacuum", "send_command", { entity_id: entity, command: "app_goto_target", params: [Math.round(mm.x), Math.round(mm.y)] }); }
     catch (e) { console.error("[anyvac-card] goto failed:", e); }
   }
-  private _toggleMode(entity: string, mode: "pin" | "calib" | "zone"): void {
+  private _toggleMode(entity: string, mode: "pin" | "zone"): void {
     if (this._mapMode === mode && this._modeEntity === entity) { this._mapMode = "normal"; this._modeEntity = null; }
     else { this._mapMode = mode; this._modeEntity = entity; }
-  }
-  private _startCalib(vac: VacuumConfig): void {
-    this._calibPts = []; this._calibStep = 0; this._calibMsg = ""; this._calibCandIdx = 0;
-    this._calibCircle = { x: 50, y: 50 };
-    this._calibCur = { ...this._calibTargets[0] };
-    this._mapMode = "calib"; this._modeEntity = vac.entity;
   }
   private _refreshMap(vac: VacuumConfig): void {
     const ent = vac.map?.entity;
     if (ent) void this.hass.callService("homeassistant", "update_entity", { entity_id: ent });
   }
-  private _calibCandidate(): { x: number; y: number } {
-    const dock = this._calibTargets[0];
-    const radii = [1600, 1100, 2300];
-    let dirs: number[][];
-    if (this._calibStep >= 2) {
-      // Point 3: only PERPENDICULAR to point 2's actual direction -> never collinear.
-      const p2 = this._calibPts[1]?.vacuum ?? { x: dock.x + 2200, y: dock.y };
-      let vx = p2.x - dock.x, vy = p2.y - dock.y;
-      const len = Math.hypot(vx, vy) || 1; vx /= len; vy /= len;
-      dirs = [[-vy, vx], [vy, -vx]];
-    } else {
-      dirs = [[1, 0], [0, 1], [-1, 0], [0, -1], [0.71, 0.71], [-0.71, 0.71], [0.71, -0.71], [-0.71, -0.71]];
-    }
-    const total = dirs.length * radii.length;
-    const i = ((this._calibCandIdx % total) + total) % total;
-    const r = radii[Math.floor(i / dirs.length)];
-    const d = dirs[i % dirs.length];
-    return { x: Math.round(dock.x + d[0] * r), y: Math.round(dock.y + d[1] * r) };
-  }
-  private _calibProbe(vac: VacuumConfig): void {
-    this._calibCur = this._calibCandidate();
-    void this._gotoMm(vac.entity, this._calibCur);
-    // Auto-refresh the map a few times while the robot drives (no manual Refresh needed).
-    [4000, 8000, 13000, 18000, 24000].forEach((t) =>
-      window.setTimeout(() => {
-        if (this._mapMode === "calib" && this._modeEntity === vac.entity) this._refreshMap(vac);
-      }, t));
-  }
-  private _calibAnother(vac: VacuumConfig): void {
-    this._calibCandIdx += 1;
-    this._calibProbe(vac);
-  }
-  private _calibConfirm(vac: VacuumConfig): void {
-    const newPt = { map: { ...this._calibContent }, vacuum: { ...this._calibCur } };
-    if (this._calibStep >= 2) {
-      const pts = [...this._calibPts, newPt];
-      const [a, b, c] = pts.map((p) => p.vacuum);
-      const area = Math.abs((b.x - a.x) * (c.y - a.y) - (c.x - a.x) * (b.y - a.y)) / 2;
-      if (area < 400000) {
-        this._calibMsg = "Points too aligned - use 'try another spot', then Confirm.";
-        return;
-      }
-      this._calibPts = pts;
-      this._saveCalib(vac.entity, pts);
-      this._calibStep = 3; this._calibMsg = "";
-      this._mapMode = "normal"; this._modeEntity = null;
-    } else {
-      this._calibPts = [...this._calibPts, newPt];
-      this._calibStep += 1;
-      this._calibMsg = "";
-      this._calibCircle = { x: 50, y: 50 };
-      this._calibCandIdx = 0;
-      this._calibProbe(vac);
-    }
-  }
   private _onMapClick(vac: VacuumConfig, e: MouseEvent): void {
-    const el = e.currentTarget as HTMLElement; const r = el.getBoundingClientRect();
-    const x = ((e.clientX - r.left) / r.width) * 100;
-    const y = ((e.clientY - r.top) / r.height) * 100;
-    const content = this._clickToContent(vac, e.clientX, e.clientY) ?? { x, y };
+    const content = this._clickToContent(vac, e.clientX, e.clientY);
     if (this._mapMode === "pin") {
-      const mm = this._cmdMm(vac, content);
-      this._dbg = "px " + content.x.toFixed(1) + "%," + content.y.toFixed(1) + "% -> mm " + (mm ? Math.round(mm.x) + "," + Math.round(mm.y) : "(no calib)");
+      const mm = content ? this._intMapToVac(vac, content) : null;
+      this._dbg = content
+        ? "px " + content.x.toFixed(1) + "%," + content.y.toFixed(1) + "% -> mm " + (mm ? Math.round(mm.x) + "," + Math.round(mm.y) : "(no calibration data)")
+        : "(map element not found)";
       if (mm) void this._gotoMm(vac.entity, mm);
       this._mapMode = "normal"; this._modeEntity = null;
-    } else if (this._mapMode === "calib") {
-      this._calibCircle = { x, y };
-      this._calibContent = { ...content };
     }
   }
-  // Map a viewport click into the clicked layer's own content space (undo its
-  // rotation/scale/offset) so calibration & pin&go are seating-independent and
-  // consistent across the image base and the map overlay (combined mode).
+  // Map a viewport click into THIS vacuum's map content space (undo its
+  // rotation/scale/offset) so pin&go / zones are seating-independent.
   private _clickToContent(vac: VacuumConfig, clientX: number, clientY: number): { x: number; y: number } | null {
-    // The map is the coordinate authority (robot + mm live there); the floorplan is decoration.
-    const mapEl = vac.map?.entity ? (this.renderRoot?.querySelector(".map-img") as HTMLElement | null) : null;
-    const el = mapEl ?? (this.renderRoot?.querySelector(".image-base-img") as HTMLElement | null);
+    // The map is the coordinate authority (mm live there). Select this vacuum's own
+    // map element — with several vacuums shown there are several .map-img and the
+    // first one may belong to a different robot with different seating (docs/13 A4).
+    // The floorplan is NOT a valid fallback: its content space has no mm mapping.
+    const el = vac.map?.entity
+      ? (this.renderRoot?.querySelector(
+          `.map-img[data-entity="${vac.entity.replace(/"/g, '\\"')}"]`
+        ) as HTMLElement | null)
+      : null;
     if (!el) return null;
     const r = el.getBoundingClientRect();
     const cx = (r.left + r.right) / 2, cy = (r.top + r.bottom) / 2;
@@ -1788,11 +1393,6 @@ export class AnyVacCard extends LitElement {
     const px = (content.x / 100) * NW, py = (content.y / 100) * NH;
     return { x: t.a * px + t.b * py + t.e, y: t.c * px + t.d * py + t.f };
   }
-  /** mm for a click, preferring the accurate integration calibration over the manual one. */
-  private _cmdMm(vac: VacuumConfig, content: { x: number; y: number }): { x: number; y: number } | null {
-    if (vac.integration_entity) { const m = this._intMapToVac(vac, content); if (m) return m; }
-    return this._mapToVac(vac.entity, content.x, content.y);
-  }
   private _onZoneDown(vac: VacuumConfig, e: PointerEvent): void {
     if (this._mapMode !== "zone" || this._modeEntity !== vac.entity) return;
     const el = e.currentTarget as HTMLElement;
@@ -1818,8 +1418,8 @@ export class AnyVacCard extends LitElement {
     const ay = r.top + (this._zoneDrag.y0 / 100) * r.height;
     const ca = this._clickToContent(vac, ax, ay);
     const cb = this._clickToContent(vac, e.clientX, e.clientY);
-    const ma = ca ? this._cmdMm(vac, ca) : null;
-    const mb = cb ? this._cmdMm(vac, cb) : null;
+    const ma = ca ? this._intMapToVac(vac, ca) : null;
+    const mb = cb ? this._intMapToVac(vac, cb) : null;
     const big = Math.abs(this._zoneDrag.x1 - this._zoneDrag.x0) > 2 || Math.abs(this._zoneDrag.y1 - this._zoneDrag.y0) > 2;
     if (ma && mb && big) {
       this._zonePending = {
@@ -1840,8 +1440,15 @@ export class AnyVacCard extends LitElement {
 
   private _renderMapTools(vac: VacuumConfig) {
     if (!vac.map && !vac.image_base) return nothing;
-    const hasCalib = !!this._loadCalib(vac.entity);
-    const canCmd = hasCalib || !!vac.integration_entity;
+    // Map commands need the integration's calibration AND this vacuum's map element
+    // for the click geometry. Disabled in the rotated (narrow) view — the click
+    // inversion does not account for the wrapper rotation yet (docs/13 A5).
+    const canCmd = !!vac.integration_entity && !!vac.map?.entity && !this._narrow;
+    const cmdTitle = this._narrow
+      ? "Not available in the rotated mobile view"
+      : (!vac.integration_entity || !vac.map?.entity)
+        ? "Requires the AnyVac integration sensor + map entity"
+        : "";
     const mode = this._modeEntity === vac.entity ? this._mapMode : "normal";
     return html`
       <div class="map-tools">
@@ -1849,32 +1456,15 @@ export class AnyVacCard extends LitElement {
           <ha-icon icon="mdi:refresh"></ha-icon><span>Refresh</span>
         </button>` : nothing}
         <button class="mtbtn ${mode === "pin" ? "on" : ""}" ?disabled=${!canCmd}
-          @click=${() => this._toggleMode(vac.entity, "pin")} title="Pin & Go">
+          @click=${() => this._toggleMode(vac.entity, "pin")} title=${cmdTitle || "Pin & Go"}>
           <ha-icon icon="mdi:map-marker-radius"></ha-icon><span>Pin &amp; Go</span>
         </button>
         <button class="mtbtn ${mode === "zone" ? "on" : ""}" ?disabled=${!canCmd}
-          @click=${() => this._toggleMode(vac.entity, "zone")} title="Zone clean">
+          @click=${() => this._toggleMode(vac.entity, "zone")} title=${cmdTitle || "Zone clean"}>
           <ha-icon icon="mdi:select-drag"></ha-icon><span>Zone</span>
-        </button>
-        <button class="mtbtn ${mode === "calib" ? "on" : ""}" @click=${() => this._startCalib(vac)}>
-          <ha-icon icon="mdi:crosshairs-gps"></ha-icon><span>${hasCalib ? "Recalibrate" : "Calibrate"}</span>
         </button>
         ${this._dbg ? html`<span style="font-size:11px;opacity:0.65;align-self:center;font-family:monospace">${this._dbg}</span>` : nothing}
       </div>
-      ${mode === "calib"
-        ? html`<div class="calib-panel">
-            <div>${this._calibStep === 0
-              ? "Step 1/3: tap to place the circle on the DOCK, align its edges, then Confirm."
-              : "Step " + (this._calibStep + 1) + "/3: tap to place the circle on the ROBOT, align its edges, then Confirm."}</div>
-            <div class="calib-actions">
-              <button class="mtbtn on" @click=${() => this._calibConfirm(vac)}>Confirm point</button>
-              ${this._calibStep > 0 ? html`
-                <button class="mtbtn" @click=${() => this._refreshMap(vac)}>Refresh map</button>
-                <button class="mtbtn" @click=${() => this._calibAnother(vac)}>Didn't reach - try another spot</button>
-              ` : nothing}
-            </div>
-          </div>`
-        : nothing}
       ${mode === "pin" ? html`<div class="calib-panel">Tap the map to send the robot there.</div>` : nothing}
       ${mode === "zone" ? html`<div class="calib-panel">
         ${this._zonePending
@@ -1920,13 +1510,14 @@ export class AnyVacCard extends LitElement {
     const rr = Math.max(NW, NH) / 55;
     const toPts = (arr: any) => (Array.isArray(arr) ? arr : []).map((p: any) => { const q = toPx(p.x, p.y); return q.x.toFixed(1) + "," + q.y.toFixed(1); }).join(" ");
     const ct = this._vacCleanType(vac);
-    // Dry layer draws the vacuum trace (path); wet layer draws the mop trace
-    // (mop_path) as a wider translucent "wet sheen" band under the line. A run that
-    // both vacuums and mops therefore shows the thin line riding on the band.
+    // Dry layer draws the SEGMENTED dry trace (path_dry — cleaning-only points, no
+    // transit / mop-wash driving; integration ≥0.12). Falls back to the legacy full
+    // trajectory (path) on older integrations. Wet layer draws the mop trace as a
+    // wider translucent "wet sheen" band under the line.
     const showDry = this._layers.dry && ct.dry;
     const showWet = this._layers.wet && ct.wet;
-    const dryStr = showDry ? toPts(at.path) : "";
-    const wetStr = showWet ? toPts(at.mop_path) : "";
+    const dryStr = showDry ? toPts(at.path_dry ?? at.path) : "";
+    const wetStr = showWet ? toPts(at.path_wet ?? at.mop_path) : "";
     const vp = at.vacuum_position;
     const rob = vp ? toPx(vp.x, vp.y) : null;
     let head: { x: number; y: number } | null = null;
@@ -2145,16 +1736,19 @@ export class AnyVacCard extends LitElement {
         ` : nothing}
         ${shown.map((v, idx) => {
           const mUrl = v.map?.entity ? this._mapUrl(v.map.entity) : null;
-          if (!mUrl || v.hide_map) return nothing;
+          if (!mUrl) return nothing;
           const mm = v.map;
           const overlay = hasImage || idx > 0;
+          // hide_map renders the element at opacity 0 instead of skipping it — the
+          // element IS the click-geometry anchor for pin&go / zones (docs/13 A4).
           return html`<img class="map-img ${overlay ? "map-img--overlay" : ""}" src=${mUrl} alt="Vacuum map"
+            data-entity=${v.entity}
             style=${styleMap({
               left: (50 + (mm?.offset_x ?? 0)) + "%",
               top: (50 + (mm?.offset_y ?? 0)) + "%",
               width: (mm?.scale ?? 100) + "%",
               transform: "translate(-50%,-50%) rotate(" + (mm?.rotation ?? 0) + "deg)",
-              opacity: String((v.overlay_opacity ?? (overlay ? 55 : 100)) / 100),
+              opacity: v.hide_map ? "0" : String((v.overlay_opacity ?? (overlay ? 55 : 100)) / 100),
               mixBlendMode: v.overlay_blend ?? "normal",
             })} />`;
         })}
@@ -2190,6 +1784,7 @@ export class AnyVacCard extends LitElement {
         ` : nothing}
         ${showMap ? html`
           <img class="map-img ${showImage ? "map-img--overlay" : ""}" src=${mapUrl!} alt="Vacuum map"
+            data-entity=${vac.entity}
             style=${styleMap({
               left: (50 + (m?.offset_x ?? 0)) + "%",
               top:  (50 + (m?.offset_y ?? 0)) + "%",
@@ -2215,9 +1810,6 @@ export class AnyVacCard extends LitElement {
               width: Math.abs(this._zoneDrag.x1 - this._zoneDrag.x0) + "%",
               height: Math.abs(this._zoneDrag.y1 - this._zoneDrag.y0) + "%",
             })}></div>`
-          : nothing}
-        ${this._mapMode === "calib" && this._modeEntity === vac.entity
-          ? html`<div class="calib-circle" style=${styleMap({ left: this._calibCircle.x + "%", top: this._calibCircle.y + "%" })}></div>`
           : nothing}
       </div>
     `;
@@ -2962,8 +2554,6 @@ export class AnyVacCard extends LitElement {
     .calib-panel { margin-top: 4px; font-size: 12px; opacity: 0.9; padding: 6px 8px; background: rgba(59,130,246,0.12); border-radius: 8px; }
     .calib-panel > div { margin-bottom: 4px; }
     .calib-actions { display: flex; gap: 6px; flex-wrap: wrap; }
-    .calib-circle { position: absolute; width: 40px; height: 40px; border: 2px solid #00e5ff; border-radius: 50%; transform: translate(-50%, -50%); box-shadow: 0 0 8px #00e5ff, inset 0 0 6px rgba(0,229,255,0.5); pointer-events: none; z-index: 6; }
-    .calib-circle::after { content: ""; position: absolute; left: 50%; top: 50%; width: 3px; height: 3px; background: #00e5ff; border-radius: 50%; transform: translate(-50%, -50%); }
   `;
 }
 

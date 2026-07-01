@@ -70,7 +70,11 @@ export interface RoomConfig {
   clean_time_dry?: number;
   /** Estimated minutes for a WET (mop) clean of this room (used when the vacuum's role is wet). */
   clean_time_wet?: number;            // odhadovaný čas úklidu (minuty) — fallback when no entity
-  clean_time_entity?: string;          // input_number — auto-calibrated rolling average (minutes)
+  /** Legacy input_number, READ-ONLY fallback estimate. The card never writes it —
+   *  estimates are learned by the anyvac integration (docs/14 §3.2). */
+  clean_time_entity?: string;
+  /** Legacy input_datetime, READ-ONLY fallback for room age. The card never writes it —
+   *  history is stamped by the anyvac integration (docs/14 §3.3). */
   last_clean_entity?: string;
   map_x: number;
   map_y: number;
@@ -275,69 +279,6 @@ export interface VacuumConfig {
   error_entity?: string;
 }
 
-export interface NotifyTemplates {
-  title?: string;
-  message?: string;
-}
-
-export interface NotifyConfig {
-  /** Ticker category name */
-  category: string;
-  /** Accent colour for dry cleaning notifications */
-  color_dry?: string;
-  /** Accent colour for wet cleaning notifications */
-  color_wet?: string;
-  /** Tag prefix for notification grouping/replacing (default: "roborock") */
-  tag_prefix?: string;
-  /** Templates fired on cleaning_started */
-  on_start?: NotifyTemplates;
-  /** Templates fired on cleaning_finished */
-  on_finish?: NotifyTemplates;
-}
-
-export interface NotifyScriptVars {
-  /** Pass vacuum_label to script (default true) */
-  vacuum_label?: boolean;
-  /** Pass room_labels — comma-separated display names (default true) */
-  room_labels?: boolean;
-  /** Pass room_keys — comma-separated room keys (default false) */
-  room_keys?: boolean;
-  /** Pass estimated_mins — total expected clean time (default true) */
-  estimated_mins?: boolean;
-  /** Pass clean_type — "wet" or "dry" (default true) */
-  clean_type?: boolean;
-}
-
-export interface NotifyScriptEvents {
-  /** Generate on_start notification block in script (default true) */
-  on_start?: boolean;
-  /** Generate on_finish notification block in script (default true) */
-  on_finish?: boolean;
-  /** Generate on_error notification block in script (default true) */
-  on_error?: boolean;
-}
-
-export interface NotifyScriptConfig {
-  /** Script entity ID to call when cleaning starts */
-  entity: string;
-  /** Which variables to pass to the script */
-  vars?: NotifyScriptVars;
-  /** Which event blocks to include in the generated script YAML */
-  gen_events?: NotifyScriptEvents;
-}
-
-/**
- * Settings for the server-side tracking blueprint deploy.
- * Stored in the card config so the editor can (re)create the automation.
- */
-export interface BackendConfig {
-  /** Notify action, e.g. "notify.mobile_app_phone". Empty = no notifications. */
-  notify_service?: string;
-  notify_on_start?: boolean;   // default true
-  notify_on_finish?: boolean;  // default true
-  notify_on_error?: boolean;   // default true
-}
-
 export interface AnyVacCardConfig {
   type: string;
   vacuums: VacuumConfig[];
@@ -362,18 +303,6 @@ export interface AnyVacCardConfig {
    * Per-room area_id overrides this when set.
    */
   area_mappings?: Record<string, string>;
-  /** Ticker notification config */
-  notify?: NotifyConfig;
-  /** Script-based notification config */
-  notify_script?: NotifyScriptConfig;
-  /**
-   * When a run cleaned exactly one room, write the measured duration
-   * directly into that room's clean_time_entity (input_number).
-   * Applied client-side and passed as a blueprint input on deploy.
-   */
-  single_room_time?: boolean;
-  /** Server-side tracking blueprint deploy settings */
-  backend?: BackendConfig;
   /** Controller surface: "auto" = single orchestrated controller, "manual" = per-robot controllers. Default auto. */
   ui_mode?: "auto" | "manual";
   /** Rotate the map to portrait: "auto" (default, on narrow card width) / "always" / "off". */

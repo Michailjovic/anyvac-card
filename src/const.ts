@@ -1,11 +1,6 @@
 export const CARD_NAME = "anyvac-card";
 export const EDITOR_NAME = "anyvac-card-editor";
-export const CARD_VERSION = "0.36.5";
-
-/** Server-side tracking blueprint */
-export const BLUEPRINT_VERSION = "1.0.0";
-export const BLUEPRINT_PATH = "anyvac_card/cleaning_tracker.yaml";
-export const TRACKER_AUTOMATION_ID = "roborock_card_cleaning_tracker";
+export const CARD_VERSION = "0.37.0";
 
 /** Hold duration in ms required to trigger START / PAUSE actions */
 export const HOLD_DURATION_MS = 600;
@@ -84,7 +79,14 @@ export const COLOR_BG_ACTIVE: Record<string, string> = {
   orange: "rgba(250,173,20,0.30)",
 };
 
-/** Vacuum entity states that count as "actively cleaning" */
+/**
+ * States that count as "actively cleaning".
+ * NOTE (docs/14 rule 4): since HA 2025 the VACUUM ENTITY state is only ever a
+ * VacuumActivity enum value — of these entries it can only match "cleaning", and a
+ * mid-clean mop wash even reports "docked". Never use the vacuum entity state for
+ * end-of-clean detection. The raw Roborock states below remain for STATUS SENSORS
+ * watched via global_actions.watch_entities.
+ */
 export const CLEANING_STATES = new Set([
   "cleaning",
   "segment_cleaning",
