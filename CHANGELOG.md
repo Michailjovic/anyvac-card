@@ -13,6 +13,19 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   software repeat move server-side, native-auto segment resolution removed from the card.
 - Rooms from the integration (real room polygons / names) for clickable cleaning on the floorplan.
 
+## [0.38.1] - 2026-07-02
+
+### Fixed
+
+- **Room-corner progress gauges finally show up in merged mode.** The gauge read
+  `rooms_progress` from the representative (FIRST) vacuum only — with a kitchen-only
+  robot first in the config, every other room's gauge stayed empty. Values are now
+  aggregated across all shown vacuums.
+- **Two gauges per room — dry and wet** (matching the layer menus): dry ring in the best
+  dry vacuum's colour, wet ring in wet-blue, `~` while the coverage baseline is still
+  calibrating. Pairs with integration 0.13.0, where point-based attribution makes them
+  fill from the first poll instead of after a ~60 s confirmation lag.
+
 ## [0.38.0] - 2026-07-02
 
 Auto-seating (docs/15): maps align themselves onto the shared floorplan.

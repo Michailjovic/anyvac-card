@@ -94,7 +94,7 @@ const t={ATTRIBUTE:1},e=t=>(...e)=>({_$litDirective$:t,values:e});let i$1 = clas
 
 const CARD_NAME = "anyvac-card";
 const EDITOR_NAME = "anyvac-card-editor";
-const CARD_VERSION = "0.38.0";
+const CARD_VERSION = "0.38.1";
 /** Hold duration in ms required to trigger START / PAUSE actions */
 const HOLD_DURATION_MS = 600;
 /**
@@ -891,19 +891,6 @@ let AnyVacCard = class AnyVacCard extends i$2 {
             return null;
         return (rp[room.key] ?? rp[room.name ?? ""] ?? null);
     }
-    /** Best progress % for a room: spatial coverage if available, else the time ratio.
-     *  kind = "S" (spatial) / "T" (time). null when no data at all. */
-    _roomProgPct(vac, room) {
-        const p = this._roomProgress(vac, room);
-        if (!p)
-            return null;
-        const title = `spatial ${p.spatial_pct ?? "—"}% · time ${p.time_pct ?? "—"}%`;
-        if (p.spatial_pct !== null && p.spatial_pct !== undefined)
-            return { pct: p.spatial_pct, kind: "S", title };
-        if (p.time_pct !== null && p.time_pct !== undefined)
-            return { pct: p.time_pct, kind: "T", title };
-        return null;
-    }
     /** Per-clean-type coverage for a room (dry from the vacuum trace, wet from the mop
      *  trace), taken from whichever vacuum has the highest value and coloured by it. Used
      *  by the per-layer (dry/wet) room menus. */
@@ -929,20 +916,26 @@ let AnyVacCard = class AnyVacCard extends i$2 {
     _progColor(pct) {
         return pct >= 90 ? "#52c41a" : pct >= 50 ? "#faad14" : "#40a9ff";
     }
-    /** Small circular % gauge drawn on a room overlay when debug_room_progress is on. */
-    _renderRoomGauge(vac, room) {
+    /** Dry + wet mini gauges in the room's corner (debug_room_progress). Values are
+     *  aggregated ACROSS the given vacuums — in merged mode the old single gauge read
+     *  only the representative (first) vacuum, so most rooms showed nothing (docs/16 §1).
+     *  Dry ring wears the best dry vacuum's colour; wet ring is always wet-blue. */
+    _renderRoomGauge(vacs, room) {
         if (!this._config.debug_room_progress)
             return A;
-        const p = this._roomProgPct(vac, room);
-        if (!p)
+        const dry = this._roomProgForType(room, vacs, "dry");
+        const wet = this._roomProgForType(room, vacs, "wet");
+        if (!dry && !wet)
             return A;
-        const ring = this._progColor(p.pct);
-        return b `
-      <div class="room-gauge" style=${o({ background: `conic-gradient(${ring} ${p.pct * 3.6}deg, rgba(255,255,255,0.12) 0)` })}
-        title=${p.title}>
-        <span>${p.pct}</span>
-      </div>
-    `;
+        const g = (pct, title, ring, calibrating) => b `
+      <span class="room-gauge" title=${title}
+        style=${o({ background: `conic-gradient(${ring} ${pct * 3.6}deg, rgba(255,255,255,0.12) 0)` })}>
+        <span>${pct}${calibrating ? "~" : ""}</span>
+      </span>`;
+        return b `<div class="room-gauges">
+      ${dry ? g(dry.pct, "dry · " + dry.title, dry.color, dry.calibrating) : A}
+      ${wet ? g(wet.pct, "wet · " + wet.title, "#40a9ff", wet.calibrating) : A}
+    </div>`;
     }
     /** Inline % chip for the room menus (debug only). Coloured by the vacuum when provided. */
     _renderProgChip(p) {
@@ -2389,7 +2382,7 @@ let AnyVacCard = class AnyVacCard extends i$2 {
               style=${o({ color: selected ? "white" : ageColor, "--mdc-icon-size": "16px" })}>
             </ha-icon>
           ` : A}
-          ${this._renderRoomGauge(vac, room)}
+          ${this._renderRoomGauge(opts?.vacs ?? [vac], room)}
         </button>
       `;
         }
@@ -2414,7 +2407,7 @@ let AnyVacCard = class AnyVacCard extends i$2 {
             style=${o({ color: selected ? "white" : "rgba(255,255,255,0.5)" })}>
           </ha-icon>
         ` : A}
-        ${this._renderRoomGauge(vac, room)}
+        ${this._renderRoomGauge(opts?.vacs ?? [vac], room)}
       </button>
     `;
     }
@@ -2873,19 +2866,23 @@ AnyVacCard.styles = i$6 `
       transition: background 0.2s, border 0.3s, box-shadow 0.3s;
     }
 
-    /* ── Debug per-room progress gauge ───────────────────────────────── */
-    .room-gauge {
+    /* ── Debug per-room progress gauges (dry + wet) ──────────────────── */
+    .room-gauges {
       position: absolute;
       top: 2px;
       right: 2px;
+      display: flex;
+      gap: 2px;
+      pointer-events: none;
+      z-index: 4;
+    }
+    .room-gauge {
       width: 26px;
       height: 26px;
       border-radius: 50%;
       display: flex;
       align-items: center;
       justify-content: center;
-      pointer-events: none;
-      z-index: 4;
     }
     .room-gauge span {
       width: 19px;

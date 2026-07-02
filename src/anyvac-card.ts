@@ -471,17 +471,6 @@ export class AnyVacCard extends LitElement {
     return (rp[room.key] ?? rp[room.name ?? ""] ?? null) as any;
   }
 
-  /** Best progress % for a room: spatial coverage if available, else the time ratio.
-   *  kind = "S" (spatial) / "T" (time). null when no data at all. */
-  private _roomProgPct(vac: VacuumConfig, room: RoomConfig): { pct: number; kind: "S" | "T"; title: string } | null {
-    const p = this._roomProgress(vac, room);
-    if (!p) return null;
-    const title = `spatial ${p.spatial_pct ?? "—"}% · time ${p.time_pct ?? "—"}%`;
-    if (p.spatial_pct !== null && p.spatial_pct !== undefined) return { pct: p.spatial_pct, kind: "S", title };
-    if (p.time_pct !== null && p.time_pct !== undefined) return { pct: p.time_pct, kind: "T", title };
-    return null;
-  }
-
   /** Per-clean-type coverage for a room (dry from the vacuum trace, wet from the mop
    *  trace), taken from whichever vacuum has the highest value and coloured by it. Used
    *  by the per-layer (dry/wet) room menus. */
@@ -507,18 +496,24 @@ export class AnyVacCard extends LitElement {
     return pct >= 90 ? "#52c41a" : pct >= 50 ? "#faad14" : "#40a9ff";
   }
 
-  /** Small circular % gauge drawn on a room overlay when debug_room_progress is on. */
-  private _renderRoomGauge(vac: VacuumConfig, room: RoomConfig) {
+  /** Dry + wet mini gauges in the room's corner (debug_room_progress). Values are
+   *  aggregated ACROSS the given vacuums — in merged mode the old single gauge read
+   *  only the representative (first) vacuum, so most rooms showed nothing (docs/16 §1).
+   *  Dry ring wears the best dry vacuum's colour; wet ring is always wet-blue. */
+  private _renderRoomGauge(vacs: VacuumConfig[], room: RoomConfig) {
     if (!this._config.debug_room_progress) return nothing;
-    const p = this._roomProgPct(vac, room);
-    if (!p) return nothing;
-    const ring = this._progColor(p.pct);
-    return html`
-      <div class="room-gauge" style=${styleMap({ background: `conic-gradient(${ring} ${p.pct * 3.6}deg, rgba(255,255,255,0.12) 0)` })}
-        title=${p.title}>
-        <span>${p.pct}</span>
-      </div>
-    `;
+    const dry = this._roomProgForType(room, vacs, "dry");
+    const wet = this._roomProgForType(room, vacs, "wet");
+    if (!dry && !wet) return nothing;
+    const g = (pct: number, title: string, ring: string, calibrating: boolean) => html`
+      <span class="room-gauge" title=${title}
+        style=${styleMap({ background: `conic-gradient(${ring} ${pct * 3.6}deg, rgba(255,255,255,0.12) 0)` })}>
+        <span>${pct}${calibrating ? "~" : ""}</span>
+      </span>`;
+    return html`<div class="room-gauges">
+      ${dry ? g(dry.pct, "dry · " + dry.title, dry.color, dry.calibrating) : nothing}
+      ${wet ? g(wet.pct, "wet · " + wet.title, "#40a9ff", wet.calibrating) : nothing}
+    </div>`;
   }
 
   /** Inline % chip for the room menus (debug only). Coloured by the vacuum when provided. */
@@ -1893,7 +1888,7 @@ export class AnyVacCard extends LitElement {
               style=${styleMap({ color: selected ? "white" : ageColor, "--mdc-icon-size": "16px" })}>
             </ha-icon>
           ` : nothing}
-          ${this._renderRoomGauge(vac, room)}
+          ${this._renderRoomGauge(opts?.vacs ?? [vac], room)}
         </button>
       `;
     }
@@ -1919,7 +1914,7 @@ export class AnyVacCard extends LitElement {
             style=${styleMap({ color: selected ? "white" : "rgba(255,255,255,0.5)" })}>
           </ha-icon>
         ` : nothing}
-        ${this._renderRoomGauge(vac, room)}
+        ${this._renderRoomGauge(opts?.vacs ?? [vac], room)}
       </button>
     `;
   }
@@ -2396,19 +2391,23 @@ export class AnyVacCard extends LitElement {
       transition: background 0.2s, border 0.3s, box-shadow 0.3s;
     }
 
-    /* ── Debug per-room progress gauge ───────────────────────────────── */
-    .room-gauge {
+    /* ── Debug per-room progress gauges (dry + wet) ──────────────────── */
+    .room-gauges {
       position: absolute;
       top: 2px;
       right: 2px;
+      display: flex;
+      gap: 2px;
+      pointer-events: none;
+      z-index: 4;
+    }
+    .room-gauge {
       width: 26px;
       height: 26px;
       border-radius: 50%;
       display: flex;
       align-items: center;
       justify-content: center;
-      pointer-events: none;
-      z-index: 4;
     }
     .room-gauge span {
       width: 19px;
