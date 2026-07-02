@@ -13,6 +13,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   software repeat move server-side, native-auto segment resolution removed from the card.
 - Rooms from the integration (real room polygons / names) for clickable cleaning on the floorplan.
 
+## [0.39.0] - 2026-07-02
+
+### Changed
+
+- **Dry/wet layer toggles are now backend-shared** (integration ≥0.14.0): the choice
+  survives page refreshes and syncs across browsers/devices, like the room selection.
+  Without the integration the local per-tab behaviour remains.
+
 ## [0.38.1] - 2026-07-02
 
 ### Fixed

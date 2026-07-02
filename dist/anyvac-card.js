@@ -94,7 +94,7 @@ const t={ATTRIBUTE:1},e=t=>(...e)=>({_$litDirective$:t,values:e});let i$1 = clas
 
 const CARD_NAME = "anyvac-card";
 const EDITOR_NAME = "anyvac-card-editor";
-const CARD_VERSION = "0.38.1";
+const CARD_VERSION = "0.39.0";
 /** Hold duration in ms required to trigger START / PAUSE actions */
 const HOLD_DURATION_MS = 600;
 /**
@@ -728,6 +728,17 @@ let AnyVacCard = class AnyVacCard extends i$2 {
             return be.has(room.key);
         return this._localRoomSel.get(vac.entity + ":" + room.key) ?? false;
     }
+    /** Effective dry/wet layer visibility: the backend-shared state when the integration
+     *  provides it (persists refreshes + syncs across devices, like the room selection),
+     *  else the local component state. */
+    _layersEff() {
+        const ent = this._selSensor();
+        const vl = ent ? this.hass.states[ent]?.attributes?.view_layers : undefined;
+        if (vl && typeof vl.dry === "boolean" && typeof vl.wet === "boolean") {
+            return { dry: vl.dry, wet: vl.wet };
+        }
+        return this._layers;
+    }
     /** Rooms for a vacuum: card-level `rooms` if defined (merged config), else the vacuum's own. */
     _roomsFor(vac) {
         return (this._config.rooms?.length ? this._config.rooms : vac.rooms) ?? [];
@@ -829,7 +840,8 @@ let AnyVacCard = class AnyVacCard extends i$2 {
                 const dry = this._ageDaysFromIso(rec.dry);
                 const wet = this._ageDaysFromIso(rec.wet);
                 const any = this._ageDaysFromIso(rec.any);
-                const dOn = this._layers.dry, wOn = this._layers.wet;
+                const L = this._layersEff();
+                const dOn = L.dry, wOn = L.wet;
                 let d;
                 if (dOn && wOn)
                     d = Math.max(dry ?? 9999, wet ?? 9999);
@@ -2034,8 +2046,9 @@ let AnyVacCard = class AnyVacCard extends i$2 {
         // transit / mop-wash driving; integration ≥0.12). Falls back to the legacy full
         // trajectory (path) on older integrations. Wet layer draws the mop trace as a
         // wider translucent "wet sheen" band under the line.
-        const showDry = this._layers.dry && ct.dry;
-        const showWet = this._layers.wet && ct.wet;
+        const layersOn = this._layersEff();
+        const showDry = layersOn.dry && ct.dry;
+        const showWet = layersOn.wet && ct.wet;
         const dryStr = showDry ? toPts(at.path_dry ?? at.path) : "";
         const wetStr = showWet ? toPts(at.path_wet ?? at.mop_path) : "";
         const vp = at.vacuum_position;
@@ -2095,7 +2108,16 @@ let AnyVacCard = class AnyVacCard extends i$2 {
             this._layerHeld = false;
             return;
         }
-        this._layers = { ...this._layers, [type]: !this._layers[type] };
+        const cur = this._layersEff();
+        const next = { ...cur, [type]: !cur[type] };
+        const ent = this._selSensor();
+        if (ent && this.hass.states[ent]?.attributes?.view_layers) {
+            // Backend-shared view state — persists refreshes, syncs across devices.
+            this._call("anyvac", "set_layers", next);
+        }
+        else {
+            this._layers = next;
+        }
         this._layerMenu = null;
     }
     /** Hold-expanded per-room ages for one layer (dry/wet). */
@@ -2143,14 +2165,15 @@ let AnyVacCard = class AnyVacCard extends i$2 {
             return max;
         };
         const badge = (d) => (d === null ? "\u2014" : d < 1 ? "<1d" : Math.round(d) + "d");
+        const L = this._layersEff();
         return b `
       <div class="layer-toggles">
-        <button class="layer-btn ${this._layers.dry ? "on" : ""}" title="Dry \u2014 tap to toggle, hold for rooms"
+        <button class="layer-btn ${L.dry ? "on" : ""}" title="Dry \u2014 tap to toggle, hold for rooms"
           @pointerdown=${() => this._onLayerDown("dry")} @pointerup=${() => this._onLayerUp()} @pointerleave=${() => this._onLayerUp()}
           @click=${() => this._onLayerClick("dry")}>
           <ha-icon icon="mdi:broom"></ha-icon><span>${badge(oldest("dry"))}</span>
         </button>
-        <button class="layer-btn ${this._layers.wet ? "on" : ""}" title="Wet \u2014 tap to toggle, hold for rooms"
+        <button class="layer-btn ${L.wet ? "on" : ""}" title="Wet \u2014 tap to toggle, hold for rooms"
           @pointerdown=${() => this._onLayerDown("wet")} @pointerup=${() => this._onLayerUp()} @pointerleave=${() => this._onLayerUp()}
           @click=${() => this._onLayerClick("wet")}>
           <ha-icon icon="mdi:water"></ha-icon><span>${badge(oldest("wet"))}</span>
