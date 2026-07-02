@@ -13,6 +13,40 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   software repeat move server-side, native-auto segment resolution removed from the card.
 - Rooms from the integration (real room polygons / names) for clickable cleaning on the floorplan.
 
+## [0.38.0] - 2026-07-02
+
+Auto-seating (docs/15): maps align themselves onto the shared floorplan.
+
+### Added
+
+- **Automatic map seating (`seat: auto`, the new default).** Each vacuum's map is fitted
+  onto the floorplan by a least-squares similarity transform whose anchors are the room
+  rectangles already drawn on the floorplan, paired **by name** with the room bboxes the
+  integration reads from that robot's map (key = Roborock room name). No clicking, no
+  sliders. Rotation snaps to 90° steps. The fit is recomputed from live sensor data, so
+  it **self-heals when the robot remaps** or the map trim changes — the failure mode
+  that silently broke manual seating. A robot whose map has only ONE shared room (e.g.
+  a kitchen-only robot) is seated from that room's centre + size, with orientation
+  estimated from its shape. Robots on a different floor match no rooms and keep manual
+  seating. Hand-drawn room differences between robots are fine — each robot is fitted
+  independently against the floorplan and the imprecision shows up in the fit error.
+- **Fit quality in the editor**: the Maps tab shows anchors used, the computed
+  rotation/scale/offset and an RMS fit error (warns above 3 % — usually a wrong room
+  key or rectangle). `seat: manual` keeps the old slider behaviour per vacuum.
+- **Room import from a vacuum** (editor, Maps tab): adds the rooms this robot's map
+  knows that are missing on the floorplan, placed through its current seat — one button
+  covers both the initial import from the reference (whole-home) robot and later
+  supplementing rooms only another robot has (it gets seated via the rooms you already
+  share, or its manual seat).
+- Editor map preview now uses the floorplan's real aspect ratio instead of a hard-coded
+  27.5 % box, so what you position in the editor matches the card.
+
+### Removed
+
+- Orphaned 3-point align tool remnants (`_alignApply` + handlers + styles) — it was
+  never wired into the UI (which is why it never worked); its similarity-fit maths now
+  powers the auto-seat in `seatfit.ts`.
+
 ## [0.37.0] - 2026-07-02
 
 Backend-first purge (docs/14 canon, Phase 1 + frontend part of Phase 3). The card no longer

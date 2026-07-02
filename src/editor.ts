@@ -25,6 +25,12 @@ import {
   CARD_VERSION,
   COLOR_HEX,
 } from "./const";
+import {
+  assembleAnchors,
+  computeSeatFit,
+  roomBboxToRect,
+  type SeatParams,
+} from "./seatfit";
 
 // ── Tab type ─────────────────────────────────────────────────────────────────
 
@@ -81,9 +87,9 @@ export class AnyVacCardEditor extends LitElement {
   // Maps tab state
   @state() private _mapVac  = 0;
   @state() private _mapRoom: number | null = null;
-  @state() private _alignActive = false;
-  @state() private _alignPairs: Array<{ n: [number, number]; f: [number, number] }> = [];
-  @state() private _alignPending: [number, number] | null = null;
+  /** Floorplan natural aspect ratio (W/H) learned from the preview image — used by
+   *  the auto-seat fit and to give the preview the correct proportions. */
+  @state() private _pvAR = 0;
 
   private _initialized = false;
 
@@ -177,71 +183,72 @@ export class AnyVacCardEditor extends LitElement {
       this._setImageBase(Math.min(this._mapVac, this._config.vacuums.length - 1), updates);
     }
   }
-  private _alignNorm(e: MouseEvent): [number, number] {
-    const el = e.currentTarget as HTMLElement; const r = el.getBoundingClientRect();
-    return [Math.min(1, Math.max(0, (e.clientX - r.left) / r.width)), Math.min(1, Math.max(0, (e.clientY - r.top) / r.height))];
+  // ── Auto-seating (docs/15) ────────────────────────────────────────────────
+  // NOTE: the old 3-point align tool (v0.17) was removed — it was orphaned code
+  // (never wired into the UI, which is why it "never worked"). Its similarity-fit
+  // maths lives on in seatfit.ts, now fed automatically by room anchors.
+
+  private _editorAR(): number {
+    return this._pvAR > 0.1 ? this._pvAR : 3.636;
   }
-  private _alignClickNative(e: MouseEvent): void {
-    if (!this._alignActive || this._alignPending) return;
-    this._alignPending = this._alignNorm(e);
-  }
-  private _alignClickFloor(e: MouseEvent): void {
-    if (!this._alignActive || !this._alignPending) return;
-    this._alignPairs = [...this._alignPairs, { n: this._alignPending, f: this._alignNorm(e) }];
-    this._alignPending = null;
-  }
-  /** Fit a similarity (scale, rotation, translation) from the marked point pairs and write it to the
-   *  vacuum's map seating. Works in each image's natural-pixel space; assumes identity floorplan seating. */
-  private _alignApply(mapVac: number): void {
-    if (this._alignPairs.length < 2) return;
-    const fImg = this.renderRoot?.querySelector(".align-floor-img") as HTMLImageElement | null;
-    const FW = fImg?.naturalWidth || 1, FH = fImg?.naturalHeight || 1;
-    // Native space must match where the TRACE is drawn (the integration's map-pixel space = image_dims),
-    // NOT the raw map PNG — otherwise the seating lines up the image but not the vector path.
-    const vac = this._config.vacuums[mapVac];
-    const dims = (this.hass?.states?.[vac?.integration_entity ?? ""]?.attributes as any)?.image_dims;
-    let NW = 1, NH = 1;
-    if (dims && dims.width && dims.height) {
-      const sc = dims.scale ?? 1;
-      NW = dims.width * sc; NH = dims.height * sc;
-      const rot = dims.rotation ?? 0;
-      if (rot === 90 || rot === 270) { const t = NW; NW = NH; NH = t; }
-    } else {
-      const nImg = this.renderRoot?.querySelector(".align-native-img") as HTMLImageElement | null;
-      NW = nImg?.naturalWidth || 1; NH = nImg?.naturalHeight || 1;
-    }
-    const P = this._alignPairs.map((p) => [p.n[0] * NW, p.n[1] * NH] as [number, number]);
-    const Q = this._alignPairs.map((p) => [p.f[0] * FW, p.f[1] * FH] as [number, number]);
-    const n = P.length;
-    const mean = (a: Array<[number, number]>): [number, number] => {
-      let sx = 0, sy = 0; for (const p of a) { sx += p[0]; sy += p[1]; } return [sx / a.length, sy / a.length];
+
+  /** Editor-side view of the effective seat (mirrors the card's _effectiveSeat). */
+  private _editorSeat(vacIdx: number): SeatParams & {
+    auto: boolean; residual?: number; anchorCount?: number;
+  } {
+    const vac = this._config.vacuums[vacIdx];
+    const m = vac?.map;
+    const manual = {
+      rotation: m?.rotation ?? 0, scale: m?.scale ?? 100,
+      offset_x: m?.offset_x ?? 0, offset_y: m?.offset_y ?? 0, auto: false,
     };
-    const mP = mean(P), mQ = mean(Q);
-    let numCos = 0, numSin = 0, denom = 0;
-    for (let i = 0; i < n; i++) {
-      const dpx = P[i][0] - mP[0], dpy = P[i][1] - mP[1], dqx = Q[i][0] - mQ[0], dqy = Q[i][1] - mQ[1];
-      numCos += dpx * dqx + dpy * dqy; numSin += dpx * dqy - dpy * dqx; denom += dpx * dpx + dpy * dpy;
-    }
-    if (denom < 1e-9) return;
-    const theta = Math.atan2(numSin, numCos);
-    const s = Math.sqrt(numCos * numCos + numSin * numSin) / denom;
-    const cos = Math.cos(theta), sin = Math.sin(theta);
-    const tx = mQ[0] - s * (cos * mP[0] - sin * mP[1]);
-    const ty = mQ[1] - s * (sin * mP[0] + cos * mP[1]);
-    const cx = s * (cos * (NW / 2) - sin * (NH / 2)) + tx;
-    const cy = s * (sin * (NW / 2) + cos * (NH / 2)) + ty;
-    const scalePct = (s * NW) / FW * 100;
-    const offX = (cx / FW - 0.5) * 100;
-    const offY = (cy / FH - 0.5) * 100;
-    let rot = (theta * 180) / Math.PI; rot = ((rot % 360) + 360) % 360;
-    this._setMap(mapVac, {
-      rotation: Math.round(rot),
-      scale: Math.round(scalePct),
-      offset_x: Math.round(offX * 10) / 10,
-      offset_y: Math.round(offY * 10) / 10,
-    });
-    this._alignActive = false; this._alignPairs = []; this._alignPending = null;
+    if (!vac || m?.seat === "manual") return manual;
+    const merged = this._config.map_mode === "merged";
+    const ib = merged ? this._config.image_base : vac.image_base;
+    if (!ib?.src || !vac.integration_entity) return manual;
+    const at = this.hass?.states?.[vac.integration_entity]?.attributes as Record<string, any> | undefined;
+    if (!at) return manual;
+    const ar = this._editorAR();
+    const rooms = merged ? (this._config.rooms ?? []) : (vac.rooms ?? []);
+    const fit = computeSeatFit(assembleAnchors(rooms as any, at, ar), ar);
+    if (!fit) return manual;
+    return {
+      rotation: fit.rotation, scale: fit.scale,
+      offset_x: fit.offset_x, offset_y: fit.offset_y,
+      auto: true, residual: fit.residual_pct, anchorCount: fit.anchors,
+    };
   }
+
+  /** Import rooms this vacuum's map knows that are missing on the floorplan —
+   *  placed through the vacuum's current (auto or manual) seat. Works both for the
+   *  initial import from the reference robot and for supplementing rooms only
+   *  another robot has (its seat must exist: shared rooms or manual seating). */
+  private _importRooms(vacIdx: number): void {
+    const vac = this._config.vacuums[vacIdx];
+    const at = vac?.integration_entity
+      ? (this.hass.states[vac.integration_entity]?.attributes as Record<string, any> | undefined)
+      : undefined;
+    const intRooms: Array<Record<string, any>> = Array.isArray(at?.rooms) ? at!.rooms : [];
+    if (!at || !intRooms.length) return;
+    const ar = this._editorAR();
+    const seat = this._editorSeat(vacIdx);
+    const target = this._mergedEdit ? [...(this._config.rooms ?? [])] : [...(vac.rooms ?? [])];
+    const have = new Set(target.map((r) => r.key));
+    let added = 0;
+    for (const ir of intRooms) {
+      const nm = ir?.name as string | undefined;
+      if (!nm || have.has(nm)) continue;
+      const rect = roomBboxToRect(ir, at, seat, ar);
+      if (!rect) continue;
+      target.push({ key: nm, name: nm, icon: "mdi:floor-plan", ...rect });
+      have.add(nm);
+      added++;
+    }
+    if (!added) return;
+    if (this._mergedEdit) this._setConfig({ rooms: target });
+    else this._setVacuum(vacIdx, { rooms: target });
+  }
+
   private _setRoom(vacIdx: number, roomIdx: number, updates: Partial<RoomConfig>): void {
     const rooms = [...(this._config.vacuums[vacIdx].rooms ?? [])];
     rooms[roomIdx] = { ...rooms[roomIdx], ...updates };
@@ -905,6 +912,7 @@ export class AnyVacCardEditor extends LitElement {
     const pvOx    = useImg ? (ib!.offset_x ?? 0)  : (map.offset_x ?? 0);
     const pvOy    = useImg ? (ib!.offset_y ?? 0)  : (map.offset_y ?? 0);
     const rooms = this._editRooms();
+    const es = this._editorSeat(mapVac);
 
     return html`
       <div class="tab-body">
@@ -979,8 +987,16 @@ export class AnyVacCardEditor extends LitElement {
               const y = Math.round(((e.clientY - rect.top) / rect.height) * 100);
               this._setEditedRoom(this._mapRoom, { map_x: x, map_y: y });
             }}>
-            <div class="map-preview-wrap">
+            <div class="map-preview-wrap"
+              style=${styleMap(this._pvAR > 0.1 ? { paddingTop: (100 / this._pvAR).toFixed(2) + "%" } : {})}>
               <img class="map-preview-img" src=${previewUrl} alt="Map preview"
+                @load=${(e: Event) => {
+                  const im = e.target as HTMLImageElement;
+                  if (useImg && im.naturalWidth && im.naturalHeight) {
+                    const arv = im.naturalWidth / im.naturalHeight;
+                    if (Math.abs(arv - this._pvAR) > 0.01) this._pvAR = arv;
+                  }
+                }}
                 style=${styleMap({
                   left:      (50 + pvOx) + "%",
                   top:       (50 + pvOy) + "%",
@@ -989,10 +1005,10 @@ export class AnyVacCardEditor extends LitElement {
                 })} />
               ${this._mergedEdit && useImg && mapUrl ? html`<img class="map-preview-img" src=${mapUrl} alt="Native map"
                 style=${styleMap({
-                  left:      (50 + (map.offset_x ?? 0)) + "%",
-                  top:       (50 + (map.offset_y ?? 0)) + "%",
-                  width:     (map.scale ?? 100) + "%",
-                  transform: "translate(-50%,-50%) rotate(" + (map.rotation ?? 0) + "deg)",
+                  left:      (50 + es.offset_x) + "%",
+                  top:       (50 + es.offset_y) + "%",
+                  width:     es.scale + "%",
+                  transform: "translate(-50%,-50%) rotate(" + es.rotation + "deg)",
                   opacity:   "0.5",
                 })} />` : nothing}
               ${rooms.map((r, ri) => html`
@@ -1005,11 +1021,36 @@ export class AnyVacCardEditor extends LitElement {
           </div>
 
           <div class="section-title">Map seating ${this._mergedEdit ? "(this vacuum)" : ""}</div>
-          ${this._mergedEdit ? html`<p class="hint">Drag the sliders so this vacuum's map (the faded overlay) lines up with the floorplan.</p>` : nothing}
-          ${this._numberSlider("Rotation",  map.rotation  ?? 0,    0, 360, 90, v => this._setMap(mapVac, { rotation:  v }), "°")}
-          ${this._numberSlider("Scale",     map.scale     ?? 100, 50, 200,  5, v => this._setMap(mapVac, { scale:     v }), "%")}
-          ${this._numberSlider("Offset X",  map.offset_x  ?? 0,  -50,  50,  1, v => this._setMap(mapVac, { offset_x:  v }), "%")}
-          ${this._numberSlider("Offset Y",  map.offset_y  ?? 0,  -50,  50,  1, v => this._setMap(mapVac, { offset_y:  v }), "%")}
+          ${this._selectField<"auto" | "manual">("Seating", (map.seat === "manual" ? "manual" : "auto"),
+            [{ value: "auto", label: "Auto — fit from rooms" },
+             { value: "manual", label: "Manual — sliders" }],
+            v => this._setMap(mapVac, { seat: v === "manual" ? "manual" : undefined }))}
+          ${map.seat !== "manual" ? (es.auto ? html`
+            <p class="hint">✅ Auto-fit from <strong>${es.anchorCount}</strong> room${(es.anchorCount ?? 0) > 1 ? "s" : ""}:
+              rot ${es.rotation}° · scale ${es.scale.toFixed(1)}% · offset ${es.offset_x.toFixed(1)}/${es.offset_y.toFixed(1)}%
+              · fit error ${(es.residual ?? 0).toFixed(1)}%${(es.residual ?? 0) > 3 ? " ⚠️ check room rectangles / keys" : ""}${
+              es.anchorCount === 1 ? " (single room — orientation estimated from its shape)" : ""}.
+              Recomputed live — self-heals after the robot remaps.</p>
+          ` : html`
+            <p class="hint">Auto-fit inactive — it needs the integration sensor, a floorplan and at least one
+              room rectangle whose key matches a room name on this robot's map. Using the manual values below.</p>
+          `) : nothing}
+          ${(map.seat === "manual" || !es.auto) ? html`
+            ${this._numberSlider("Rotation",  map.rotation  ?? 0,    0, 360, 90, v => this._setMap(mapVac, { rotation:  v }), "°")}
+            ${this._numberSlider("Scale",     map.scale     ?? 100, 50, 200,  5, v => this._setMap(mapVac, { scale:     v }), "%")}
+            ${this._numberSlider("Offset X",  map.offset_x  ?? 0,  -50,  50,  1, v => this._setMap(mapVac, { offset_x:  v }), "%")}
+            ${this._numberSlider("Offset Y",  map.offset_y  ?? 0,  -50,  50,  1, v => this._setMap(mapVac, { offset_y:  v }), "%")}
+          ` : nothing}
+          ${vac.integration_entity ? html`
+            <button class="btn btn--add btn--sm" style="align-self:flex-start"
+              @click=${() => this._importRooms(mapVac)}>
+              <ha-icon icon="mdi:import"></ha-icon> Import missing rooms from this vacuum
+            </button>
+            <p class="hint">Adds rooms this robot's map knows that aren't on the floorplan yet
+              (key = Roborock room name), placed through its current seat. Import from your
+              reference (whole-home) robot first; then switch to another robot to supplement
+              rooms only it has — it will be seated via the rooms you already share.</p>
+          ` : nothing}
 
           ${this._config.map_mode === "merged" ? html`<button class="btn btn--add btn--sm" style="align-self:flex-start;margin-top:4px" @click=${() => this._addEditedRoom()}><ha-icon icon="mdi:plus"></ha-icon> Add room</button>` : nothing}
           ${rooms.length ? html`
@@ -1534,11 +1575,6 @@ export class AnyVacCardEditor extends LitElement {
       overflow:hidden; border-radius:8px; background:rgba(0,0,0,.06);
     }
     .map-preview-img { position:absolute; transform-origin:center center; object-fit:cover; }
-    .align-grid { display:grid; grid-template-columns:1fr 1fr; gap:6px; margin-top:4px; }
-    .align-pane { position:relative; border:1px solid rgba(255,255,255,0.2); border-radius:8px; overflow:hidden; cursor:crosshair; background:rgba(0,0,0,0.3); }
-    .align-pane img { display:block; width:100%; height:auto; }
-    .align-dot { position:absolute; transform:translate(-50%,-50%); width:16px; height:16px; border-radius:50%; background:#4db6ff; color:#fff; font-size:10px; font-weight:700; display:flex; align-items:center; justify-content:center; border:2px solid #fff; pointer-events:none; }
-    .align-dot--pending { background:#ffb74d; }
 
     .pos-dot {
       position:absolute; transform:translate(-50%,-50%);

@@ -40,6 +40,10 @@ export interface MapConfig {
   scale: number;
   offset_x: number;
   offset_y: number;
+  /** Seating mode (docs/15): "auto" (default — fitted from room anchors when the
+   *  integration + a floorplan + at least one matched room are available) or
+   *  "manual" (use the rotation/scale/offset values above). */
+  seat?: "auto" | "manual";
 }
 
 export interface ImageBaseConfig {

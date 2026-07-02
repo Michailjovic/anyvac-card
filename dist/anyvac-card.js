@@ -94,7 +94,7 @@ const t={ATTRIBUTE:1},e=t=>(...e)=>({_$litDirective$:t,values:e});let i$1 = clas
 
 const CARD_NAME = "anyvac-card";
 const EDITOR_NAME = "anyvac-card-editor";
-const CARD_VERSION = "0.37.0";
+const CARD_VERSION = "0.38.0";
 /** Hold duration in ms required to trigger START / PAUSE actions */
 const HOLD_DURATION_MS = 600;
 /**
@@ -190,6 +190,235 @@ const CLEANING_STATES = new Set([
     "zoned_clean_mop_cleaning",
     "zoned_clean_mop_mopping",
 ]);
+
+/**
+ * Auto-seating maths (docs/15): fit each vacuum map onto the shared floorplan
+ * automatically, using the card's room rectangles as anchors.
+ *
+ * Anchor pairing is by NAME (card room key == the room name in the Roborock app ==
+ * the integration's room name), so no manual clicking is needed. Each vacuum is
+ * fitted INDEPENDENTLY against the floorplan — hand-drawn room differences between
+ * robots don't matter, they just yield slightly different per-robot transforms and
+ * show up in the residual.
+ *
+ * Unit convention: all fitting happens in "wrap units" where the floorplan wrap is
+ * 1.0 wide and 1/AR tall (AR = wrap width/height). Map pixels are normalised by the
+ * rendered map width NW, so the fitted scale is directly the CSS `width` fraction.
+ */
+// ── Small linear algebra (shared with the card's click inversion) ────────────
+/** Solve a 3x3 linear system by Cramer's rule. */
+function solve3(m, r) {
+    const d = (a) => a[0][0] * (a[1][1] * a[2][2] - a[1][2] * a[2][1]) -
+        a[0][1] * (a[1][0] * a[2][2] - a[1][2] * a[2][0]) +
+        a[0][2] * (a[1][0] * a[2][1] - a[1][1] * a[2][0]);
+    const D = d(m);
+    if (Math.abs(D) < 1e-9)
+        return null;
+    const col = (i) => m.map((row, ri) => row.map((v, ci) => (ci === i ? r[ri] : v)));
+    return [d(col(0)) / D, d(col(1)) / D, d(col(2)) / D];
+}
+/** Affine vacuum-mm → rendered-map-px from the parser's calibration points. */
+function affineFromCalibration(cal) {
+    if (!Array.isArray(cal) || cal.length < 3)
+        return null;
+    try {
+        const M = cal.slice(0, 3).map((p) => [p.vacuum.x, p.vacuum.y, 1]);
+        const abc = solve3(M, cal.slice(0, 3).map((p) => p.map.x));
+        const def = solve3(M, cal.slice(0, 3).map((p) => p.map.y));
+        if (!abc || !def)
+            return null;
+        return { a: abc[0], b: abc[1], c: abc[2], d: def[0], e: def[1], f: def[2] };
+    }
+    catch {
+        return null;
+    }
+}
+/** Rendered map pixel dimensions (rotation-aware) from the sensor's image_dims. */
+function mapPxDims(dims) {
+    if (!dims)
+        return null;
+    const sc = dims.scale ?? 1;
+    let NW = (dims.width ?? 0) * sc;
+    let NH = (dims.height ?? 0) * sc;
+    const rot = dims.rotation ?? 0;
+    if (rot === 90 || rot === 270) {
+        const t = NW;
+        NW = NH;
+        NH = t;
+    }
+    return NW > 0 && NH > 0 ? { NW, NH } : null;
+}
+/**
+ * Build fit anchors by pairing the card's floorplan rooms with the integration
+ * sensor's room bboxes (attributes: calibration_points, image_dims, rooms[]).
+ */
+function assembleAnchors(cardRooms, at, ar) {
+    if (!at)
+        return [];
+    const t = affineFromCalibration(at.calibration_points);
+    const dims = mapPxDims(at.image_dims);
+    const intRooms = Array.isArray(at.rooms) ? at.rooms : [];
+    if (!t || !dims || !intRooms.length)
+        return [];
+    const { NW, NH } = dims;
+    const toPx = (x, y) => ({ x: t.a * x + t.b * y + t.c, y: t.d * x + t.e * y + t.f });
+    const out = [];
+    for (const cr of cardRooms) {
+        if (cr.map_x == null || cr.map_y == null)
+            continue;
+        const ir = intRooms.find((r) => r.name === cr.key) ?? intRooms.find((r) => r.name === cr.name);
+        if (!ir || [ir.x0, ir.y0, ir.x1, ir.y1].some((v) => v == null))
+            continue;
+        // Room bbox mm → px: transform all 4 corners (the affine may rotate) and take spread.
+        const corners = [toPx(ir.x0, ir.y0), toPx(ir.x1, ir.y1), toPx(ir.x0, ir.y1), toPx(ir.x1, ir.y0)];
+        const xs = corners.map((p) => p.x), ys = corners.map((p) => p.y);
+        const cxPx = (Math.min(...xs) + Math.max(...xs)) / 2;
+        const cyPx = (Math.min(...ys) + Math.max(...ys)) / 2;
+        const anchor = {
+            q: { x: (cxPx - NW / 2) / NW, y: (cyPx - NH / 2) / NW },
+            a: { x: cr.map_x / 100, y: cr.map_y / 100 / ar },
+        };
+        if (cr.map_w != null && cr.map_h != null && cr.map_w > 0 && cr.map_h > 0) {
+            anchor.sizeQ = { w: (Math.max(...xs) - Math.min(...xs)) / NW, h: (Math.max(...ys) - Math.min(...ys)) / NW };
+            anchor.sizeA = { w: cr.map_w / 100, h: cr.map_h / 100 / ar };
+        }
+        out.push(anchor);
+    }
+    return out;
+}
+// ── The fit ───────────────────────────────────────────────────────────────────
+const RAD = Math.PI / 180;
+function seatFromFrame(theta, s, c, ar, residual, n, rawTheta) {
+    let rot = Math.round(theta / RAD) % 360;
+    if (rot < 0)
+        rot += 360;
+    return {
+        rotation: rot,
+        scale: s * 100,
+        offset_x: c.x * 100 - 50,
+        offset_y: c.y * ar * 100 - 50,
+        residual_pct: residual * 100,
+        anchors: n,
+        raw_rotation: Math.round((rawTheta / RAD) * 10) / 10,
+    };
+}
+/**
+ * Least-squares similarity fit (rotation snapped to 90° steps) mapping map anchors
+ * onto floorplan anchors. Returns null when the anchors cannot determine a seat.
+ */
+function computeSeatFit(anchors, ar) {
+    if (!anchors.length || !(ar > 0))
+        return null;
+    if (anchors.length >= 2) {
+        const n = anchors.length;
+        const qm = { x: 0, y: 0 }, am = { x: 0, y: 0 };
+        for (const p of anchors) {
+            qm.x += p.q.x;
+            qm.y += p.q.y;
+            am.x += p.a.x;
+            am.y += p.a.y;
+        }
+        qm.x /= n;
+        qm.y /= n;
+        am.x /= n;
+        am.y /= n;
+        let numCos = 0, numSin = 0, denom = 0;
+        for (const p of anchors) {
+            const dqx = p.q.x - qm.x, dqy = p.q.y - qm.y;
+            const dax = p.a.x - am.x, day = p.a.y - am.y;
+            numCos += dqx * dax + dqy * day;
+            numSin += dqx * day - dqy * dax;
+            denom += dqx * dqx + dqy * dqy;
+        }
+        if (denom > 1e-8) {
+            const rawTheta = Math.atan2(numSin, numCos);
+            // Snap to the nearest 90° (Roborock maps and floorplans are axis-aligned),
+            // then refit scale + translation with the snapped rotation.
+            const theta = Math.round(rawTheta / (Math.PI / 2)) * (Math.PI / 2);
+            const cos = Math.cos(theta), sin = Math.sin(theta);
+            let num = 0;
+            for (const p of anchors) {
+                const dqx = p.q.x - qm.x, dqy = p.q.y - qm.y;
+                const rx = cos * dqx - sin * dqy, ry = sin * dqx + cos * dqy;
+                num += rx * (p.a.x - am.x) + ry * (p.a.y - am.y);
+            }
+            const s = num / denom;
+            if (s > 1e-4) {
+                const c = { x: am.x - s * (cos * qm.x - sin * qm.y), y: am.y - s * (sin * qm.x + cos * qm.y) };
+                let err = 0;
+                for (const p of anchors) {
+                    const rx = c.x + s * (cos * p.q.x - sin * p.q.y) - p.a.x;
+                    const ry = c.y + s * (sin * p.q.x + cos * p.q.y) - p.a.y;
+                    err += rx * rx + ry * ry;
+                }
+                return seatFromFrame(theta, s, c, ar, Math.sqrt(err / n), n, rawTheta);
+            }
+        }
+        // Degenerate spread (coincident centres) → fall through to the 1-anchor path.
+    }
+    // Single usable anchor: translation from centres, scale from bbox↔rect sizes,
+    // orientation by testing the four axis-aligned rotations for best size agreement.
+    const p = anchors.find((x) => x.sizeQ && x.sizeA) ?? null;
+    if (!p || !p.sizeQ || !p.sizeA || p.sizeQ.w < 1e-6 || p.sizeQ.h < 1e-6)
+        return null;
+    let best = null;
+    for (const k of [0, 1, 2, 3]) {
+        const theta = k * (Math.PI / 2);
+        const w = k % 2 === 0 ? p.sizeQ.w : p.sizeQ.h;
+        const h = k % 2 === 0 ? p.sizeQ.h : p.sizeQ.w;
+        const sw = p.sizeA.w / w, sh = p.sizeA.h / h;
+        if (!(sw > 0) || !(sh > 0))
+            continue;
+        const s = Math.sqrt(sw * sh);
+        const mism = Math.abs(Math.log(sw / sh));
+        if (!best || mism < best.mism - 1e-9)
+            best = { theta, s, mism };
+    }
+    if (!best)
+        return null;
+    const cos = Math.cos(best.theta), sin = Math.sin(best.theta);
+    const c = {
+        x: p.a.x - best.s * (cos * p.q.x - sin * p.q.y),
+        y: p.a.y - best.s * (sin * p.q.x + cos * p.q.y),
+    };
+    return seatFromFrame(best.theta, best.s, c, ar, 0, 1, best.theta);
+}
+// ── Forward transform (room import) ──────────────────────────────────────────
+/**
+ * Transform an integration room bbox (mm) into floorplan rectangle percentages,
+ * given a seat (auto-fitted or manual) — used by the editor's room import.
+ */
+function roomBboxToRect(ir, at, seat, ar) {
+    const t = affineFromCalibration(at?.calibration_points);
+    const dims = mapPxDims(at?.image_dims);
+    if (!t || !dims || [ir?.x0, ir?.y0, ir?.x1, ir?.y1].some((v) => v == null))
+        return null;
+    const { NW, NH } = dims;
+    const toPx = (x, y) => ({ x: t.a * x + t.b * y + t.c, y: t.d * x + t.e * y + t.f });
+    const corners = [toPx(ir.x0, ir.y0), toPx(ir.x1, ir.y1), toPx(ir.x0, ir.y1), toPx(ir.x1, ir.y0)];
+    const xs = corners.map((p) => p.x), ys = corners.map((p) => p.y);
+    const q = { x: ((Math.min(...xs) + Math.max(...xs)) / 2 - NW / 2) / NW, y: ((Math.min(...ys) + Math.max(...ys)) / 2 - NH / 2) / NW };
+    let w = (Math.max(...xs) - Math.min(...xs)) / NW;
+    let h = (Math.max(...ys) - Math.min(...ys)) / NW;
+    const s = seat.scale / 100;
+    const theta = seat.rotation * RAD;
+    const cos = Math.cos(theta), sin = Math.sin(theta);
+    const c = { x: (50 + seat.offset_x) / 100, y: (50 + seat.offset_y) / 100 / ar };
+    const u = { x: c.x + s * (cos * q.x - sin * q.y), y: c.y + s * (sin * q.x + cos * q.y) };
+    const rot90 = Math.round(seat.rotation / 90) % 2 !== 0;
+    if (rot90) {
+        const tmp = w;
+        w = h;
+        h = tmp;
+    }
+    const clamp = (v, lo, hi) => Math.min(hi, Math.max(lo, v));
+    return {
+        map_x: clamp(Math.round(u.x * 1000) / 10, 0, 100),
+        map_y: clamp(Math.round(u.y * ar * 1000) / 10, 0, 100),
+        map_w: clamp(Math.round(s * w * 1000) / 10, 2, 100),
+        map_h: clamp(Math.round(s * h * ar * 1000) / 10, 2, 100),
+    };
+}
 
 var _a;
 console.info(`%c ANYVAC-CARD %c v${CARD_VERSION} `, "background:#2196F3;color:#fff;font-weight:700;padding:2px 4px;border-radius:3px 0 0 3px", "background:#1a1a1a;color:#fff;font-weight:400;padding:2px 4px;border-radius:0 3px 3px 0");
@@ -1548,20 +1777,12 @@ let AnyVacCard = class AnyVacCard extends i$2 {
     // the dock sits at map origin, trusted commanded goto targets over the robot's real
     // position, and duplicated maths the integration provides for free. Map commands now
     // require the integration's calibration_points.
-    _solve3(m, r) {
-        const d = (a) => a[0][0] * (a[1][1] * a[2][2] - a[1][2] * a[2][1]) - a[0][1] * (a[1][0] * a[2][2] - a[1][2] * a[2][0]) + a[0][2] * (a[1][0] * a[2][1] - a[1][1] * a[2][0]);
-        const D = d(m);
-        if (Math.abs(D) < 1e-9)
-            return null;
-        const col = (i) => m.map((row, ri) => row.map((v, ci) => (ci === i ? r[ri] : v)));
-        return [d(col(0)) / D, d(col(1)) / D, d(col(2)) / D];
-    }
     _affine(pts) {
         if (pts.length < 3)
             return null;
         const M = pts.slice(0, 3).map((p) => [p.map.x, p.map.y, 1]);
-        const ab = this._solve3(M, pts.slice(0, 3).map((p) => p.vacuum.x));
-        const cd = this._solve3(M, pts.slice(0, 3).map((p) => p.vacuum.y));
+        const ab = solve3(M, pts.slice(0, 3).map((p) => p.vacuum.x));
+        const cd = solve3(M, pts.slice(0, 3).map((p) => p.vacuum.y));
         if (!ab || !cd)
             return null;
         return { a: ab[0], b: ab[1], e: ab[2], c: cd[0], d: cd[1], f: cd[2] };
@@ -1741,19 +1962,51 @@ let AnyVacCard = class AnyVacCard extends i$2 {
     `;
     }
     _intAffine(cal) {
-        if (!Array.isArray(cal) || cal.length < 3)
-            return null;
-        try {
-            const M = cal.slice(0, 3).map((p) => [p.vacuum.x, p.vacuum.y, 1]);
-            const abc = this._solve3(M, cal.slice(0, 3).map((p) => p.map.x));
-            const def = this._solve3(M, cal.slice(0, 3).map((p) => p.map.y));
-            if (!abc || !def)
-                return null;
-            return { a: abc[0], b: abc[1], c: abc[2], d: def[0], e: def[1], f: def[2] };
+        return affineFromCalibration(cal);
+    }
+    // ── Auto-seating (docs/15) ──────────────────────────────────────────────
+    /** Aspect ratio (W/H) of the map wrap, for the seat fit's unit conversions. */
+    _wrapAspect(baseHeight) {
+        if (typeof baseHeight === "number" && baseHeight > 0 && this._cardW > 0) {
+            return Math.max(0.2, (this._cardW - 16) / baseHeight);
         }
-        catch {
-            return null;
-        }
+        return this._mapAR > 0.1 ? this._mapAR : 3.636;
+    }
+    /** Effective map seating: auto-fitted from room anchors (rooms drawn on the
+     *  floorplan matched by name against the integration's room bboxes) whenever
+     *  possible, else the manual slider values. Recomputed from live attributes,
+     *  so it self-heals when the robot remaps / the map trim changes. */
+    _effectiveSeat(vac) {
+        const m = vac.map;
+        const manual = {
+            rotation: m?.rotation ?? 0, scale: m?.scale ?? 100,
+            offset_x: m?.offset_x ?? 0, offset_y: m?.offset_y ?? 0, auto: false,
+        };
+        if (m?.seat === "manual")
+            return manual;
+        const merged = this._config.map_mode === "merged";
+        const ib = merged
+            ? (this._config.image_base ?? this._config.vacuums.find((v) => v.image_base?.src)?.image_base)
+            : vac.image_base;
+        // Auto-seat only makes sense against a floorplan reference; a map-only base
+        // IS the reference itself and keeps its manual (default) seat.
+        if (!ib?.src || !vac.integration_entity)
+            return manual;
+        const at = this.hass?.states?.[vac.integration_entity]?.attributes;
+        if (!at)
+            return manual;
+        const bh = merged
+            ? (this._config.base_height ?? this._config.vacuums.find((v) => v.base_height)?.base_height)
+            : vac.base_height;
+        const ar = this._wrapAspect(bh);
+        const fit = computeSeatFit(assembleAnchors(this._roomsFor(vac), at, ar), ar);
+        if (!fit)
+            return manual;
+        return {
+            rotation: fit.rotation, scale: fit.scale,
+            offset_x: fit.offset_x, offset_y: fit.offset_y,
+            auto: true, residual: fit.residual_pct, anchorCount: fit.anchors,
+        };
     }
     /** Integration mode: draw the robot + cleaning path as a vector overlay using
      *  the calibration_points (mm -> rendered-map px) exposed by the AnyVac sensor. */
@@ -2022,22 +2275,22 @@ let AnyVacCard = class AnyVacCard extends i$2 {
             const mUrl = v.map?.entity ? this._mapUrl(v.map.entity) : null;
             if (!mUrl)
                 return A;
-            const mm = v.map;
+            const seat = this._effectiveSeat(v);
             const overlay = hasImage || idx > 0;
             // hide_map renders the element at opacity 0 instead of skipping it — the
             // element IS the click-geometry anchor for pin&go / zones (docs/13 A4).
             return b `<img class="map-img ${overlay ? "map-img--overlay" : ""}" src=${mUrl} alt="Vacuum map"
             data-entity=${v.entity}
             style=${o({
-                left: (50 + (mm?.offset_x ?? 0)) + "%",
-                top: (50 + (mm?.offset_y ?? 0)) + "%",
-                width: (mm?.scale ?? 100) + "%",
-                transform: "translate(-50%,-50%) rotate(" + (mm?.rotation ?? 0) + "deg)",
+                left: (50 + seat.offset_x) + "%",
+                top: (50 + seat.offset_y) + "%",
+                width: seat.scale + "%",
+                transform: "translate(-50%,-50%) rotate(" + seat.rotation + "deg)",
                 opacity: v.hide_map ? "0" : String((v.overlay_opacity ?? (overlay ? 55 : 100)) / 100),
                 mixBlendMode: v.overlay_blend ?? "normal",
             })} />`;
         })}
-        ${shown.map((v) => (v.integration_entity ? this._renderIntegrationOverlay(v, v.map) : A))}
+        ${shown.map((v) => (v.integration_entity ? this._renderIntegrationOverlay(v, this._effectiveSeat(v)) : A))}
         ${this._renderLayerToggles(shown)}
         ${this._renderMergedRooms(shown)}
       </div>
@@ -2053,7 +2306,7 @@ let AnyVacCard = class AnyVacCard extends i$2 {
         const showMap = (base === "map" || base === "combined") && !!mapUrl;
         if (!showImage && !showMap)
             return A;
-        const m = vac.map;
+        const seat = this._effectiveSeat(vac);
         const fixedH = typeof vac.base_height === "number" && vac.base_height > 0;
         const wrapClass = fixedH ? "map-wrap--fixed" : (showImage ? "map-wrap--image" : "");
         const wrapStyle = o(fixedH ? { height: (vac.base_height ?? 0) + "px" } : {});
@@ -2070,14 +2323,14 @@ let AnyVacCard = class AnyVacCard extends i$2 {
           <img class="map-img ${showImage ? "map-img--overlay" : ""}" src=${mapUrl} alt="Vacuum map"
             data-entity=${vac.entity}
             style=${o({
-            left: (50 + (m?.offset_x ?? 0)) + "%",
-            top: (50 + (m?.offset_y ?? 0)) + "%",
-            width: (m?.scale ?? 100) + "%",
-            transform: "translate(-50%,-50%) rotate(" + (m?.rotation ?? 0) + "deg)",
+            left: (50 + seat.offset_x) + "%",
+            top: (50 + seat.offset_y) + "%",
+            width: seat.scale + "%",
+            transform: "translate(-50%,-50%) rotate(" + seat.rotation + "deg)",
             ...(vac.hide_map ? { opacity: "0" } : (showImage ? { opacity: String((vac.overlay_opacity ?? 55) / 100), mixBlendMode: vac.overlay_blend ?? "normal" } : {})),
         })} />
         ` : A}
-        ${showMap ? this._renderIntegrationOverlay(vac, m) : A}
+        ${showMap ? this._renderIntegrationOverlay(vac, seat) : A}
         ${this._renderLayerToggles([vac])}
         ${(this._roomsFor(vac)).map((r) => this._renderRoomOverlay(r, vac))}
         ${this._mapMode !== "normal" && this._modeEntity === vac.entity
@@ -2929,9 +3182,9 @@ let AnyVacCardEditor = class AnyVacCardEditor extends i$2 {
         // Maps tab state
         this._mapVac = 0;
         this._mapRoom = null;
-        this._alignActive = false;
-        this._alignPairs = [];
-        this._alignPending = null;
+        /** Floorplan natural aspect ratio (W/H) learned from the preview image — used by
+         *  the auto-seat fit and to give the preview the correct proportions. */
+        this._pvAR = 0;
         this._initialized = false;
     }
     setConfig(config) {
@@ -3024,92 +3277,75 @@ let AnyVacCardEditor = class AnyVacCardEditor extends i$2 {
             this._setImageBase(Math.min(this._mapVac, this._config.vacuums.length - 1), updates);
         }
     }
-    _alignNorm(e) {
-        const el = e.currentTarget;
-        const r = el.getBoundingClientRect();
-        return [Math.min(1, Math.max(0, (e.clientX - r.left) / r.width)), Math.min(1, Math.max(0, (e.clientY - r.top) / r.height))];
+    // ── Auto-seating (docs/15) ────────────────────────────────────────────────
+    // NOTE: the old 3-point align tool (v0.17) was removed — it was orphaned code
+    // (never wired into the UI, which is why it "never worked"). Its similarity-fit
+    // maths lives on in seatfit.ts, now fed automatically by room anchors.
+    _editorAR() {
+        return this._pvAR > 0.1 ? this._pvAR : 3.636;
     }
-    _alignClickNative(e) {
-        if (!this._alignActive || this._alignPending)
-            return;
-        this._alignPending = this._alignNorm(e);
-    }
-    _alignClickFloor(e) {
-        if (!this._alignActive || !this._alignPending)
-            return;
-        this._alignPairs = [...this._alignPairs, { n: this._alignPending, f: this._alignNorm(e) }];
-        this._alignPending = null;
-    }
-    /** Fit a similarity (scale, rotation, translation) from the marked point pairs and write it to the
-     *  vacuum's map seating. Works in each image's natural-pixel space; assumes identity floorplan seating. */
-    _alignApply(mapVac) {
-        if (this._alignPairs.length < 2)
-            return;
-        const fImg = this.renderRoot?.querySelector(".align-floor-img");
-        const FW = fImg?.naturalWidth || 1, FH = fImg?.naturalHeight || 1;
-        // Native space must match where the TRACE is drawn (the integration's map-pixel space = image_dims),
-        // NOT the raw map PNG — otherwise the seating lines up the image but not the vector path.
-        const vac = this._config.vacuums[mapVac];
-        const dims = this.hass?.states?.[vac?.integration_entity ?? ""]?.attributes?.image_dims;
-        let NW = 1, NH = 1;
-        if (dims && dims.width && dims.height) {
-            const sc = dims.scale ?? 1;
-            NW = dims.width * sc;
-            NH = dims.height * sc;
-            const rot = dims.rotation ?? 0;
-            if (rot === 90 || rot === 270) {
-                const t = NW;
-                NW = NH;
-                NH = t;
-            }
-        }
-        else {
-            const nImg = this.renderRoot?.querySelector(".align-native-img");
-            NW = nImg?.naturalWidth || 1;
-            NH = nImg?.naturalHeight || 1;
-        }
-        const P = this._alignPairs.map((p) => [p.n[0] * NW, p.n[1] * NH]);
-        const Q = this._alignPairs.map((p) => [p.f[0] * FW, p.f[1] * FH]);
-        const n = P.length;
-        const mean = (a) => {
-            let sx = 0, sy = 0;
-            for (const p of a) {
-                sx += p[0];
-                sy += p[1];
-            }
-            return [sx / a.length, sy / a.length];
+    /** Editor-side view of the effective seat (mirrors the card's _effectiveSeat). */
+    _editorSeat(vacIdx) {
+        const vac = this._config.vacuums[vacIdx];
+        const m = vac?.map;
+        const manual = {
+            rotation: m?.rotation ?? 0, scale: m?.scale ?? 100,
+            offset_x: m?.offset_x ?? 0, offset_y: m?.offset_y ?? 0, auto: false,
         };
-        const mP = mean(P), mQ = mean(Q);
-        let numCos = 0, numSin = 0, denom = 0;
-        for (let i = 0; i < n; i++) {
-            const dpx = P[i][0] - mP[0], dpy = P[i][1] - mP[1], dqx = Q[i][0] - mQ[0], dqy = Q[i][1] - mQ[1];
-            numCos += dpx * dqx + dpy * dqy;
-            numSin += dpx * dqy - dpy * dqx;
-            denom += dpx * dpx + dpy * dpy;
-        }
-        if (denom < 1e-9)
+        if (!vac || m?.seat === "manual")
+            return manual;
+        const merged = this._config.map_mode === "merged";
+        const ib = merged ? this._config.image_base : vac.image_base;
+        if (!ib?.src || !vac.integration_entity)
+            return manual;
+        const at = this.hass?.states?.[vac.integration_entity]?.attributes;
+        if (!at)
+            return manual;
+        const ar = this._editorAR();
+        const rooms = merged ? (this._config.rooms ?? []) : (vac.rooms ?? []);
+        const fit = computeSeatFit(assembleAnchors(rooms, at, ar), ar);
+        if (!fit)
+            return manual;
+        return {
+            rotation: fit.rotation, scale: fit.scale,
+            offset_x: fit.offset_x, offset_y: fit.offset_y,
+            auto: true, residual: fit.residual_pct, anchorCount: fit.anchors,
+        };
+    }
+    /** Import rooms this vacuum's map knows that are missing on the floorplan —
+     *  placed through the vacuum's current (auto or manual) seat. Works both for the
+     *  initial import from the reference robot and for supplementing rooms only
+     *  another robot has (its seat must exist: shared rooms or manual seating). */
+    _importRooms(vacIdx) {
+        const vac = this._config.vacuums[vacIdx];
+        const at = vac?.integration_entity
+            ? this.hass.states[vac.integration_entity]?.attributes
+            : undefined;
+        const intRooms = Array.isArray(at?.rooms) ? at.rooms : [];
+        if (!at || !intRooms.length)
             return;
-        const theta = Math.atan2(numSin, numCos);
-        const s = Math.sqrt(numCos * numCos + numSin * numSin) / denom;
-        const cos = Math.cos(theta), sin = Math.sin(theta);
-        const tx = mQ[0] - s * (cos * mP[0] - sin * mP[1]);
-        const ty = mQ[1] - s * (sin * mP[0] + cos * mP[1]);
-        const cx = s * (cos * (NW / 2) - sin * (NH / 2)) + tx;
-        const cy = s * (sin * (NW / 2) + cos * (NH / 2)) + ty;
-        const scalePct = (s * NW) / FW * 100;
-        const offX = (cx / FW - 0.5) * 100;
-        const offY = (cy / FH - 0.5) * 100;
-        let rot = (theta * 180) / Math.PI;
-        rot = ((rot % 360) + 360) % 360;
-        this._setMap(mapVac, {
-            rotation: Math.round(rot),
-            scale: Math.round(scalePct),
-            offset_x: Math.round(offX * 10) / 10,
-            offset_y: Math.round(offY * 10) / 10,
-        });
-        this._alignActive = false;
-        this._alignPairs = [];
-        this._alignPending = null;
+        const ar = this._editorAR();
+        const seat = this._editorSeat(vacIdx);
+        const target = this._mergedEdit ? [...(this._config.rooms ?? [])] : [...(vac.rooms ?? [])];
+        const have = new Set(target.map((r) => r.key));
+        let added = 0;
+        for (const ir of intRooms) {
+            const nm = ir?.name;
+            if (!nm || have.has(nm))
+                continue;
+            const rect = roomBboxToRect(ir, at, seat, ar);
+            if (!rect)
+                continue;
+            target.push({ key: nm, name: nm, icon: "mdi:floor-plan", ...rect });
+            have.add(nm);
+            added++;
+        }
+        if (!added)
+            return;
+        if (this._mergedEdit)
+            this._setConfig({ rooms: target });
+        else
+            this._setVacuum(vacIdx, { rooms: target });
     }
     _setRoom(vacIdx, roomIdx, updates) {
         const rooms = [...(this._config.vacuums[vacIdx].rooms ?? [])];
@@ -3724,6 +3960,7 @@ let AnyVacCardEditor = class AnyVacCardEditor extends i$2 {
         const pvOx = useImg ? (ib.offset_x ?? 0) : (map.offset_x ?? 0);
         const pvOy = useImg ? (ib.offset_y ?? 0) : (map.offset_y ?? 0);
         const rooms = this._editRooms();
+        const es = this._editorSeat(mapVac);
         return b `
       <div class="tab-body">
 
@@ -3784,8 +4021,17 @@ let AnyVacCardEditor = class AnyVacCardEditor extends i$2 {
             const y = Math.round(((e.clientY - rect.top) / rect.height) * 100);
             this._setEditedRoom(this._mapRoom, { map_x: x, map_y: y });
         }}>
-            <div class="map-preview-wrap">
+            <div class="map-preview-wrap"
+              style=${o(this._pvAR > 0.1 ? { paddingTop: (100 / this._pvAR).toFixed(2) + "%" } : {})}>
               <img class="map-preview-img" src=${previewUrl} alt="Map preview"
+                @load=${(e) => {
+            const im = e.target;
+            if (useImg && im.naturalWidth && im.naturalHeight) {
+                const arv = im.naturalWidth / im.naturalHeight;
+                if (Math.abs(arv - this._pvAR) > 0.01)
+                    this._pvAR = arv;
+            }
+        }}
                 style=${o({
             left: (50 + pvOx) + "%",
             top: (50 + pvOy) + "%",
@@ -3794,10 +4040,10 @@ let AnyVacCardEditor = class AnyVacCardEditor extends i$2 {
         })} />
               ${this._mergedEdit && useImg && mapUrl ? b `<img class="map-preview-img" src=${mapUrl} alt="Native map"
                 style=${o({
-            left: (50 + (map.offset_x ?? 0)) + "%",
-            top: (50 + (map.offset_y ?? 0)) + "%",
-            width: (map.scale ?? 100) + "%",
-            transform: "translate(-50%,-50%) rotate(" + (map.rotation ?? 0) + "deg)",
+            left: (50 + es.offset_x) + "%",
+            top: (50 + es.offset_y) + "%",
+            width: es.scale + "%",
+            transform: "translate(-50%,-50%) rotate(" + es.rotation + "deg)",
             opacity: "0.5",
         })} />` : A}
               ${rooms.map((r, ri) => b `
@@ -3810,11 +4056,33 @@ let AnyVacCardEditor = class AnyVacCardEditor extends i$2 {
           </div>
 
           <div class="section-title">Map seating ${this._mergedEdit ? "(this vacuum)" : ""}</div>
-          ${this._mergedEdit ? b `<p class="hint">Drag the sliders so this vacuum's map (the faded overlay) lines up with the floorplan.</p>` : A}
-          ${this._numberSlider("Rotation", map.rotation ?? 0, 0, 360, 90, v => this._setMap(mapVac, { rotation: v }), "°")}
-          ${this._numberSlider("Scale", map.scale ?? 100, 50, 200, 5, v => this._setMap(mapVac, { scale: v }), "%")}
-          ${this._numberSlider("Offset X", map.offset_x ?? 0, -50, 50, 1, v => this._setMap(mapVac, { offset_x: v }), "%")}
-          ${this._numberSlider("Offset Y", map.offset_y ?? 0, -50, 50, 1, v => this._setMap(mapVac, { offset_y: v }), "%")}
+          ${this._selectField("Seating", (map.seat === "manual" ? "manual" : "auto"), [{ value: "auto", label: "Auto — fit from rooms" },
+            { value: "manual", label: "Manual — sliders" }], v => this._setMap(mapVac, { seat: v === "manual" ? "manual" : undefined }))}
+          ${map.seat !== "manual" ? (es.auto ? b `
+            <p class="hint">✅ Auto-fit from <strong>${es.anchorCount}</strong> room${(es.anchorCount ?? 0) > 1 ? "s" : ""}:
+              rot ${es.rotation}° · scale ${es.scale.toFixed(1)}% · offset ${es.offset_x.toFixed(1)}/${es.offset_y.toFixed(1)}%
+              · fit error ${(es.residual ?? 0).toFixed(1)}%${(es.residual ?? 0) > 3 ? " ⚠️ check room rectangles / keys" : ""}${es.anchorCount === 1 ? " (single room — orientation estimated from its shape)" : ""}.
+              Recomputed live — self-heals after the robot remaps.</p>
+          ` : b `
+            <p class="hint">Auto-fit inactive — it needs the integration sensor, a floorplan and at least one
+              room rectangle whose key matches a room name on this robot's map. Using the manual values below.</p>
+          `) : A}
+          ${(map.seat === "manual" || !es.auto) ? b `
+            ${this._numberSlider("Rotation", map.rotation ?? 0, 0, 360, 90, v => this._setMap(mapVac, { rotation: v }), "°")}
+            ${this._numberSlider("Scale", map.scale ?? 100, 50, 200, 5, v => this._setMap(mapVac, { scale: v }), "%")}
+            ${this._numberSlider("Offset X", map.offset_x ?? 0, -50, 50, 1, v => this._setMap(mapVac, { offset_x: v }), "%")}
+            ${this._numberSlider("Offset Y", map.offset_y ?? 0, -50, 50, 1, v => this._setMap(mapVac, { offset_y: v }), "%")}
+          ` : A}
+          ${vac.integration_entity ? b `
+            <button class="btn btn--add btn--sm" style="align-self:flex-start"
+              @click=${() => this._importRooms(mapVac)}>
+              <ha-icon icon="mdi:import"></ha-icon> Import missing rooms from this vacuum
+            </button>
+            <p class="hint">Adds rooms this robot's map knows that aren't on the floorplan yet
+              (key = Roborock room name), placed through its current seat. Import from your
+              reference (whole-home) robot first; then switch to another robot to supplement
+              rooms only it has — it will be seated via the rooms you already share.</p>
+          ` : A}
 
           ${this._config.map_mode === "merged" ? b `<button class="btn btn--add btn--sm" style="align-self:flex-start;margin-top:4px" @click=${() => this._addEditedRoom()}><ha-icon icon="mdi:plus"></ha-icon> Add room</button>` : A}
           ${rooms.length ? b `
@@ -4315,11 +4583,6 @@ AnyVacCardEditor.styles = i$6 `
       overflow:hidden; border-radius:8px; background:rgba(0,0,0,.06);
     }
     .map-preview-img { position:absolute; transform-origin:center center; object-fit:cover; }
-    .align-grid { display:grid; grid-template-columns:1fr 1fr; gap:6px; margin-top:4px; }
-    .align-pane { position:relative; border:1px solid rgba(255,255,255,0.2); border-radius:8px; overflow:hidden; cursor:crosshair; background:rgba(0,0,0,0.3); }
-    .align-pane img { display:block; width:100%; height:auto; }
-    .align-dot { position:absolute; transform:translate(-50%,-50%); width:16px; height:16px; border-radius:50%; background:#4db6ff; color:#fff; font-size:10px; font-weight:700; display:flex; align-items:center; justify-content:center; border:2px solid #fff; pointer-events:none; }
-    .align-dot--pending { background:#ffb74d; }
 
     .pos-dot {
       position:absolute; transform:translate(-50%,-50%);
@@ -4465,13 +4728,7 @@ __decorate([
 ], AnyVacCardEditor.prototype, "_mapRoom", void 0);
 __decorate([
     r()
-], AnyVacCardEditor.prototype, "_alignActive", void 0);
-__decorate([
-    r()
-], AnyVacCardEditor.prototype, "_alignPairs", void 0);
-__decorate([
-    r()
-], AnyVacCardEditor.prototype, "_alignPending", void 0);
+], AnyVacCardEditor.prototype, "_pvAR", void 0);
 AnyVacCardEditor = __decorate([
     t$1(EDITOR_NAME)
 ], AnyVacCardEditor);

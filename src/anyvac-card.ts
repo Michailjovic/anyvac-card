@@ -28,6 +28,13 @@ import {
   COLOR_BG_ACTIVE,
   CLEANING_STATES,
 } from "./const";
+import {
+  assembleAnchors,
+  computeSeatFit,
+  affineFromCalibration,
+  solve3,
+  type SeatParams,
+} from "./seatfit";
 
 console.info(
   `%c ANYVAC-CARD %c v${CARD_VERSION} `,
@@ -1317,17 +1324,11 @@ export class AnyVacCard extends LitElement {
   // the dock sits at map origin, trusted commanded goto targets over the robot's real
   // position, and duplicated maths the integration provides for free. Map commands now
   // require the integration's calibration_points.
-  private _solve3(m: number[][], r: number[]): number[] | null {
-    const d = (a: number[][]) => a[0][0]*(a[1][1]*a[2][2]-a[1][2]*a[2][1]) - a[0][1]*(a[1][0]*a[2][2]-a[1][2]*a[2][0]) + a[0][2]*(a[1][0]*a[2][1]-a[1][1]*a[2][0]);
-    const D = d(m); if (Math.abs(D) < 1e-9) return null;
-    const col = (i: number) => m.map((row, ri) => row.map((v, ci) => (ci === i ? r[ri] : v)));
-    return [d(col(0)) / D, d(col(1)) / D, d(col(2)) / D];
-  }
   private _affine(pts: Array<{ map: { x: number; y: number }; vacuum: { x: number; y: number } }>) {
     if (pts.length < 3) return null;
     const M = pts.slice(0, 3).map((p) => [p.map.x, p.map.y, 1]);
-    const ab = this._solve3(M, pts.slice(0, 3).map((p) => p.vacuum.x));
-    const cd = this._solve3(M, pts.slice(0, 3).map((p) => p.vacuum.y));
+    const ab = solve3(M, pts.slice(0, 3).map((p) => p.vacuum.x));
+    const cd = solve3(M, pts.slice(0, 3).map((p) => p.vacuum.y));
     if (!ab || !cd) return null;
     return { a: ab[0], b: ab[1], e: ab[2], c: cd[0], d: cd[1], f: cd[2] };
   }
@@ -1479,14 +1480,52 @@ export class AnyVacCard extends LitElement {
   }
 
   private _intAffine(cal: any): { a: number; b: number; c: number; d: number; e: number; f: number } | null {
-    if (!Array.isArray(cal) || cal.length < 3) return null;
-    try {
-      const M = cal.slice(0, 3).map((p: any) => [p.vacuum.x, p.vacuum.y, 1]);
-      const abc = this._solve3(M, cal.slice(0, 3).map((p: any) => p.map.x));
-      const def = this._solve3(M, cal.slice(0, 3).map((p: any) => p.map.y));
-      if (!abc || !def) return null;
-      return { a: abc[0], b: abc[1], c: abc[2], d: def[0], e: def[1], f: def[2] };
-    } catch { return null; }
+    return affineFromCalibration(cal);
+  }
+
+  // ── Auto-seating (docs/15) ──────────────────────────────────────────────
+
+  /** Aspect ratio (W/H) of the map wrap, for the seat fit's unit conversions. */
+  private _wrapAspect(baseHeight?: number): number {
+    if (typeof baseHeight === "number" && baseHeight > 0 && this._cardW > 0) {
+      return Math.max(0.2, (this._cardW - 16) / baseHeight);
+    }
+    return this._mapAR > 0.1 ? this._mapAR : 3.636;
+  }
+
+  /** Effective map seating: auto-fitted from room anchors (rooms drawn on the
+   *  floorplan matched by name against the integration's room bboxes) whenever
+   *  possible, else the manual slider values. Recomputed from live attributes,
+   *  so it self-heals when the robot remaps / the map trim changes. */
+  private _effectiveSeat(vac: VacuumConfig): SeatParams & {
+    auto: boolean; residual?: number; anchorCount?: number;
+  } {
+    const m = vac.map;
+    const manual = {
+      rotation: m?.rotation ?? 0, scale: m?.scale ?? 100,
+      offset_x: m?.offset_x ?? 0, offset_y: m?.offset_y ?? 0, auto: false,
+    };
+    if (m?.seat === "manual") return manual;
+    const merged = this._config.map_mode === "merged";
+    const ib = merged
+      ? (this._config.image_base ?? this._config.vacuums.find((v) => v.image_base?.src)?.image_base)
+      : vac.image_base;
+    // Auto-seat only makes sense against a floorplan reference; a map-only base
+    // IS the reference itself and keeps its manual (default) seat.
+    if (!ib?.src || !vac.integration_entity) return manual;
+    const at = this.hass?.states?.[vac.integration_entity]?.attributes as Record<string, any> | undefined;
+    if (!at) return manual;
+    const bh = merged
+      ? (this._config.base_height ?? this._config.vacuums.find((v) => v.base_height)?.base_height)
+      : vac.base_height;
+    const ar = this._wrapAspect(bh);
+    const fit = computeSeatFit(assembleAnchors(this._roomsFor(vac), at, ar), ar);
+    if (!fit) return manual;
+    return {
+      rotation: fit.rotation, scale: fit.scale,
+      offset_x: fit.offset_x, offset_y: fit.offset_y,
+      auto: true, residual: fit.residual_pct, anchorCount: fit.anchors,
+    };
   }
 
   /** Integration mode: draw the robot + cleaning path as a vector overlay using
@@ -1737,22 +1776,22 @@ export class AnyVacCard extends LitElement {
         ${shown.map((v, idx) => {
           const mUrl = v.map?.entity ? this._mapUrl(v.map.entity) : null;
           if (!mUrl) return nothing;
-          const mm = v.map;
+          const seat = this._effectiveSeat(v);
           const overlay = hasImage || idx > 0;
           // hide_map renders the element at opacity 0 instead of skipping it — the
           // element IS the click-geometry anchor for pin&go / zones (docs/13 A4).
           return html`<img class="map-img ${overlay ? "map-img--overlay" : ""}" src=${mUrl} alt="Vacuum map"
             data-entity=${v.entity}
             style=${styleMap({
-              left: (50 + (mm?.offset_x ?? 0)) + "%",
-              top: (50 + (mm?.offset_y ?? 0)) + "%",
-              width: (mm?.scale ?? 100) + "%",
-              transform: "translate(-50%,-50%) rotate(" + (mm?.rotation ?? 0) + "deg)",
+              left: (50 + seat.offset_x) + "%",
+              top: (50 + seat.offset_y) + "%",
+              width: seat.scale + "%",
+              transform: "translate(-50%,-50%) rotate(" + seat.rotation + "deg)",
               opacity: v.hide_map ? "0" : String((v.overlay_opacity ?? (overlay ? 55 : 100)) / 100),
               mixBlendMode: v.overlay_blend ?? "normal",
             })} />`;
         })}
-        ${shown.map((v) => (v.integration_entity ? this._renderIntegrationOverlay(v, v.map) : nothing))}
+        ${shown.map((v) => (v.integration_entity ? this._renderIntegrationOverlay(v, this._effectiveSeat(v)) : nothing))}
         ${this._renderLayerToggles(shown)}
         ${this._renderMergedRooms(shown)}
       </div>
@@ -1769,7 +1808,7 @@ export class AnyVacCard extends LitElement {
     const showMap = (base === "map" || base === "combined") && !!mapUrl;
     if (!showImage && !showMap) return nothing;
 
-    const m = vac.map;
+    const seat = this._effectiveSeat(vac);
     const fixedH = typeof vac.base_height === "number" && vac.base_height > 0;
     const wrapClass = fixedH ? "map-wrap--fixed" : (showImage ? "map-wrap--image" : "");
     const wrapStyle = styleMap(fixedH ? { height: (vac.base_height ?? 0) + "px" } : {});
@@ -1786,14 +1825,14 @@ export class AnyVacCard extends LitElement {
           <img class="map-img ${showImage ? "map-img--overlay" : ""}" src=${mapUrl!} alt="Vacuum map"
             data-entity=${vac.entity}
             style=${styleMap({
-              left: (50 + (m?.offset_x ?? 0)) + "%",
-              top:  (50 + (m?.offset_y ?? 0)) + "%",
-              width: (m?.scale ?? 100) + "%",
-              transform: "translate(-50%,-50%) rotate(" + (m?.rotation ?? 0) + "deg)",
+              left: (50 + seat.offset_x) + "%",
+              top:  (50 + seat.offset_y) + "%",
+              width: seat.scale + "%",
+              transform: "translate(-50%,-50%) rotate(" + seat.rotation + "deg)",
               ...(vac.hide_map ? { opacity: "0" } : (showImage ? { opacity: String((vac.overlay_opacity ?? 55) / 100), mixBlendMode: vac.overlay_blend ?? "normal" } : {})),
             })} />
         ` : nothing}
-        ${showMap ? this._renderIntegrationOverlay(vac, m) : nothing}
+        ${showMap ? this._renderIntegrationOverlay(vac, seat) : nothing}
         ${this._renderLayerToggles([vac])}
         ${(this._roomsFor(vac)).map((r) => this._renderRoomOverlay(r, vac))}
         ${this._mapMode !== "normal" && this._modeEntity === vac.entity
