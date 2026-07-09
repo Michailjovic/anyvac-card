@@ -32,20 +32,13 @@ typeof SuppressedError === "function" ? SuppressedError : function (error, suppr
  * Copyright 2019 Google LLC
  * SPDX-License-Identifier: BSD-3-Clause
  */
-const t$4=globalThis,e$4=t$4.ShadowRoot&&(void 0===t$4.ShadyCSS||t$4.ShadyCSS.nativeShadow)&&"adoptedStyleSheets"in Document.prototype&&"replace"in CSSStyleSheet.prototype,s$3=Symbol(),o$6=new WeakMap;let n$5 = class n{constructor(t,e,o){if(this._$cssResult$=true,o!==s$3)throw Error("CSSResult is not constructable. Use `unsafeCSS` or `css` instead.");this.cssText=t,this.t=e;}get styleSheet(){let t=this.o;const s=this.t;if(e$4&&void 0===t){const e=void 0!==s&&1===s.length;e&&(t=o$6.get(s)),void 0===t&&((this.o=t=new CSSStyleSheet).replaceSync(this.cssText),e&&o$6.set(s,t));}return t}toString(){return this.cssText}};const r$5=t=>new n$5("string"==typeof t?t:t+"",void 0,s$3),i$6=(t,...e)=>{const o=1===t.length?t[0]:e.reduce((e,s,o)=>e+(t=>{if(true===t._$cssResult$)return t.cssText;if("number"==typeof t)return t;throw Error("Value passed to 'css' function must be a 'css' function result: "+t+". Use 'unsafeCSS' to pass non-literal values, but take care to ensure page security.")})(s)+t[o+1],t[0]);return new n$5(o,t,s$3)},S$2=(s,o)=>{if(e$4)s.adoptedStyleSheets=o.map(t=>t instanceof CSSStyleSheet?t:t.styleSheet);else for(const e of o){const o=document.createElement("style"),n=t$4.litNonce;void 0!==n&&o.setAttribute("nonce",n),o.textContent=e.cssText,s.appendChild(o);}},c$3=e$4?t=>t:t=>t instanceof CSSStyleSheet?(t=>{let e="";for(const s of t.cssRules)e+=s.cssText;return r$5(e)})(t):t;
+const t$3=globalThis,e$3=t$3.ShadowRoot&&(void 0===t$3.ShadyCSS||t$3.ShadyCSS.nativeShadow)&&"adoptedStyleSheets"in Document.prototype&&"replace"in CSSStyleSheet.prototype,s$2=Symbol(),o$5=new WeakMap;let n$4 = class n{constructor(t,e,o){if(this._$cssResult$=true,o!==s$2)throw Error("CSSResult is not constructable. Use `unsafeCSS` or `css` instead.");this.cssText=t,this.t=e;}get styleSheet(){let t=this.o;const s=this.t;if(e$3&&void 0===t){const e=void 0!==s&&1===s.length;e&&(t=o$5.get(s)),void 0===t&&((this.o=t=new CSSStyleSheet).replaceSync(this.cssText),e&&o$5.set(s,t));}return t}toString(){return this.cssText}};const r$4=t=>new n$4("string"==typeof t?t:t+"",void 0,s$2),i$5=(t,...e)=>{const o=1===t.length?t[0]:e.reduce((e,s,o)=>e+(t=>{if(true===t._$cssResult$)return t.cssText;if("number"==typeof t)return t;throw Error("Value passed to 'css' function must be a 'css' function result: "+t+". Use 'unsafeCSS' to pass non-literal values, but take care to ensure page security.")})(s)+t[o+1],t[0]);return new n$4(o,t,s$2)},S$1=(s,o)=>{if(e$3)s.adoptedStyleSheets=o.map(t=>t instanceof CSSStyleSheet?t:t.styleSheet);else for(const e of o){const o=document.createElement("style"),n=t$3.litNonce;void 0!==n&&o.setAttribute("nonce",n),o.textContent=e.cssText,s.appendChild(o);}},c$2=e$3?t=>t:t=>t instanceof CSSStyleSheet?(t=>{let e="";for(const s of t.cssRules)e+=s.cssText;return r$4(e)})(t):t;
 
 /**
  * @license
  * Copyright 2017 Google LLC
  * SPDX-License-Identifier: BSD-3-Clause
- */const{is:i$5,defineProperty:e$3,getOwnPropertyDescriptor:h$2,getOwnPropertyNames:r$4,getOwnPropertySymbols:o$5,getPrototypeOf:n$4}=Object,a$2=globalThis,c$2=a$2.trustedTypes,l$2=c$2?c$2.emptyScript:"",p$2=a$2.reactiveElementPolyfillSupport,d$2=(t,s)=>t,u$2={toAttribute(t,s){switch(s){case Boolean:t=t?l$2:null;break;case Object:case Array:t=null==t?t:JSON.stringify(t);}return t},fromAttribute(t,s){let i=t;switch(s){case Boolean:i=null!==t;break;case Number:i=null===t?null:Number(t);break;case Object:case Array:try{i=JSON.parse(t);}catch(t){i=null;}}return i}},f$2=(t,s)=>!i$5(t,s),b$1={attribute:true,type:String,converter:u$2,reflect:false,useDefault:false,hasChanged:f$2};Symbol.metadata??=Symbol("metadata"),a$2.litPropertyMetadata??=new WeakMap;let y$2 = class y extends HTMLElement{static addInitializer(t){this._$Ei(),(this.l??=[]).push(t);}static get observedAttributes(){return this.finalize(),this._$Eh&&[...this._$Eh.keys()]}static createProperty(t,s=b$1){if(s.state&&(s.attribute=false),this._$Ei(),this.prototype.hasOwnProperty(t)&&((s=Object.create(s)).wrapped=true),this.elementProperties.set(t,s),!s.noAccessor){const i=Symbol(),h=this.getPropertyDescriptor(t,i,s);void 0!==h&&e$3(this.prototype,t,h);}}static getPropertyDescriptor(t,s,i){const{get:e,set:r}=h$2(this.prototype,t)??{get(){return this[s]},set(t){this[s]=t;}};return {get:e,set(s){const h=e?.call(this);r?.call(this,s),this.requestUpdate(t,h,i);},configurable:true,enumerable:true}}static getPropertyOptions(t){return this.elementProperties.get(t)??b$1}static _$Ei(){if(this.hasOwnProperty(d$2("elementProperties")))return;const t=n$4(this);t.finalize(),void 0!==t.l&&(this.l=[...t.l]),this.elementProperties=new Map(t.elementProperties);}static finalize(){if(this.hasOwnProperty(d$2("finalized")))return;if(this.finalized=true,this._$Ei(),this.hasOwnProperty(d$2("properties"))){const t=this.properties,s=[...r$4(t),...o$5(t)];for(const i of s)this.createProperty(i,t[i]);}const t=this[Symbol.metadata];if(null!==t){const s=litPropertyMetadata.get(t);if(void 0!==s)for(const[t,i]of s)this.elementProperties.set(t,i);}this._$Eh=new Map;for(const[t,s]of this.elementProperties){const i=this._$Eu(t,s);void 0!==i&&this._$Eh.set(i,t);}this.elementStyles=this.finalizeStyles(this.styles);}static finalizeStyles(s){const i=[];if(Array.isArray(s)){const e=new Set(s.flat(1/0).reverse());for(const s of e)i.unshift(c$3(s));}else void 0!==s&&i.push(c$3(s));return i}static _$Eu(t,s){const i=s.attribute;return  false===i?void 0:"string"==typeof i?i:"string"==typeof t?t.toLowerCase():void 0}constructor(){super(),this._$Ep=void 0,this.isUpdatePending=false,this.hasUpdated=false,this._$Em=null,this._$Ev();}_$Ev(){this._$ES=new Promise(t=>this.enableUpdating=t),this._$AL=new Map,this._$E_(),this.requestUpdate(),this.constructor.l?.forEach(t=>t(this));}addController(t){(this._$EO??=new Set).add(t),void 0!==this.renderRoot&&this.isConnected&&t.hostConnected?.();}removeController(t){this._$EO?.delete(t);}_$E_(){const t=new Map,s=this.constructor.elementProperties;for(const i of s.keys())this.hasOwnProperty(i)&&(t.set(i,this[i]),delete this[i]);t.size>0&&(this._$Ep=t);}createRenderRoot(){const t=this.shadowRoot??this.attachShadow(this.constructor.shadowRootOptions);return S$2(t,this.constructor.elementStyles),t}connectedCallback(){this.renderRoot??=this.createRenderRoot(),this.enableUpdating(true),this._$EO?.forEach(t=>t.hostConnected?.());}enableUpdating(t){}disconnectedCallback(){this._$EO?.forEach(t=>t.hostDisconnected?.());}attributeChangedCallback(t,s,i){this._$AK(t,i);}_$ET(t,s){const i=this.constructor.elementProperties.get(t),e=this.constructor._$Eu(t,i);if(void 0!==e&&true===i.reflect){const h=(void 0!==i.converter?.toAttribute?i.converter:u$2).toAttribute(s,i.type);this._$Em=t,null==h?this.removeAttribute(e):this.setAttribute(e,h),this._$Em=null;}}_$AK(t,s){const i=this.constructor,e=i._$Eh.get(t);if(void 0!==e&&this._$Em!==e){const t=i.getPropertyOptions(e),h="function"==typeof t.converter?{fromAttribute:t.converter}:void 0!==t.converter?.fromAttribute?t.converter:u$2;this._$Em=e;const r=h.fromAttribute(s,t.type);this[e]=r??this._$Ej?.get(e)??r,this._$Em=null;}}requestUpdate(t,s,i,e=false,h){if(void 0!==t){const r=this.constructor;if(false===e&&(h=this[t]),i??=r.getPropertyOptions(t),!((i.hasChanged??f$2)(h,s)||i.useDefault&&i.reflect&&h===this._$Ej?.get(t)&&!this.hasAttribute(r._$Eu(t,i))))return;this.C(t,s,i);} false===this.isUpdatePending&&(this._$ES=this._$EP());}C(t,s,{useDefault:i,reflect:e,wrapped:h},r){i&&!(this._$Ej??=new Map).has(t)&&(this._$Ej.set(t,r??s??this[t]),true!==h||void 0!==r)||(this._$AL.has(t)||(this.hasUpdated||i||(s=void 0),this._$AL.set(t,s)),true===e&&this._$Em!==t&&(this._$Eq??=new Set).add(t));}async _$EP(){this.isUpdatePending=true;try{await this._$ES;}catch(t){Promise.reject(t);}const t=this.scheduleUpdate();return null!=t&&await t,!this.isUpdatePending}scheduleUpdate(){return this.performUpdate()}performUpdate(){if(!this.isUpdatePending)return;if(!this.hasUpdated){if(this.renderRoot??=this.createRenderRoot(),this._$Ep){for(const[t,s]of this._$Ep)this[t]=s;this._$Ep=void 0;}const t=this.constructor.elementProperties;if(t.size>0)for(const[s,i]of t){const{wrapped:t}=i,e=this[s];true!==t||this._$AL.has(s)||void 0===e||this.C(s,void 0,i,e);}}let t=false;const s=this._$AL;try{t=this.shouldUpdate(s),t?(this.willUpdate(s),this._$EO?.forEach(t=>t.hostUpdate?.()),this.update(s)):this._$EM();}catch(s){throw t=false,this._$EM(),s}t&&this._$AE(s);}willUpdate(t){}_$AE(t){this._$EO?.forEach(t=>t.hostUpdated?.()),this.hasUpdated||(this.hasUpdated=true,this.firstUpdated(t)),this.updated(t);}_$EM(){this._$AL=new Map,this.isUpdatePending=false;}get updateComplete(){return this.getUpdateComplete()}getUpdateComplete(){return this._$ES}shouldUpdate(t){return  true}update(t){this._$Eq&&=this._$Eq.forEach(t=>this._$ET(t,this[t])),this._$EM();}updated(t){}firstUpdated(t){}};y$2.elementStyles=[],y$2.shadowRootOptions={mode:"open"},y$2[d$2("elementProperties")]=new Map,y$2[d$2("finalized")]=new Map,p$2?.({ReactiveElement:y$2}),(a$2.reactiveElementVersions??=[]).push("2.1.2");
-
-/**
- * @license
- * Copyright 2017 Google LLC
- * SPDX-License-Identifier: BSD-3-Clause
- */
-const t$3=globalThis,i$4=t=>t,s$2=t$3.trustedTypes,e$2=s$2?s$2.createPolicy("lit-html",{createHTML:t=>t}):void 0,h$1="$lit$",o$4=`lit$${Math.random().toFixed(9).slice(2)}$`,n$3="?"+o$4,r$3=`<${n$3}>`,l$1=document,c$1=()=>l$1.createComment(""),a$1=t=>null===t||"object"!=typeof t&&"function"!=typeof t,u$1=Array.isArray,d$1=t=>u$1(t)||"function"==typeof t?.[Symbol.iterator],f$1="[ \t\n\f\r]",v$1=/<(?:(!--|\/[^a-zA-Z])|(\/?[a-zA-Z][^>\s]*)|(\/?$))/g,_$1=/-->/g,m$1=/>/g,p$1=RegExp(`>|${f$1}(?:([^\\s"'>=/]+)(${f$1}*=${f$1}*(?:[^ \t\n\f\r"'\`<>=]|("|')|))|$)`,"g"),g$1=/'/g,$$1=/"/g,y$1=/^(?:script|style|textarea|title)$/i,E$1=Symbol.for("lit-noChange"),A$1=Symbol.for("lit-nothing"),C$1=new WeakMap,P$1=l$1.createTreeWalker(l$1,129);function V$1(t,i){if(!u$1(t)||!t.hasOwnProperty("raw"))throw Error("invalid template strings array");return void 0!==e$2?e$2.createHTML(i):i}const N$1=(t,i)=>{const s=t.length-1,e=[];let n,l=2===i?"<svg>":3===i?"<math>":"",c=v$1;for(let i=0;i<s;i++){const s=t[i];let a,u,d=-1,f=0;for(;f<s.length&&(c.lastIndex=f,u=c.exec(s),null!==u);)f=c.lastIndex,c===v$1?"!--"===u[1]?c=_$1:void 0!==u[1]?c=m$1:void 0!==u[2]?(y$1.test(u[2])&&(n=RegExp("</"+u[2],"g")),c=p$1):void 0!==u[3]&&(c=p$1):c===p$1?">"===u[0]?(c=n??v$1,d=-1):void 0===u[1]?d=-2:(d=c.lastIndex-u[2].length,a=u[1],c=void 0===u[3]?p$1:'"'===u[3]?$$1:g$1):c===$$1||c===g$1?c=p$1:c===_$1||c===m$1?c=v$1:(c=p$1,n=void 0);const x=c===p$1&&t[i+1].startsWith("/>")?" ":"";l+=c===v$1?s+r$3:d>=0?(e.push(a),s.slice(0,d)+h$1+s.slice(d)+o$4+x):s+o$4+(-2===d?i:x);}return [V$1(t,l+(t[s]||"<?>")+(2===i?"</svg>":3===i?"</math>":"")),e]};let S$1 = class S{constructor({strings:t,_$litType$:i},e){let r;this.parts=[];let l=0,a=0;const u=t.length-1,d=this.parts,[f,v]=N$1(t,i);if(this.el=S.createElement(f,e),P$1.currentNode=this.el.content,2===i||3===i){const t=this.el.content.firstChild;t.replaceWith(...t.childNodes);}for(;null!==(r=P$1.nextNode())&&d.length<u;){if(1===r.nodeType){if(r.hasAttributes())for(const t of r.getAttributeNames())if(t.endsWith(h$1)){const i=v[a++],s=r.getAttribute(t).split(o$4),e=/([.?@])?(.*)/.exec(i);d.push({type:1,index:l,name:e[2],strings:s,ctor:"."===e[1]?I$1:"?"===e[1]?L$1:"@"===e[1]?z$1:H$1}),r.removeAttribute(t);}else t.startsWith(o$4)&&(d.push({type:6,index:l}),r.removeAttribute(t));if(y$1.test(r.tagName)){const t=r.textContent.split(o$4),i=t.length-1;if(i>0){r.textContent=s$2?s$2.emptyScript:"";for(let s=0;s<i;s++)r.append(t[s],c$1()),P$1.nextNode(),d.push({type:2,index:++l});r.append(t[i],c$1());}}}else if(8===r.nodeType)if(r.data===n$3)d.push({type:2,index:l});else {let t=-1;for(;-1!==(t=r.data.indexOf(o$4,t+1));)d.push({type:7,index:l}),t+=o$4.length-1;}l++;}}static createElement(t,i){const s=l$1.createElement("template");return s.innerHTML=t,s}};function M$1(t,i,s=t,e){if(i===E$1)return i;let h=void 0!==e?s._$Co?.[e]:s._$Cl;const o=a$1(i)?void 0:i._$litDirective$;return h?.constructor!==o&&(h?._$AO?.(false),void 0===o?h=void 0:(h=new o(t),h._$AT(t,s,e)),void 0!==e?(s._$Co??=[])[e]=h:s._$Cl=h),void 0!==h&&(i=M$1(t,h._$AS(t,i.values),h,e)),i}let R$1 = class R{constructor(t,i){this._$AV=[],this._$AN=void 0,this._$AD=t,this._$AM=i;}get parentNode(){return this._$AM.parentNode}get _$AU(){return this._$AM._$AU}u(t){const{el:{content:i},parts:s}=this._$AD,e=(t?.creationScope??l$1).importNode(i,true);P$1.currentNode=e;let h=P$1.nextNode(),o=0,n=0,r=s[0];for(;void 0!==r;){if(o===r.index){let i;2===r.type?i=new k$1(h,h.nextSibling,this,t):1===r.type?i=new r.ctor(h,r.name,r.strings,this,t):6===r.type&&(i=new Z$1(h,this,t)),this._$AV.push(i),r=s[++n];}o!==r?.index&&(h=P$1.nextNode(),o++);}return P$1.currentNode=l$1,e}p(t){let i=0;for(const s of this._$AV) void 0!==s&&(void 0!==s.strings?(s._$AI(t,s,i),i+=s.strings.length-2):s._$AI(t[i])),i++;}};let k$1 = class k{get _$AU(){return this._$AM?._$AU??this._$Cv}constructor(t,i,s,e){this.type=2,this._$AH=A$1,this._$AN=void 0,this._$AA=t,this._$AB=i,this._$AM=s,this.options=e,this._$Cv=e?.isConnected??true;}get parentNode(){let t=this._$AA.parentNode;const i=this._$AM;return void 0!==i&&11===t?.nodeType&&(t=i.parentNode),t}get startNode(){return this._$AA}get endNode(){return this._$AB}_$AI(t,i=this){t=M$1(this,t,i),a$1(t)?t===A$1||null==t||""===t?(this._$AH!==A$1&&this._$AR(),this._$AH=A$1):t!==this._$AH&&t!==E$1&&this._(t):void 0!==t._$litType$?this.$(t):void 0!==t.nodeType?this.T(t):d$1(t)?this.k(t):this._(t);}O(t){return this._$AA.parentNode.insertBefore(t,this._$AB)}T(t){this._$AH!==t&&(this._$AR(),this._$AH=this.O(t));}_(t){this._$AH!==A$1&&a$1(this._$AH)?this._$AA.nextSibling.data=t:this.T(l$1.createTextNode(t)),this._$AH=t;}$(t){const{values:i,_$litType$:s}=t,e="number"==typeof s?this._$AC(t):(void 0===s.el&&(s.el=S$1.createElement(V$1(s.h,s.h[0]),this.options)),s);if(this._$AH?._$AD===e)this._$AH.p(i);else {const t=new R$1(e,this),s=t.u(this.options);t.p(i),this.T(s),this._$AH=t;}}_$AC(t){let i=C$1.get(t.strings);return void 0===i&&C$1.set(t.strings,i=new S$1(t)),i}k(t){u$1(this._$AH)||(this._$AH=[],this._$AR());const i=this._$AH;let s,e=0;for(const h of t)e===i.length?i.push(s=new k(this.O(c$1()),this.O(c$1()),this,this.options)):s=i[e],s._$AI(h),e++;e<i.length&&(this._$AR(s&&s._$AB.nextSibling,e),i.length=e);}_$AR(t=this._$AA.nextSibling,s){for(this._$AP?.(false,true,s);t!==this._$AB;){const s=i$4(t).nextSibling;i$4(t).remove(),t=s;}}setConnected(t){ void 0===this._$AM&&(this._$Cv=t,this._$AP?.(t));}};let H$1 = class H{get tagName(){return this.element.tagName}get _$AU(){return this._$AM._$AU}constructor(t,i,s,e,h){this.type=1,this._$AH=A$1,this._$AN=void 0,this.element=t,this.name=i,this._$AM=e,this.options=h,s.length>2||""!==s[0]||""!==s[1]?(this._$AH=Array(s.length-1).fill(new String),this.strings=s):this._$AH=A$1;}_$AI(t,i=this,s,e){const h=this.strings;let o=false;if(void 0===h)t=M$1(this,t,i,0),o=!a$1(t)||t!==this._$AH&&t!==E$1,o&&(this._$AH=t);else {const e=t;let n,r;for(t=h[0],n=0;n<h.length-1;n++)r=M$1(this,e[s+n],i,n),r===E$1&&(r=this._$AH[n]),o||=!a$1(r)||r!==this._$AH[n],r===A$1?t=A$1:t!==A$1&&(t+=(r??"")+h[n+1]),this._$AH[n]=r;}o&&!e&&this.j(t);}j(t){t===A$1?this.element.removeAttribute(this.name):this.element.setAttribute(this.name,t??"");}};let I$1 = class I extends H$1{constructor(){super(...arguments),this.type=3;}j(t){this.element[this.name]=t===A$1?void 0:t;}};let L$1 = class L extends H$1{constructor(){super(...arguments),this.type=4;}j(t){this.element.toggleAttribute(this.name,!!t&&t!==A$1);}};let z$1 = class z extends H$1{constructor(t,i,s,e,h){super(t,i,s,e,h),this.type=5;}_$AI(t,i=this){if((t=M$1(this,t,i,0)??A$1)===E$1)return;const s=this._$AH,e=t===A$1&&s!==A$1||t.capture!==s.capture||t.once!==s.once||t.passive!==s.passive,h=t!==A$1&&(s===A$1||e);e&&this.element.removeEventListener(this.name,this,s),h&&this.element.addEventListener(this.name,this,t),this._$AH=t;}handleEvent(t){"function"==typeof this._$AH?this._$AH.call(this.options?.host??this.element,t):this._$AH.handleEvent(t);}};let Z$1 = class Z{constructor(t,i,s){this.element=t,this.type=6,this._$AN=void 0,this._$AM=i,this.options=s;}get _$AU(){return this._$AM._$AU}_$AI(t){M$1(this,t);}};const B$1=t$3.litHtmlPolyfillSupport;B$1?.(S$1,k$1),(t$3.litHtmlVersions??=[]).push("3.3.3");
+ */const{is:i$4,defineProperty:e$2,getOwnPropertyDescriptor:h$1,getOwnPropertyNames:r$3,getOwnPropertySymbols:o$4,getPrototypeOf:n$3}=Object,a$1=globalThis,c$1=a$1.trustedTypes,l$1=c$1?c$1.emptyScript:"",p$1=a$1.reactiveElementPolyfillSupport,d$1=(t,s)=>t,u$1={toAttribute(t,s){switch(s){case Boolean:t=t?l$1:null;break;case Object:case Array:t=null==t?t:JSON.stringify(t);}return t},fromAttribute(t,s){let i=t;switch(s){case Boolean:i=null!==t;break;case Number:i=null===t?null:Number(t);break;case Object:case Array:try{i=JSON.parse(t);}catch(t){i=null;}}return i}},f$1=(t,s)=>!i$4(t,s),b$1={attribute:true,type:String,converter:u$1,reflect:false,useDefault:false,hasChanged:f$1};Symbol.metadata??=Symbol("metadata"),a$1.litPropertyMetadata??=new WeakMap;let y$1 = class y extends HTMLElement{static addInitializer(t){this._$Ei(),(this.l??=[]).push(t);}static get observedAttributes(){return this.finalize(),this._$Eh&&[...this._$Eh.keys()]}static createProperty(t,s=b$1){if(s.state&&(s.attribute=false),this._$Ei(),this.prototype.hasOwnProperty(t)&&((s=Object.create(s)).wrapped=true),this.elementProperties.set(t,s),!s.noAccessor){const i=Symbol(),h=this.getPropertyDescriptor(t,i,s);void 0!==h&&e$2(this.prototype,t,h);}}static getPropertyDescriptor(t,s,i){const{get:e,set:r}=h$1(this.prototype,t)??{get(){return this[s]},set(t){this[s]=t;}};return {get:e,set(s){const h=e?.call(this);r?.call(this,s),this.requestUpdate(t,h,i);},configurable:true,enumerable:true}}static getPropertyOptions(t){return this.elementProperties.get(t)??b$1}static _$Ei(){if(this.hasOwnProperty(d$1("elementProperties")))return;const t=n$3(this);t.finalize(),void 0!==t.l&&(this.l=[...t.l]),this.elementProperties=new Map(t.elementProperties);}static finalize(){if(this.hasOwnProperty(d$1("finalized")))return;if(this.finalized=true,this._$Ei(),this.hasOwnProperty(d$1("properties"))){const t=this.properties,s=[...r$3(t),...o$4(t)];for(const i of s)this.createProperty(i,t[i]);}const t=this[Symbol.metadata];if(null!==t){const s=litPropertyMetadata.get(t);if(void 0!==s)for(const[t,i]of s)this.elementProperties.set(t,i);}this._$Eh=new Map;for(const[t,s]of this.elementProperties){const i=this._$Eu(t,s);void 0!==i&&this._$Eh.set(i,t);}this.elementStyles=this.finalizeStyles(this.styles);}static finalizeStyles(s){const i=[];if(Array.isArray(s)){const e=new Set(s.flat(1/0).reverse());for(const s of e)i.unshift(c$2(s));}else void 0!==s&&i.push(c$2(s));return i}static _$Eu(t,s){const i=s.attribute;return  false===i?void 0:"string"==typeof i?i:"string"==typeof t?t.toLowerCase():void 0}constructor(){super(),this._$Ep=void 0,this.isUpdatePending=false,this.hasUpdated=false,this._$Em=null,this._$Ev();}_$Ev(){this._$ES=new Promise(t=>this.enableUpdating=t),this._$AL=new Map,this._$E_(),this.requestUpdate(),this.constructor.l?.forEach(t=>t(this));}addController(t){(this._$EO??=new Set).add(t),void 0!==this.renderRoot&&this.isConnected&&t.hostConnected?.();}removeController(t){this._$EO?.delete(t);}_$E_(){const t=new Map,s=this.constructor.elementProperties;for(const i of s.keys())this.hasOwnProperty(i)&&(t.set(i,this[i]),delete this[i]);t.size>0&&(this._$Ep=t);}createRenderRoot(){const t=this.shadowRoot??this.attachShadow(this.constructor.shadowRootOptions);return S$1(t,this.constructor.elementStyles),t}connectedCallback(){this.renderRoot??=this.createRenderRoot(),this.enableUpdating(true),this._$EO?.forEach(t=>t.hostConnected?.());}enableUpdating(t){}disconnectedCallback(){this._$EO?.forEach(t=>t.hostDisconnected?.());}attributeChangedCallback(t,s,i){this._$AK(t,i);}_$ET(t,s){const i=this.constructor.elementProperties.get(t),e=this.constructor._$Eu(t,i);if(void 0!==e&&true===i.reflect){const h=(void 0!==i.converter?.toAttribute?i.converter:u$1).toAttribute(s,i.type);this._$Em=t,null==h?this.removeAttribute(e):this.setAttribute(e,h),this._$Em=null;}}_$AK(t,s){const i=this.constructor,e=i._$Eh.get(t);if(void 0!==e&&this._$Em!==e){const t=i.getPropertyOptions(e),h="function"==typeof t.converter?{fromAttribute:t.converter}:void 0!==t.converter?.fromAttribute?t.converter:u$1;this._$Em=e;const r=h.fromAttribute(s,t.type);this[e]=r??this._$Ej?.get(e)??r,this._$Em=null;}}requestUpdate(t,s,i,e=false,h){if(void 0!==t){const r=this.constructor;if(false===e&&(h=this[t]),i??=r.getPropertyOptions(t),!((i.hasChanged??f$1)(h,s)||i.useDefault&&i.reflect&&h===this._$Ej?.get(t)&&!this.hasAttribute(r._$Eu(t,i))))return;this.C(t,s,i);} false===this.isUpdatePending&&(this._$ES=this._$EP());}C(t,s,{useDefault:i,reflect:e,wrapped:h},r){i&&!(this._$Ej??=new Map).has(t)&&(this._$Ej.set(t,r??s??this[t]),true!==h||void 0!==r)||(this._$AL.has(t)||(this.hasUpdated||i||(s=void 0),this._$AL.set(t,s)),true===e&&this._$Em!==t&&(this._$Eq??=new Set).add(t));}async _$EP(){this.isUpdatePending=true;try{await this._$ES;}catch(t){Promise.reject(t);}const t=this.scheduleUpdate();return null!=t&&await t,!this.isUpdatePending}scheduleUpdate(){return this.performUpdate()}performUpdate(){if(!this.isUpdatePending)return;if(!this.hasUpdated){if(this.renderRoot??=this.createRenderRoot(),this._$Ep){for(const[t,s]of this._$Ep)this[t]=s;this._$Ep=void 0;}const t=this.constructor.elementProperties;if(t.size>0)for(const[s,i]of t){const{wrapped:t}=i,e=this[s];true!==t||this._$AL.has(s)||void 0===e||this.C(s,void 0,i,e);}}let t=false;const s=this._$AL;try{t=this.shouldUpdate(s),t?(this.willUpdate(s),this._$EO?.forEach(t=>t.hostUpdate?.()),this.update(s)):this._$EM();}catch(s){throw t=false,this._$EM(),s}t&&this._$AE(s);}willUpdate(t){}_$AE(t){this._$EO?.forEach(t=>t.hostUpdated?.()),this.hasUpdated||(this.hasUpdated=true,this.firstUpdated(t)),this.updated(t);}_$EM(){this._$AL=new Map,this.isUpdatePending=false;}get updateComplete(){return this.getUpdateComplete()}getUpdateComplete(){return this._$ES}shouldUpdate(t){return  true}update(t){this._$Eq&&=this._$Eq.forEach(t=>this._$ET(t,this[t])),this._$EM();}updated(t){}firstUpdated(t){}};y$1.elementStyles=[],y$1.shadowRootOptions={mode:"open"},y$1[d$1("elementProperties")]=new Map,y$1[d$1("finalized")]=new Map,p$1?.({ReactiveElement:y$1}),(a$1.reactiveElementVersions??=[]).push("2.1.2");
 
 /**
  * @license
@@ -58,7 +51,7 @@ const t$2=globalThis,i$3=t=>t,s$1=t$2.trustedTypes,e$1=s$1?s$1.createPolicy("lit
  * @license
  * Copyright 2017 Google LLC
  * SPDX-License-Identifier: BSD-3-Clause
- */const s=globalThis;let i$2 = class i extends y$2{constructor(){super(...arguments),this.renderOptions={host:this},this._$Do=void 0;}createRenderRoot(){const t=super.createRenderRoot();return this.renderOptions.renderBefore??=t.firstChild,t}update(t){const r=this.render();this.hasUpdated||(this.renderOptions.isConnected=this.isConnected),super.update(t),this._$Do=D(r,this.renderRoot,this.renderOptions);}connectedCallback(){super.connectedCallback(),this._$Do?.setConnected(true);}disconnectedCallback(){super.disconnectedCallback(),this._$Do?.setConnected(false);}render(){return E}};i$2._$litElement$=true,i$2["finalized"]=true,s.litElementHydrateSupport?.({LitElement:i$2});const o$2=s.litElementPolyfillSupport;o$2?.({LitElement:i$2});(s.litElementVersions??=[]).push("4.2.2");
+ */const s=globalThis;let i$2 = class i extends y$1{constructor(){super(...arguments),this.renderOptions={host:this},this._$Do=void 0;}createRenderRoot(){const t=super.createRenderRoot();return this.renderOptions.renderBefore??=t.firstChild,t}update(t){const r=this.render();this.hasUpdated||(this.renderOptions.isConnected=this.isConnected),super.update(t),this._$Do=D(r,this.renderRoot,this.renderOptions);}connectedCallback(){super.connectedCallback(),this._$Do?.setConnected(true);}disconnectedCallback(){super.disconnectedCallback(),this._$Do?.setConnected(false);}render(){return E}};i$2._$litElement$=true,i$2["finalized"]=true,s.litElementHydrateSupport?.({LitElement:i$2});const o$2=s.litElementPolyfillSupport;o$2?.({LitElement:i$2});(s.litElementVersions??=[]).push("4.2.2");
 
 /**
  * @license
@@ -71,7 +64,7 @@ const t$1=t=>(e,o)=>{ void 0!==o?o.addInitializer(()=>{customElements.define(t,e
  * @license
  * Copyright 2017 Google LLC
  * SPDX-License-Identifier: BSD-3-Clause
- */const o$1={attribute:true,type:String,converter:u$2,reflect:false,hasChanged:f$2},r$1=(t=o$1,e,r)=>{const{kind:n,metadata:i}=r;let s=globalThis.litPropertyMetadata.get(i);if(void 0===s&&globalThis.litPropertyMetadata.set(i,s=new Map),"setter"===n&&((t=Object.create(t)).wrapped=true),s.set(r.name,t),"accessor"===n){const{name:o}=r;return {set(r){const n=e.get.call(this);e.set.call(this,r),this.requestUpdate(o,n,t,true,r);},init(e){return void 0!==e&&this.C(o,void 0,t,e),e}}}if("setter"===n){const{name:o}=r;return function(r){const n=this[o];e.call(this,r),this.requestUpdate(o,n,t,true,r);}}throw Error("Unsupported decorator location: "+n)};function n$1(t){return (e,o)=>"object"==typeof o?r$1(t,e,o):((t,e,o)=>{const r=e.hasOwnProperty(o);return e.constructor.createProperty(o,t),r?Object.getOwnPropertyDescriptor(e,o):void 0})(t,e,o)}
+ */const o$1={attribute:true,type:String,converter:u$1,reflect:false,hasChanged:f$1},r$1=(t=o$1,e,r)=>{const{kind:n,metadata:i}=r;let s=globalThis.litPropertyMetadata.get(i);if(void 0===s&&globalThis.litPropertyMetadata.set(i,s=new Map),"setter"===n&&((t=Object.create(t)).wrapped=true),s.set(r.name,t),"accessor"===n){const{name:o}=r;return {set(r){const n=e.get.call(this);e.set.call(this,r),this.requestUpdate(o,n,t,true,r);},init(e){return void 0!==e&&this.C(o,void 0,t,e),e}}}if("setter"===n){const{name:o}=r;return function(r){const n=this[o];e.call(this,r),this.requestUpdate(o,n,t,true,r);}}throw Error("Unsupported decorator location: "+n)};function n$1(t){return (e,o)=>"object"==typeof o?r$1(t,e,o):((t,e,o)=>{const r=e.hasOwnProperty(o);return e.constructor.createProperty(o,t),r?Object.getOwnPropertyDescriptor(e,o):void 0})(t,e,o)}
 
 /**
  * @license
@@ -90,11 +83,11 @@ const t={ATTRIBUTE:1},e=t=>(...e)=>({_$litDirective$:t,values:e});let i$1 = clas
  * @license
  * Copyright 2018 Google LLC
  * SPDX-License-Identifier: BSD-3-Clause
- */const n="important",i=" !"+n,o=e(class extends i$1{constructor(t$1){if(super(t$1),t$1.type!==t.ATTRIBUTE||"style"!==t$1.name||t$1.strings?.length>2)throw Error("The `styleMap` directive must be used in the `style` attribute and must be the only part in the attribute.")}render(t){return Object.keys(t).reduce((e,r)=>{const s=t[r];return null==s?e:e+`${r=r.includes("-")?r:r.replace(/(?:^(webkit|moz|ms|o)|)(?=[A-Z])/g,"-$&").toLowerCase()}:${s};`},"")}update(e,[r]){const{style:s}=e.element;if(void 0===this.ft)return this.ft=new Set(Object.keys(r)),this.render(r);for(const t of this.ft)null==r[t]&&(this.ft.delete(t),t.includes("-")?s.removeProperty(t):s[t]=null);for(const t in r){const e=r[t];if(null!=e){this.ft.add(t);const r="string"==typeof e&&e.endsWith(i);t.includes("-")||r?s.setProperty(t,r?e.slice(0,-11):e,r?n:""):s[t]=e;}}return E$1}});
+ */const n="important",i=" !"+n,o=e(class extends i$1{constructor(t$1){if(super(t$1),t$1.type!==t.ATTRIBUTE||"style"!==t$1.name||t$1.strings?.length>2)throw Error("The `styleMap` directive must be used in the `style` attribute and must be the only part in the attribute.")}render(t){return Object.keys(t).reduce((e,r)=>{const s=t[r];return null==s?e:e+`${r=r.includes("-")?r:r.replace(/(?:^(webkit|moz|ms|o)|)(?=[A-Z])/g,"-$&").toLowerCase()}:${s};`},"")}update(e,[r]){const{style:s}=e.element;if(void 0===this.ft)return this.ft=new Set(Object.keys(r)),this.render(r);for(const t of this.ft)null==r[t]&&(this.ft.delete(t),t.includes("-")?s.removeProperty(t):s[t]=null);for(const t in r){const e=r[t];if(null!=e){this.ft.add(t);const r="string"==typeof e&&e.endsWith(i);t.includes("-")||r?s.setProperty(t,r?e.slice(0,-11):e,r?n:""):s[t]=e;}}return E}});
 
 const CARD_NAME = "anyvac-card";
 const EDITOR_NAME = "anyvac-card-editor";
-const CARD_VERSION = "0.39.0";
+const CARD_VERSION = "0.40.0";
 /** Hold duration in ms required to trigger START / PAUSE actions */
 const HOLD_DURATION_MS = 600;
 /**
@@ -205,34 +198,7 @@ const CLEANING_STATES = new Set([
  * 1.0 wide and 1/AR tall (AR = wrap width/height). Map pixels are normalised by the
  * rendered map width NW, so the fitted scale is directly the CSS `width` fraction.
  */
-// ── Small linear algebra (shared with the card's click inversion) ────────────
-/** Solve a 3x3 linear system by Cramer's rule. */
-function solve3(m, r) {
-    const d = (a) => a[0][0] * (a[1][1] * a[2][2] - a[1][2] * a[2][1]) -
-        a[0][1] * (a[1][0] * a[2][2] - a[1][2] * a[2][0]) +
-        a[0][2] * (a[1][0] * a[2][1] - a[1][1] * a[2][0]);
-    const D = d(m);
-    if (Math.abs(D) < 1e-9)
-        return null;
-    const col = (i) => m.map((row, ri) => row.map((v, ci) => (ci === i ? r[ri] : v)));
-    return [d(col(0)) / D, d(col(1)) / D, d(col(2)) / D];
-}
-/** Affine vacuum-mm → rendered-map-px from the parser's calibration points. */
-function affineFromCalibration(cal) {
-    if (!Array.isArray(cal) || cal.length < 3)
-        return null;
-    try {
-        const M = cal.slice(0, 3).map((p) => [p.vacuum.x, p.vacuum.y, 1]);
-        const abc = solve3(M, cal.slice(0, 3).map((p) => p.map.x));
-        const def = solve3(M, cal.slice(0, 3).map((p) => p.map.y));
-        if (!abc || !def)
-            return null;
-        return { a: abc[0], b: abc[1], c: abc[2], d: def[0], e: def[1], f: def[2] };
-    }
-    catch {
-        return null;
-    }
-}
+// ── Geometry helpers (kontrakt v2: the integration publishes px, no mm here) ──
 /** Rendered map pixel dimensions (rotation-aware) from the sensor's image_dims. */
 function mapPxDims(dims) {
     if (!dims)
@@ -250,36 +216,33 @@ function mapPxDims(dims) {
 }
 /**
  * Build fit anchors by pairing the card's floorplan rooms with the integration
- * sensor's room bboxes (attributes: calibration_points, image_dims, rooms[]).
+ * sensor's room bboxes. Kontrakt v2: bboxes come pre-transformed in rendered-map
+ * pixels (`rooms[].bbox_px`, integration ≥ 0.18) — the card does no mm math.
  */
 function assembleAnchors(cardRooms, at, ar) {
     if (!at)
         return [];
-    const t = affineFromCalibration(at.calibration_points);
     const dims = mapPxDims(at.image_dims);
     const intRooms = Array.isArray(at.rooms) ? at.rooms : [];
-    if (!t || !dims || !intRooms.length)
+    if (!dims || !intRooms.length)
         return [];
     const { NW, NH } = dims;
-    const toPx = (x, y) => ({ x: t.a * x + t.b * y + t.c, y: t.d * x + t.e * y + t.f });
     const out = [];
     for (const cr of cardRooms) {
         if (cr.map_x == null || cr.map_y == null)
             continue;
         const ir = intRooms.find((r) => r.name === cr.key) ?? intRooms.find((r) => r.name === cr.name);
-        if (!ir || [ir.x0, ir.y0, ir.x1, ir.y1].some((v) => v == null))
+        const bp = ir?.bbox_px;
+        if (!bp || [bp.x0, bp.y0, bp.x1, bp.y1].some((v) => v == null))
             continue;
-        // Room bbox mm → px: transform all 4 corners (the affine may rotate) and take spread.
-        const corners = [toPx(ir.x0, ir.y0), toPx(ir.x1, ir.y1), toPx(ir.x0, ir.y1), toPx(ir.x1, ir.y0)];
-        const xs = corners.map((p) => p.x), ys = corners.map((p) => p.y);
-        const cxPx = (Math.min(...xs) + Math.max(...xs)) / 2;
-        const cyPx = (Math.min(...ys) + Math.max(...ys)) / 2;
+        const cxPx = (bp.x0 + bp.x1) / 2;
+        const cyPx = (bp.y0 + bp.y1) / 2;
         const anchor = {
             q: { x: (cxPx - NW / 2) / NW, y: (cyPx - NH / 2) / NW },
             a: { x: cr.map_x / 100, y: cr.map_y / 100 / ar },
         };
         if (cr.map_w != null && cr.map_h != null && cr.map_w > 0 && cr.map_h > 0) {
-            anchor.sizeQ = { w: (Math.max(...xs) - Math.min(...xs)) / NW, h: (Math.max(...ys) - Math.min(...ys)) / NW };
+            anchor.sizeQ = { w: (bp.x1 - bp.x0) / NW, h: (bp.y1 - bp.y0) / NW };
             anchor.sizeA = { w: cr.map_w / 100, h: cr.map_h / 100 / ar };
         }
         out.push(anchor);
@@ -385,21 +348,19 @@ function computeSeatFit(anchors, ar) {
 }
 // ── Forward transform (room import) ──────────────────────────────────────────
 /**
- * Transform an integration room bbox (mm) into floorplan rectangle percentages,
- * given a seat (auto-fitted or manual) — used by the editor's room import.
+ * Transform an integration room bbox (rendered-map px, `bbox_px`) into floorplan
+ * rectangle percentages, given a seat (auto-fitted or manual) — used by the
+ * editor's room import.
  */
 function roomBboxToRect(ir, at, seat, ar) {
-    const t = affineFromCalibration(at?.calibration_points);
     const dims = mapPxDims(at?.image_dims);
-    if (!t || !dims || [ir?.x0, ir?.y0, ir?.x1, ir?.y1].some((v) => v == null))
+    const bp = ir?.bbox_px;
+    if (!dims || !bp || [bp.x0, bp.y0, bp.x1, bp.y1].some((v) => v == null))
         return null;
     const { NW, NH } = dims;
-    const toPx = (x, y) => ({ x: t.a * x + t.b * y + t.c, y: t.d * x + t.e * y + t.f });
-    const corners = [toPx(ir.x0, ir.y0), toPx(ir.x1, ir.y1), toPx(ir.x0, ir.y1), toPx(ir.x1, ir.y0)];
-    const xs = corners.map((p) => p.x), ys = corners.map((p) => p.y);
-    const q = { x: ((Math.min(...xs) + Math.max(...xs)) / 2 - NW / 2) / NW, y: ((Math.min(...ys) + Math.max(...ys)) / 2 - NH / 2) / NW };
-    let w = (Math.max(...xs) - Math.min(...xs)) / NW;
-    let h = (Math.max(...ys) - Math.min(...ys)) / NW;
+    const q = { x: ((bp.x0 + bp.x1) / 2 - NW / 2) / NW, y: ((bp.y0 + bp.y1) / 2 - NH / 2) / NW };
+    let w = (bp.x1 - bp.x0) / NW;
+    let h = (bp.y1 - bp.y0) / NW;
     const s = seat.scale / 100;
     const theta = seat.rotation * RAD;
     const cos = Math.cos(theta), sin = Math.sin(theta);
@@ -464,10 +425,17 @@ let AnyVacCard = class AnyVacCard extends i$2 {
         this._initialized = false;
         /** Entities whose state changes should trigger a re-render */
         this._watched = null;
+        /** Integration sensor for a vacuum: explicit config, else auto-resolved from the
+         *  entity registry — the AnyVac map sensor sits on the SAME device as the vacuum
+         *  entity (platform "anyvac"), so no manual plumbing is needed (docs/14 Fáze 3). */
+        this._intCache = new Map();
         this._autoCache = new Map();
         this._holdEnd = () => {
             this._cancelHold();
         };
+        /** Backend plan preview (anyvac.plan, response-only): room key -> vacuum entity. */
+        this._planPreview = null;
+        this._planFetchKey = "";
         /** Learn the floorplan's aspect ratio once it loads, for the rotation maths. */
         this._onFloorplanLoad = (e) => {
             const img = e.target;
@@ -604,7 +572,7 @@ let AnyVacCard = class AnyVacCard extends i$2 {
         for (const vac of this._config?.vacuums ?? []) {
             for (const id of [vac.entity, vac.status_entity, vac.battery_entity,
                 vac.last_clean_entity, vac.progress_entity, vac.current_room_entity,
-                vac.error_entity, vac.map?.entity, vac.integration_entity,
+                vac.error_entity, vac.map?.entity, this._intEntity(vac),
                 ...Object.values(this._autoEntities(vac))]) {
                 if (id)
                     s.add(id);
@@ -633,6 +601,42 @@ let AnyVacCard = class AnyVacCard extends i$2 {
     }
     _colorKey(vac) {
         return vac.color ?? "green";
+    }
+    _intEntity(vac) {
+        if (vac.integration_entity)
+            return vac.integration_entity;
+        const reg = this.hass?.entities;
+        if (!reg || !vac.entity)
+            return undefined;
+        if (this._intCache.has(vac.entity))
+            return this._intCache.get(vac.entity);
+        const dev = reg[vac.entity]?.device_id;
+        const found = dev
+            ? Object.keys(reg).find((id) => reg[id]?.device_id === dev && reg[id]?.platform === "anyvac" && id.startsWith("sensor."))
+            : undefined;
+        this._intCache.set(vac.entity, found);
+        return found;
+    }
+    /** Kontrakt v2 gate: attributes of the vacuum's integration sensor, only when the
+     *  integration speaks schema_version ≥ 2. Older backends → smart features off. */
+    _intAttrs(vac) {
+        const ent = this._intEntity(vac);
+        const at = ent ? this.hass.states[ent]?.attributes : undefined;
+        if (!at)
+            return undefined;
+        return (at.schema_version ?? 0) >= 2 ? at : undefined;
+    }
+    /** Human-readable warning when an integration sensor exists but speaks an old schema. */
+    _schemaWarning() {
+        for (const v of this._config?.vacuums ?? []) {
+            const ent = this._intEntity(v);
+            const at = ent ? this.hass.states[ent]?.attributes : undefined;
+            if (at && (at.schema_version ?? 0) < 2) {
+                return `AnyVac integration is too old for this card (schema ${at.schema_version ?? 1} < 2). ` +
+                    "Update the anyvac integration to ≥ 0.18.0.";
+            }
+        }
+        return null;
     }
     /** Resolve a vacuum's sibling entities (battery/status/last-clean/progress/room/error) from its
      *  device, so the user does not have to fill them in. Matched by translation_key / device_class. */
@@ -705,7 +709,7 @@ let AnyVacCard = class AnyVacCard extends i$2 {
     /** First integration sensor that exposes the shared (backend) selection. */
     _selSensor() {
         for (const v of this._config.vacuums) {
-            const ent = v.integration_entity;
+            const ent = this._intEntity(v);
             if (ent && Array.isArray(this.hass.states[ent]?.attributes?.selected_rooms))
                 return ent;
         }
@@ -761,10 +765,7 @@ let AnyVacCard = class AnyVacCard extends i$2 {
             return wet ? "wet" : "dry";
         }
         // 2) Live backend signal (follows the actual water mode).
-        const ent = vac.integration_entity;
-        const ct = ent
-            ? this.hass.states[ent]?.attributes?.clean_type
-            : undefined;
+        const ct = this._intAttrs(vac)?.clean_type;
         if (ct === "wet" || ct === "dry")
             return ct;
         // 3) Fallback: the vacuum's configured role (wet-only robots default to wet).
@@ -774,10 +775,7 @@ let AnyVacCard = class AnyVacCard extends i$2 {
     /** Self-calibrated clean-time estimate learned by the backend integration,
      *  per room name + type (dry/wet). Null when no integration / no learned value. */
     _backendEstimate(vac, room, kind) {
-        const ent = vac.integration_entity;
-        if (!ent)
-            return null;
-        const re = this.hass.states[ent]?.attributes?.rooms_estimate;
+        const re = this._intAttrs(vac)?.rooms_estimate;
         if (!re)
             return null;
         const rec = re[room.name ?? ""] ?? re[room.key];
@@ -817,10 +815,7 @@ let AnyVacCard = class AnyVacCard extends i$2 {
         }, 0);
     }
     _intRoomRec(vac, room) {
-        const ent = vac.integration_entity;
-        if (!ent)
-            return null;
-        const rlc = this.hass.states[ent]?.attributes?.rooms_last_cleaned;
+        const rlc = this._intAttrs(vac)?.rooms_last_cleaned;
         if (!rlc)
             return null;
         return (rlc[room.key] ?? rlc[room.name ?? ""] ?? null);
@@ -895,10 +890,7 @@ let AnyVacCard = class AnyVacCard extends i$2 {
     }
     /** Debug: per-room cleaning progress from the integration (rooms_progress). */
     _roomProgress(vac, room) {
-        const ent = vac.integration_entity;
-        if (!ent)
-            return null;
-        const rp = this.hass.states[ent]?.attributes?.rooms_progress;
+        const rp = this._intAttrs(vac)?.rooms_progress;
         if (!rp)
             return null;
         return (rp[room.key] ?? rp[room.name ?? ""] ?? null);
@@ -1204,180 +1196,90 @@ let AnyVacCard = class AnyVacCard extends i$2 {
         const shown = this._config.vacuums.filter((_, i) => this._shownSet.has(i));
         return shown.length ? shown : this._config.vacuums;
     }
-    /** duid of a vacuum (from its integration sensor) — used to gate wet tasks. */
-    _duidOf(vac) {
-        const ent = vac.integration_entity;
-        return ent ? this.hass.states[ent]?.attributes?.duid : undefined;
-    }
-    /** Room name a vacuum reports for a key (must match anyvac_room_done's room). */
-    _intRoomName(vac, key) {
-        return this._roomsFor(vac).find((r) => r.key === key)?.name ?? key;
-    }
-    /** Largest per-room estimate across vacuums (for LPT ordering). */
-    _roomEstMax(key) {
-        let m = 0;
+    // ── Clean intent → backend planner (kontrakt v2, docs/14 §3.7) ─────────────
+    /** Per-kind vacuum restriction for anyvac.clean/plan, from the configured roles —
+     *  preserves the user's dry/wet split even when a robot is both-capable. */
+    _v2Vacuums() {
+        const dry = [], wet = [];
         for (const v of this._config.vacuums) {
-            const r = this._roomsFor(v).find((x) => x.key === key);
-            if (r)
-                m = Math.max(m, this._roomCleanMins(r, v));
+            const role = this._vacCleanType(v);
+            if (role.dry)
+                dry.push(v.entity);
+            if (role.wet)
+                wet.push(v.entity);
         }
-        return m;
+        return { dry, wet };
     }
-    /** Distribute rooms across the capable owners to balance estimated time (LPT greedy:
-     *  biggest room first → least-loaded capable owner), so the work is actually split
-     *  between robots instead of dumped on the first owner. */
-    _assignByCap(roomKeys, cap, vacuums = this._config.vacuums) {
-        const out = new Map();
-        const load = new Map();
-        const sorted = [...roomKeys].sort((a, b) => this._roomEstMax(b) - this._roomEstMax(a));
-        for (const key of sorted) {
-            const owners = vacuums.filter((v) => cap(v) && this._roomCleanableBy(v, key));
-            if (!owners.length)
-                continue;
-            let best = owners[0];
-            for (const v of owners)
-                if ((load.get(v.entity) ?? 0) < (load.get(best.entity) ?? 0))
-                    best = v;
-            const arr = out.get(best.entity) ?? [];
-            arr.push(key);
-            out.set(best.entity, arr);
-            const r = this._roomsFor(best).find((x) => x.key === key);
-            // min weight 1 per room: with no estimates configured, this still round-robins
-            // the rooms across robots instead of collapsing onto the first owner.
-            load.set(best.entity, (load.get(best.entity) ?? 0) + Math.max(r ? this._roomCleanMins(r, best) : 0, 1));
-        }
-        return out;
-    }
-    _segmentFor(vac, key) {
-        const r = this._roomsFor(vac).find((x) => x.key === key);
-        if (r?.segment_id != null)
-            return r.segment_id;
-        const ent = vac.integration_entity;
-        const rooms = ent ? this.hass.states[ent]?.attributes?.rooms : undefined;
-        // The integration names rooms by the Roborock app name (== the card room KEY); match
-        // by key first, then the display name as a fallback, then a numeric segment key.
-        const match = rooms?.find((ir) => ir.name === key || ir.name === r?.name || String(ir.segment_id) === key);
-        return match?.segment_id ?? null;
-    }
-    /** Whether this vacuum can actually clean a room — its map contains it. In merged mode
-     *  every vacuum nominally "has" all card rooms, but a robot on a different map (or a
-     *  different home) can't, so orchestration must not assign it that room. */
-    _roomCleanableBy(vac, key) {
-        const t = vac.clean_action?.type;
-        if (t === "native" || t === "native-auto")
-            return this._segmentFor(vac, key) != null;
-        if (t === "native-area") {
-            const ent = vac.integration_entity;
-            const name = this._roomsFor(vac).find((x) => x.key === key)?.name ?? key;
-            const rooms = ent ? this.hass.states[ent]?.attributes?.rooms : undefined;
-            if (rooms)
-                return rooms.some((ir) => ir.name === key || ir.name === name);
-            return this._roomsFor(vac).some((x) => x.key === key); // best-effort when no sensor
-        }
-        return false;
-    }
-    /** Build the clean service call for a vacuum + rooms, mirroring _startClean's strategy. */
-    _cleanCmdFor(vac, roomKeys, repeat = 1) {
-        const ca = vac.clean_action;
-        if (!ca)
-            return null;
-        const rep = Math.max(1, Math.round(repeat));
-        if (ca.type === "native-area") {
-            return { service: "vacuum.clean_area", service_data: {
-                    entity_id: vac.entity,
-                    cleaning_area_id: roomKeys.map((k) => {
-                        const r = this._roomsFor(vac).find((x) => x.key === k);
-                        return r?.area_id ?? this._config.area_mappings?.[k] ?? k;
-                    }),
-                } };
-        }
-        if (ca.type === "native" || ca.type === "native-auto") {
-            const segs = roomKeys.map((k) => this._segmentFor(vac, k)).filter((s) => s != null);
-            if (!segs.length)
-                return null;
-            return { service: "vacuum.send_command", service_data: {
-                    entity_id: vac.entity, command: "app_segment_clean",
-                    params: [{ segments: segs, repeat: rep }],
-                } };
-        }
-        return null; // script strategy is not orchestrated in v1
-    }
-    /** Pre-clean settings (mop selects + fan speed) for a kind, from the matching preset. */
-    _settingsForKind(vac, kind) {
-        const presets = this._settingPresets(vac);
+    /** Per-kind settings for anyvac.clean, from the first capable vacuum's matching
+     *  preset (fan speed / mop mode / mop intensity / repeat). */
+    _v2Settings() {
         const isWet = (p) => (p.mop_intensity != null && p.mop_intensity !== "" && p.mop_intensity !== "off") || !!p.mop_mode;
-        const pick = presets.find((p) => (kind === "wet" ? isWet(p) : !isWet(p))) ?? presets[0];
-        const ca = vac.clean_action;
-        const selects = [];
-        // A dry pass forces the mop off regardless of the preset, so a dry-typed vacuum
-        // always cleans dry even when its only preset happens to be a wet one.
-        if (kind === "wet" && ca?.mop_mode_entity && pick.mop_mode) {
-            selects.push({ entity_id: ca.mop_mode_entity, option: pick.mop_mode });
+        const out = {};
+        for (const kind of ["dry", "wet"]) {
+            for (const v of this._config.vacuums) {
+                const role = this._vacCleanType(v);
+                if (!(kind === "dry" ? role.dry : role.wet))
+                    continue;
+                const presets = this._settingPresets(v);
+                const pick = presets.find((p) => (kind === "wet" ? isWet(p) : !isWet(p))) ?? presets[0];
+                if (!pick)
+                    continue;
+                const s = {};
+                if (pick.suction_level)
+                    s.fan_speed = pick.suction_level;
+                if (kind === "wet" && pick.mop_mode)
+                    s.mop_mode = pick.mop_mode;
+                if (kind === "wet" && pick.mop_intensity)
+                    s.mop_intensity = pick.mop_intensity;
+                if (pick.repeat && pick.repeat > 1)
+                    s.repeat = pick.repeat;
+                if (Object.keys(s).length) {
+                    out[kind] = s;
+                    break;
+                }
+            }
         }
-        if (ca?.mop_intensity_entity) {
-            const opt = kind === "dry" ? "off" : pick.mop_intensity;
-            if (opt)
-                selects.push({ entity_id: ca.mop_intensity_entity, option: opt });
-        }
-        const ca2 = vac.clean_action;
-        return { selects, fan_speed: pick.suction_level, repeat: pick.repeat ?? ca2?.repeat ?? 1 };
+        return Object.keys(out).length ? out : undefined;
     }
-    /** Build a job (capability-aware assignment + dry→wet gating) and hand it to the
-     *  backend anyvac.run_job service, which executes it server-side. */
+    _fetchPlan(selKeys, mode) {
+        const key = JSON.stringify([selKeys, mode, this._v2Vacuums()]);
+        if (key === this._planFetchKey)
+            return;
+        this._planFetchKey = key;
+        void (async () => {
+            try {
+                const res = await this.hass.callService("anyvac", "plan", { rooms: selKeys, mode, vacuums: this._v2Vacuums() }, undefined, false, true);
+                if (this._planFetchKey !== key)
+                    return; // stale response
+                const plan = res?.response?.plan ?? {};
+                const inv = (m) => {
+                    const out = new Map();
+                    for (const [ent, rooms] of Object.entries(m ?? {}))
+                        for (const r of rooms)
+                            out.set(r, ent);
+                    return out;
+                };
+                this._planPreview = { key, dry: inv(plan.dry), wet: inv(plan.wet) };
+            }
+            catch (err) {
+                console.warn("[anyvac-card] anyvac.plan preview failed:", err);
+                if (this._planFetchKey === key)
+                    this._planPreview = { key, dry: new Map(), wet: new Map() };
+            }
+        })();
+    }
+    /** Send the clean intent — planning (capability, LPT assignment, segment resolve,
+     *  dry→wet gating, repeat) is entirely backend-side now (anyvac.clean, docs/14
+     *  §3.7). The old client-side plan builder + run_job assembly was deleted. */
     async _runOrchestrated(roomKeys, mode) {
         if (!roomKeys.length)
             return;
-        const tasks = [];
-        const roomToDryDuid = new Map();
-        // Orchestration spans ALL configured vacuums (not just the shown tab) — every
-        // capable robot should take part in a whole-home clean.
-        const dryAssign = mode !== "wet"
-            ? this._assignByCap(roomKeys, (v) => this._vacCleanType(v).dry, this._config.vacuums)
-            : new Map();
-        let i = 0;
-        for (const [entity, keys] of dryAssign) {
-            const vac = this._config.vacuums.find((v) => v.entity === entity);
-            if (!vac)
-                continue;
-            const s = this._settingsForKind(vac, "dry");
-            const cmd = this._cleanCmdFor(vac, keys, s.repeat);
-            if (!cmd)
-                continue;
-            tasks.push({ id: "dry" + i++, vacuum: entity, selects: s.selects, fan_speed: s.fan_speed, service: cmd.service, service_data: cmd.service_data });
-            const duid = this._duidOf(vac);
-            for (const k of keys)
-                roomToDryDuid.set(k, duid);
-        }
-        if (mode === "wet" || mode === "both") {
-            let j = 0;
-            for (const [entity, keys] of this._assignByCap(roomKeys, (v) => this._vacCleanType(v).wet, this._config.vacuums)) {
-                const vac = this._config.vacuums.find((v) => v.entity === entity);
-                if (!vac)
-                    continue;
-                const s = this._settingsForKind(vac, "wet");
-                const cmd = this._cleanCmdFor(vac, keys, s.repeat);
-                if (!cmd)
-                    continue;
-                // Gate on the dry vacuum finishing each room. The room in anyvac_room_done is the
-                // integration's room name (= the card room KEY, kept identical to the Roborock app
-                // name), NOT the display name — so gate by key, else the wet pass never releases.
-                const after = mode === "both"
-                    ? keys.map((k) => { const duid = roomToDryDuid.get(k); return duid ? { duid, room: k } : null; })
-                        .filter((a) => a != null)
-                    : [];
-                // A both-capable robot does its dry pass first; its wet pass must wait for its
-                // OWN dry session to finish — it can't clean wet while still cleaning dry.
-                if (mode === "both" && dryAssign.has(entity)) {
-                    const selfDuid = this._duidOf(vac);
-                    if (selfDuid)
-                        after.push({ duid: selfDuid });
-                }
-                tasks.push({ id: "wet" + j++, vacuum: entity, selects: s.selects, fan_speed: s.fan_speed, service: cmd.service, service_data: cmd.service_data, after });
-            }
-        }
-        if (!tasks.length)
-            return;
-        await this._call("anyvac", "run_job", { tasks });
+        await this._call("anyvac", "clean", {
+            rooms: roomKeys,
+            mode,
+            vacuums: this._v2Vacuums(),
+            ...(this._v2Settings() ? { settings: this._v2Settings() } : {}),
+        });
     }
     /** Select a global preset (does NOT run): set the plan mode + apply its room scope,
      *  so the plan preview reflects it. The user runs it via the plan's "Spustit". */
@@ -1425,16 +1327,12 @@ let AnyVacCard = class AnyVacCard extends i$2 {
         const apLabel = (this._config.global_presets ?? []).find((g) => g.id === this._activeGlobalPreset)?.label;
         const showDry = mode === "dry" || mode === "both";
         const showWet = mode === "wet" || mode === "both";
-        const vacs = this._config.vacuums; // plan across all robots, not just the shown tab
-        const invert = (m) => {
-            const out = new Map();
-            for (const [e, ks] of m)
-                for (const k of ks)
-                    out.set(k, e);
-            return out;
-        };
-        const dryOf = invert(this._assignByCap(selKeys, (v) => this._vacCleanType(v).dry, vacs));
-        const wetOf = invert(this._assignByCap(selKeys, (v) => this._vacCleanType(v).wet, vacs));
+        // The preview is the BACKEND's real assignment (anyvac.plan, response-only) —
+        // the card no longer computes plans locally (docs/14 §3.7). Debounced by key;
+        // until the response lands the cells show "—".
+        this._fetchPlan(selKeys, mode);
+        const dryOf = this._planPreview?.dry ?? new Map();
+        const wetOf = this._planPreview?.wet ?? new Map();
         const roomDef = (k) => {
             for (const v of this._config.vacuums) {
                 const r = this._roomsFor(v).find((x) => x.key === k);
@@ -1573,12 +1471,37 @@ let AnyVacCard = class AnyVacCard extends i$2 {
     `;
     }
     async _startClean(vac) {
-        if (!vac.clean_action)
-            return;
         const selected = (this._roomsFor(vac)).filter((r) => this._isRoomSelected(r, vac));
         if (selected.length === 0)
             return;
-        // Script strategy -- no in-flight tracking
+        // ── Kontrakt v2: with the integration present, the START button sends an
+        // INTENT restricted to THIS vacuum — segment resolve, settings application and
+        // session tracking are backend-side (anyvac.clean, docs/14 §3.7). No in-flight
+        // tracking, events or notifications here (docs/14 §3.1, §3.10).
+        if (this._intAttrs(vac)) {
+            const ap = this._activePreset(vac);
+            const mode = this._liveCleanType(vac);
+            const s = {};
+            if (ap.suction_level)
+                s.fan_speed = ap.suction_level;
+            if (mode === "wet" && ap.mop_mode)
+                s.mop_mode = ap.mop_mode;
+            if (mode === "wet" && ap.mop_intensity)
+                s.mop_intensity = ap.mop_intensity;
+            if (ap.repeat && ap.repeat > 1)
+                s.repeat = ap.repeat;
+            await this._call("anyvac", "clean", {
+                rooms: selected.map((r) => r.key),
+                mode,
+                vacuums: [vac.entity],
+                ...(Object.keys(s).length ? { settings: { [mode]: s } } : {}),
+            });
+            return;
+        }
+        // ── Degraded mode (no integration, docs/14 §8): dumb direct commands. ──
+        if (!vac.clean_action)
+            return;
+        // Script strategy
         if (vac.clean_action.type === "script") {
             const action = vac.clean_action;
             const variables = {};
@@ -1610,83 +1533,32 @@ let AnyVacCard = class AnyVacCard extends i$2 {
             await this._call("vacuum", "set_fan_speed", { entity_id: vac.entity, fan_speed: apSuction });
         }
         if (vac.clean_action.type === "native-area") {
-            // Uses HA vacuum.clean_area — area_id resolved via area_mappings.
-            // NOTE: software repeat was removed (docs/13 A1 — restarting on a "docked"
-            // transition fired during mid-clean mop washes); repeat returns server-side
-            // with the anyvac.clean service (docs/14 §3.8).
+            // Uses HA vacuum.clean_area — area_id resolved via area_mappings. No repeat
+            // (docs/13 A1); repeat lives server-side in anyvac.clean (docs/14 §3.8).
             try {
                 await this.hass.callService("vacuum", "clean_area", { cleaning_area_id: selected.map((r) => r.area_id ?? this._config.area_mappings?.[r.key] ?? r.key) }, { entity_id: vac.entity });
             }
             catch (err) {
                 console.error("[anyvac-card] vacuum.clean_area failed:", err);
-                return;
             }
-        }
-        else if (vac.clean_action.type === "native-auto") {
-            // Dynamically resolve segment IDs from roborock.get_maps, then send_command
-            const autoAction = vac.clean_action;
-            let autoSegments = [];
-            try {
-                const mapResult = await this.hass.callService("roborock", "get_maps", {}, { entity_id: vac.entity }, false, true);
-                const maps = mapResult?.response?.[vac.entity]?.maps;
-                const roomsMap = {};
-                if (maps) {
-                    for (const m of maps) {
-                        if (m.rooms && Object.keys(m.rooms).length > 0) {
-                            Object.assign(roomsMap, m.rooms);
-                            break;
-                        }
-                    }
-                }
-                const slugify = (s) => s.toLowerCase().replace(/\s+/g, "_").replace(/[^a-z0-9_]/g, "");
-                const slugMap = {};
-                for (const [sid, name] of Object.entries(roomsMap))
-                    slugMap[slugify(name)] = Number(sid);
-                for (const room of selected) {
-                    // Match against the Roborock room NAME: the room key (our convention = Roborock name)
-                    // first, then the display name, then any explicit area mapping as a fallback.
-                    const sid = slugMap[slugify(room.key)] ??
-                        slugMap[slugify(room.name ?? "")] ??
-                        slugMap[String(room.area_id ?? this._config.area_mappings?.[room.key] ?? "")];
-                    if (sid !== undefined) {
-                        autoSegments.push(sid);
-                    }
-                    else if (room.segment_id !== undefined) {
-                        autoSegments.push(room.segment_id); // fallback to manual segment_id
-                    }
-                    else {
-                        console.warn("[anyvac-card] no segment for", room.key);
-                    }
-                }
-            }
-            catch (err) {
-                console.error("[anyvac-card] get_maps failed:", err);
-                autoSegments = selected.map(r => r.segment_id).filter((id) => id !== undefined);
-            }
-            if (autoSegments.length === 0) {
-                console.error("[anyvac-card] native-auto: no segments resolved, aborting");
-                return;
-            }
-            await this._call("vacuum", "send_command", {
-                entity_id: vac.entity,
-                command: "app_segment_clean",
-                params: [{ segments: autoSegments, repeat: autoAction.repeat ?? 1 }],
-            });
         }
         else {
-            // type === "native" — segment IDs from room config
+            // "native" / "native-auto" — segment IDs from the room config. The old
+            // native-auto dynamic resolve (roborock.get_maps) was DELETED with the plan
+            // builder (docs/14 §3.7): with an integration the backend resolves segments,
+            // without one the card only knows its configured segment_ids.
             const action = vac.clean_action;
             const segments = selected.map((r) => r.segment_id).filter((id) => id !== undefined);
+            if (!segments.length) {
+                console.error("[anyvac-card] no configured segment_ids for the selection; aborting");
+                return;
+            }
             await this._call("vacuum", "send_command", {
                 entity_id: vac.entity,
                 command: "app_segment_clean",
                 params: [{ segments, repeat: action.repeat ?? 1 }],
             });
         }
-        // No in-flight tracking, events or notifications here (docs/14 §3.1, §3.10):
-        // the integration tracks the session (`in_cleaning`, mop-wash aware), fires
-        // anyvac_clean_started/finished/room_done, stamps history and clears the
-        // shared room selection when the clean finishes.
     }
     // ── Render: badges ──────────────────────────────────────────────────────
     _renderBadge(vac, index) {
@@ -1777,29 +1649,11 @@ let AnyVacCard = class AnyVacCard extends i$2 {
     `;
     }
     // ── Render: map ─────────────────────────────────────────────────────────
-    // ── Pin & go / zone (integration-only; docs/14 §3.6) ─────────────────────────
-    // The manual 3-point calibration (Milestone 2, localStorage) was removed: it assumed
-    // the dock sits at map origin, trusted commanded goto targets over the robot's real
-    // position, and duplicated maths the integration provides for free. Map commands now
-    // require the integration's calibration_points.
-    _affine(pts) {
-        if (pts.length < 3)
-            return null;
-        const M = pts.slice(0, 3).map((p) => [p.map.x, p.map.y, 1]);
-        const ab = solve3(M, pts.slice(0, 3).map((p) => p.vacuum.x));
-        const cd = solve3(M, pts.slice(0, 3).map((p) => p.vacuum.y));
-        if (!ab || !cd)
-            return null;
-        return { a: ab[0], b: ab[1], e: ab[2], c: cd[0], d: cd[1], f: cd[2] };
-    }
-    async _gotoMm(entity, mm) {
-        try {
-            await this.hass.callService("vacuum", "send_command", { entity_id: entity, command: "app_goto_target", params: [Math.round(mm.x), Math.round(mm.y)] });
-        }
-        catch (e) {
-            console.error("[anyvac-card] goto failed:", e);
-        }
-    }
+    // ── Pin & go / zone (integration-only; docs/14 §3.6, kontrakt v2) ────────────
+    // The card sends clicks as PERCENT of the map image to anyvac.goto /
+    // anyvac.zone_clean; the pct→px→mm conversion is backend-side. All client-side
+    // affine math (solve3 / _affine / _intMapToVac / _gotoMm) was deleted — mm no
+    // longer exist in the card.
     _toggleMode(entity, mode) {
         if (this._mapMode === mode && this._modeEntity === entity) {
             this._mapMode = "normal";
@@ -1815,15 +1669,22 @@ let AnyVacCard = class AnyVacCard extends i$2 {
         if (ent)
             void this.hass.callService("homeassistant", "update_entity", { entity_id: ent });
     }
+    _clampPct(v) {
+        return Math.min(100, Math.max(0, v));
+    }
     _onMapClick(vac, e) {
         const content = this._clickToContent(vac, e.clientX, e.clientY);
         if (this._mapMode === "pin") {
-            const mm = content ? this._intMapToVac(vac, content) : null;
             this._dbg = content
-                ? "px " + content.x.toFixed(1) + "%," + content.y.toFixed(1) + "% -> mm " + (mm ? Math.round(mm.x) + "," + Math.round(mm.y) : "(no calibration data)")
+                ? "goto " + content.x.toFixed(1) + "%, " + content.y.toFixed(1) + "%"
                 : "(map element not found)";
-            if (mm)
-                void this._gotoMm(vac.entity, mm);
+            if (content) {
+                void this._call("anyvac", "goto", {
+                    entity_id: vac.entity,
+                    x_pct: this._clampPct(content.x),
+                    y_pct: this._clampPct(content.y),
+                });
+            }
             this._mapMode = "normal";
             this._modeEntity = null;
         }
@@ -1853,27 +1714,6 @@ let AnyVacCard = class AnyVacCard extends i$2 {
         const w = el.offsetWidth || 1, h = el.offsetHeight || 1;
         return { x: (lx / w + 0.5) * 100, y: (ly / h + 0.5) * 100 };
     }
-    _intMapToVac(vac, content) {
-        const at = this.hass?.states?.[vac.integration_entity ?? ""]?.attributes;
-        if (!at)
-            return null;
-        const t = this._affine(at.calibration_points);
-        const dims = at.image_dims;
-        if (!t || !dims)
-            return null;
-        let NW = (dims.width ?? 0) * (dims.scale ?? 1);
-        let NH = (dims.height ?? 0) * (dims.scale ?? 1);
-        const rot = dims.rotation ?? 0;
-        if (rot === 90 || rot === 270) {
-            const tmp = NW;
-            NW = NH;
-            NH = tmp;
-        }
-        if (!NW || !NH)
-            return null;
-        const px = (content.x / 100) * NW, py = (content.y / 100) * NH;
-        return { x: t.a * px + t.b * py + t.e, y: t.c * px + t.d * py + t.f };
-    }
     _onZoneDown(vac, e) {
         if (this._mapMode !== "zone" || this._modeEntity !== vac.entity)
             return;
@@ -1900,15 +1740,14 @@ let AnyVacCard = class AnyVacCard extends i$2 {
         const r = el.getBoundingClientRect();
         const ax = r.left + (this._zoneDrag.x0 / 100) * r.width;
         const ay = r.top + (this._zoneDrag.y0 / 100) * r.height;
+        // Both corners as PERCENT of the map image content (mm math is backend-side).
         const ca = this._clickToContent(vac, ax, ay);
         const cb = this._clickToContent(vac, e.clientX, e.clientY);
-        const ma = ca ? this._intMapToVac(vac, ca) : null;
-        const mb = cb ? this._intMapToVac(vac, cb) : null;
         const big = Math.abs(this._zoneDrag.x1 - this._zoneDrag.x0) > 2 || Math.abs(this._zoneDrag.y1 - this._zoneDrag.y0) > 2;
-        if (ma && mb && big) {
+        if (ca && cb && big) {
             this._zonePending = {
-                x1: Math.round(Math.min(ma.x, mb.x)), y1: Math.round(Math.min(ma.y, mb.y)),
-                x2: Math.round(Math.max(ma.x, mb.x)), y2: Math.round(Math.max(ma.y, mb.y)),
+                x1: this._clampPct(Math.min(ca.x, cb.x)), y1: this._clampPct(Math.min(ca.y, cb.y)),
+                x2: this._clampPct(Math.max(ca.x, cb.x)), y2: this._clampPct(Math.max(ca.y, cb.y)),
             };
         }
         else {
@@ -1919,7 +1758,11 @@ let AnyVacCard = class AnyVacCard extends i$2 {
         const z = this._zonePending;
         if (!z)
             return;
-        void this.hass.callService("vacuum", "send_command", { entity_id: vac.entity, command: "app_zoned_clean", params: [[z.x1, z.y1, z.x2, z.y2, 1]] });
+        void this._call("anyvac", "zone_clean", {
+            entity_id: vac.entity,
+            x1_pct: z.x1, y1_pct: z.y1, x2_pct: z.x2, y2_pct: z.y2,
+            repeat: 1,
+        });
         this._zonePending = null;
         this._zoneDrag = null;
         this._mapMode = "normal";
@@ -1932,11 +1775,11 @@ let AnyVacCard = class AnyVacCard extends i$2 {
         // Map commands need the integration's calibration AND this vacuum's map element
         // for the click geometry. Disabled in the rotated (narrow) view — the click
         // inversion does not account for the wrapper rotation yet (docs/13 A5).
-        const canCmd = !!vac.integration_entity && !!vac.map?.entity && !this._narrow;
+        const canCmd = !!this._intAttrs(vac) && !!vac.map?.entity && !this._narrow;
         const cmdTitle = this._narrow
             ? "Not available in the rotated mobile view"
-            : (!vac.integration_entity || !vac.map?.entity)
-                ? "Requires the AnyVac integration sensor + map entity"
+            : (!this._intAttrs(vac) || !vac.map?.entity)
+                ? "Requires the AnyVac integration (≥ 0.18) + map entity"
                 : "";
         const mode = this._modeEntity === vac.entity ? this._mapMode : "normal";
         return b `
@@ -1957,7 +1800,7 @@ let AnyVacCard = class AnyVacCard extends i$2 {
       ${mode === "pin" ? b `<div class="calib-panel">Tap the map to send the robot there.</div>` : A}
       ${mode === "zone" ? b `<div class="calib-panel">
         ${this._zonePending
-            ? b `<div>Clean this zone? (${this._zonePending.x2 - this._zonePending.x1}&times;${this._zonePending.y2 - this._zonePending.y1}&nbsp;mm)</div>
+            ? b `<div>Clean this zone?</div>
               <div class="calib-actions">
                 <button class="mtbtn on" @click=${() => this._confirmZone(vac)}>Clean zone</button>
                 <button class="mtbtn" @click=${() => this._cancelZone()}>Cancel</button>
@@ -1965,9 +1808,6 @@ let AnyVacCard = class AnyVacCard extends i$2 {
             : b `Drag a rectangle on the map to set a cleaning zone.`}
       </div>` : A}
     `;
-    }
-    _intAffine(cal) {
-        return affineFromCalibration(cal);
     }
     // ── Auto-seating (docs/15) ──────────────────────────────────────────────
     /** Aspect ratio (W/H) of the map wrap, for the seat fit's unit conversions. */
@@ -1995,9 +1835,10 @@ let AnyVacCard = class AnyVacCard extends i$2 {
             : vac.image_base;
         // Auto-seat only makes sense against a floorplan reference; a map-only base
         // IS the reference itself and keeps its manual (default) seat.
-        if (!ib?.src || !vac.integration_entity)
+        if (!ib?.src)
             return manual;
-        const at = this.hass?.states?.[vac.integration_entity]?.attributes;
+        // Kontrakt v2: anchors come from rooms[].bbox_px (integration ≥ 0.18).
+        const at = this._intAttrs(vac);
         if (!at)
             return manual;
         const bh = merged
@@ -2013,18 +1854,15 @@ let AnyVacCard = class AnyVacCard extends i$2 {
             auto: true, residual: fit.residual_pct, anchorCount: fit.anchors,
         };
     }
-    /** Integration mode: draw the robot + cleaning path as a vector overlay using
-     *  the calibration_points (mm -> rendered-map px) exposed by the AnyVac sensor. */
+    /** Integration mode: draw the robot + cleaning path as a vector overlay from the
+     *  px-space attributes (kontrakt v2: vacuum_position_px, path_dry_px, path_wet_px
+     *  — already in rendered-map pixels, no client-side mm math). */
     _renderIntegrationOverlay(vac, m) {
-        const ent = vac.integration_entity;
-        if (!ent)
-            return A;
-        const at = this.hass?.states?.[ent]?.attributes;
+        const at = this._intAttrs(vac);
         if (!at)
             return A;
-        const t = this._intAffine(at.calibration_points);
         const dims = at.image_dims;
-        if (!t || !dims)
+        if (!dims)
             return A;
         const sc = dims.scale ?? 1;
         let NW = (dims.width ?? 0) * sc;
@@ -2037,26 +1875,26 @@ let AnyVacCard = class AnyVacCard extends i$2 {
         }
         if (!NW || !NH)
             return A;
-        const toPx = (x, y) => ({ x: t.a * x + t.b * y + t.c, y: t.d * x + t.e * y + t.f });
         const color = this._color(vac);
         const rr = Math.max(NW, NH) / 55;
-        const toPts = (arr) => (Array.isArray(arr) ? arr : []).map((p) => { const q = toPx(p.x, p.y); return q.x.toFixed(1) + "," + q.y.toFixed(1); }).join(" ");
+        const toPts = (arr) => (Array.isArray(arr) ? arr : []).map((p) => p.x.toFixed(1) + "," + p.y.toFixed(1)).join(" ");
         const ct = this._vacCleanType(vac);
-        // Dry layer draws the SEGMENTED dry trace (path_dry — cleaning-only points, no
-        // transit / mop-wash driving; integration ≥0.12). Falls back to the legacy full
-        // trajectory (path) on older integrations. Wet layer draws the mop trace as a
-        // wider translucent "wet sheen" band under the line.
+        // Dry layer draws the SEGMENTED dry trace (path_dry_px — cleaning-only points,
+        // no transit / mop-wash driving). Wet layer draws the mop trace as a wider
+        // translucent "wet sheen" band under the line.
         const layersOn = this._layersEff();
         const showDry = layersOn.dry && ct.dry;
         const showWet = layersOn.wet && ct.wet;
-        const dryStr = showDry ? toPts(at.path_dry ?? at.path) : "";
-        const wetStr = showWet ? toPts(at.path_wet ?? at.mop_path) : "";
-        const vp = at.vacuum_position;
-        const rob = vp ? toPx(vp.x, vp.y) : null;
+        const dryStr = showDry ? toPts(at.path_dry_px) : "";
+        const wetStr = showWet ? toPts(at.path_wet_px) : "";
+        const vp = at.vacuum_position_px;
+        const rob = vp ? { x: vp.x, y: vp.y } : null;
         let head = null;
-        if (vp && vp.a != null) {
-            const ar = (vp.a * Math.PI) / 180;
-            head = toPx(vp.x + 320 * Math.cos(ar), vp.y + 320 * Math.sin(ar));
+        if (rob && vp.a != null) {
+            // Heading: the angle is reported in vacuum space; the mm→px transform flips
+            // the y axis, so the px-space direction is (cos a, −sin a).
+            const arad = (vp.a * Math.PI) / 180;
+            head = { x: rob.x + rr * 1.3 * Math.cos(arad), y: rob.y - rr * 1.3 * Math.sin(arad) };
         }
         const seat = {
             left: (50 + (m?.offset_x ?? 0)) + "%",
@@ -2147,13 +1985,13 @@ let AnyVacCard = class AnyVacCard extends i$2 {
     `;
     }
     _renderLayerToggles(vacs) {
-        const withInt = vacs.filter((v) => v.integration_entity);
+        const withInt = vacs.filter((v) => this._intAttrs(v));
         if (!withInt.length)
             return A;
         const oldest = (type) => {
             let max = null;
             for (const v of withInt) {
-                const rlc = this.hass.states[v.integration_entity]?.attributes?.rooms_last_cleaned;
+                const rlc = this._intAttrs(v)?.rooms_last_cleaned;
                 if (!rlc)
                     continue;
                 for (const rec of Object.values(rlc)) {
@@ -2184,7 +2022,7 @@ let AnyVacCard = class AnyVacCard extends i$2 {
     }
     /** Per-room status list (dry + wet age), deduped across vacuums; click selects across all. */
     _renderRoomList(shown) {
-        if (!shown.some((v) => v.integration_entity))
+        if (!shown.some((v) => this._intAttrs(v)))
             return A;
         const seen = new Set();
         const rooms = [];
@@ -2306,7 +2144,7 @@ let AnyVacCard = class AnyVacCard extends i$2 {
                 mixBlendMode: v.overlay_blend ?? "normal",
             })} />`;
         })}
-        ${shown.map((v) => (v.integration_entity ? this._renderIntegrationOverlay(v, this._effectiveSeat(v)) : A))}
+        ${shown.map((v) => (this._intAttrs(v) ? this._renderIntegrationOverlay(v, this._effectiveSeat(v)) : A))}
         ${this._renderLayerToggles(shown)}
         ${this._renderMergedRooms(shown)}
       </div>
@@ -2637,8 +2475,7 @@ let AnyVacCard = class AnyVacCard extends i$2 {
     }
     /** Room the vacuum is currently in, per the integration (for live-ticking its timer). */
     _currentRoomName(vac) {
-        const ent = vac.integration_entity;
-        return ent ? this.hass.states[ent]?.attributes?.vacuum_room_name : undefined;
+        return this._intAttrs(vac)?.vacuum_room_name;
     }
     _mmss(sec) {
         const s = Math.max(0, Math.round(sec));
@@ -2655,7 +2492,7 @@ let AnyVacCard = class AnyVacCard extends i$2 {
         if (!rows.length)
             return A;
         const color = this._color(vac);
-        const ent = vac.integration_entity;
+        const ent = this._intEntity(vac);
         const sensorTs = ent ? Date.parse(this.hass.states[ent]?.last_updated ?? "") : NaN;
         const curRoom = this._currentRoomName(vac);
         const cleaning = this._isCleaning(vac);
@@ -2691,9 +2528,13 @@ let AnyVacCard = class AnyVacCard extends i$2 {
     render() {
         if (!this._config || !this.hass)
             return A;
+        const schemaWarn = this._schemaWarning();
         return b `
       <ha-card>
         ${this.editMode ? b `<div class="version-chip">v${CARD_VERSION} · ${Math.round(this._cardW)}w</div>` : A}
+        ${schemaWarn ? b `<div style="margin:0 4px;padding:8px 12px;border-radius:12px;border:1px solid rgba(250,173,20,0.55);background:rgba(250,173,20,0.12);color:#faad14;font-size:12px;display:flex;align-items:center;gap:8px">
+          <ha-icon icon="mdi:alert" style="--mdc-icon-size:18px"></ha-icon><span>${schemaWarn}</span>
+        </div>` : A}
         <div class="badges-row">
           ${this._config.vacuums.map((v, i) => this._renderBadge(v, i))}
           ${(this._config.global_actions ?? []).map((ga, i) => this._renderGlobalBadge(ga, i))}
@@ -2720,7 +2561,7 @@ let AnyVacCard = class AnyVacCard extends i$2 {
     }
 };
 // ── Styles ──────────────────────────────────────────────────────────────
-AnyVacCard.styles = i$6 `
+AnyVacCard.styles = i$5 `
     :host {
       display: block;
       width: 100%;
@@ -3148,6 +2989,9 @@ __decorate([
 __decorate([
     r()
 ], AnyVacCard.prototype, "_now", void 0);
+__decorate([
+    r()
+], AnyVacCard.prototype, "_planPreview", void 0);
 AnyVacCard = __decorate([
     t$1(CARD_NAME)
 ], AnyVacCard);
@@ -3304,6 +3148,20 @@ let AnyVacCardEditor = class AnyVacCardEditor extends i$2 {
     _editorAR() {
         return this._pvAR > 0.1 ? this._pvAR : 3.636;
     }
+    /** Integration sensor for a vacuum: explicit config, else auto-resolved from the
+     *  entity registry — the AnyVac map sensor sits on the same device as the vacuum
+     *  entity (platform "anyvac"; same rule as the card, docs/14 Fáze 3). */
+    _intEntityFor(vac) {
+        if (!vac)
+            return undefined;
+        if (vac.integration_entity)
+            return vac.integration_entity;
+        const reg = this.hass?.entities;
+        const dev = reg?.[vac.entity]?.device_id;
+        return dev
+            ? Object.keys(reg).find((id) => reg[id]?.device_id === dev && reg[id]?.platform === "anyvac" && id.startsWith("sensor."))
+            : undefined;
+    }
     /** Editor-side view of the effective seat (mirrors the card's _effectiveSeat). */
     _editorSeat(vacIdx) {
         const vac = this._config.vacuums[vacIdx];
@@ -3316,10 +3174,12 @@ let AnyVacCardEditor = class AnyVacCardEditor extends i$2 {
             return manual;
         const merged = this._config.map_mode === "merged";
         const ib = merged ? this._config.image_base : vac.image_base;
-        if (!ib?.src || !vac.integration_entity)
+        if (!ib?.src)
             return manual;
-        const at = this.hass?.states?.[vac.integration_entity]?.attributes;
-        if (!at)
+        const ie = this._intEntityFor(vac);
+        const at = ie ? this.hass?.states?.[ie]?.attributes : undefined;
+        // Kontrakt v2: anchors need rooms[].bbox_px (integration ≥ 0.18).
+        if (!at || (at.schema_version ?? 0) < 2)
             return manual;
         const ar = this._editorAR();
         const rooms = merged ? (this._config.rooms ?? []) : (vac.rooms ?? []);
@@ -3338,11 +3198,11 @@ let AnyVacCardEditor = class AnyVacCardEditor extends i$2 {
      *  another robot has (its seat must exist: shared rooms or manual seating). */
     _importRooms(vacIdx) {
         const vac = this._config.vacuums[vacIdx];
-        const at = vac?.integration_entity
-            ? this.hass.states[vac.integration_entity]?.attributes
-            : undefined;
+        const ie = this._intEntityFor(vac);
+        const at = ie ? this.hass.states[ie]?.attributes : undefined;
         const intRooms = Array.isArray(at?.rooms) ? at.rooms : [];
-        if (!at || !intRooms.length)
+        // Kontrakt v2: the import places rooms via bbox_px (integration ≥ 0.18).
+        if (!at || (at.schema_version ?? 0) < 2 || !intRooms.length)
             return;
         const ar = this._editorAR();
         const seat = this._editorSeat(vacIdx);
@@ -3794,7 +3654,7 @@ let AnyVacCardEditor = class AnyVacCardEditor extends i$2 {
         const action = vac.clean_action ?? { type: "native" };
         return b `
       ${this._selectField("Strategy", action.type, [{ value: "native", label: "Native (vacuum.send_command + segment IDs)" },
-            { value: "native-auto", label: "Native auto (auto-resolve IDs from roborock.get_maps)" },
+            { value: "native-auto", label: "Native auto (deprecated — same as Native without the integration)" },
             { value: "native-area", label: "Native area (vacuum.clean_area)" },
             { value: "script", label: "Custom script" }], v => {
             if (v === "script") {
@@ -3821,9 +3681,9 @@ let AnyVacCardEditor = class AnyVacCardEditor extends i$2 {
     /** Shared editor for all three native strategies — only the hint differs */
     _renderNativeOptions(vacIdx, action) {
         const hint = action.type === "native-area"
-            ? b `<p class="hint">Calls <code>vacuum.clean_area</code>. Repeat is implemented in software — the card restarts cleaning after each pass (robot docks between passes).</p>`
+            ? b `<p class="hint">Calls <code>vacuum.clean_area</code> (degraded mode only — with the AnyVac integration the START button sends <code>anyvac.clean</code> instead). No repeat; repeat lives server-side in <code>anyvac.clean</code>.</p>`
             : action.type === "native-auto"
-                ? b `<p class="hint">Calls <code>roborock.get_maps</code> at clean time, matches rooms via Area mappings (Global tab), then sends <code>vacuum.send_command</code> with <code>app_segment_clean</code>. Supports native repeat. Falls back to <code>segment_id</code> if auto-resolve fails.</p>`
+                ? b `<p class="hint">Deprecated: the <code>roborock.get_maps</code> auto-resolve was removed (docs/14 §3.7). With the AnyVac integration the backend resolves segments; without it this behaves like Native and needs configured <code>segment_id</code>s.</p>`
                 : A;
         return b `
       <div class="sub-section">
@@ -4216,7 +4076,7 @@ let AnyVacCardEditor = class AnyVacCardEditor extends i$2 {
         </div>
         <p class="hint">Draws a small % gauge on each room (spatial coverage). Spatial % is approximate — the room box includes furniture, so it plateaus below 100%.</p>
         ${this._config.vacuums.map((vac) => {
-            const ie = vac.integration_entity;
+            const ie = this._intEntityFor(vac);
             const st = ie ? this.hass.states[ie] : undefined;
             const at = (st?.attributes ?? {});
             const ms = (at.mop_signal ?? {});
@@ -4224,11 +4084,13 @@ let AnyVacCardEditor = class AnyVacCardEditor extends i$2 {
             <div class="section-title">${vac.name ?? vac.entity}</div>
             <div class="sub-section">
               ${!ie
-                ? b `<p class="hint">No <code>integration_entity</code> set — backend values unavailable.</p>`
+                ? b `<p class="hint">No AnyVac integration sensor found (config or auto-resolve) — backend values unavailable.</p>`
                 : !st
                     ? b `<p class="hint">Sensor <code>${ie}</code> not found.</p>`
                     : b `
                     ${this._dbgRow("sensor", `${ie} = ${st.state}`)}
+                    ${this._dbgRow("schema_version", at.schema_version)}
+                    ${this._dbgRow("pipeline_ok", at.pipeline_ok)}
                     ${this._dbgRow("clean_type", at.clean_type)}
                     ${this._dbgRow("in_cleaning", at.in_cleaning)}
                     ${this._dbgRow("vacuum_room_name", at.vacuum_room_name)}
@@ -4246,7 +4108,7 @@ let AnyVacCardEditor = class AnyVacCardEditor extends i$2 {
                     <div class="sub-title">rooms_progress — spatial % + time ratio (live)</div>
                     <pre style=${pre}>${fmt(at.rooms_progress)}</pre>
                     <div class="sub-title">rooms (geometry — for spatial coverage)</div>
-                    <pre style=${pre}>${fmt((at.rooms ?? []).map((r) => ({ name: r.name, x0: r.x0, y0: r.y0, x1: r.x1, y1: r.y1, pos_x: r.pos_x, pos_y: r.pos_y })))}</pre>
+                    <pre style=${pre}>${fmt((at.rooms ?? []).map((r) => ({ name: r.name, bbox_px: r.bbox_px, x0: r.x0, y0: r.y0, x1: r.x1, y1: r.y1 })))}</pre>
                     <details><summary class="hint" style="cursor:pointer">Raw attributes</summary><pre style=${pre}>${fmt(at)}</pre></details>
                   `}
             </div>`;
@@ -4463,7 +4325,7 @@ let AnyVacCardEditor = class AnyVacCardEditor extends i$2 {
     }
 };
 // ── Styles ────────────────────────────────────────────────────────────────
-AnyVacCardEditor.styles = i$6 `
+AnyVacCardEditor.styles = i$5 `
     .editor-root { display:flex; flex-direction:column; }
 
     /* ── Tabs ── */

@@ -39,33 +39,7 @@ export interface SeatAnchor {
   sizeA?: { w: number; h: number };
 }
 
-// ── Small linear algebra (shared with the card's click inversion) ────────────
-
-/** Solve a 3x3 linear system by Cramer's rule. */
-export function solve3(m: number[][], r: number[]): number[] | null {
-  const d = (a: number[][]) =>
-    a[0][0] * (a[1][1] * a[2][2] - a[1][2] * a[2][1]) -
-    a[0][1] * (a[1][0] * a[2][2] - a[1][2] * a[2][0]) +
-    a[0][2] * (a[1][0] * a[2][1] - a[1][1] * a[2][0]);
-  const D = d(m);
-  if (Math.abs(D) < 1e-9) return null;
-  const col = (i: number) => m.map((row, ri) => row.map((v, ci) => (ci === i ? r[ri] : v)));
-  return [d(col(0)) / D, d(col(1)) / D, d(col(2)) / D];
-}
-
-export interface Affine { a: number; b: number; c: number; d: number; e: number; f: number }
-
-/** Affine vacuum-mm → rendered-map-px from the parser's calibration points. */
-export function affineFromCalibration(cal: unknown): Affine | null {
-  if (!Array.isArray(cal) || cal.length < 3) return null;
-  try {
-    const M = cal.slice(0, 3).map((p: any) => [p.vacuum.x, p.vacuum.y, 1]);
-    const abc = solve3(M, cal.slice(0, 3).map((p: any) => p.map.x));
-    const def = solve3(M, cal.slice(0, 3).map((p: any) => p.map.y));
-    if (!abc || !def) return null;
-    return { a: abc[0], b: abc[1], c: abc[2], d: def[0], e: def[1], f: def[2] };
-  } catch { return null; }
-}
+// ── Geometry helpers (kontrakt v2: the integration publishes px, no mm here) ──
 
 /** Rendered map pixel dimensions (rotation-aware) from the sensor's image_dims. */
 export function mapPxDims(dims: any): { NW: number; NH: number } | null {
@@ -91,7 +65,8 @@ interface CardRoomLike {
 
 /**
  * Build fit anchors by pairing the card's floorplan rooms with the integration
- * sensor's room bboxes (attributes: calibration_points, image_dims, rooms[]).
+ * sensor's room bboxes. Kontrakt v2: bboxes come pre-transformed in rendered-map
+ * pixels (`rooms[].bbox_px`, integration ≥ 0.18) — the card does no mm math.
  */
 export function assembleAnchors(
   cardRooms: CardRoomLike[],
@@ -99,28 +74,24 @@ export function assembleAnchors(
   ar: number,
 ): SeatAnchor[] {
   if (!at) return [];
-  const t = affineFromCalibration(at.calibration_points);
   const dims = mapPxDims(at.image_dims);
   const intRooms: Array<Record<string, any>> = Array.isArray(at.rooms) ? at.rooms : [];
-  if (!t || !dims || !intRooms.length) return [];
+  if (!dims || !intRooms.length) return [];
   const { NW, NH } = dims;
-  const toPx = (x: number, y: number) => ({ x: t.a * x + t.b * y + t.c, y: t.d * x + t.e * y + t.f });
   const out: SeatAnchor[] = [];
   for (const cr of cardRooms) {
     if (cr.map_x == null || cr.map_y == null) continue;
     const ir = intRooms.find((r) => r.name === cr.key) ?? intRooms.find((r) => r.name === cr.name);
-    if (!ir || [ir.x0, ir.y0, ir.x1, ir.y1].some((v) => v == null)) continue;
-    // Room bbox mm → px: transform all 4 corners (the affine may rotate) and take spread.
-    const corners = [toPx(ir.x0, ir.y0), toPx(ir.x1, ir.y1), toPx(ir.x0, ir.y1), toPx(ir.x1, ir.y0)];
-    const xs = corners.map((p) => p.x), ys = corners.map((p) => p.y);
-    const cxPx = (Math.min(...xs) + Math.max(...xs)) / 2;
-    const cyPx = (Math.min(...ys) + Math.max(...ys)) / 2;
+    const bp = ir?.bbox_px as { x0: number; y0: number; x1: number; y1: number } | undefined | null;
+    if (!bp || [bp.x0, bp.y0, bp.x1, bp.y1].some((v) => v == null)) continue;
+    const cxPx = (bp.x0 + bp.x1) / 2;
+    const cyPx = (bp.y0 + bp.y1) / 2;
     const anchor: SeatAnchor = {
       q: { x: (cxPx - NW / 2) / NW, y: (cyPx - NH / 2) / NW },
       a: { x: cr.map_x / 100, y: cr.map_y / 100 / ar },
     };
     if (cr.map_w != null && cr.map_h != null && cr.map_w > 0 && cr.map_h > 0) {
-      anchor.sizeQ = { w: (Math.max(...xs) - Math.min(...xs)) / NW, h: (Math.max(...ys) - Math.min(...ys)) / NW };
+      anchor.sizeQ = { w: (bp.x1 - bp.x0) / NW, h: (bp.y1 - bp.y0) / NW };
       anchor.sizeA = { w: cr.map_w / 100, h: cr.map_h / 100 / ar };
     }
     out.push(anchor);
@@ -223,8 +194,9 @@ export function computeSeatFit(anchors: SeatAnchor[], ar: number): SeatFitResult
 // ── Forward transform (room import) ──────────────────────────────────────────
 
 /**
- * Transform an integration room bbox (mm) into floorplan rectangle percentages,
- * given a seat (auto-fitted or manual) — used by the editor's room import.
+ * Transform an integration room bbox (rendered-map px, `bbox_px`) into floorplan
+ * rectangle percentages, given a seat (auto-fitted or manual) — used by the
+ * editor's room import.
  */
 export function roomBboxToRect(
   ir: Record<string, any>,
@@ -232,16 +204,13 @@ export function roomBboxToRect(
   seat: SeatParams,
   ar: number,
 ): { map_x: number; map_y: number; map_w: number; map_h: number } | null {
-  const t = affineFromCalibration(at?.calibration_points);
   const dims = mapPxDims(at?.image_dims);
-  if (!t || !dims || [ir?.x0, ir?.y0, ir?.x1, ir?.y1].some((v) => v == null)) return null;
+  const bp = ir?.bbox_px as { x0: number; y0: number; x1: number; y1: number } | undefined | null;
+  if (!dims || !bp || [bp.x0, bp.y0, bp.x1, bp.y1].some((v) => v == null)) return null;
   const { NW, NH } = dims;
-  const toPx = (x: number, y: number) => ({ x: t.a * x + t.b * y + t.c, y: t.d * x + t.e * y + t.f });
-  const corners = [toPx(ir.x0, ir.y0), toPx(ir.x1, ir.y1), toPx(ir.x0, ir.y1), toPx(ir.x1, ir.y0)];
-  const xs = corners.map((p) => p.x), ys = corners.map((p) => p.y);
-  const q = { x: ((Math.min(...xs) + Math.max(...xs)) / 2 - NW / 2) / NW, y: ((Math.min(...ys) + Math.max(...ys)) / 2 - NH / 2) / NW };
-  let w = (Math.max(...xs) - Math.min(...xs)) / NW;
-  let h = (Math.max(...ys) - Math.min(...ys)) / NW;
+  const q = { x: ((bp.x0 + bp.x1) / 2 - NW / 2) / NW, y: ((bp.y0 + bp.y1) / 2 - NH / 2) / NW };
+  let w = (bp.x1 - bp.x0) / NW;
+  let h = (bp.y1 - bp.y0) / NW;
   const s = seat.scale / 100;
   const theta = seat.rotation * RAD;
   const cos = Math.cos(theta), sin = Math.sin(theta);

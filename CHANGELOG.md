@@ -8,10 +8,46 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Planned
 
-- Backend contract v2 (docs/14 Phase 2): px-space geometry attributes, `anyvac.clean` /
-  `anyvac.goto` / `anyvac.zone_clean` / `anyvac.plan` / `anyvac.cancel`; plan building and
-  software repeat move server-side, native-auto segment resolution removed from the card.
 - Rooms from the integration (real room polygons / names) for clickable cleaning on the floorplan.
+
+## [0.40.0] - 2026-07-09
+
+Fáze 3 of the backend-first canon (docs/14): the card switches to backend contract v2
+(integration ≥ 0.18.0) and loses the last of its client-side smarts. A schema warning
+banner appears when the integration is older than the card expects.
+
+### Changed
+
+- **Vector overlay reads px-space attributes** (`vacuum_position_px`, `path_dry_px`,
+  `path_wet_px`) — the mm→px affine transform is gone from the card; the robot heading
+  is derived in px space (y axis flip).
+- **Auto-seating & room import use `rooms[].bbox_px`** — `seatfit.ts` lost `solve3` /
+  `affineFromCalibration`; anchors and the editor's room import are built from the
+  backend-transformed pixel bboxes.
+- **Pin & go / zone clean send image PERCENTAGES** to `anyvac.goto` /
+  `anyvac.zone_clean`; the pct→px→mm conversion is backend-side. The zone confirm
+  dialog no longer shows mm dimensions (the card no longer knows any).
+- **Orchestrated cleans send an INTENT** — `_runOrchestrated` is a thin
+  `anyvac.clean` call (rooms + mode + per-kind vacuum roles from the config + settings
+  from the presets). The whole client-side plan builder (`_assignByCap`,
+  `_cleanCmdFor`, `_settingsForKind`, `_segmentFor`, `_roomCleanableBy`,
+  `_roomEstMax`, `_duidOf`, run_job task assembly) was DELETED.
+- **Plan preview is the backend's real plan** — fetched from the response-only
+  `anyvac.plan` service (debounced), no local approximation.
+- **Per-vacuum START uses `anyvac.clean`** restricted to that vacuum when the
+  integration is present; direct `vacuum.*` commands remain only for the degraded
+  (no-integration) mode.
+- **`integration_entity` is auto-resolved** from the entity registry (the AnyVac map
+  sensor sits on the vacuum's device); the config key remains as an explicit override.
+- **Editor Debug tab** shows `schema_version`, `pipeline_ok` and `bbox_px` geometry.
+
+### Removed
+
+- native-auto dynamic segment resolution via `roborock.get_maps` (docs/14 §3.7) —
+  with the integration the backend resolves segments; without it the card only uses
+  configured `segment_id`s.
+- All client-side affine/mm math (docs/14 §3.6): `solve3`, `affineFromCalibration`,
+  `_affine`, `_intAffine`, `_intMapToVac`, `_cmdMm`-era helpers, `_gotoMm`.
 
 ## [0.39.0] - 2026-07-02
 

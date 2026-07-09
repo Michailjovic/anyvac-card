@@ -192,6 +192,21 @@ export class AnyVacCardEditor extends LitElement {
     return this._pvAR > 0.1 ? this._pvAR : 3.636;
   }
 
+  /** Integration sensor for a vacuum: explicit config, else auto-resolved from the
+   *  entity registry — the AnyVac map sensor sits on the same device as the vacuum
+   *  entity (platform "anyvac"; same rule as the card, docs/14 Fáze 3). */
+  private _intEntityFor(vac: { entity: string; integration_entity?: string } | undefined): string | undefined {
+    if (!vac) return undefined;
+    if (vac.integration_entity) return vac.integration_entity;
+    const reg = (this.hass as any)?.entities as Record<string, any> | undefined;
+    const dev = reg?.[vac.entity]?.device_id;
+    return dev
+      ? Object.keys(reg!).find(
+          (id) => reg![id]?.device_id === dev && reg![id]?.platform === "anyvac" && id.startsWith("sensor.")
+        )
+      : undefined;
+  }
+
   /** Editor-side view of the effective seat (mirrors the card's _effectiveSeat). */
   private _editorSeat(vacIdx: number): SeatParams & {
     auto: boolean; residual?: number; anchorCount?: number;
@@ -205,9 +220,11 @@ export class AnyVacCardEditor extends LitElement {
     if (!vac || m?.seat === "manual") return manual;
     const merged = this._config.map_mode === "merged";
     const ib = merged ? this._config.image_base : vac.image_base;
-    if (!ib?.src || !vac.integration_entity) return manual;
-    const at = this.hass?.states?.[vac.integration_entity]?.attributes as Record<string, any> | undefined;
-    if (!at) return manual;
+    if (!ib?.src) return manual;
+    const ie = this._intEntityFor(vac);
+    const at = ie ? (this.hass?.states?.[ie]?.attributes as Record<string, any> | undefined) : undefined;
+    // Kontrakt v2: anchors need rooms[].bbox_px (integration ≥ 0.18).
+    if (!at || (at.schema_version ?? 0) < 2) return manual;
     const ar = this._editorAR();
     const rooms = merged ? (this._config.rooms ?? []) : (vac.rooms ?? []);
     const fit = computeSeatFit(assembleAnchors(rooms as any, at, ar), ar);
@@ -225,11 +242,11 @@ export class AnyVacCardEditor extends LitElement {
    *  another robot has (its seat must exist: shared rooms or manual seating). */
   private _importRooms(vacIdx: number): void {
     const vac = this._config.vacuums[vacIdx];
-    const at = vac?.integration_entity
-      ? (this.hass.states[vac.integration_entity]?.attributes as Record<string, any> | undefined)
-      : undefined;
+    const ie = this._intEntityFor(vac);
+    const at = ie ? (this.hass.states[ie]?.attributes as Record<string, any> | undefined) : undefined;
     const intRooms: Array<Record<string, any>> = Array.isArray(at?.rooms) ? at!.rooms : [];
-    if (!at || !intRooms.length) return;
+    // Kontrakt v2: the import places rooms via bbox_px (integration ≥ 0.18).
+    if (!at || (at.schema_version ?? 0) < 2 || !intRooms.length) return;
     const ar = this._editorAR();
     const seat = this._editorSeat(vacIdx);
     const target = this._mergedEdit ? [...(this._config.rooms ?? [])] : [...(vac.rooms ?? [])];
@@ -705,7 +722,7 @@ export class AnyVacCardEditor extends LitElement {
     return html`
       ${this._selectField<"native" | "native-area" | "native-auto" | "script">("Strategy", action.type,
         [{ value: "native",      label: "Native (vacuum.send_command + segment IDs)" },
-         { value: "native-auto", label: "Native auto (auto-resolve IDs from roborock.get_maps)" },
+         { value: "native-auto", label: "Native auto (deprecated — same as Native without the integration)" },
          { value: "native-area", label: "Native area (vacuum.clean_area)" },
          { value: "script",      label: "Custom script" }],
         v => {
@@ -738,9 +755,9 @@ export class AnyVacCardEditor extends LitElement {
   ) {
     const hint =
       action.type === "native-area"
-        ? html`<p class="hint">Calls <code>vacuum.clean_area</code>. Repeat is implemented in software — the card restarts cleaning after each pass (robot docks between passes).</p>`
+        ? html`<p class="hint">Calls <code>vacuum.clean_area</code> (degraded mode only — with the AnyVac integration the START button sends <code>anyvac.clean</code> instead). No repeat; repeat lives server-side in <code>anyvac.clean</code>.</p>`
         : action.type === "native-auto"
-          ? html`<p class="hint">Calls <code>roborock.get_maps</code> at clean time, matches rooms via Area mappings (Global tab), then sends <code>vacuum.send_command</code> with <code>app_segment_clean</code>. Supports native repeat. Falls back to <code>segment_id</code> if auto-resolve fails.</p>`
+          ? html`<p class="hint">Deprecated: the <code>roborock.get_maps</code> auto-resolve was removed (docs/14 §3.7). With the AnyVac integration the backend resolves segments; without it this behaves like Native and needs configured <code>segment_id</code>s.</p>`
           : nothing;
     return html`
       <div class="sub-section">
@@ -1168,7 +1185,7 @@ export class AnyVacCardEditor extends LitElement {
         </div>
         <p class="hint">Draws a small % gauge on each room (spatial coverage). Spatial % is approximate — the room box includes furniture, so it plateaus below 100%.</p>
         ${this._config.vacuums.map((vac) => {
-          const ie = vac.integration_entity;
+          const ie = this._intEntityFor(vac);
           const st = ie ? this.hass.states[ie] : undefined;
           const at = (st?.attributes ?? {}) as Record<string, any>;
           const ms = (at.mop_signal ?? {}) as Record<string, any>;
@@ -1176,11 +1193,13 @@ export class AnyVacCardEditor extends LitElement {
             <div class="section-title">${vac.name ?? vac.entity}</div>
             <div class="sub-section">
               ${!ie
-                ? html`<p class="hint">No <code>integration_entity</code> set — backend values unavailable.</p>`
+                ? html`<p class="hint">No AnyVac integration sensor found (config or auto-resolve) — backend values unavailable.</p>`
                 : !st
                   ? html`<p class="hint">Sensor <code>${ie}</code> not found.</p>`
                   : html`
                     ${this._dbgRow("sensor", `${ie} = ${st.state}`)}
+                    ${this._dbgRow("schema_version", at.schema_version)}
+                    ${this._dbgRow("pipeline_ok", at.pipeline_ok)}
                     ${this._dbgRow("clean_type", at.clean_type)}
                     ${this._dbgRow("in_cleaning", at.in_cleaning)}
                     ${this._dbgRow("vacuum_room_name", at.vacuum_room_name)}
@@ -1198,7 +1217,7 @@ export class AnyVacCardEditor extends LitElement {
                     <div class="sub-title">rooms_progress — spatial % + time ratio (live)</div>
                     <pre style=${pre}>${fmt(at.rooms_progress)}</pre>
                     <div class="sub-title">rooms (geometry — for spatial coverage)</div>
-                    <pre style=${pre}>${fmt((at.rooms ?? []).map((r: any) => ({ name: r.name, x0: r.x0, y0: r.y0, x1: r.x1, y1: r.y1, pos_x: r.pos_x, pos_y: r.pos_y })))}</pre>
+                    <pre style=${pre}>${fmt((at.rooms ?? []).map((r: any) => ({ name: r.name, bbox_px: r.bbox_px, x0: r.x0, y0: r.y0, x1: r.x1, y1: r.y1 })))}</pre>
                     <details><summary class="hint" style="cursor:pointer">Raw attributes</summary><pre style=${pre}>${fmt(at)}</pre></details>
                   `}
             </div>`;

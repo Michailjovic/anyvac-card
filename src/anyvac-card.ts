@@ -31,8 +31,6 @@ import {
 import {
   assembleAnchors,
   computeSeatFit,
-  affineFromCalibration,
-  solve3,
   type SeatParams,
 } from "./seatfit";
 
@@ -201,7 +199,7 @@ export class AnyVacCard extends LitElement {
     for (const vac of this._config?.vacuums ?? []) {
       for (const id of [vac.entity, vac.status_entity, vac.battery_entity,
         vac.last_clean_entity, vac.progress_entity, vac.current_room_entity,
-        vac.error_entity, vac.map?.entity, vac.integration_entity,
+        vac.error_entity, vac.map?.entity, this._intEntity(vac),
         ...Object.values(this._autoEntities(vac))]) {
         if (id) s.add(id);
       }
@@ -227,6 +225,47 @@ export class AnyVacCard extends LitElement {
 
   private _colorKey(vac: VacuumConfig): string {
     return vac.color ?? "green";
+  }
+
+  /** Integration sensor for a vacuum: explicit config, else auto-resolved from the
+   *  entity registry — the AnyVac map sensor sits on the SAME device as the vacuum
+   *  entity (platform "anyvac"), so no manual plumbing is needed (docs/14 Fáze 3). */
+  private _intCache = new Map<string, string | undefined>();
+  private _intEntity(vac: VacuumConfig): string | undefined {
+    if (vac.integration_entity) return vac.integration_entity;
+    const reg = (this.hass as any)?.entities as Record<string, any> | undefined;
+    if (!reg || !vac.entity) return undefined;
+    if (this._intCache.has(vac.entity)) return this._intCache.get(vac.entity);
+    const dev = reg[vac.entity]?.device_id;
+    const found = dev
+      ? Object.keys(reg).find(
+          (id) => reg[id]?.device_id === dev && reg[id]?.platform === "anyvac" && id.startsWith("sensor.")
+        )
+      : undefined;
+    this._intCache.set(vac.entity, found);
+    return found;
+  }
+
+  /** Kontrakt v2 gate: attributes of the vacuum's integration sensor, only when the
+   *  integration speaks schema_version ≥ 2. Older backends → smart features off. */
+  private _intAttrs(vac: VacuumConfig): Record<string, any> | undefined {
+    const ent = this._intEntity(vac);
+    const at = ent ? (this.hass.states[ent]?.attributes as Record<string, any> | undefined) : undefined;
+    if (!at) return undefined;
+    return (at.schema_version ?? 0) >= 2 ? at : undefined;
+  }
+
+  /** Human-readable warning when an integration sensor exists but speaks an old schema. */
+  private _schemaWarning(): string | null {
+    for (const v of this._config?.vacuums ?? []) {
+      const ent = this._intEntity(v);
+      const at = ent ? (this.hass.states[ent]?.attributes as Record<string, any> | undefined) : undefined;
+      if (at && (at.schema_version ?? 0) < 2) {
+        return `AnyVac integration is too old for this card (schema ${at.schema_version ?? 1} < 2). ` +
+          "Update the anyvac integration to ≥ 0.18.0.";
+      }
+    }
+    return null;
   }
 
   private _autoCache = new Map<string, Record<string, string | undefined>>();
@@ -300,7 +339,7 @@ export class AnyVacCard extends LitElement {
   /** First integration sensor that exposes the shared (backend) selection. */
   private _selSensor(): string | undefined {
     for (const v of this._config.vacuums) {
-      const ent = v.integration_entity;
+      const ent = this._intEntity(v);
       if (ent && Array.isArray(this.hass.states[ent]?.attributes?.selected_rooms)) return ent;
     }
     return undefined;
@@ -357,10 +396,7 @@ export class AnyVacCard extends LitElement {
       return wet ? "wet" : "dry";
     }
     // 2) Live backend signal (follows the actual water mode).
-    const ent = vac.integration_entity;
-    const ct = ent
-      ? (this.hass.states[ent]?.attributes?.clean_type as string | undefined)
-      : undefined;
+    const ct = this._intAttrs(vac)?.clean_type as string | undefined;
     if (ct === "wet" || ct === "dry") return ct;
     // 3) Fallback: the vacuum's configured role (wet-only robots default to wet).
     const role = this._vacCleanType(vac);
@@ -370,9 +406,7 @@ export class AnyVacCard extends LitElement {
   /** Self-calibrated clean-time estimate learned by the backend integration,
    *  per room name + type (dry/wet). Null when no integration / no learned value. */
   private _backendEstimate(vac: VacuumConfig, room: RoomConfig, kind: "dry" | "wet"): number | null {
-    const ent = vac.integration_entity;
-    if (!ent) return null;
-    const re = this.hass.states[ent]?.attributes?.rooms_estimate as Record<string, any> | undefined;
+    const re = this._intAttrs(vac)?.rooms_estimate as Record<string, any> | undefined;
     if (!re) return null;
     const rec = re[room.name ?? ""] ?? re[room.key];
     const v = rec ? rec[kind] : undefined;
@@ -409,9 +443,7 @@ export class AnyVacCard extends LitElement {
   }
 
   private _intRoomRec(vac: VacuumConfig, room: RoomConfig): Record<string, string> | null {
-    const ent = vac.integration_entity;
-    if (!ent) return null;
-    const rlc = this.hass.states[ent]?.attributes?.rooms_last_cleaned as Record<string, any> | undefined;
+    const rlc = this._intAttrs(vac)?.rooms_last_cleaned as Record<string, any> | undefined;
     if (!rlc) return null;
     return (rlc[room.key] ?? rlc[room.name ?? ""] ?? null) as Record<string, string> | null;
   }
@@ -477,9 +509,7 @@ export class AnyVacCard extends LitElement {
     dry_calibrating?: boolean; wet_calibrating?: boolean;
     visited_cells?: number; total_cells?: number; elapsed_s?: number | null; est_s?: number | null;
   } | null {
-    const ent = vac.integration_entity;
-    if (!ent) return null;
-    const rp = this.hass.states[ent]?.attributes?.rooms_progress as Record<string, any> | undefined;
+    const rp = this._intAttrs(vac)?.rooms_progress as Record<string, any> | undefined;
     if (!rp) return null;
     return (rp[room.key] ?? rp[room.name ?? ""] ?? null) as any;
   }
@@ -777,166 +807,80 @@ export class AnyVacCard extends LitElement {
     const shown = this._config.vacuums.filter((_, i) => this._shownSet.has(i));
     return shown.length ? shown : this._config.vacuums;
   }
-  /** duid of a vacuum (from its integration sensor) — used to gate wet tasks. */
-  private _duidOf(vac: VacuumConfig): string | undefined {
-    const ent = vac.integration_entity;
-    return ent ? (this.hass.states[ent]?.attributes?.duid as string | undefined) : undefined;
-  }
-  /** Room name a vacuum reports for a key (must match anyvac_room_done's room). */
-  private _intRoomName(vac: VacuumConfig, key: string): string {
-    return this._roomsFor(vac).find((r) => r.key === key)?.name ?? key;
-  }
-  /** Largest per-room estimate across vacuums (for LPT ordering). */
-  private _roomEstMax(key: string): number {
-    let m = 0;
+  // ── Clean intent → backend planner (kontrakt v2, docs/14 §3.7) ─────────────
+  /** Per-kind vacuum restriction for anyvac.clean/plan, from the configured roles —
+   *  preserves the user's dry/wet split even when a robot is both-capable. */
+  private _v2Vacuums(): { dry: string[]; wet: string[] } {
+    const dry: string[] = [], wet: string[] = [];
     for (const v of this._config.vacuums) {
-      const r = this._roomsFor(v).find((x) => x.key === key);
-      if (r) m = Math.max(m, this._roomCleanMins(r, v));
+      const role = this._vacCleanType(v);
+      if (role.dry) dry.push(v.entity);
+      if (role.wet) wet.push(v.entity);
     }
-    return m;
+    return { dry, wet };
   }
-  /** Distribute rooms across the capable owners to balance estimated time (LPT greedy:
-   *  biggest room first → least-loaded capable owner), so the work is actually split
-   *  between robots instead of dumped on the first owner. */
-  private _assignByCap(
-    roomKeys: string[],
-    cap: (v: VacuumConfig) => boolean,
-    vacuums: VacuumConfig[] = this._config.vacuums,
-  ): Map<string, string[]> {
-    const out = new Map<string, string[]>();
-    const load = new Map<string, number>();
-    const sorted = [...roomKeys].sort((a, b) => this._roomEstMax(b) - this._roomEstMax(a));
-    for (const key of sorted) {
-      const owners = vacuums.filter((v) => cap(v) && this._roomCleanableBy(v, key));
-      if (!owners.length) continue;
-      let best = owners[0];
-      for (const v of owners) if ((load.get(v.entity) ?? 0) < (load.get(best.entity) ?? 0)) best = v;
-      const arr = out.get(best.entity) ?? [];
-      arr.push(key);
-      out.set(best.entity, arr);
-      const r = this._roomsFor(best).find((x) => x.key === key);
-      // min weight 1 per room: with no estimates configured, this still round-robins
-      // the rooms across robots instead of collapsing onto the first owner.
-      load.set(best.entity, (load.get(best.entity) ?? 0) + Math.max(r ? this._roomCleanMins(r, best) : 0, 1));
-    }
-    return out;
-  }
-  private _segmentFor(vac: VacuumConfig, key: string): number | null {
-    const r = this._roomsFor(vac).find((x) => x.key === key);
-    if (r?.segment_id != null) return r.segment_id;
-    const ent = vac.integration_entity;
-    const rooms = ent ? (this.hass.states[ent]?.attributes?.rooms as Array<Record<string, any>> | undefined) : undefined;
-    // The integration names rooms by the Roborock app name (== the card room KEY); match
-    // by key first, then the display name as a fallback, then a numeric segment key.
-    const match = rooms?.find((ir) => ir.name === key || ir.name === r?.name || String(ir.segment_id) === key);
-    return (match?.segment_id as number | undefined) ?? null;
-  }
-  /** Whether this vacuum can actually clean a room — its map contains it. In merged mode
-   *  every vacuum nominally "has" all card rooms, but a robot on a different map (or a
-   *  different home) can't, so orchestration must not assign it that room. */
-  private _roomCleanableBy(vac: VacuumConfig, key: string): boolean {
-    const t = vac.clean_action?.type;
-    if (t === "native" || t === "native-auto") return this._segmentFor(vac, key) != null;
-    if (t === "native-area") {
-      const ent = vac.integration_entity;
-      const name = this._roomsFor(vac).find((x) => x.key === key)?.name ?? key;
-      const rooms = ent ? (this.hass.states[ent]?.attributes?.rooms as Array<Record<string, any>> | undefined) : undefined;
-      if (rooms) return rooms.some((ir) => ir.name === key || ir.name === name);
-      return this._roomsFor(vac).some((x) => x.key === key);  // best-effort when no sensor
-    }
-    return false;
-  }
-  /** Build the clean service call for a vacuum + rooms, mirroring _startClean's strategy. */
-  private _cleanCmdFor(vac: VacuumConfig, roomKeys: string[], repeat = 1): { service: string; service_data: Record<string, unknown> } | null {
-    const ca = vac.clean_action;
-    if (!ca) return null;
-    const rep = Math.max(1, Math.round(repeat));
-    if (ca.type === "native-area") {
-      return { service: "vacuum.clean_area", service_data: {
-        entity_id: vac.entity,
-        cleaning_area_id: roomKeys.map((k) => {
-          const r = this._roomsFor(vac).find((x) => x.key === k);
-          return r?.area_id ?? this._config.area_mappings?.[k] ?? k;
-        }),
-      }};
-    }
-    if (ca.type === "native" || ca.type === "native-auto") {
-      const segs = roomKeys.map((k) => this._segmentFor(vac, k)).filter((s): s is number => s != null);
-      if (!segs.length) return null;
-      return { service: "vacuum.send_command", service_data: {
-        entity_id: vac.entity, command: "app_segment_clean",
-        params: [{ segments: segs, repeat: rep }],
-      }};
-    }
-    return null; // script strategy is not orchestrated in v1
-  }
-  /** Pre-clean settings (mop selects + fan speed) for a kind, from the matching preset. */
-  private _settingsForKind(vac: VacuumConfig, kind: "dry" | "wet"): { selects: Array<{ entity_id: string; option: string }>; fan_speed?: string; repeat: number } {
-    const presets = this._settingPresets(vac);
-    const isWet = (p: SettingPreset) => (p.mop_intensity != null && p.mop_intensity !== "" && p.mop_intensity !== "off") || !!p.mop_mode;
-    const pick = presets.find((p) => (kind === "wet" ? isWet(p) : !isWet(p))) ?? presets[0];
-    const ca = vac.clean_action as Partial<NativeAutoCleanAction> | undefined;
-    const selects: Array<{ entity_id: string; option: string }> = [];
-    // A dry pass forces the mop off regardless of the preset, so a dry-typed vacuum
-    // always cleans dry even when its only preset happens to be a wet one.
-    if (kind === "wet" && ca?.mop_mode_entity && pick.mop_mode) {
-      selects.push({ entity_id: ca.mop_mode_entity, option: pick.mop_mode });
-    }
-    if (ca?.mop_intensity_entity) {
-      const opt = kind === "dry" ? "off" : pick.mop_intensity;
-      if (opt) selects.push({ entity_id: ca.mop_intensity_entity, option: opt });
-    }
-    const ca2 = vac.clean_action as Partial<NativeAutoCleanAction> | undefined;
-    return { selects, fan_speed: pick.suction_level, repeat: pick.repeat ?? ca2?.repeat ?? 1 };
-  }
-  /** Build a job (capability-aware assignment + dry→wet gating) and hand it to the
-   *  backend anyvac.run_job service, which executes it server-side. */
-  private async _runOrchestrated(roomKeys: string[], mode: "dry" | "wet" | "both"): Promise<void> {
-    if (!roomKeys.length) return;
-    const tasks: Array<Record<string, unknown>> = [];
-    const roomToDryDuid = new Map<string, string | undefined>();
-    // Orchestration spans ALL configured vacuums (not just the shown tab) — every
-    // capable robot should take part in a whole-home clean.
-    const dryAssign = mode !== "wet"
-      ? this._assignByCap(roomKeys, (v) => this._vacCleanType(v).dry, this._config.vacuums)
-      : new Map<string, string[]>();
-    let i = 0;
-    for (const [entity, keys] of dryAssign) {
-      const vac = this._config.vacuums.find((v) => v.entity === entity);
-      if (!vac) continue;
-      const s = this._settingsForKind(vac, "dry");
-      const cmd = this._cleanCmdFor(vac, keys, s.repeat);
-      if (!cmd) continue;
-      tasks.push({ id: "dry" + i++, vacuum: entity, selects: s.selects, fan_speed: s.fan_speed, service: cmd.service, service_data: cmd.service_data });
-      const duid = this._duidOf(vac);
-      for (const k of keys) roomToDryDuid.set(k, duid);
-    }
-    if (mode === "wet" || mode === "both") {
-      let j = 0;
-      for (const [entity, keys] of this._assignByCap(roomKeys, (v) => this._vacCleanType(v).wet, this._config.vacuums)) {
-        const vac = this._config.vacuums.find((v) => v.entity === entity);
-        if (!vac) continue;
-        const s = this._settingsForKind(vac, "wet");
-        const cmd = this._cleanCmdFor(vac, keys, s.repeat);
-        if (!cmd) continue;
-        // Gate on the dry vacuum finishing each room. The room in anyvac_room_done is the
-        // integration's room name (= the card room KEY, kept identical to the Roborock app
-        // name), NOT the display name — so gate by key, else the wet pass never releases.
-        const after: Array<{ duid: string; room?: string }> = mode === "both"
-          ? keys.map((k) => { const duid = roomToDryDuid.get(k); return duid ? { duid, room: k } : null; })
-              .filter((a): a is { duid: string; room: string } => a != null)
-          : [];
-        // A both-capable robot does its dry pass first; its wet pass must wait for its
-        // OWN dry session to finish — it can't clean wet while still cleaning dry.
-        if (mode === "both" && dryAssign.has(entity)) {
-          const selfDuid = this._duidOf(vac);
-          if (selfDuid) after.push({ duid: selfDuid });
-        }
-        tasks.push({ id: "wet" + j++, vacuum: entity, selects: s.selects, fan_speed: s.fan_speed, service: cmd.service, service_data: cmd.service_data, after });
+  /** Per-kind settings for anyvac.clean, from the first capable vacuum's matching
+   *  preset (fan speed / mop mode / mop intensity / repeat). */
+  private _v2Settings(): Record<string, Record<string, unknown>> | undefined {
+    const isWet = (p: SettingPreset) =>
+      (p.mop_intensity != null && p.mop_intensity !== "" && p.mop_intensity !== "off") || !!p.mop_mode;
+    const out: Record<string, Record<string, unknown>> = {};
+    for (const kind of ["dry", "wet"] as const) {
+      for (const v of this._config.vacuums) {
+        const role = this._vacCleanType(v);
+        if (!(kind === "dry" ? role.dry : role.wet)) continue;
+        const presets = this._settingPresets(v);
+        const pick = presets.find((p) => (kind === "wet" ? isWet(p) : !isWet(p))) ?? presets[0];
+        if (!pick) continue;
+        const s: Record<string, unknown> = {};
+        if (pick.suction_level) s.fan_speed = pick.suction_level;
+        if (kind === "wet" && pick.mop_mode) s.mop_mode = pick.mop_mode;
+        if (kind === "wet" && pick.mop_intensity) s.mop_intensity = pick.mop_intensity;
+        if (pick.repeat && pick.repeat > 1) s.repeat = pick.repeat;
+        if (Object.keys(s).length) { out[kind] = s; break; }
       }
     }
-    if (!tasks.length) return;
-    await this._call("anyvac", "run_job", { tasks });
+    return Object.keys(out).length ? out : undefined;
+  }
+  /** Backend plan preview (anyvac.plan, response-only): room key -> vacuum entity. */
+  @state() private _planPreview: { key: string; dry: Map<string, string>; wet: Map<string, string> } | null = null;
+  private _planFetchKey = "";
+  private _fetchPlan(selKeys: string[], mode: "dry" | "wet" | "both"): void {
+    const key = JSON.stringify([selKeys, mode, this._v2Vacuums()]);
+    if (key === this._planFetchKey) return;
+    this._planFetchKey = key;
+    void (async () => {
+      try {
+        const res = await (this.hass as any).callService(
+          "anyvac", "plan",
+          { rooms: selKeys, mode, vacuums: this._v2Vacuums() },
+          undefined, false, true,
+        ) as { response?: { plan?: Record<string, Record<string, string[]>> } } | void;
+        if (this._planFetchKey !== key) return;  // stale response
+        const plan = (res as any)?.response?.plan ?? {};
+        const inv = (m: Record<string, string[]> | undefined) => {
+          const out = new Map<string, string>();
+          for (const [ent, rooms] of Object.entries(m ?? {})) for (const r of rooms) out.set(r, ent);
+          return out;
+        };
+        this._planPreview = { key, dry: inv(plan.dry), wet: inv(plan.wet) };
+      } catch (err) {
+        console.warn("[anyvac-card] anyvac.plan preview failed:", err);
+        if (this._planFetchKey === key) this._planPreview = { key, dry: new Map(), wet: new Map() };
+      }
+    })();
+  }
+  /** Send the clean intent — planning (capability, LPT assignment, segment resolve,
+   *  dry→wet gating, repeat) is entirely backend-side now (anyvac.clean, docs/14
+   *  §3.7). The old client-side plan builder + run_job assembly was deleted. */
+  private async _runOrchestrated(roomKeys: string[], mode: "dry" | "wet" | "both"): Promise<void> {
+    if (!roomKeys.length) return;
+    await this._call("anyvac", "clean", {
+      rooms: roomKeys,
+      mode,
+      vacuums: this._v2Vacuums(),
+      ...(this._v2Settings() ? { settings: this._v2Settings() } : {}),
+    });
   }
   /** Select a global preset (does NOT run): set the plan mode + apply its room scope,
    *  so the plan preview reflects it. The user runs it via the plan's "Spustit". */
@@ -973,14 +917,12 @@ export class AnyVacCard extends LitElement {
     const apLabel = (this._config.global_presets ?? []).find((g) => g.id === this._activeGlobalPreset)?.label;
     const showDry = mode === "dry" || mode === "both";
     const showWet = mode === "wet" || mode === "both";
-    const vacs = this._config.vacuums;  // plan across all robots, not just the shown tab
-    const invert = (m: Map<string, string[]>) => {
-      const out = new Map<string, string>();
-      for (const [e, ks] of m) for (const k of ks) out.set(k, e);
-      return out;
-    };
-    const dryOf = invert(this._assignByCap(selKeys, (v) => this._vacCleanType(v).dry, vacs));
-    const wetOf = invert(this._assignByCap(selKeys, (v) => this._vacCleanType(v).wet, vacs));
+    // The preview is the BACKEND's real assignment (anyvac.plan, response-only) —
+    // the card no longer computes plans locally (docs/14 §3.7). Debounced by key;
+    // until the response lands the cells show "—".
+    this._fetchPlan(selKeys, mode);
+    const dryOf = this._planPreview?.dry ?? new Map<string, string>();
+    const wetOf = this._planPreview?.wet ?? new Map<string, string>();
     const roomDef = (k: string) => {
       for (const v of this._config.vacuums) { const r = this._roomsFor(v).find((x) => x.key === k); if (r) return r; }
       return undefined;
@@ -1114,12 +1056,34 @@ export class AnyVacCard extends LitElement {
   }
 
   private async _startClean(vac: VacuumConfig): Promise<void> {
-    if (!vac.clean_action) return;
-
     const selected = (this._roomsFor(vac)).filter((r) => this._isRoomSelected(r, vac));
     if (selected.length === 0) return;
 
-    // Script strategy -- no in-flight tracking
+    // ── Kontrakt v2: with the integration present, the START button sends an
+    // INTENT restricted to THIS vacuum — segment resolve, settings application and
+    // session tracking are backend-side (anyvac.clean, docs/14 §3.7). No in-flight
+    // tracking, events or notifications here (docs/14 §3.1, §3.10).
+    if (this._intAttrs(vac)) {
+      const ap = this._activePreset(vac);
+      const mode = this._liveCleanType(vac);
+      const s: Record<string, unknown> = {};
+      if (ap.suction_level) s.fan_speed = ap.suction_level;
+      if (mode === "wet" && ap.mop_mode) s.mop_mode = ap.mop_mode;
+      if (mode === "wet" && ap.mop_intensity) s.mop_intensity = ap.mop_intensity;
+      if (ap.repeat && ap.repeat > 1) s.repeat = ap.repeat;
+      await this._call("anyvac", "clean", {
+        rooms: selected.map((r) => r.key),
+        mode,
+        vacuums: [vac.entity],
+        ...(Object.keys(s).length ? { settings: { [mode]: s } } : {}),
+      });
+      return;
+    }
+
+    // ── Degraded mode (no integration, docs/14 §8): dumb direct commands. ──
+    if (!vac.clean_action) return;
+
+    // Script strategy
     if (vac.clean_action.type === "script") {
       const action = vac.clean_action as ScriptCleanAction;
       const variables: Record<string, unknown> = {};
@@ -1153,10 +1117,8 @@ export class AnyVacCard extends LitElement {
     }
 
     if (vac.clean_action.type === "native-area") {
-      // Uses HA vacuum.clean_area — area_id resolved via area_mappings.
-      // NOTE: software repeat was removed (docs/13 A1 — restarting on a "docked"
-      // transition fired during mid-clean mop washes); repeat returns server-side
-      // with the anyvac.clean service (docs/14 §3.8).
+      // Uses HA vacuum.clean_area — area_id resolved via area_mappings. No repeat
+      // (docs/13 A1); repeat lives server-side in anyvac.clean (docs/14 §3.8).
       try {
         await this.hass.callService(
           "vacuum", "clean_area",
@@ -1166,69 +1128,24 @@ export class AnyVacCard extends LitElement {
         );
       } catch (err) {
         console.error("[anyvac-card] vacuum.clean_area failed:", err);
-        return;
       }
-    } else if (vac.clean_action.type === "native-auto") {
-      // Dynamically resolve segment IDs from roborock.get_maps, then send_command
-      const autoAction = vac.clean_action as NativeAutoCleanAction;
-      let autoSegments: number[] = [];
-      try {
-        const mapResult = await (this.hass as any).callService(
-          "roborock", "get_maps", {}, { entity_id: vac.entity }, false, true
-        ) as { response?: Record<string, any> } | void;
-        const maps = (mapResult as any)?.response?.[vac.entity]?.maps as
-          Array<{ rooms?: Record<string, string> }> | undefined;
-        const roomsMap: Record<string, string> = {};
-        if (maps) {
-          for (const m of maps) {
-            if (m.rooms && Object.keys(m.rooms).length > 0) { Object.assign(roomsMap, m.rooms); break; }
-          }
-        }
-        const slugify = (s: string) => s.toLowerCase().replace(/\s+/g, "_").replace(/[^a-z0-9_]/g, "");
-        const slugMap: Record<string, number> = {};
-        for (const [sid, name] of Object.entries(roomsMap)) slugMap[slugify(name)] = Number(sid);
-        for (const room of selected) {
-          // Match against the Roborock room NAME: the room key (our convention = Roborock name)
-          // first, then the display name, then any explicit area mapping as a fallback.
-          const sid =
-            slugMap[slugify(room.key)] ??
-            slugMap[slugify(room.name ?? "")] ??
-            slugMap[String(room.area_id ?? this._config.area_mappings?.[room.key] ?? "")];
-          if (sid !== undefined) {
-            autoSegments.push(sid);
-          } else if (room.segment_id !== undefined) {
-            autoSegments.push(room.segment_id); // fallback to manual segment_id
-          } else {
-            console.warn("[anyvac-card] no segment for", room.key);
-          }
-        }
-      } catch (err) {
-        console.error("[anyvac-card] get_maps failed:", err);
-        autoSegments = selected.map(r => r.segment_id).filter((id): id is number => id !== undefined);
-      }
-      if (autoSegments.length === 0) {
-        console.error("[anyvac-card] native-auto: no segments resolved, aborting");
-        return;
-      }
-      await this._call("vacuum", "send_command", {
-        entity_id: vac.entity,
-        command: "app_segment_clean",
-        params: [{ segments: autoSegments, repeat: autoAction.repeat ?? 1 }],
-      });
     } else {
-      // type === "native" — segment IDs from room config
-      const action = vac.clean_action as NativeCleanAction;
+      // "native" / "native-auto" — segment IDs from the room config. The old
+      // native-auto dynamic resolve (roborock.get_maps) was DELETED with the plan
+      // builder (docs/14 §3.7): with an integration the backend resolves segments,
+      // without one the card only knows its configured segment_ids.
+      const action = vac.clean_action as NativeCleanAction | NativeAutoCleanAction;
       const segments = selected.map((r) => r.segment_id).filter((id): id is number => id !== undefined);
+      if (!segments.length) {
+        console.error("[anyvac-card] no configured segment_ids for the selection; aborting");
+        return;
+      }
       await this._call("vacuum", "send_command", {
         entity_id: vac.entity,
         command: "app_segment_clean",
         params: [{ segments, repeat: action.repeat ?? 1 }],
       });
     }
-    // No in-flight tracking, events or notifications here (docs/14 §3.1, §3.10):
-    // the integration tracks the session (`in_cleaning`, mop-wash aware), fires
-    // anyvac_clean_started/finished/room_done, stamps history and clears the
-    // shared room selection when the clean finishes.
   }
 
   // ── Render: badges ──────────────────────────────────────────────────────
@@ -1327,23 +1244,11 @@ export class AnyVacCard extends LitElement {
 
   // ── Render: map ─────────────────────────────────────────────────────────
 
-  // ── Pin & go / zone (integration-only; docs/14 §3.6) ─────────────────────────
-  // The manual 3-point calibration (Milestone 2, localStorage) was removed: it assumed
-  // the dock sits at map origin, trusted commanded goto targets over the robot's real
-  // position, and duplicated maths the integration provides for free. Map commands now
-  // require the integration's calibration_points.
-  private _affine(pts: Array<{ map: { x: number; y: number }; vacuum: { x: number; y: number } }>) {
-    if (pts.length < 3) return null;
-    const M = pts.slice(0, 3).map((p) => [p.map.x, p.map.y, 1]);
-    const ab = solve3(M, pts.slice(0, 3).map((p) => p.vacuum.x));
-    const cd = solve3(M, pts.slice(0, 3).map((p) => p.vacuum.y));
-    if (!ab || !cd) return null;
-    return { a: ab[0], b: ab[1], e: ab[2], c: cd[0], d: cd[1], f: cd[2] };
-  }
-  private async _gotoMm(entity: string, mm: { x: number; y: number }): Promise<void> {
-    try { await this.hass.callService("vacuum", "send_command", { entity_id: entity, command: "app_goto_target", params: [Math.round(mm.x), Math.round(mm.y)] }); }
-    catch (e) { console.error("[anyvac-card] goto failed:", e); }
-  }
+  // ── Pin & go / zone (integration-only; docs/14 §3.6, kontrakt v2) ────────────
+  // The card sends clicks as PERCENT of the map image to anyvac.goto /
+  // anyvac.zone_clean; the pct→px→mm conversion is backend-side. All client-side
+  // affine math (solve3 / _affine / _intMapToVac / _gotoMm) was deleted — mm no
+  // longer exist in the card.
   private _toggleMode(entity: string, mode: "pin" | "zone"): void {
     if (this._mapMode === mode && this._modeEntity === entity) { this._mapMode = "normal"; this._modeEntity = null; }
     else { this._mapMode = mode; this._modeEntity = entity; }
@@ -1352,14 +1257,22 @@ export class AnyVacCard extends LitElement {
     const ent = vac.map?.entity;
     if (ent) void this.hass.callService("homeassistant", "update_entity", { entity_id: ent });
   }
+  private _clampPct(v: number): number {
+    return Math.min(100, Math.max(0, v));
+  }
   private _onMapClick(vac: VacuumConfig, e: MouseEvent): void {
     const content = this._clickToContent(vac, e.clientX, e.clientY);
     if (this._mapMode === "pin") {
-      const mm = content ? this._intMapToVac(vac, content) : null;
       this._dbg = content
-        ? "px " + content.x.toFixed(1) + "%," + content.y.toFixed(1) + "% -> mm " + (mm ? Math.round(mm.x) + "," + Math.round(mm.y) : "(no calibration data)")
+        ? "goto " + content.x.toFixed(1) + "%, " + content.y.toFixed(1) + "%"
         : "(map element not found)";
-      if (mm) void this._gotoMm(vac.entity, mm);
+      if (content) {
+        void this._call("anyvac", "goto", {
+          entity_id: vac.entity,
+          x_pct: this._clampPct(content.x),
+          y_pct: this._clampPct(content.y),
+        });
+      }
       this._mapMode = "normal"; this._modeEntity = null;
     }
   }
@@ -1388,20 +1301,6 @@ export class AnyVacCard extends LitElement {
     const w = el.offsetWidth || 1, h = el.offsetHeight || 1;
     return { x: (lx / w + 0.5) * 100, y: (ly / h + 0.5) * 100 };
   }
-  private _intMapToVac(vac: VacuumConfig, content: { x: number; y: number }): { x: number; y: number } | null {
-    const at = this.hass?.states?.[vac.integration_entity ?? ""]?.attributes as any;
-    if (!at) return null;
-    const t = this._affine(at.calibration_points);
-    const dims = at.image_dims;
-    if (!t || !dims) return null;
-    let NW = (dims.width ?? 0) * (dims.scale ?? 1);
-    let NH = (dims.height ?? 0) * (dims.scale ?? 1);
-    const rot = dims.rotation ?? 0;
-    if (rot === 90 || rot === 270) { const tmp = NW; NW = NH; NH = tmp; }
-    if (!NW || !NH) return null;
-    const px = (content.x / 100) * NW, py = (content.y / 100) * NH;
-    return { x: t.a * px + t.b * py + t.e, y: t.c * px + t.d * py + t.f };
-  }
   private _onZoneDown(vac: VacuumConfig, e: PointerEvent): void {
     if (this._mapMode !== "zone" || this._modeEntity !== vac.entity) return;
     const el = e.currentTarget as HTMLElement;
@@ -1425,15 +1324,14 @@ export class AnyVacCard extends LitElement {
     const r = el.getBoundingClientRect();
     const ax = r.left + (this._zoneDrag.x0 / 100) * r.width;
     const ay = r.top + (this._zoneDrag.y0 / 100) * r.height;
+    // Both corners as PERCENT of the map image content (mm math is backend-side).
     const ca = this._clickToContent(vac, ax, ay);
     const cb = this._clickToContent(vac, e.clientX, e.clientY);
-    const ma = ca ? this._intMapToVac(vac, ca) : null;
-    const mb = cb ? this._intMapToVac(vac, cb) : null;
     const big = Math.abs(this._zoneDrag.x1 - this._zoneDrag.x0) > 2 || Math.abs(this._zoneDrag.y1 - this._zoneDrag.y0) > 2;
-    if (ma && mb && big) {
+    if (ca && cb && big) {
       this._zonePending = {
-        x1: Math.round(Math.min(ma.x, mb.x)), y1: Math.round(Math.min(ma.y, mb.y)),
-        x2: Math.round(Math.max(ma.x, mb.x)), y2: Math.round(Math.max(ma.y, mb.y)),
+        x1: this._clampPct(Math.min(ca.x, cb.x)), y1: this._clampPct(Math.min(ca.y, cb.y)),
+        x2: this._clampPct(Math.max(ca.x, cb.x)), y2: this._clampPct(Math.max(ca.y, cb.y)),
       };
     } else {
       this._zoneDrag = null;
@@ -1441,7 +1339,11 @@ export class AnyVacCard extends LitElement {
   }
   private _confirmZone(vac: VacuumConfig): void {
     const z = this._zonePending; if (!z) return;
-    void this.hass.callService("vacuum", "send_command", { entity_id: vac.entity, command: "app_zoned_clean", params: [[z.x1, z.y1, z.x2, z.y2, 1]] });
+    void this._call("anyvac", "zone_clean", {
+      entity_id: vac.entity,
+      x1_pct: z.x1, y1_pct: z.y1, x2_pct: z.x2, y2_pct: z.y2,
+      repeat: 1,
+    });
     this._zonePending = null; this._zoneDrag = null;
     this._mapMode = "normal"; this._modeEntity = null;
   }
@@ -1452,11 +1354,11 @@ export class AnyVacCard extends LitElement {
     // Map commands need the integration's calibration AND this vacuum's map element
     // for the click geometry. Disabled in the rotated (narrow) view — the click
     // inversion does not account for the wrapper rotation yet (docs/13 A5).
-    const canCmd = !!vac.integration_entity && !!vac.map?.entity && !this._narrow;
+    const canCmd = !!this._intAttrs(vac) && !!vac.map?.entity && !this._narrow;
     const cmdTitle = this._narrow
       ? "Not available in the rotated mobile view"
-      : (!vac.integration_entity || !vac.map?.entity)
-        ? "Requires the AnyVac integration sensor + map entity"
+      : (!this._intAttrs(vac) || !vac.map?.entity)
+        ? "Requires the AnyVac integration (≥ 0.18) + map entity"
         : "";
     const mode = this._modeEntity === vac.entity ? this._mapMode : "normal";
     return html`
@@ -1477,7 +1379,7 @@ export class AnyVacCard extends LitElement {
       ${mode === "pin" ? html`<div class="calib-panel">Tap the map to send the robot there.</div>` : nothing}
       ${mode === "zone" ? html`<div class="calib-panel">
         ${this._zonePending
-          ? html`<div>Clean this zone? (${this._zonePending.x2 - this._zonePending.x1}&times;${this._zonePending.y2 - this._zonePending.y1}&nbsp;mm)</div>
+          ? html`<div>Clean this zone?</div>
               <div class="calib-actions">
                 <button class="mtbtn on" @click=${() => this._confirmZone(vac)}>Clean zone</button>
                 <button class="mtbtn" @click=${() => this._cancelZone()}>Cancel</button>
@@ -1485,10 +1387,6 @@ export class AnyVacCard extends LitElement {
           : html`Drag a rectangle on the map to set a cleaning zone.`}
       </div>` : nothing}
     `;
-  }
-
-  private _intAffine(cal: any): { a: number; b: number; c: number; d: number; e: number; f: number } | null {
-    return affineFromCalibration(cal);
   }
 
   // ── Auto-seating (docs/15) ──────────────────────────────────────────────
@@ -1520,8 +1418,9 @@ export class AnyVacCard extends LitElement {
       : vac.image_base;
     // Auto-seat only makes sense against a floorplan reference; a map-only base
     // IS the reference itself and keeps its manual (default) seat.
-    if (!ib?.src || !vac.integration_entity) return manual;
-    const at = this.hass?.states?.[vac.integration_entity]?.attributes as Record<string, any> | undefined;
+    if (!ib?.src) return manual;
+    // Kontrakt v2: anchors come from rooms[].bbox_px (integration ≥ 0.18).
+    const at = this._intAttrs(vac);
     if (!at) return manual;
     const bh = merged
       ? (this._config.base_height ?? this._config.vacuums.find((v) => v.base_height)?.base_height)
@@ -1536,42 +1435,40 @@ export class AnyVacCard extends LitElement {
     };
   }
 
-  /** Integration mode: draw the robot + cleaning path as a vector overlay using
-   *  the calibration_points (mm -> rendered-map px) exposed by the AnyVac sensor. */
+  /** Integration mode: draw the robot + cleaning path as a vector overlay from the
+   *  px-space attributes (kontrakt v2: vacuum_position_px, path_dry_px, path_wet_px
+   *  — already in rendered-map pixels, no client-side mm math). */
   private _renderIntegrationOverlay(vac: VacuumConfig, m: any) {
-    const ent = vac.integration_entity;
-    if (!ent) return nothing;
-    const at = this.hass?.states?.[ent]?.attributes as any;
+    const at = this._intAttrs(vac);
     if (!at) return nothing;
-    const t = this._intAffine(at.calibration_points);
     const dims = at.image_dims;
-    if (!t || !dims) return nothing;
+    if (!dims) return nothing;
     const sc = dims.scale ?? 1;
     let NW = (dims.width ?? 0) * sc;
     let NH = (dims.height ?? 0) * sc;
     const rot = dims.rotation ?? 0;
     if (rot === 90 || rot === 270) { const tmp = NW; NW = NH; NH = tmp; }
     if (!NW || !NH) return nothing;
-    const toPx = (x: number, y: number) => ({ x: t.a * x + t.b * y + t.c, y: t.d * x + t.e * y + t.f });
     const color = this._color(vac);
     const rr = Math.max(NW, NH) / 55;
-    const toPts = (arr: any) => (Array.isArray(arr) ? arr : []).map((p: any) => { const q = toPx(p.x, p.y); return q.x.toFixed(1) + "," + q.y.toFixed(1); }).join(" ");
+    const toPts = (arr: any) => (Array.isArray(arr) ? arr : []).map((p: any) => p.x.toFixed(1) + "," + p.y.toFixed(1)).join(" ");
     const ct = this._vacCleanType(vac);
-    // Dry layer draws the SEGMENTED dry trace (path_dry — cleaning-only points, no
-    // transit / mop-wash driving; integration ≥0.12). Falls back to the legacy full
-    // trajectory (path) on older integrations. Wet layer draws the mop trace as a
-    // wider translucent "wet sheen" band under the line.
+    // Dry layer draws the SEGMENTED dry trace (path_dry_px — cleaning-only points,
+    // no transit / mop-wash driving). Wet layer draws the mop trace as a wider
+    // translucent "wet sheen" band under the line.
     const layersOn = this._layersEff();
     const showDry = layersOn.dry && ct.dry;
     const showWet = layersOn.wet && ct.wet;
-    const dryStr = showDry ? toPts(at.path_dry ?? at.path) : "";
-    const wetStr = showWet ? toPts(at.path_wet ?? at.mop_path) : "";
-    const vp = at.vacuum_position;
-    const rob = vp ? toPx(vp.x, vp.y) : null;
+    const dryStr = showDry ? toPts(at.path_dry_px) : "";
+    const wetStr = showWet ? toPts(at.path_wet_px) : "";
+    const vp = at.vacuum_position_px;
+    const rob = vp ? { x: vp.x as number, y: vp.y as number } : null;
     let head: { x: number; y: number } | null = null;
-    if (vp && vp.a != null) {
-      const ar = (vp.a * Math.PI) / 180;
-      head = toPx(vp.x + 320 * Math.cos(ar), vp.y + 320 * Math.sin(ar));
+    if (rob && vp.a != null) {
+      // Heading: the angle is reported in vacuum space; the mm→px transform flips
+      // the y axis, so the px-space direction is (cos a, −sin a).
+      const arad = (vp.a * Math.PI) / 180;
+      head = { x: rob.x + rr * 1.3 * Math.cos(arad), y: rob.y - rr * 1.3 * Math.sin(arad) };
     }
     const seat = {
       left: (50 + (m?.offset_x ?? 0)) + "%",
@@ -1657,12 +1554,12 @@ export class AnyVacCard extends LitElement {
   }
 
   private _renderLayerToggles(vacs: VacuumConfig[]) {
-    const withInt = vacs.filter((v) => v.integration_entity);
+    const withInt = vacs.filter((v) => this._intAttrs(v));
     if (!withInt.length) return nothing;
     const oldest = (type: "dry" | "wet"): number | null => {
       let max: number | null = null;
       for (const v of withInt) {
-        const rlc = this.hass.states[v.integration_entity!]?.attributes?.rooms_last_cleaned as Record<string, any> | undefined;
+        const rlc = this._intAttrs(v)?.rooms_last_cleaned as Record<string, any> | undefined;
         if (!rlc) continue;
         for (const rec of Object.values(rlc)) {
           const d = this._ageDaysFromIso((rec as any)?.[type]);
@@ -1692,7 +1589,7 @@ export class AnyVacCard extends LitElement {
 
   /** Per-room status list (dry + wet age), deduped across vacuums; click selects across all. */
   private _renderRoomList(shown: VacuumConfig[]) {
-    if (!shown.some((v) => v.integration_entity)) return nothing;
+    if (!shown.some((v) => this._intAttrs(v))) return nothing;
     const seen = new Set<string>();
     const rooms: Array<{ r: RoomConfig; v: VacuumConfig }> = [];
     for (const v of shown) for (const r of v.rooms ?? []) {
@@ -1809,7 +1706,7 @@ export class AnyVacCard extends LitElement {
               mixBlendMode: v.overlay_blend ?? "normal",
             })} />`;
         })}
-        ${shown.map((v) => (v.integration_entity ? this._renderIntegrationOverlay(v, this._effectiveSeat(v)) : nothing))}
+        ${shown.map((v) => (this._intAttrs(v) ? this._renderIntegrationOverlay(v, this._effectiveSeat(v)) : nothing))}
         ${this._renderLayerToggles(shown)}
         ${this._renderMergedRooms(shown)}
       </div>
@@ -2160,8 +2057,7 @@ export class AnyVacCard extends LitElement {
 
   /** Room the vacuum is currently in, per the integration (for live-ticking its timer). */
   private _currentRoomName(vac: VacuumConfig): string | undefined {
-    const ent = vac.integration_entity;
-    return ent ? (this.hass.states[ent]?.attributes?.vacuum_room_name as string | undefined) : undefined;
+    return this._intAttrs(vac)?.vacuum_room_name as string | undefined;
   }
 
   private _mmss(sec: number): string {
@@ -2178,7 +2074,7 @@ export class AnyVacCard extends LitElement {
       .filter((x) => x.p && (x.p!.dry_pct != null || x.p!.wet_pct != null || x.p!.elapsed_s != null));
     if (!rows.length) return nothing;
     const color = this._color(vac);
-    const ent = vac.integration_entity;
+    const ent = this._intEntity(vac);
     const sensorTs = ent ? Date.parse(this.hass.states[ent]?.last_updated ?? "") : NaN;
     const curRoom = this._currentRoomName(vac);
     const cleaning = this._isCleaning(vac);
@@ -2215,9 +2111,13 @@ export class AnyVacCard extends LitElement {
   render() {
     if (!this._config || !this.hass) return nothing;
 
+    const schemaWarn = this._schemaWarning();
     return html`
       <ha-card>
         ${this.editMode ? html`<div class="version-chip">v${CARD_VERSION} · ${Math.round(this._cardW)}w</div>` : nothing}
+        ${schemaWarn ? html`<div style="margin:0 4px;padding:8px 12px;border-radius:12px;border:1px solid rgba(250,173,20,0.55);background:rgba(250,173,20,0.12);color:#faad14;font-size:12px;display:flex;align-items:center;gap:8px">
+          <ha-icon icon="mdi:alert" style="--mdc-icon-size:18px"></ha-icon><span>${schemaWarn}</span>
+        </div>` : nothing}
         <div class="badges-row">
           ${this._config.vacuums.map((v, i) => this._renderBadge(v, i))}
           ${(this._config.global_actions ?? []).map((ga, i) => this._renderGlobalBadge(ga, i))}
