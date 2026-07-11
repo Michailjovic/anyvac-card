@@ -13,6 +13,28 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   floating map tools, stats trio, exact rotated-map fit, per-room vacuum pinning),
   landscape cockpit. Completion of the rebuild ships as **v1.0.0**.
 
+## [0.42.1] - 2026-07-11
+
+First field pass over the 0.42.0 grid profiles — fixes from live screenshots.
+
+### Fixed
+
+- **Floating map tools removed** — per-vacuum tool columns overlaid (and blocked)
+  the right side of the map, one column per vacuum. Landscape now places the
+  `tools` region UNDER the map (new canonical rows `[9, 56, 35]`, tools row gets a
+  per-vacuum name label); portrait gets a single floating refresh-all button
+  (pin&go/zone are disabled in the rotated view anyway).
+- **Layer toggles moved out of the rotated map** — they now render at map-REGION
+  level (upright, top-right), never rotate with the portrait map and no longer
+  collide with on-map gauges.
+- **On-map chips counter-rotated in portrait** — room gauges, progress chips and
+  room icons stay upright inside the 90° rotated map (`.avc-rot` wrapper).
+- **Portrait badges row** — no wrapping (it cut off the third vacuum); compact
+  badges with horizontal scroll instead. Stats trio renders only in landscape —
+  the portrait START bar already shows the count + estimate.
+- **Portrait dock** — compact: icon-only mode buttons, room rows without names
+  (icon + dry/wet ages + avatars), smaller chips, so the 28 % column actually fits.
+
 ## [0.42.0] - 2026-07-11
 
 Phase B of the responsive rebuild (docs/18): the portrait profile per docs/12, the

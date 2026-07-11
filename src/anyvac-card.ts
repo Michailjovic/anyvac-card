@@ -1601,7 +1601,18 @@ export class AnyVacCard extends LitElement {
   }
   private _cancelZone(): void { this._zonePending = null; this._zoneDrag = null; }
 
-  private _renderMapTools(vac: VacuumConfig, float = false, slot = 0) {
+  /** Single floating refresh-all button for map regions without a `tools` row
+   *  (portrait grid) — the only map command that works in the rotated view. */
+  private _renderMapRefreshFloat(vacs: VacuumConfig[]) {
+    const withMap = vacs.filter((v) => v.map?.entity);
+    if (!withMap.length) return nothing;
+    return html`<button class="mtbtn map-refresh-float" title="Refresh maps"
+      @click=${() => { for (const v of withMap) this._refreshMap(v); }}>
+      <ha-icon icon="mdi:refresh"></ha-icon>
+    </button>`;
+  }
+
+  private _renderMapTools(vac: VacuumConfig) {
     if (!vac.map && !vac.image_base) return nothing;
     // Map commands need the integration's calibration AND this vacuum's map element
     // for the click geometry. Disabled in the rotated (narrow) view — the click
@@ -1613,12 +1624,10 @@ export class AnyVacCard extends LitElement {
         ? "Requires the AnyVac integration (≥ 0.18) + map entity"
         : "";
     const mode = this._modeEntity === vac.entity ? this._mapMode : "normal";
-    // Floating variant (docs/18 §3): icon-only column overlaid on the map edge —
-    // Roborock-app style. Panels/hints float along the bottom of the map region.
-    const toolsStyle = float ? `right:${8 + slot * 44}px` : "";
-    const panelClass = float ? "calib-panel calib-panel--float" : "calib-panel";
     return html`
-      <div class="map-tools ${float ? "map-tools--float" : ""}" style=${toolsStyle}>
+      <div class="map-tools">
+        ${this._config.layout && this._config.vacuums.length > 1
+          ? html`<span class="map-tools-label">${vac.name ?? vac.entity}</span>` : nothing}
         ${vac.map?.entity ? html`<button class="mtbtn" @click=${() => this._refreshMap(vac)} title="Refresh map">
           <ha-icon icon="mdi:refresh"></ha-icon><span>Refresh</span>
         </button>` : nothing}
@@ -1630,10 +1639,10 @@ export class AnyVacCard extends LitElement {
           @click=${() => this._toggleMode(vac.entity, "zone")} title=${cmdTitle || "Zone clean"}>
           <ha-icon icon="mdi:select-drag"></ha-icon><span>Zone</span>
         </button>
-        ${this._dbg && (this._config.debug || !float) ? html`<span style="font-size:11px;opacity:0.65;align-self:center;font-family:monospace">${this._dbg}</span>` : nothing}
+        ${this._dbg && (this._config.debug || !this._config.layout) ? html`<span style="font-size:11px;opacity:0.65;align-self:center;font-family:monospace">${this._dbg}</span>` : nothing}
       </div>
-      ${mode === "pin" ? html`<div class=${panelClass}>Tap the map to send the robot there.</div>` : nothing}
-      ${mode === "zone" ? html`<div class=${panelClass}>
+      ${mode === "pin" ? html`<div class="calib-panel">Tap the map to send the robot there.</div>` : nothing}
+      ${mode === "zone" ? html`<div class="calib-panel">
         ${this._zonePending
           ? html`<div>Clean this zone?</div>
               <div class="calib-actions">
@@ -1930,8 +1939,10 @@ export class AnyVacCard extends LitElement {
       rW = Math.round(W * scale);
       rH = Math.round(visH * scale);
     }
+    // .avc-rot lets CSS counter-rotate small on-map chips (gauges, prog chips,
+    // room icons) so their text stays upright while the map itself is rotated.
     return html`
-      <div style="position:relative;width:${rW}px;height:${rH}px;margin:0 auto;overflow:hidden">
+      <div class="avc-rot" style="position:relative;width:${rW}px;height:${rH}px;margin:0 auto;overflow:hidden">
         <div style="position:absolute;top:0;left:0;width:${rH}px;height:${rW}px;transform-origin:top left;transform:translateX(${rW}px) rotate(90deg)">
           ${mapHtml}
         </div>
@@ -1977,7 +1988,7 @@ export class AnyVacCard extends LitElement {
             })} />`;
         })}
         ${shown.map((v) => (this._intAttrs(v) ? this._renderIntegrationOverlay(v, this._effectiveSeat(v)) : nothing))}
-        ${this._renderLayerToggles(shown)}
+        ${this._config.layout ? nothing : this._renderLayerToggles(shown)}
         ${this._renderMergedRooms(shown)}
       </div>
     `;
@@ -2018,7 +2029,7 @@ export class AnyVacCard extends LitElement {
             })} />
         ` : nothing}
         ${showMap ? this._renderIntegrationOverlay(vac, seat) : nothing}
-        ${this._renderLayerToggles([vac])}
+        ${this._config.layout ? nothing : this._renderLayerToggles([vac])}
         ${(this._roomsFor(vac)).map((r) => this._renderRoomOverlay(r, vac))}
         ${this._mapMode !== "normal" && this._modeEntity === vac.entity
           ? html`<div class="map-clickcatch" style="touch-action:none"
@@ -2396,22 +2407,30 @@ export class AnyVacCard extends LitElement {
     const vacsOf = (idxs: number[]) => idxs.map((i) => this._config.vacuums[i]);
     switch (name) {
       case "badges":
+        // Stats trio only in landscape — portrait has no room for it (the START
+        // bar shows the selection count + estimate there instead).
         return html`<div class="badges-row badges-row--grid">
           ${this._config.vacuums.map((v, i) => this._renderBadge(v, i))}
           ${(this._config.global_actions ?? []).map((ga, i) => this._renderGlobalBadge(ga, i))}
-          ${this._renderStatsTrio()}
+          ${this._profile === "landscape" ? this._renderStatsTrio() : nothing}
         </div>`;
       case "autobar":
         return this._renderAutoBar();
       case "plan":
         return this._renderPlanPreview();
       case "map": {
-        // Map tools float over the map edge in grid mode (docs/18 §3) — the tools
-        // region stays available for explicit old-style placement.
+        // Layer toggles render at REGION level: upright (outside the portrait
+        // rotation wrapper) and never overlapping the on-map gauges. Pin&go/zone
+        // tools live in the `tools` region (landscape, under the map); when it is
+        // not placed (portrait — the commands are disabled in rotation anyway),
+        // the map gets a single floating refresh-all button instead.
         const maps = merged
           ? this._renderResponsive(this._renderMergedMap())
           : html`${shown.map((i) => this._renderResponsive(this._renderMap(this._config.vacuums[i])))}`;
-        return html`${maps}${vacsOf(shown).map((v, slot) => this._renderMapTools(v, true, slot))}`;
+        const vacs = vacsOf(shown);
+        return html`${maps}
+          ${this._renderLayerToggles(vacs)}
+          ${"tools" in prof.place ? nothing : this._renderMapRefreshFloat(vacs)}`;
       }
       case "tools":
         return html`${vacsOf(shown).map((v) => this._renderMapTools(v))}`;
@@ -2435,7 +2454,7 @@ export class AnyVacCard extends LitElement {
     return html`
       <ha-card style="padding:0;display:block">
         ${this.editMode ? html`<div class="version-chip">v${CARD_VERSION} · ${Math.round(this._cardW)}w · ${this._profile}</div>` : nothing}
-        <div class="avc-grid" style=${styleMap(gridRootStyles(lay, prof))}>
+        <div class="avc-grid avc-grid--${this._profile}" style=${styleMap(gridRootStyles(lay, prof))}>
           ${schemaWarn ? html`<div class="avc-schemawarn">
             <ha-icon icon="mdi:alert" style="--mdc-icon-size:18px"></ha-icon><span>${schemaWarn}</span>
           </div>` : nothing}
@@ -2672,33 +2691,51 @@ export class AnyVacCard extends LitElement {
       border-color: rgba(250, 173, 20, 0.6);
     }
 
-    /* Floating map tools (grid mode) */
-    .map-tools--float {
+    /* Map-region furniture (grid mode): upright, OUTSIDE the rotation wrapper */
+    .map-refresh-float {
       position: absolute;
       top: 8px;
+      left: 8px;
       z-index: 6;
-      flex-direction: column;
-      gap: 6px;
-      margin: 0;
-    }
-    .map-tools--float .mtbtn {
       padding: 8px;
       backdrop-filter: blur(8px);
       -webkit-backdrop-filter: blur(8px);
       background: rgba(20, 20, 20, 0.55);
     }
-    .map-tools--float .mtbtn span { display: none; }
-    .calib-panel--float {
-      position: absolute;
-      left: 8px;
-      right: 56px;
-      bottom: 8px;
-      z-index: 6;
-      margin: 0;
-      backdrop-filter: blur(8px);
-      -webkit-backdrop-filter: blur(8px);
-      background: rgba(20, 20, 30, 0.75);
+    .map-tools-label {
+      font-size: 11px;
+      font-weight: 700;
+      color: rgba(255, 255, 255, 0.45);
+      align-self: center;
+      min-width: 64px;
     }
+
+    /* Counter-rotate small on-map chips inside the rotated portrait map so their
+     *  text stays upright (the rotation wrapper adds .avc-rot). */
+    .avc-rot .room-gauge { transform: rotate(-90deg); }
+    .avc-rot .rl-prog { transform: rotate(-90deg); }
+    .avc-rot .room-btn > ha-icon,
+    .avc-rot .room-overlay > ha-icon { transform: rotate(-90deg); }
+
+    /* Portrait grid: compact badges (horizontal scroll, no wrap) + compact dock */
+    .avc-grid--portrait .badges-row--grid {
+      flex-wrap: nowrap;
+      overflow-x: auto;
+      scrollbar-width: none;
+    }
+    .avc-grid--portrait .badges-row--grid::-webkit-scrollbar { display: none; }
+    .avc-grid--portrait .badge { padding: 4px 10px 4px 4px; gap: 6px; flex-shrink: 0; }
+    .avc-grid--portrait .badge-img { width: 30px; height: 30px; }
+    .avc-grid--portrait .badge-icon { --mdc-icon-size: 26px; }
+    .avc-grid--portrait .badge-name { font-size: 11px; }
+    .avc-grid--portrait .dock { padding: 4px; gap: 4px; }
+    .avc-grid--portrait .dock-mode { padding: 6px 2px; }
+    .avc-grid--portrait .dock-mode span { display: none; }
+    .avc-grid--portrait .dock-name { display: none; }
+    .avc-grid--portrait .dock-row { padding: 5px 5px; gap: 4px; flex-wrap: wrap; justify-content: center; }
+    .avc-grid--portrait .dock-ages { gap: 3px; }
+    .avc-grid--portrait .dock-age { font-size: 9px; }
+    .avc-grid--portrait .dock-age ha-icon { --mdc-icon-size: 10px; }
 
     .avc-schemawarn {
       position: absolute;

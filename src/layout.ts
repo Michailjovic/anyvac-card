@@ -47,10 +47,13 @@ export interface LayoutConfig {
 export const DEFAULT_PROFILES: Record<LayoutProfile, Required<Omit<ProfileGridConfig, never>>> = {
   landscape: {
     columns: [70, 30],
-    rows: [9, 61, 30],
+    rows: [9, 56, 35],
     place: {
       badges: { row: 1, col: 1 },
-      map: { row: "2/4", col: 1, overflow: "auto" },
+      map: { row: 2, col: 1, overflow: "auto" },
+      // Map tools live UNDER the map in landscape — floating columns blocked the
+      // right side of the map (field feedback 2026-07-11).
+      tools: { row: 3, col: 1, overflow: "auto", align: "start" },
       dock: { row: "1/3", col: 2 },
       status: { row: 3, col: 2, overflow: "auto" },
     },
