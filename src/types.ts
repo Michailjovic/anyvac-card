@@ -1,3 +1,5 @@
+import type { LayoutConfig } from "./layout";
+
 // ── Home Assistant core types ─────────────────────────────────────────────
 
 export interface HassConnection {
@@ -318,4 +320,8 @@ export interface AnyVacCardConfig {
   /** Debug: draw a per-room cleaning-progress gauge on the map (reads the integration's
    *  rooms_progress). Off by default — a testing aid, not for everyday cards. */
   debug_room_progress?: boolean;
+  /** Two-profile percentage-grid layout (docs/18). Omitted = today's stacked
+   *  render, unchanged. Present = the card becomes a viewport-sized grid with
+   *  named regions placed per portrait/landscape profile. */
+  layout?: LayoutConfig;
 }

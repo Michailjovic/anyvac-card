@@ -87,7 +87,7 @@ const t={ATTRIBUTE:1},e=t=>(...e)=>({_$litDirective$:t,values:e});let i$1 = clas
 
 const CARD_NAME = "anyvac-card";
 const EDITOR_NAME = "anyvac-card-editor";
-const CARD_VERSION = "0.40.0";
+const CARD_VERSION = "0.41.0";
 /** Hold duration in ms required to trigger START / PAUSE actions */
 const HOLD_DURATION_MS = 600;
 /**
@@ -381,6 +381,120 @@ function roomBboxToRect(ir, at, seat, ar) {
     };
 }
 
+/**
+ * layout.ts — two-profile percentage-grid layout runtime (docs/18).
+ *
+ * Model: two complete layout profiles (portrait / landscape), picked by the
+ * aspect ratio of the available viewport — never by device type and never by
+ * width breakpoints. Each profile is a CSS grid whose tracks are percentages
+ * of the available viewport; the UI is a set of named regions placed into the
+ * grid per profile. A region not placed in a profile is not rendered there.
+ */
+/**
+ * Interim Phase-A defaults. The canonical docs/18 §4 defaults reference the
+ * `dock` and `start` regions which only come to exist in Phase B/C — until
+ * then the defaults place today's regions sensibly. Overridable per config.
+ */
+const DEFAULT_PROFILES = {
+    landscape: {
+        columns: [70, 30],
+        rows: [9, 61, 30],
+        place: {
+            badges: { row: 1, col: 1 },
+            autobar: { row: 1, col: 2, overflow: "auto" },
+            map: { row: "2/4", col: 1 },
+            plan: { row: 2, col: 2, overflow: "auto" },
+            status: { row: 3, col: 2, overflow: "auto" },
+        },
+    },
+    portrait: {
+        columns: [100],
+        rows: [8, 72, 20],
+        place: {
+            badges: { row: 1 },
+            // Exact rotated-map fit into the region height lands in Phase B; until
+            // then the region scrolls if the rotated map is taller than its track.
+            map: { row: 2, overflow: "auto" },
+            status: { row: 3, overflow: "auto" },
+        },
+    },
+};
+/** Pick the active profile from the available viewport. */
+function pickProfile(cfg, availW, availH) {
+    const o = cfg?.orientation;
+    if (o === "portrait" || o === "landscape")
+        return o;
+    if (!availW || !availH)
+        return "landscape";
+    return availW / availH < (cfg?.threshold ?? 1.0) ? "portrait" : "landscape";
+}
+/** Read the HA header height (px) from the CSS variable, 0 when absent. */
+function headerPx(el) {
+    try {
+        const raw = getComputedStyle(el).getPropertyValue("--header-height").trim();
+        const n = parseFloat(raw);
+        return Number.isFinite(n) && n > 0 ? n : 0;
+    }
+    catch {
+        return 0;
+    }
+}
+/** Merge the profile's grid config with the built-in defaults. */
+function resolveProfile(cfg, profile) {
+    const p = cfg[profile] ?? {};
+    const d = DEFAULT_PROFILES[profile];
+    return {
+        columns: p.columns?.length ? p.columns : d.columns,
+        rows: p.rows?.length ? p.rows : d.rows,
+        place: p.place && Object.keys(p.place).length ? p.place : d.place,
+    };
+}
+function track(v) {
+    return typeof v === "number" ? v + "%" : v;
+}
+function trackList(list) {
+    return list.map(track).join(" ");
+}
+/** CSS height for the grid root. The measured refinement (innerHeight − rootTop)
+ *  is applied on top of this by the card; this is the declarative fallback.
+ *  `svh` (not vh/dvh) so a mobile URL-bar show/hide doesn't make the layout jump. */
+function resolveHeightCss(cfg) {
+    const h = cfg.height ?? "viewport";
+    if (h === "viewport")
+        return "calc(100svh - var(--header-height, 0px))";
+    if (h === "container")
+        return "100%";
+    return h;
+}
+/** Inline styles for the grid root (static styles can't express a dynamic grid). */
+function gridRootStyles(cfg, prof) {
+    return {
+        display: "grid",
+        width: "100%",
+        height: resolveHeightCss(cfg),
+        alignContent: "start",
+        gridTemplateColumns: trackList(prof.columns),
+        gridTemplateRows: trackList(prof.rows),
+        gap: cfg.gap ?? "6px",
+        boxSizing: "border-box",
+    };
+}
+/** Inline styles for a region wrapper. `position:relative` keeps absolutely
+ *  positioned children (map overlays, layer toggles) correct in both profiles. */
+function regionStyles(place) {
+    const s = {
+        gridRow: String(place.row ?? "auto"),
+        gridColumn: String(place.col ?? "1"),
+        overflow: place.overflow ?? "hidden",
+        position: "relative",
+        minWidth: "0",
+        minHeight: "0",
+    };
+    if (place.align && place.align !== "stretch")
+        s.alignSelf = place.align;
+    return s;
+}
+
 var _a;
 console.info(`%c ANYVAC-CARD %c v${CARD_VERSION} `, "background:#2196F3;color:#fff;font-weight:700;padding:2px 4px;border-radius:3px 0 0 3px", "background:#1a1a1a;color:#fff;font-weight:400;padding:2px 4px;border-radius:0 3px 3px 0");
 let AnyVacCard = class AnyVacCard extends i$2 {
@@ -411,6 +525,8 @@ let AnyVacCard = class AnyVacCard extends i$2 {
         /** Responsive: measured card width + map aspect ratio (W/H) for portrait rotation. */
         this._cardW = 0;
         this._mapAR = 3.636;
+        /** Active layout profile (docs/18) — picked by viewport aspect ratio. */
+        this._profile = "landscape";
         this._ro = null;
         this._onWinResize = null;
         this._measureRaf = 0;
@@ -498,6 +614,7 @@ let AnyVacCard = class AnyVacCard extends i$2 {
         if (!this._onWinResize) {
             this._onWinResize = () => this._scheduleMeasure();
             window.addEventListener("resize", this._onWinResize, { passive: true });
+            window.addEventListener("orientationchange", this._onWinResize, { passive: true });
         }
         this._scheduleMeasure();
         if (!this._tickTimer) {
@@ -511,7 +628,9 @@ let AnyVacCard = class AnyVacCard extends i$2 {
             }, 1000);
         }
     }
-    /** Coalesce all width re-measures into one rAF tick (RO + window resize). */
+    /** Coalesce all width re-measures into one rAF tick (RO + window resize +
+     *  orientationchange). Also re-picks the layout profile (docs/18) from the
+     *  available viewport ratio and refines the grid height. */
     _scheduleMeasure() {
         if (this._measureRaf)
             return;
@@ -520,7 +639,32 @@ let AnyVacCard = class AnyVacCard extends i$2 {
             const w = Math.round(this.getBoundingClientRect().width);
             if (w && Math.abs(w - this._cardW) >= 2)
                 this._cardW = w;
+            const lay = this._config?.layout;
+            if (lay) {
+                const hh = headerPx(this);
+                const p = pickProfile(lay, window.innerWidth, Math.max(1, window.innerHeight - hh));
+                if (p !== this._profile)
+                    this._profile = p;
+                this._refineGridHeight();
+            }
         });
+    }
+    /** Measured refinement of the grid height: innerHeight − rootTop beats the raw
+     *  `calc(100svh − header)` when the root is offset (padding, safe-area). Applied
+     *  directly to the element — no state, no re-render loop. */
+    _refineGridHeight() {
+        const lay = this._config?.layout;
+        if (!lay || (lay.height ?? "viewport") !== "viewport")
+            return;
+        const root = this.renderRoot?.querySelector(".avc-grid");
+        if (!root)
+            return;
+        const top = root.getBoundingClientRect().top;
+        if (top >= 0 && top < window.innerHeight) {
+            const h = Math.round(window.innerHeight - top);
+            if (h > 120)
+                root.style.height = h + "px";
+        }
     }
     disconnectedCallback() {
         super.disconnectedCallback();
@@ -535,6 +679,7 @@ let AnyVacCard = class AnyVacCard extends i$2 {
         }
         if (this._onWinResize) {
             window.removeEventListener("resize", this._onWinResize);
+            window.removeEventListener("orientationchange", this._onWinResize);
             this._onWinResize = null;
         }
         if (this._ro) {
@@ -548,6 +693,12 @@ let AnyVacCard = class AnyVacCard extends i$2 {
         const w = Math.round(this.getBoundingClientRect().width);
         if (w)
             this._cardW = w;
+        this._scheduleMeasure();
+    }
+    updated() {
+        // Grid mode: re-apply the measured height after every render (the declarative
+        // svh calc stays as the pre-measure fallback).
+        this._refineGridHeight();
     }
     /**
      * Re-render only when a relevant entity changed — the hass object is
@@ -2075,13 +2226,17 @@ let AnyVacCard = class AnyVacCard extends i$2 {
     _renderMergedRooms(shown) {
         return this._mergedRoomDefs(shown).map(({ r, v }) => this._renderRoomOverlay(r, v, { vacs: shown }));
     }
-    /** Narrow (mobile) card → rotate the map to portrait (auto, unless disabled). */
+    /** Narrow (mobile) card → rotate the map to portrait (auto, unless disabled).
+     *  With a layout: block the portrait PROFILE drives the rotation (docs/18);
+     *  without one the legacy card-width heuristic applies. */
     get _narrow() {
         const mr = this._config.mobile_rotate;
         if (mr === "off")
             return false;
         if (mr === "always" || mr === "on")
             return true; // force (good for testing)
+        if (this._config.layout)
+            return this._profile === "portrait";
         return this._cardW > 0 && this._cardW < 500; // auto: by card width
     }
     /** Wrap a map render in a 90° portrait rotation when the card is narrow. The map
@@ -2525,9 +2680,53 @@ let AnyVacCard = class AnyVacCard extends i$2 {
     `;
     }
     // ── Main render ─────────────────────────────────────────────────────────
+    /** Named region templates (docs/18 §3). Phase A regions = today's blocks;
+     *  `dock` and `start` arrive with Phase B. A region not placed in the active
+     *  profile is not rendered at all. */
+    _regionTemplates() {
+        const shown = [...this._shownSet].filter((i) => i < this._config.vacuums.length);
+        const merged = this._config.map_mode === "merged";
+        return {
+            badges: b `<div class="badges-row">
+        ${this._config.vacuums.map((v, i) => this._renderBadge(v, i))}
+        ${(this._config.global_actions ?? []).map((ga, i) => this._renderGlobalBadge(ga, i))}
+      </div>`,
+            autobar: this._renderAutoBar(),
+            plan: this._renderPlanPreview(),
+            map: merged
+                ? this._renderResponsive(this._renderMergedMap())
+                : b `${shown.map((i) => this._renderResponsive(this._renderMap(this._config.vacuums[i])))}`,
+            tools: b `${shown.map((i) => this._renderMapTools(this._config.vacuums[i]))}`,
+            status: b `${shown.map((i) => this._renderStatusCard(this._config.vacuums[i], i))}`,
+        };
+    }
+    /** Grid render path (docs/18): active only with a `layout:` config block. */
+    _renderGrid(lay) {
+        const prof = resolveProfile(lay, this._profile);
+        const regions = this._regionTemplates();
+        const schemaWarn = this._schemaWarning();
+        return b `
+      <ha-card style="padding:0;display:block">
+        ${this.editMode ? b `<div class="version-chip">v${CARD_VERSION} · ${Math.round(this._cardW)}w · ${this._profile}</div>` : A}
+        <div class="avc-grid" style=${o(gridRootStyles(lay, prof))}>
+          ${schemaWarn ? b `<div class="avc-schemawarn">
+            <ha-icon icon="mdi:alert" style="--mdc-icon-size:18px"></ha-icon><span>${schemaWarn}</span>
+          </div>` : A}
+          ${Object.entries(prof.place).map(([name, pl]) => {
+            const tpl = regions[name];
+            if (tpl == null || tpl === A)
+                return A;
+            return b `<div class="avc-region avc-region--${name}" style=${o(regionStyles(pl))}>${tpl}</div>`;
+        })}
+        </div>
+      </ha-card>
+    `;
+    }
     render() {
         if (!this._config || !this.hass)
             return A;
+        if (this._config.layout)
+            return this._renderGrid(this._config.layout);
         const schemaWarn = this._schemaWarning();
         return b `
       <ha-card>
@@ -2587,6 +2786,25 @@ AnyVacCard.styles = i$5 `
       color: rgba(255, 255, 255, 0.35);
       pointer-events: none;
       z-index: 2;
+    }
+
+    /* ── Grid layout (docs/18) ───────────────────────────────────────── */
+    .avc-schemawarn {
+      position: absolute;
+      top: 4px;
+      left: 50%;
+      transform: translateX(-50%);
+      z-index: 5;
+      padding: 8px 12px;
+      border-radius: 12px;
+      border: 1px solid rgba(250, 173, 20, 0.55);
+      background: rgba(250, 173, 20, 0.12);
+      color: #faad14;
+      font-size: 12px;
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      max-width: 90%;
     }
 
     /* ── Badges ──────────────────────────────────────────────────────── */
@@ -2986,6 +3204,9 @@ __decorate([
 __decorate([
     r()
 ], AnyVacCard.prototype, "_mapAR", void 0);
+__decorate([
+    r()
+], AnyVacCard.prototype, "_profile", void 0);
 __decorate([
     r()
 ], AnyVacCard.prototype, "_now", void 0);

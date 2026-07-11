@@ -9,6 +9,41 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Planned
 
 - Rooms from the integration (real room polygons / names) for clickable cleaning on the floorplan.
+- Responsive rebuild Phase B/C (docs/18): portrait profile per docs/12 (dock + START bar,
+  floating map tools, stats trio, exact rotated-map fit, per-room vacuum pinning),
+  landscape cockpit. Completion of the rebuild ships as **v1.0.0**.
+
+## [0.41.0] - 2026-07-11
+
+Phase A of the responsive rebuild (docs/18, ratified 2026-07-11): the two-profile
+percentage-grid layout runtime. Without a `layout:` config block the card renders
+exactly as before — the grid is strictly opt-in.
+
+### Added
+
+- **`src/layout.ts`** — layout runtime: profile picker (viewport aspect ratio vs.
+  `threshold`, `orientation` force override), grid CSS generator (numeric tracks → `%`,
+  strings like `1fr`/`auto`/`120px` pass through), height resolver (`viewport` →
+  `calc(100svh - var(--header-height))` with a measured `innerHeight - rootTop`
+  refinement; `container`; fixed CSS length), and `pval`/`papply` per-profile scalar
+  resolvers (no second breakpoint system).
+- **`layout:` config block** (`threshold`, `orientation`, `gap`, `height`,
+  `portrait`/`landscape` profiles with `columns`/`rows`/`place`). Each profile is a
+  complete design: regions are placed via `{row, col}` (CSS grid-line syntax, spans
+  allowed); a region not placed in a profile is not rendered there. Per-region
+  `overflow: hidden|auto` and `align`.
+- **Named regions** (Phase A set): `badges`, `autobar`, `plan`, `map`, `tools`,
+  `status`. The `dock` and `start` regions arrive with Phase B.
+- Interim default profiles (documented in `layout.ts`) until the docs/18 §4 canonical
+  defaults become possible in Phase B/C.
+- `orientationchange` listener (rAF-coalesced with resize) re-picks the profile.
+
+### Changed
+
+- With a `layout:` block, the map's 90° portrait rotation is driven by the **portrait
+  profile** instead of the card-width heuristic (`mobile_rotate` still force-overrides;
+  legacy width heuristic unchanged without `layout:`).
+- Edit-mode version chip shows the active profile in grid mode.
 
 ## [0.40.0] - 2026-07-09
 

@@ -33,6 +33,15 @@ import {
   computeSeatFit,
   type SeatParams,
 } from "./seatfit";
+import {
+  pickProfile,
+  headerPx,
+  resolveProfile,
+  gridRootStyles,
+  regionStyles,
+  type LayoutProfile,
+  type LayoutConfig,
+} from "./layout";
 
 console.info(
   `%c ANYVAC-CARD %c v${CARD_VERSION} `,
@@ -69,6 +78,8 @@ export class AnyVacCard extends LitElement {
   /** Responsive: measured card width + map aspect ratio (W/H) for portrait rotation. */
   @state() private _cardW = 0;
   @state() private _mapAR = 3.636;
+  /** Active layout profile (docs/18) — picked by viewport aspect ratio. */
+  @state() private _profile: LayoutProfile = "landscape";
   private _ro: ResizeObserver | null = null;
   private _onWinResize: (() => void) | null = null;
   private _measureRaf = 0;
@@ -139,6 +150,7 @@ export class AnyVacCard extends LitElement {
     if (!this._onWinResize) {
       this._onWinResize = () => this._scheduleMeasure();
       window.addEventListener("resize", this._onWinResize, { passive: true });
+      window.addEventListener("orientationchange", this._onWinResize, { passive: true });
     }
     this._scheduleMeasure();
     if (!this._tickTimer) {
@@ -153,14 +165,38 @@ export class AnyVacCard extends LitElement {
     }
   }
 
-  /** Coalesce all width re-measures into one rAF tick (RO + window resize). */
+  /** Coalesce all width re-measures into one rAF tick (RO + window resize +
+   *  orientationchange). Also re-picks the layout profile (docs/18) from the
+   *  available viewport ratio and refines the grid height. */
   private _scheduleMeasure(): void {
     if (this._measureRaf) return;
     this._measureRaf = requestAnimationFrame(() => {
       this._measureRaf = 0;
       const w = Math.round(this.getBoundingClientRect().width);
       if (w && Math.abs(w - this._cardW) >= 2) this._cardW = w;
+      const lay = this._config?.layout;
+      if (lay) {
+        const hh = headerPx(this);
+        const p = pickProfile(lay, window.innerWidth, Math.max(1, window.innerHeight - hh));
+        if (p !== this._profile) this._profile = p;
+        this._refineGridHeight();
+      }
     });
+  }
+
+  /** Measured refinement of the grid height: innerHeight − rootTop beats the raw
+   *  `calc(100svh − header)` when the root is offset (padding, safe-area). Applied
+   *  directly to the element — no state, no re-render loop. */
+  private _refineGridHeight(): void {
+    const lay = this._config?.layout;
+    if (!lay || (lay.height ?? "viewport") !== "viewport") return;
+    const root = this.renderRoot?.querySelector<HTMLElement>(".avc-grid");
+    if (!root) return;
+    const top = root.getBoundingClientRect().top;
+    if (top >= 0 && top < window.innerHeight) {
+      const h = Math.round(window.innerHeight - top);
+      if (h > 120) root.style.height = h + "px";
+    }
   }
 
   disconnectedCallback(): void {
@@ -168,7 +204,11 @@ export class AnyVacCard extends LitElement {
     this._cancelHold();
     if (this._measureRaf) { cancelAnimationFrame(this._measureRaf); this._measureRaf = 0; }
     if (this._tickTimer) { clearInterval(this._tickTimer); this._tickTimer = null; }
-    if (this._onWinResize) { window.removeEventListener("resize", this._onWinResize); this._onWinResize = null; }
+    if (this._onWinResize) {
+      window.removeEventListener("resize", this._onWinResize);
+      window.removeEventListener("orientationchange", this._onWinResize);
+      this._onWinResize = null;
+    }
     if (this._ro) { this._ro.disconnect(); this._ro = null; }
   }
 
@@ -177,6 +217,13 @@ export class AnyVacCard extends LitElement {
     // first paint (and never fires if the host has no layout box yet).
     const w = Math.round(this.getBoundingClientRect().width);
     if (w) this._cardW = w;
+    this._scheduleMeasure();
+  }
+
+  protected updated(): void {
+    // Grid mode: re-apply the measured height after every render (the declarative
+    // svh calc stays as the pre-measure fallback).
+    this._refineGridHeight();
   }
 
   /**
@@ -1633,11 +1680,14 @@ export class AnyVacCard extends LitElement {
     return this._mergedRoomDefs(shown).map(({ r, v }) => this._renderRoomOverlay(r, v, { vacs: shown }));
   }
 
-  /** Narrow (mobile) card → rotate the map to portrait (auto, unless disabled). */
+  /** Narrow (mobile) card → rotate the map to portrait (auto, unless disabled).
+   *  With a layout: block the portrait PROFILE drives the rotation (docs/18);
+   *  without one the legacy card-width heuristic applies. */
   private get _narrow(): boolean {
     const mr = this._config.mobile_rotate as string | undefined;
     if (mr === "off") return false;
     if (mr === "always" || mr === "on") return true;  // force (good for testing)
+    if (this._config.layout) return this._profile === "portrait";
     return this._cardW > 0 && this._cardW < 500;       // auto: by card width
   }
   /** Learn the floorplan's aspect ratio once it loads, for the rotation maths. */
@@ -2108,8 +2158,52 @@ export class AnyVacCard extends LitElement {
 
   // ── Main render ─────────────────────────────────────────────────────────
 
+  /** Named region templates (docs/18 §3). Phase A regions = today's blocks;
+   *  `dock` and `start` arrive with Phase B. A region not placed in the active
+   *  profile is not rendered at all. */
+  private _regionTemplates(): Record<string, unknown> {
+    const shown = [...this._shownSet].filter((i) => i < this._config.vacuums.length);
+    const merged = this._config.map_mode === "merged";
+    return {
+      badges: html`<div class="badges-row">
+        ${this._config.vacuums.map((v, i) => this._renderBadge(v, i))}
+        ${(this._config.global_actions ?? []).map((ga, i) => this._renderGlobalBadge(ga, i))}
+      </div>`,
+      autobar: this._renderAutoBar(),
+      plan: this._renderPlanPreview(),
+      map: merged
+        ? this._renderResponsive(this._renderMergedMap())
+        : html`${shown.map((i) => this._renderResponsive(this._renderMap(this._config.vacuums[i])))}`,
+      tools: html`${shown.map((i) => this._renderMapTools(this._config.vacuums[i]))}`,
+      status: html`${shown.map((i) => this._renderStatusCard(this._config.vacuums[i], i))}`,
+    };
+  }
+
+  /** Grid render path (docs/18): active only with a `layout:` config block. */
+  private _renderGrid(lay: LayoutConfig) {
+    const prof = resolveProfile(lay, this._profile);
+    const regions = this._regionTemplates();
+    const schemaWarn = this._schemaWarning();
+    return html`
+      <ha-card style="padding:0;display:block">
+        ${this.editMode ? html`<div class="version-chip">v${CARD_VERSION} · ${Math.round(this._cardW)}w · ${this._profile}</div>` : nothing}
+        <div class="avc-grid" style=${styleMap(gridRootStyles(lay, prof))}>
+          ${schemaWarn ? html`<div class="avc-schemawarn">
+            <ha-icon icon="mdi:alert" style="--mdc-icon-size:18px"></ha-icon><span>${schemaWarn}</span>
+          </div>` : nothing}
+          ${Object.entries(prof.place).map(([name, pl]) => {
+            const tpl = regions[name];
+            if (tpl == null || tpl === nothing) return nothing;
+            return html`<div class="avc-region avc-region--${name}" style=${styleMap(regionStyles(pl))}>${tpl}</div>`;
+          })}
+        </div>
+      </ha-card>
+    `;
+  }
+
   render() {
     if (!this._config || !this.hass) return nothing;
+    if (this._config.layout) return this._renderGrid(this._config.layout);
 
     const schemaWarn = this._schemaWarning();
     return html`
@@ -2171,6 +2265,25 @@ export class AnyVacCard extends LitElement {
       color: rgba(255, 255, 255, 0.35);
       pointer-events: none;
       z-index: 2;
+    }
+
+    /* ── Grid layout (docs/18) ───────────────────────────────────────── */
+    .avc-schemawarn {
+      position: absolute;
+      top: 4px;
+      left: 50%;
+      transform: translateX(-50%);
+      z-index: 5;
+      padding: 8px 12px;
+      border-radius: 12px;
+      border: 1px solid rgba(250, 173, 20, 0.55);
+      background: rgba(250, 173, 20, 0.12);
+      color: #faad14;
+      font-size: 12px;
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      max-width: 90%;
     }
 
     /* ── Badges ──────────────────────────────────────────────────────── */
