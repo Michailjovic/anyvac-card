@@ -13,6 +13,48 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   floating map tools, stats trio, exact rotated-map fit, per-room vacuum pinning),
   landscape cockpit. Completion of the rebuild ships as **v1.0.0**.
 
+## [0.42.0] - 2026-07-11
+
+Phase B of the responsive rebuild (docs/18): the portrait profile per docs/12, the
+`dock` and `start` regions, floating map tools, per-room vacuum pinning and the
+canonical default profiles. Requires integration ≥ 0.19.0 for pinning.
+
+### Added
+
+- **`dock` region** (docs/12 §3): selection, plan preview and pinning in one block —
+  Dry/Wet/Both mode header, room rows (tap = toggle the backend-shared selection,
+  compact dry/wet age chips), and per-pass **assignment avatars showing the backend's
+  real plan** (`anyvac.plan`). In landscape (no `start` region) the dock carries the
+  orchestrated run footer with the hold-to-run button and a rooms/minutes summary.
+- **`start` region** (portrait bottom bar, docs/18 §7d): full-width thumb-zone
+  hold-to-start that ALWAYS sends the orchestrated `anyvac.clean` intent; while
+  anything runs it flips to a hold-to-cancel bar (`anyvac.cancel`; degraded mode
+  pauses the cleaning vacuums instead).
+- **Per-room vacuum pinning** (docs/18 §7e): tapping a room's assignment avatar in
+  the dock cycles auto → vac1 → vac2 → auto via `anyvac.pin_room`; pins are
+  backend-shared (`room_pins` sensor attribute), used by the planner as the default,
+  highlighted with a pin ring, and auto-cleared after the room's clean.
+- **Floating map tools** (grid mode): Refresh / Pin&Go / Zone as an icon-only
+  column overlaid on the map edge (Roborock-app style); hint/confirm panels float
+  along the bottom of the map region. The `tools` region remains for explicit
+  old-style placement.
+- **Stats trio** in the grid badges region: selected rooms · estimated minutes
+  (max-across-vacuums display aid) · lowest battery.
+- **`debug` config flag** (docs/18 §7c): raw geometry readouts in the grid UI hide
+  behind it (off by default).
+
+### Changed
+
+- **Canonical docs/18 §4 default profiles**: landscape = map left (scrolls in split
+  mode) + dock & status right; portrait = slim badges bar, tall rotated map, right
+  thumb dock, full-width START bar (replaces the Phase-A interim defaults).
+- **Exact rotated-map fit** (docs/18 §7): in grid mode the 90° rotated map is fitted
+  into the measured map-region box — the legacy width × 1.4·viewport cap heuristic
+  only applies without a `layout:` block.
+- **Portrait single-vacuum focus** (docs/18 §7b): in split mode the portrait grid
+  renders one vacuum; a badge tap SWITCHES the focus instead of toggling set
+  membership. Landscape/merged behaviour unchanged.
+
 ## [0.41.0] - 2026-07-11
 
 Phase A of the responsive rebuild (docs/18, ratified 2026-07-11): the two-profile

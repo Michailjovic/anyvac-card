@@ -324,4 +324,7 @@ export interface AnyVacCardConfig {
    *  render, unchanged. Present = the card becomes a viewport-sized grid with
    *  named regions placed per portrait/landscape profile. */
   layout?: LayoutConfig;
+  /** Show debug details (raw geometry readouts etc.) in the production grid UI.
+   *  Off by default (docs/18 §7c) — debug data moves behind this toggle. */
+  debug?: boolean;
 }

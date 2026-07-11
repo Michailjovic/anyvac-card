@@ -41,6 +41,7 @@ import {
   regionStyles,
   type LayoutProfile,
   type LayoutConfig,
+  type ProfileGridConfig,
 } from "./layout";
 
 console.info(
@@ -80,6 +81,9 @@ export class AnyVacCard extends LitElement {
   @state() private _mapAR = 3.636;
   /** Active layout profile (docs/18) — picked by viewport aspect ratio. */
   @state() private _profile: LayoutProfile = "landscape";
+  /** Measured inner box of the map region (grid mode) for the exact rotated fit. */
+  @state() private _mapRegW = 0;
+  @state() private _mapRegH = 0;
   private _ro: ResizeObserver | null = null;
   private _onWinResize: (() => void) | null = null;
   private _measureRaf = 0;
@@ -189,13 +193,24 @@ export class AnyVacCard extends LitElement {
    *  directly to the element — no state, no re-render loop. */
   private _refineGridHeight(): void {
     const lay = this._config?.layout;
-    if (!lay || (lay.height ?? "viewport") !== "viewport") return;
+    if (!lay) return;
     const root = this.renderRoot?.querySelector<HTMLElement>(".avc-grid");
     if (!root) return;
-    const top = root.getBoundingClientRect().top;
-    if (top >= 0 && top < window.innerHeight) {
-      const h = Math.round(window.innerHeight - top);
-      if (h > 120) root.style.height = h + "px";
+    if ((lay.height ?? "viewport") === "viewport") {
+      const top = root.getBoundingClientRect().top;
+      if (top >= 0 && top < window.innerHeight) {
+        const h = Math.round(window.innerHeight - top);
+        if (h > 120) root.style.height = h + "px";
+      }
+    }
+    // Measure the map region for the exact rotated-map fit (docs/18 §7). Guarded
+    // by a ±2 px threshold so the update→measure cycle settles instead of looping.
+    const reg = this.renderRoot?.querySelector<HTMLElement>(".avc-region--map");
+    if (reg) {
+      const w = Math.round(reg.clientWidth);
+      const h2 = Math.round(reg.clientHeight);
+      if (w && Math.abs(w - this._mapRegW) >= 2) this._mapRegW = w;
+      if (h2 && Math.abs(h2 - this._mapRegH) >= 2) this._mapRegH = h2;
     }
   }
 
@@ -706,6 +721,13 @@ export class AnyVacCard extends LitElement {
   };
 
   private _toggleShown(index: number): void {
+    // Portrait grid = single-vacuum focus (docs/18 §7b): a badge tap SWITCHES the
+    // focused vacuum instead of toggling set membership — no room for more on a phone.
+    if (this._config.layout && this._profile === "portrait") {
+      this._shownSet = new Set([index]);
+      this._saveShown();
+      return;
+    }
     const next = new Set(this._shownSet);
     if (next.has(index)) { if (next.size > 1) next.delete(index); }
     else { next.add(index); }
@@ -1042,6 +1064,189 @@ export class AnyVacCard extends LitElement {
         })}
       </div>
     `;
+  }
+
+  // ── Dock & START regions (docs/18 Fáze B) ────────────────────────────────
+
+  /** Shared per-room vacuum pins from the integration sensor (anyvac.pin_room). */
+  private _pinsAttr(): Record<string, string> {
+    const ent = this._selSensor();
+    const rp = ent ? (this.hass.states[ent]?.attributes?.room_pins as Record<string, string> | undefined) : undefined;
+    return rp && typeof rp === "object" ? rp : {};
+  }
+  /** Vacuums that could clean this room at all (know the room key). */
+  private _pinCandidates(key: string): VacuumConfig[] {
+    return this._config.vacuums.filter((v) => this._roomsFor(v).some((r) => r.key === key));
+  }
+  /** Cycle the room's pin: auto → vac1 → vac2 → … → auto (docs/18 §7e). The pin is
+   *  stored backend-side (anyvac.pin_room) so every browser sees the same override;
+   *  the planner treats it as the default and it auto-clears after the clean. */
+  private _cycleRoomPin(key: string): void {
+    const cands = this._pinCandidates(key);
+    if (cands.length < 2) return; // nothing to choose from
+    const cur = this._pinsAttr()[key];
+    const idx = cands.findIndex((v) => v.entity === cur);
+    const next = idx < 0 ? cands[0] : idx + 1 < cands.length ? cands[idx + 1] : null;
+    void this._call("anyvac", "pin_room", next ? { room: key, vacuum: next.entity } : { room: key });
+  }
+  /** Small vacuum-abbrev chip; `pinned` gets a solid ring + pin glyph. */
+  private _vacChip(entity: string | undefined, pinned: boolean, onTap?: (e: Event) => void) {
+    const v = this._config.vacuums.find((x) => x.entity === entity);
+    if (!v) {
+      return html`<span class="dock-chip dock-chip--empty" @click=${onTap ?? nothing}>—</span>`;
+    }
+    const c = this._color(v);
+    return html`<span class="dock-chip ${pinned ? "dock-chip--pinned" : ""}"
+      style="color:#fff;background:${c}30;border-color:${c}"
+      title=${(v.name ?? v.entity) + (pinned ? " · pinned — tap to change" : " · tap to pin")}
+      @click=${onTap ?? nothing}>${pinned ? html`<ha-icon icon="mdi:pin" style="--mdc-icon-size:10px"></ha-icon>` : nothing}${this._vacAbbrev(v)}</span>`;
+  }
+
+  private _batteryPct(vac: VacuumConfig): number | null {
+    if (vac.battery_entity) {
+      const v = Number(this.hass.states[vac.battery_entity]?.state);
+      if (Number.isFinite(v)) return v;
+    }
+    const bl = Number((this.hass.states[vac.entity]?.attributes as Record<string, unknown> | undefined)?.battery_level);
+    return Number.isFinite(bl) ? bl : null;
+  }
+  /** Estimated minutes for the current selection: per room the worst (max) estimate
+   *  across vacuums — a display aid only, the real plan is the backend's. */
+  private _selEstMins(selKeys: string[]): number {
+    let sum = 0;
+    for (const k of selKeys) {
+      let best = 0;
+      for (const v of this._config.vacuums) {
+        const r = this._roomsFor(v).find((x) => x.key === k);
+        if (r) best = Math.max(best, this._roomCleanMins(r, v));
+      }
+      sum += best;
+    }
+    return Math.round(sum);
+  }
+  /** Glanceable stats trio (grid badges region): selected rooms · est time · min battery. */
+  private _renderStatsTrio() {
+    const vacs = this._config.vacuums;
+    const selKeys = this._allRoomKeys().filter((k) => this._isRoomSelectedAny(k, vacs));
+    const est = this._selEstMins(selKeys);
+    const batts = vacs.map((v) => this._batteryPct(v)).filter((x): x is number => x !== null);
+    const minB = batts.length ? Math.min(...batts) : null;
+    return html`
+      <div class="stats-trio">
+        <span class="stat"><ha-icon icon="mdi:floor-plan"></ha-icon><b>${selKeys.length}</b></span>
+        ${est > 0 ? html`<span class="stat"><ha-icon icon="mdi:clock-outline"></ha-icon><b>${est}</b><small>min</small></span>` : nothing}
+        ${minB !== null ? html`<span class="stat"><ha-icon icon="mdi:battery"></ha-icon><b>${Math.round(minB)}</b><small>%</small></span>` : nothing}
+      </div>
+    `;
+  }
+
+  /** Dock region (docs/12 §3 + docs/18 §3): selection, plan preview and pinning in
+   *  one block. Row = room (tap toggles selection); the avatar shows the BACKEND's
+   *  real assignment per pass; tapping the avatar cycles the room's vacuum pin.
+   *  `withRun` adds the orchestrated run footer (landscape — no `start` region). */
+  private _renderDock(withRun: boolean) {
+    const vacs = this._config.vacuums;
+    const rooms = this._mergedRoomDefs(vacs);
+    if (!rooms.length) return nothing;
+    const hasInt = vacs.some((v) => this._intAttrs(v));
+    const mode = this._planMode;
+    const selKeys = this._allRoomKeys().filter((k) => this._isRoomSelectedAny(k, vacs));
+    if (hasInt && selKeys.length) this._fetchPlan(selKeys, mode);
+    const dryOf = this._planPreview?.dry ?? new Map<string, string>();
+    const wetOf = this._planPreview?.wet ?? new Map<string, string>();
+    const pins = this._pinsAttr();
+    const showDry = mode !== "wet";
+    const showWet = mode !== "dry";
+    const badge = (d: number | null) => (d === null ? "—" : d < 1 ? "<1d" : Math.round(d) + "d");
+    const modeBtn = (m: "dry" | "wet" | "both", icon: string, label: string) => html`
+      <button class="dock-mode ${mode === m ? "on" : ""}"
+        @click=${(e: Event) => { e.stopPropagation(); this._planMode = m; }}>
+        <ha-icon icon=${icon}></ha-icon><span>${label}</span>
+      </button>`;
+    const runHid = "dock-run";
+    return html`
+      <div class="dock">
+        <div class="dock-head">
+          ${modeBtn("dry", "mdi:broom", "Dry")}${modeBtn("wet", "mdi:water", "Wet")}${modeBtn("both", "mdi:water-plus", "Both")}
+        </div>
+        <div class="dock-rows">
+          ${rooms.map(({ r, v }) => {
+            const rec = this._intRoomRec(v, r);
+            const dry = this._ageDaysFromIso(rec?.dry);
+            const wet = this._ageDaysFromIso(rec?.wet);
+            const sel = this._isRoomSelectedAny(r.key, vacs);
+            const pinned = pins[r.key];
+            const pinTap = this._pinCandidates(r.key).length > 1
+              ? (e: Event) => { e.stopPropagation(); this._cycleRoomPin(r.key); }
+              : undefined;
+            return html`
+              <button class="dock-row ${sel ? "on" : ""}" @click=${() => this._toggleRoomAcross(r.key, vacs)}>
+                <ha-icon class="dock-ric" icon=${r.icon ?? "mdi:square"}></ha-icon>
+                <span class="dock-name">${r.name ?? r.key}</span>
+                <span class="dock-ages">
+                  <span class="dock-age"><ha-icon icon="mdi:broom"></ha-icon><b style=${styleMap({ color: this._colorForAgeDays(dry) })}>${badge(dry)}</b></span>
+                  <span class="dock-age"><ha-icon icon="mdi:water"></ha-icon><b style=${styleMap({ color: this._colorForAgeDays(wet) })}>${badge(wet)}</b></span>
+                </span>
+                ${hasInt && sel ? html`
+                  <span class="dock-avatars">
+                    ${showDry ? this._vacChip(dryOf.get(r.key), pinned === dryOf.get(r.key) && !!pinned, pinTap) : nothing}
+                    ${showWet ? this._vacChip(wetOf.get(r.key), pinned === wetOf.get(r.key) && !!pinned, pinTap) : nothing}
+                  </span>` : nothing}
+              </button>`;
+          })}
+        </div>
+        ${withRun && hasInt ? html`
+          <div class="dock-foot">
+            <span class="dock-est">${selKeys.length ? selKeys.length + " rooms · ~" + this._selEstMins(selKeys) + " min" : "Select rooms"}</span>
+            <button class="action-btn ${this._holdId === runHid ? "action-btn--holding" : ""}"
+              style="flex:0 0 auto;padding:7px 14px;background:rgba(82,196,26,0.14);border:1px solid rgba(82,196,26,0.55);color:#fff"
+              ?disabled=${!selKeys.length}
+              @pointerdown=${selKeys.length ? this._holdStart(runHid, () => this._runOrchestrated(selKeys, this._planMode)) : nothing}
+              @pointerup=${this._holdEnd}
+              @pointerleave=${this._holdEnd}
+              @pointercancel=${this._holdEnd}>
+              <div class="hold-ring"></div>
+              <ha-icon icon="mdi:play" style="--mdc-icon-size:16px"></ha-icon>
+              <span style="font-size:12px">Start · hold</span>
+            </button>
+          </div>` : nothing}
+      </div>
+    `;
+  }
+
+  /** START region (portrait bottom bar, docs/18 §7d): ALWAYS the orchestrated
+   *  intent (anyvac.clean); while anything runs it flips to a cancel bar. */
+  private _renderStartBar() {
+    const vacs = this._config.vacuums;
+    const hasInt = vacs.some((v) => this._intAttrs(v));
+    const selKeys = this._allRoomKeys().filter((k) => this._isRoomSelectedAny(k, vacs));
+    const anyCleaning = vacs.some((v) => this._isCleaning(v));
+    const hid = "startbar";
+    if (anyCleaning) {
+      return html`
+        <button class="start-bar start-bar--cancel ${this._holdId === hid ? "action-btn--holding" : ""}"
+          @pointerdown=${this._holdStart(hid, () => {
+            if (hasInt) void this._call("anyvac", "cancel", {});
+            else for (const v of vacs) { if (this._isCleaning(v)) void this._pause(v); }
+          })}
+          @pointerup=${this._holdEnd} @pointerleave=${this._holdEnd} @pointercancel=${this._holdEnd}>
+          <div class="hold-ring"></div>
+          <ha-icon icon="mdi:stop"></ha-icon>
+          <span>CANCEL · hold</span>
+        </button>`;
+    }
+    const canStart = hasInt && selKeys.length > 0;
+    const est = this._selEstMins(selKeys);
+    return html`
+      <button class="start-bar ${canStart && this._holdId === hid ? "action-btn--holding" : ""}"
+        ?disabled=${!canStart}
+        title=${hasInt ? "" : "Requires the AnyVac integration"}
+        @pointerdown=${canStart ? this._holdStart(hid, () => this._runOrchestrated(selKeys, this._planMode)) : nothing}
+        @pointerup=${this._holdEnd} @pointerleave=${this._holdEnd} @pointercancel=${this._holdEnd}>
+        <div class="hold-ring"></div>
+        <ha-icon icon="mdi:rocket-launch"></ha-icon>
+        <span>START${selKeys.length ? " · " + selKeys.length + (est ? " · ~" + est + " min" : "") : ""}</span>
+      </button>`;
   }
 
   /** Setting presets for a vacuum; falls back to a single default synthesized from clean_action. */
@@ -1396,7 +1601,7 @@ export class AnyVacCard extends LitElement {
   }
   private _cancelZone(): void { this._zonePending = null; this._zoneDrag = null; }
 
-  private _renderMapTools(vac: VacuumConfig) {
+  private _renderMapTools(vac: VacuumConfig, float = false, slot = 0) {
     if (!vac.map && !vac.image_base) return nothing;
     // Map commands need the integration's calibration AND this vacuum's map element
     // for the click geometry. Disabled in the rotated (narrow) view — the click
@@ -1408,8 +1613,12 @@ export class AnyVacCard extends LitElement {
         ? "Requires the AnyVac integration (≥ 0.18) + map entity"
         : "";
     const mode = this._modeEntity === vac.entity ? this._mapMode : "normal";
+    // Floating variant (docs/18 §3): icon-only column overlaid on the map edge —
+    // Roborock-app style. Panels/hints float along the bottom of the map region.
+    const toolsStyle = float ? `right:${8 + slot * 44}px` : "";
+    const panelClass = float ? "calib-panel calib-panel--float" : "calib-panel";
     return html`
-      <div class="map-tools">
+      <div class="map-tools ${float ? "map-tools--float" : ""}" style=${toolsStyle}>
         ${vac.map?.entity ? html`<button class="mtbtn" @click=${() => this._refreshMap(vac)} title="Refresh map">
           <ha-icon icon="mdi:refresh"></ha-icon><span>Refresh</span>
         </button>` : nothing}
@@ -1421,10 +1630,10 @@ export class AnyVacCard extends LitElement {
           @click=${() => this._toggleMode(vac.entity, "zone")} title=${cmdTitle || "Zone clean"}>
           <ha-icon icon="mdi:select-drag"></ha-icon><span>Zone</span>
         </button>
-        ${this._dbg ? html`<span style="font-size:11px;opacity:0.65;align-self:center;font-family:monospace">${this._dbg}</span>` : nothing}
+        ${this._dbg && (this._config.debug || !float) ? html`<span style="font-size:11px;opacity:0.65;align-self:center;font-family:monospace">${this._dbg}</span>` : nothing}
       </div>
-      ${mode === "pin" ? html`<div class="calib-panel">Tap the map to send the robot there.</div>` : nothing}
-      ${mode === "zone" ? html`<div class="calib-panel">
+      ${mode === "pin" ? html`<div class=${panelClass}>Tap the map to send the robot there.</div>` : nothing}
+      ${mode === "zone" ? html`<div class=${panelClass}>
         ${this._zonePending
           ? html`<div>Clean this zone?</div>
               <div class="calib-actions">
@@ -1700,16 +1909,27 @@ export class AnyVacCard extends LitElement {
   };
   /** Wrap a map render in a 90° portrait rotation when the card is narrow. The map
    *  fills the card width and goes tall (capped), so the floorplan is readable on a
-   *  phone instead of a thin letterbox. Controls outside the map-wrap stay upright. */
+   *  phone instead of a thin letterbox. Controls outside the map-wrap stay upright.
+   *  In grid mode (docs/18 §7) the rotated map is fitted EXACTLY into the measured
+   *  map-region box instead of the legacy width × cap heuristic — no scroll, no cap. */
   private _renderResponsive(mapHtml: unknown) {
     if (!this._narrow) return mapHtml;
     const ar = this._mapAR > 0.1 ? this._mapAR : 3.636;
-    const W = this._cardW || this.clientWidth || 360;
-    const capH = (typeof window !== "undefined" ? window.innerHeight : 800) * 1.4;
-    const visH = W * ar;
-    const scale = visH > capH ? capH / visH : 1;
-    const rW = Math.round(W * scale);
-    const rH = Math.round(visH * scale);
+    let rW: number;
+    let rH: number;
+    if (this._config.layout && this._mapRegW > 4 && this._mapRegH > 4) {
+      rW = Math.min(this._mapRegW, this._mapRegH / ar);
+      rH = Math.min(this._mapRegH, rW * ar);
+      rW = Math.floor(rW);
+      rH = Math.floor(rH);
+    } else {
+      const W = this._cardW || this.clientWidth || 360;
+      const capH = (typeof window !== "undefined" ? window.innerHeight : 800) * 1.4;
+      const visH = W * ar;
+      const scale = visH > capH ? capH / visH : 1;
+      rW = Math.round(W * scale);
+      rH = Math.round(visH * scale);
+    }
     return html`
       <div style="position:relative;width:${rW}px;height:${rH}px;margin:0 auto;overflow:hidden">
         <div style="position:absolute;top:0;left:0;width:${rH}px;height:${rW}px;transform-origin:top left;transform:translateX(${rW}px) rotate(90deg)">
@@ -2158,31 +2378,59 @@ export class AnyVacCard extends LitElement {
 
   // ── Main render ─────────────────────────────────────────────────────────
 
-  /** Named region templates (docs/18 §3). Phase A regions = today's blocks;
-   *  `dock` and `start` arrive with Phase B. A region not placed in the active
-   *  profile is not rendered at all. */
-  private _regionTemplates(): Record<string, unknown> {
+  /** Vacuum indexes shown in the grid. Portrait split = single-vacuum focus
+   *  (docs/18 §7b): only the first of the shown set renders; badges switch it. */
+  private _gridShown(): number[] {
     const shown = [...this._shownSet].filter((i) => i < this._config.vacuums.length);
+    if (this._profile === "portrait" && this._config.map_mode !== "merged" && shown.length > 1) {
+      return shown.slice(0, 1);
+    }
+    return shown;
+  }
+
+  /** Named region template (docs/18 §3), built on demand — a region not placed
+   *  in the active profile is never even computed. */
+  private _regionTemplate(name: string, prof: Required<ProfileGridConfig>): unknown {
+    const shown = this._gridShown();
     const merged = this._config.map_mode === "merged";
-    return {
-      badges: html`<div class="badges-row">
-        ${this._config.vacuums.map((v, i) => this._renderBadge(v, i))}
-        ${(this._config.global_actions ?? []).map((ga, i) => this._renderGlobalBadge(ga, i))}
-      </div>`,
-      autobar: this._renderAutoBar(),
-      plan: this._renderPlanPreview(),
-      map: merged
-        ? this._renderResponsive(this._renderMergedMap())
-        : html`${shown.map((i) => this._renderResponsive(this._renderMap(this._config.vacuums[i])))}`,
-      tools: html`${shown.map((i) => this._renderMapTools(this._config.vacuums[i]))}`,
-      status: html`${shown.map((i) => this._renderStatusCard(this._config.vacuums[i], i))}`,
-    };
+    const vacsOf = (idxs: number[]) => idxs.map((i) => this._config.vacuums[i]);
+    switch (name) {
+      case "badges":
+        return html`<div class="badges-row badges-row--grid">
+          ${this._config.vacuums.map((v, i) => this._renderBadge(v, i))}
+          ${(this._config.global_actions ?? []).map((ga, i) => this._renderGlobalBadge(ga, i))}
+          ${this._renderStatsTrio()}
+        </div>`;
+      case "autobar":
+        return this._renderAutoBar();
+      case "plan":
+        return this._renderPlanPreview();
+      case "map": {
+        // Map tools float over the map edge in grid mode (docs/18 §3) — the tools
+        // region stays available for explicit old-style placement.
+        const maps = merged
+          ? this._renderResponsive(this._renderMergedMap())
+          : html`${shown.map((i) => this._renderResponsive(this._renderMap(this._config.vacuums[i])))}`;
+        return html`${maps}${vacsOf(shown).map((v, slot) => this._renderMapTools(v, true, slot))}`;
+      }
+      case "tools":
+        return html`${vacsOf(shown).map((v) => this._renderMapTools(v))}`;
+      case "dock":
+        // The dock carries the orchestrated run footer when no `start` region is
+        // placed in this profile (landscape, docs/18 §7d).
+        return this._renderDock(!("start" in prof.place));
+      case "start":
+        return this._renderStartBar();
+      case "status":
+        return html`${shown.map((i) => this._renderStatusCard(this._config.vacuums[i], i))}`;
+      default:
+        return null;
+    }
   }
 
   /** Grid render path (docs/18): active only with a `layout:` config block. */
   private _renderGrid(lay: LayoutConfig) {
     const prof = resolveProfile(lay, this._profile);
-    const regions = this._regionTemplates();
     const schemaWarn = this._schemaWarning();
     return html`
       <ha-card style="padding:0;display:block">
@@ -2192,7 +2440,7 @@ export class AnyVacCard extends LitElement {
             <ha-icon icon="mdi:alert" style="--mdc-icon-size:18px"></ha-icon><span>${schemaWarn}</span>
           </div>` : nothing}
           ${Object.entries(prof.place).map(([name, pl]) => {
-            const tpl = regions[name];
+            const tpl = this._regionTemplate(name, prof);
             if (tpl == null || tpl === nothing) return nothing;
             return html`<div class="avc-region avc-region--${name}" style=${styleMap(regionStyles(pl))}>${tpl}</div>`;
           })}
@@ -2268,6 +2516,190 @@ export class AnyVacCard extends LitElement {
     }
 
     /* ── Grid layout (docs/18) ───────────────────────────────────────── */
+    .badges-row--grid {
+      align-items: center;
+      padding: 4px 6px;
+    }
+
+    .stats-trio {
+      display: flex;
+      gap: 10px;
+      margin-left: auto;
+      align-items: center;
+      padding-right: 4px;
+    }
+    .stat {
+      display: inline-flex;
+      align-items: center;
+      gap: 3px;
+      font-size: 12px;
+      color: rgba(255, 255, 255, 0.75);
+    }
+    .stat ha-icon { --mdc-icon-size: 15px; color: rgba(255, 255, 255, 0.4); }
+    .stat b { font-weight: 700; }
+    .stat small { font-size: 10px; color: rgba(255, 255, 255, 0.4); }
+
+    /* Dock (docs/12 §3): selection + plan + pinning in one column */
+    .dock {
+      display: flex;
+      flex-direction: column;
+      gap: 6px;
+      height: 100%;
+      padding: 6px;
+      box-sizing: border-box;
+      background: rgba(255, 255, 255, 0.03);
+      border: 1px solid rgba(255, 255, 255, 0.08);
+      border-radius: 12px;
+    }
+    .dock-head { display: flex; gap: 4px; }
+    .dock-mode {
+      flex: 1;
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      gap: 4px;
+      padding: 6px 4px;
+      border-radius: 9px;
+      cursor: pointer;
+      font-family: inherit;
+      font-size: 11px;
+      font-weight: 700;
+      color: rgba(255, 255, 255, 0.5);
+      background: transparent;
+      border: 1px solid rgba(255, 255, 255, 0.15);
+    }
+    .dock-mode ha-icon { --mdc-icon-size: 15px; }
+    .dock-mode.on {
+      color: #fff;
+      background: rgba(255, 255, 255, 0.12);
+      border-color: rgba(255, 255, 255, 0.5);
+    }
+    .dock-rows {
+      display: flex;
+      flex-direction: column;
+      gap: 3px;
+      overflow-y: auto;
+      min-height: 0;
+      flex: 1;
+    }
+    .dock-row {
+      display: flex;
+      align-items: center;
+      gap: 6px;
+      padding: 6px 7px;
+      border-radius: 9px;
+      cursor: pointer;
+      font-family: inherit;
+      text-align: left;
+      color: rgba(255, 255, 255, 0.85);
+      background: rgba(255, 255, 255, 0.03);
+      border: 1px solid rgba(255, 255, 255, 0.07);
+    }
+    .dock-row.on {
+      background: rgba(82, 196, 26, 0.1);
+      border-color: rgba(82, 196, 26, 0.5);
+    }
+    .dock-ric { --mdc-icon-size: 16px; color: rgba(255, 255, 255, 0.55); flex-shrink: 0; }
+    .dock-name {
+      flex: 1;
+      min-width: 0;
+      overflow: hidden;
+      text-overflow: ellipsis;
+      white-space: nowrap;
+      font-size: 12px;
+      font-weight: 600;
+    }
+    .dock-ages { display: inline-flex; gap: 6px; flex-shrink: 0; }
+    .dock-age { display: inline-flex; align-items: center; gap: 2px; font-size: 10px; }
+    .dock-age ha-icon { --mdc-icon-size: 12px; color: rgba(255, 255, 255, 0.3); }
+    .dock-avatars { display: inline-flex; gap: 3px; flex-shrink: 0; }
+    .dock-chip {
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      gap: 1px;
+      min-width: 24px;
+      height: 17px;
+      padding: 0 5px;
+      border-radius: 9px;
+      font-size: 10px;
+      font-weight: 700;
+      border: 1px solid transparent;
+      cursor: pointer;
+    }
+    .dock-chip--empty { color: rgba(255, 255, 255, 0.25); border-color: rgba(255, 255, 255, 0.15); }
+    .dock-chip--pinned { box-shadow: 0 0 0 1.5px currentColor; }
+    .dock-foot {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 8px;
+      border-top: 1px solid rgba(255, 255, 255, 0.08);
+      padding-top: 6px;
+    }
+    .dock-est { font-size: 11px; color: rgba(255, 255, 255, 0.45); }
+
+    /* START bar (portrait bottom, docs/18 §7d) */
+    .start-bar {
+      position: relative;
+      overflow: hidden;
+      width: 100%;
+      height: 100%;
+      min-height: 44px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      gap: 10px;
+      border-radius: 14px;
+      cursor: pointer;
+      font-family: inherit;
+      font-size: 15px;
+      font-weight: 800;
+      color: #fff;
+      background: rgba(82, 196, 26, 0.16);
+      border: 1px solid rgba(82, 196, 26, 0.6);
+    }
+    .start-bar:disabled {
+      cursor: default;
+      color: rgba(255, 255, 255, 0.25);
+      background: rgba(60, 60, 60, 0.4);
+      border-color: rgba(255, 255, 255, 0.1);
+    }
+    .start-bar ha-icon { --mdc-icon-size: 22px; position: relative; z-index: 1; }
+    .start-bar span { position: relative; z-index: 1; }
+    .start-bar--cancel {
+      background: rgba(250, 173, 20, 0.16);
+      border-color: rgba(250, 173, 20, 0.6);
+    }
+
+    /* Floating map tools (grid mode) */
+    .map-tools--float {
+      position: absolute;
+      top: 8px;
+      z-index: 6;
+      flex-direction: column;
+      gap: 6px;
+      margin: 0;
+    }
+    .map-tools--float .mtbtn {
+      padding: 8px;
+      backdrop-filter: blur(8px);
+      -webkit-backdrop-filter: blur(8px);
+      background: rgba(20, 20, 20, 0.55);
+    }
+    .map-tools--float .mtbtn span { display: none; }
+    .calib-panel--float {
+      position: absolute;
+      left: 8px;
+      right: 56px;
+      bottom: 8px;
+      z-index: 6;
+      margin: 0;
+      backdrop-filter: blur(8px);
+      -webkit-backdrop-filter: blur(8px);
+      background: rgba(20, 20, 30, 0.75);
+    }
+
     .avc-schemawarn {
       position: absolute;
       top: 4px;

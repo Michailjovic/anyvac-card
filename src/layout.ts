@@ -39,9 +39,10 @@ export interface LayoutConfig {
 }
 
 /**
- * Interim Phase-A defaults. The canonical docs/18 §4 defaults reference the
- * `dock` and `start` regions which only come to exist in Phase B/C — until
- * then the defaults place today's regions sensibly. Overridable per config.
+ * Canonical docs/18 §4 default profiles (Phase B). Landscape = cockpit: map left
+ * (scrolls in split mode, §7b), dock (selection + plan + orchestrated run, §7d)
+ * and per-robot status cards right. Portrait = docs/12: slim badges bar, tall
+ * rotated map, right thumb dock, full-width START bar. Overridable per config.
  */
 export const DEFAULT_PROFILES: Record<LayoutProfile, Required<Omit<ProfileGridConfig, never>>> = {
   landscape: {
@@ -49,21 +50,19 @@ export const DEFAULT_PROFILES: Record<LayoutProfile, Required<Omit<ProfileGridCo
     rows: [9, 61, 30],
     place: {
       badges: { row: 1, col: 1 },
-      autobar: { row: 1, col: 2, overflow: "auto" },
-      map: { row: "2/4", col: 1 },
-      plan: { row: 2, col: 2, overflow: "auto" },
+      map: { row: "2/4", col: 1, overflow: "auto" },
+      dock: { row: "1/3", col: 2 },
       status: { row: 3, col: 2, overflow: "auto" },
     },
   },
   portrait: {
-    columns: [100],
-    rows: [8, 72, 20],
+    columns: [72, 28],
+    rows: [8, 82, 10],
     place: {
-      badges: { row: 1 },
-      // Exact rotated-map fit into the region height lands in Phase B; until
-      // then the region scrolls if the rotated map is taller than its track.
-      map: { row: 2, overflow: "auto" },
-      status: { row: 3, overflow: "auto" },
+      badges: { row: 1, col: "1/3" },
+      map: { row: 2, col: 1 },
+      dock: { row: 2, col: 2 },
+      start: { row: 3, col: "1/3" },
     },
   },
 };
