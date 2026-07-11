@@ -13,6 +13,22 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   floating map tools, stats trio, exact rotated-map fit, per-room vacuum pinning),
   landscape cockpit. Completion of the rebuild ships as **v1.0.0**.
 
+## [0.42.2] - 2026-07-11
+
+Second field pass (docs/18 §10b).
+
+### Fixed
+
+- **Landscape dead space** — the map track is now `auto` (intrinsic height) with
+  tools directly under the map, status cards filling the rest of the left column
+  and the dock owning the full right column (`rows: [9, auto, auto, 1fr]`).
+- **Refresh moved to the badges row** (right edge) — the floating map-corner
+  button sat in dead space next to the centred portrait map.
+- **Per-room progress gauges in the dock** — the dry/wet `%` chips
+  (`debug_room_progress`) render next to the age badges in dock rows, so live
+  cleaning progress is visible in portrait again (status cards are not placed
+  there). On-map room gauges are unchanged (upright via `.avc-rot`).
+
 ## [0.42.1] - 2026-07-11
 
 First field pass over the 0.42.0 grid profiles — fixes from live screenshots.

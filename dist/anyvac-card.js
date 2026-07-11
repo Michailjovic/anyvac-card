@@ -87,7 +87,7 @@ const t={ATTRIBUTE:1},e=t=>(...e)=>({_$litDirective$:t,values:e});let i$1 = clas
 
 const CARD_NAME = "anyvac-card";
 const EDITOR_NAME = "anyvac-card-editor";
-const CARD_VERSION = "0.42.1";
+const CARD_VERSION = "0.42.2";
 /** Hold duration in ms required to trigger START / PAUSE actions */
 const HOLD_DURATION_MS = 600;
 /**
@@ -398,16 +398,18 @@ function roomBboxToRect(ir, at, seat, ar) {
  */
 const DEFAULT_PROFILES = {
     landscape: {
+        // `auto` map track: the map takes its intrinsic height (a 3.6:1 floorplan in
+        // a 70 % column needs ~25 % of the screen, a fixed 56 % track left a huge
+        // dead hole — field feedback 2026-07-11). Tools sit right under the map,
+        // status cards fill the rest of the left column; dock owns the full right.
         columns: [70, 30],
-        rows: [9, 56, 35],
+        rows: [9, "auto", "auto", "1fr"],
         place: {
             badges: { row: 1, col: 1 },
-            map: { row: 2, col: 1, overflow: "auto" },
-            // Map tools live UNDER the map in landscape — floating columns blocked the
-            // right side of the map (field feedback 2026-07-11).
-            tools: { row: 3, col: 1, overflow: "auto", align: "start" },
-            dock: { row: "1/3", col: 2 },
-            status: { row: 3, col: 2, overflow: "auto" },
+            map: { row: 2, col: 1 },
+            tools: { row: 3, col: 1, align: "start" },
+            status: { row: 4, col: 1, overflow: "auto" },
+            dock: { row: "1/5", col: 2 },
         },
     },
     portrait: {
@@ -1707,8 +1709,8 @@ let AnyVacCard = class AnyVacCard extends i$2 {
                 <ha-icon class="dock-ric" icon=${r.icon ?? "mdi:square"}></ha-icon>
                 <span class="dock-name">${r.name ?? r.key}</span>
                 <span class="dock-ages">
-                  <span class="dock-age"><ha-icon icon="mdi:broom"></ha-icon><b style=${o({ color: this._colorForAgeDays(dry) })}>${badge(dry)}</b></span>
-                  <span class="dock-age"><ha-icon icon="mdi:water"></ha-icon><b style=${o({ color: this._colorForAgeDays(wet) })}>${badge(wet)}</b></span>
+                  <span class="dock-age">${this._renderProgChip(this._roomProgForType(r, vacs, "dry"))}<ha-icon icon="mdi:broom"></ha-icon><b style=${o({ color: this._colorForAgeDays(dry) })}>${badge(dry)}</b></span>
+                  <span class="dock-age">${this._renderProgChip(this._roomProgForType(r, vacs, "wet"))}<ha-icon icon="mdi:water"></ha-icon><b style=${o({ color: this._colorForAgeDays(wet) })}>${badge(wet)}</b></span>
                 </span>
                 ${hasInt && sel ? b `
                   <span class="dock-avatars">
@@ -2133,13 +2135,13 @@ let AnyVacCard = class AnyVacCard extends i$2 {
         this._modeEntity = null;
     }
     _cancelZone() { this._zonePending = null; this._zoneDrag = null; }
-    /** Single floating refresh-all button for map regions without a `tools` row
-     *  (portrait grid) — the only map command that works in the rotated view. */
-    _renderMapRefreshFloat(vacs) {
-        const withMap = vacs.filter((v) => v.map?.entity);
+    /** Refresh-all button in the badges row (grid mode) — the map corner variant
+     *  floated in dead space (field feedback 2026-07-11). */
+    _renderBadgesRefresh() {
+        const withMap = this._config.vacuums.filter((v) => v.map?.entity);
         if (!withMap.length)
             return A;
-        return b `<button class="mtbtn map-refresh-float" title="Refresh maps"
+        return b `<button class="mtbtn badges-refresh" title="Refresh maps"
       @click=${() => { for (const v of withMap)
             this._refreshMap(v); }}>
       <ha-icon icon="mdi:refresh"></ha-icon>
@@ -2944,6 +2946,7 @@ let AnyVacCard = class AnyVacCard extends i$2 {
           ${this._config.vacuums.map((v, i) => this._renderBadge(v, i))}
           ${(this._config.global_actions ?? []).map((ga, i) => this._renderGlobalBadge(ga, i))}
           ${this._profile === "landscape" ? this._renderStatsTrio() : A}
+          ${this._renderBadgesRefresh()}
         </div>`;
             case "autobar":
                 return this._renderAutoBar();
@@ -2960,8 +2963,7 @@ let AnyVacCard = class AnyVacCard extends i$2 {
                     : b `${shown.map((i) => this._renderResponsive(this._renderMap(this._config.vacuums[i])))}`;
                 const vacs = vacsOf(shown);
                 return b `${maps}
-          ${this._renderLayerToggles(vacs)}
-          ${"tools" in prof.place ? A : this._renderMapRefreshFloat(vacs)}`;
+          ${this._renderLayerToggles(vacs)}`;
             }
             case "tools":
                 return b `${vacsOf(shown).map((v) => this._renderMapTools(v))}`;
@@ -3221,17 +3223,9 @@ AnyVacCard.styles = i$5 `
       border-color: rgba(250, 173, 20, 0.6);
     }
 
-    /* Map-region furniture (grid mode): upright, OUTSIDE the rotation wrapper */
-    .map-refresh-float {
-      position: absolute;
-      top: 8px;
-      left: 8px;
-      z-index: 6;
-      padding: 8px;
-      backdrop-filter: blur(8px);
-      -webkit-backdrop-filter: blur(8px);
-      background: rgba(20, 20, 20, 0.55);
-    }
+    /* Grid badges-row extras */
+    .badges-refresh { margin-left: auto; flex-shrink: 0; padding: 8px; }
+    .stats-trio + .badges-refresh { margin-left: 6px; }
     .map-tools-label {
       font-size: 11px;
       font-weight: 700;

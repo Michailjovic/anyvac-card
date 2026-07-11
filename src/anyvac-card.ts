@@ -1184,8 +1184,8 @@ export class AnyVacCard extends LitElement {
                 <ha-icon class="dock-ric" icon=${r.icon ?? "mdi:square"}></ha-icon>
                 <span class="dock-name">${r.name ?? r.key}</span>
                 <span class="dock-ages">
-                  <span class="dock-age"><ha-icon icon="mdi:broom"></ha-icon><b style=${styleMap({ color: this._colorForAgeDays(dry) })}>${badge(dry)}</b></span>
-                  <span class="dock-age"><ha-icon icon="mdi:water"></ha-icon><b style=${styleMap({ color: this._colorForAgeDays(wet) })}>${badge(wet)}</b></span>
+                  <span class="dock-age">${this._renderProgChip(this._roomProgForType(r, vacs, "dry"))}<ha-icon icon="mdi:broom"></ha-icon><b style=${styleMap({ color: this._colorForAgeDays(dry) })}>${badge(dry)}</b></span>
+                  <span class="dock-age">${this._renderProgChip(this._roomProgForType(r, vacs, "wet"))}<ha-icon icon="mdi:water"></ha-icon><b style=${styleMap({ color: this._colorForAgeDays(wet) })}>${badge(wet)}</b></span>
                 </span>
                 ${hasInt && sel ? html`
                   <span class="dock-avatars">
@@ -1601,12 +1601,12 @@ export class AnyVacCard extends LitElement {
   }
   private _cancelZone(): void { this._zonePending = null; this._zoneDrag = null; }
 
-  /** Single floating refresh-all button for map regions without a `tools` row
-   *  (portrait grid) — the only map command that works in the rotated view. */
-  private _renderMapRefreshFloat(vacs: VacuumConfig[]) {
-    const withMap = vacs.filter((v) => v.map?.entity);
+  /** Refresh-all button in the badges row (grid mode) — the map corner variant
+   *  floated in dead space (field feedback 2026-07-11). */
+  private _renderBadgesRefresh() {
+    const withMap = this._config.vacuums.filter((v) => v.map?.entity);
     if (!withMap.length) return nothing;
-    return html`<button class="mtbtn map-refresh-float" title="Refresh maps"
+    return html`<button class="mtbtn badges-refresh" title="Refresh maps"
       @click=${() => { for (const v of withMap) this._refreshMap(v); }}>
       <ha-icon icon="mdi:refresh"></ha-icon>
     </button>`;
@@ -2413,6 +2413,7 @@ export class AnyVacCard extends LitElement {
           ${this._config.vacuums.map((v, i) => this._renderBadge(v, i))}
           ${(this._config.global_actions ?? []).map((ga, i) => this._renderGlobalBadge(ga, i))}
           ${this._profile === "landscape" ? this._renderStatsTrio() : nothing}
+          ${this._renderBadgesRefresh()}
         </div>`;
       case "autobar":
         return this._renderAutoBar();
@@ -2429,8 +2430,7 @@ export class AnyVacCard extends LitElement {
           : html`${shown.map((i) => this._renderResponsive(this._renderMap(this._config.vacuums[i])))}`;
         const vacs = vacsOf(shown);
         return html`${maps}
-          ${this._renderLayerToggles(vacs)}
-          ${"tools" in prof.place ? nothing : this._renderMapRefreshFloat(vacs)}`;
+          ${this._renderLayerToggles(vacs)}`;
       }
       case "tools":
         return html`${vacsOf(shown).map((v) => this._renderMapTools(v))}`;
@@ -2691,17 +2691,9 @@ export class AnyVacCard extends LitElement {
       border-color: rgba(250, 173, 20, 0.6);
     }
 
-    /* Map-region furniture (grid mode): upright, OUTSIDE the rotation wrapper */
-    .map-refresh-float {
-      position: absolute;
-      top: 8px;
-      left: 8px;
-      z-index: 6;
-      padding: 8px;
-      backdrop-filter: blur(8px);
-      -webkit-backdrop-filter: blur(8px);
-      background: rgba(20, 20, 20, 0.55);
-    }
+    /* Grid badges-row extras */
+    .badges-refresh { margin-left: auto; flex-shrink: 0; padding: 8px; }
+    .stats-trio + .badges-refresh { margin-left: 6px; }
     .map-tools-label {
       font-size: 11px;
       font-weight: 700;

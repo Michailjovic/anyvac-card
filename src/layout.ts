@@ -46,16 +46,18 @@ export interface LayoutConfig {
  */
 export const DEFAULT_PROFILES: Record<LayoutProfile, Required<Omit<ProfileGridConfig, never>>> = {
   landscape: {
+    // `auto` map track: the map takes its intrinsic height (a 3.6:1 floorplan in
+    // a 70 % column needs ~25 % of the screen, a fixed 56 % track left a huge
+    // dead hole — field feedback 2026-07-11). Tools sit right under the map,
+    // status cards fill the rest of the left column; dock owns the full right.
     columns: [70, 30],
-    rows: [9, 56, 35],
+    rows: [9, "auto", "auto", "1fr"],
     place: {
       badges: { row: 1, col: 1 },
-      map: { row: 2, col: 1, overflow: "auto" },
-      // Map tools live UNDER the map in landscape — floating columns blocked the
-      // right side of the map (field feedback 2026-07-11).
-      tools: { row: 3, col: 1, overflow: "auto", align: "start" },
-      dock: { row: "1/3", col: 2 },
-      status: { row: 3, col: 2, overflow: "auto" },
+      map: { row: 2, col: 1 },
+      tools: { row: 3, col: 1, align: "start" },
+      status: { row: 4, col: 1, overflow: "auto" },
+      dock: { row: "1/5", col: 2 },
     },
   },
   portrait: {
