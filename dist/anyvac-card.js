@@ -87,7 +87,7 @@ const t={ATTRIBUTE:1},e=t=>(...e)=>({_$litDirective$:t,values:e});let i$1 = clas
 
 const CARD_NAME = "anyvac-card";
 const EDITOR_NAME = "anyvac-card-editor";
-const CARD_VERSION = "0.42.4";
+const CARD_VERSION = "0.43.0";
 /** Hold duration in ms required to trigger START / PAUSE actions */
 const HOLD_DURATION_MS = 600;
 /**
@@ -845,6 +845,13 @@ let AnyVacCard = class AnyVacCard extends i$2 {
     }
     _isCleaning(vac) {
         return CLEANING_STATES.has(this.hass.states[vac.entity]?.state ?? "");
+    }
+    /** True when the vacuum's error entity/attribute reports an active error
+     *  (shared by the status card error row and the map robot-error halo). */
+    _hasError(vac) {
+        const erid = this._ent(vac, "error");
+        const errState = erid ? this.hass.states[erid]?.state : null;
+        return !!errState && errState !== "none" && errState !== "unknown" && errState !== "unavailable";
     }
     _isPaused(vac) {
         return this.hass.states[vac.entity]?.state === "paused";
@@ -2314,7 +2321,20 @@ let AnyVacCard = class AnyVacCard extends i$2 {
                 ? w `<image href=${vac.image} x=${(rob.x - robSize / 2).toFixed(1)} y=${(rob.y - robSize / 2).toFixed(1)} width=${robSize.toFixed(1)} height=${robSize.toFixed(1)} preserveAspectRatio="xMidYMid meet" transform=${"rotate(" + robA + " " + rob.x.toFixed(1) + " " + rob.y.toFixed(1) + ")"}></image>`
                 : w `${head ? w `<line x1=${rob.x.toFixed(1)} y1=${rob.y.toFixed(1)} x2=${head.x.toFixed(1)} y2=${head.y.toFixed(1)} stroke="#ffffff" stroke-width=${(rr * 0.3).toFixed(2)} stroke-linecap="round"></line>` : A}<circle cx=${rob.x.toFixed(1)} cy=${rob.y.toFixed(1)} r=${rr.toFixed(1)} fill=${color} stroke="#ffffff" stroke-width=${(rr * 0.18).toFixed(2)}></circle>`)
             : A;
-        return b `<svg class="map-vector" viewBox="0 0 ${NW} ${NH}" preserveAspectRatio="none" style=${o(seat)}>${mopBand}${mopLine}${traceT}${robotT}</svg>`;
+        // Robot-error halo: a soft pulsing red glow behind the robot marker, so an
+        // active error is visible directly on the map, not just in the status card.
+        // Filter id is per-vacuum-entity to avoid collisions between multiple <svg>
+        // overlays (merged mode renders one per vacuum, all in the same shadow root).
+        const hasErr = rob && this._hasError(vac);
+        const errFilterId = "avc-err-blur-" + vac.entity.replace(/[^a-zA-Z0-9]/g, "-");
+        const errHalo = hasErr
+            ? w `<defs><filter id=${errFilterId} x="-150%" y="-150%" width="400%" height="400%">
+              <feGaussianBlur stdDeviation=${(rr * 0.5).toFixed(2)}></feGaussianBlur>
+            </filter></defs>
+            <circle class="avc-err-halo" cx=${rob.x.toFixed(1)} cy=${rob.y.toFixed(1)} r=${(rr * 2.2).toFixed(1)}
+              fill="#ff3b30" filter=${"url(#" + errFilterId + ")"}></circle>`
+            : A;
+        return b `<svg class="map-vector" viewBox="0 0 ${NW} ${NH}" preserveAspectRatio="none" style=${o(seat)}>${mopBand}${mopLine}${traceT}${errHalo}${robotT}</svg>`;
     }
     _onLayerDown(type) {
         this._layerHeld = false;
@@ -2691,7 +2711,7 @@ let AnyVacCard = class AnyVacCard extends i$2 {
         // Error
         const erid = this._ent(vac, "error");
         const errState = erid ? this.hass.states[erid]?.state : null;
-        const hasError = errState && errState !== "none" && errState !== "unknown" && errState !== "unavailable";
+        const hasError = this._hasError(vac);
         return b `
       ${hasError ? b `
         <div class="error-row">
@@ -3378,6 +3398,8 @@ AnyVacCard.styles = i$5 `
     .image-base-img { position: relative; display: block; width: 100%; height: auto; transform-origin: center center; }
     .map-img--overlay { opacity: 0.55; pointer-events: none; }
     .map-vector { position: absolute; transform-origin: center center; pointer-events: none; overflow: visible; }
+    .avc-err-halo { animation: avc-err-pulse 1.3s ease-in-out infinite; }
+    @keyframes avc-err-pulse { 0%,100% { opacity: 0.18; } 50% { opacity: 0.6; } }
     .zone-rect { position: absolute; border: 2px solid #fff; background: rgba(255,255,255,0.15); border-radius: 4px; pointer-events: none; box-shadow: 0 0 0 1px rgba(0,0,0,0.45); }
     .layer-toggles { position: absolute; top: 8px; right: 8px; display: flex; gap: 6px; z-index: 3; }
     .layer-btn { display: flex; align-items: center; gap: 3px; padding: 3px 8px; border-radius: 999px; border: 1px solid rgba(255,255,255,0.2); background: rgba(0,0,0,0.45); color: rgba(255,255,255,0.55); font-size: 11px; font-weight: 600; cursor: pointer; --mdc-icon-size: 16px; user-select: none; -webkit-touch-callout: none; touch-action: manipulation; }

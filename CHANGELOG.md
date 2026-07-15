@@ -13,6 +13,18 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   floating map tools, stats trio, exact rotated-map fit, per-room vacuum pinning),
   landscape cockpit. Completion of the rebuild ships as **v1.0.0**.
 
+## [0.43.0] - 2026-07-15
+
+### Added
+
+- **Robot error halo on the map** — when a vacuum's error entity reports an
+  active error, a soft pulsing red glow now renders behind its robot marker
+  in the integration vector overlay (`_renderIntegrationOverlay`), not just in
+  the status card's error row. Shares the new `_hasError()` helper with the
+  status card so both stay in sync. Blurred via a per-vacuum-entity SVG
+  filter id (`avc-err-blur-<entity>`) to avoid `<defs>` id collisions when
+  multiple vacuums render in merged mode.
+
 ## [0.42.4] - 2026-07-15
 
 ### Fixed
