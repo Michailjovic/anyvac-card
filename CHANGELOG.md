@@ -14,6 +14,31 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   hints. Completion of the whole rebuild (this release + the follow-up)
   ships as **v1.0.0**.
 
+## [0.60.0] - 2026-07-16
+
+**Stability fix** — user reported a full crash of the HA mobile companion
+app after 0.59.0 (PC still showed the pre-existing layout issue, no crash).
+No backend change — still pairs with `anyvac` 0.50.0.
+
+### Fixed
+
+- **Removed the detached-clone dock-width measurement** added in 0.57/0.58 —
+  it ran on every `updated()` cycle, including the once-a-second
+  `debug_room_progress` clock tick, meaning a full DOM subtree clone
+  (create → append → measure → remove) every second for the life of the
+  session. Plausible crash source on a memory/CPU-constrained mobile
+  WebView, and if anything in that path ever threw before reaching
+  `clone.remove()`, it would leak one detached node per tick, unbounded.
+  Reverted to the simpler map-only fit that shipped in 0.56 (`dock` back to
+  a flat `1fr`) — the sidebar-width-overshoot cosmetic issue returns, but a
+  cosmetic issue is preferable to an app crash. The genuinely-confirmed
+  0.59.0 fix (removing `gridTemplateColumns`/`height` from Lit's `styleMap`
+  so JS is their sole owner) is kept — that part has a concrete root cause,
+  not a guess, and doesn't do any per-tick DOM work.
+- The dock-width capping (giving surplus width back to the map when the
+  room list doesn't need it all) is parked until it can be re-implemented
+  behind a `try/finally` and confirmed not to reproduce the crash.
+
 ## [0.59.0] - 2026-07-16
 
 Same-day follow-up to 0.58.0: user correctly noticed the map still showed a

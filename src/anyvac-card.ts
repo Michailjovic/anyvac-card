@@ -315,7 +315,21 @@ export class AnyVacCard extends LitElement {
    *  owner either way, closing off that entire class of doubt. Also now
    *  handles landscape (previously untouched — its fixed split lived
    *  purely in styleMap, so it needs its own JS-applied fallback now that
-   *  styleMap no longer carries it at all). */
+   *  styleMap no longer carries it at all).
+   *
+   *  Reverted 2026-07-16 (crash report, mobile companion app): the
+   *  detached-clone dock measurement above ran on EVERY `updated()` cycle —
+   *  including the once-a-second `debug_room_progress` clock tick — which
+   *  means creating, appending and removing a full DOM subtree clone every
+   *  second for as long as the card is open. Cheap on desktop, but a
+   *  plausible crash source on a memory/CPU-constrained mobile WebView,
+   *  especially if `getBoundingClientRect()` or anything else in that path
+   *  ever threw before reaching `clone.remove()` — that would leak one
+   *  detached node per tick, unbounded, for the life of the session.
+   *  Dropped back to the simpler, already-safe map-only fit (`mapW = rW`,
+   *  `dock` stays a flat `1fr`) until this can be re-tried behind a
+   *  try/finally and confirmed not to reproduce the crash. Sidebar-width
+   *  overshoot is a cosmetic regression next to an app crash. */
   private _refineGridColumns(): void {
     const lay = this._config?.layout;
     if (!lay) return;
@@ -332,22 +346,6 @@ export class AnyVacCard extends LitElement {
     const avail = total - gapPx;
     let mapW = Math.round(this._lastPortraitFitW);
     if (avail > 0) mapW = Math.min(mapW, avail);
-    const dockEl = this.renderRoot?.querySelector<HTMLElement>(".avc-region--dock .dock");
-    if (dockEl && avail > 0) {
-      const clone = dockEl.cloneNode(true) as HTMLElement;
-      clone.style.position = "absolute";
-      clone.style.visibility = "hidden";
-      clone.style.pointerEvents = "none";
-      clone.style.left = "-9999px";
-      clone.style.top = "0";
-      clone.style.height = "auto";
-      clone.style.width = "max-content";
-      this.renderRoot.appendChild(clone);
-      const need = Math.ceil(clone.getBoundingClientRect().width);
-      clone.remove();
-      const leftover = avail - mapW;
-      if (need > 0 && need < leftover) mapW = avail - need;
-    }
     const want = Math.round(mapW) + "px 1fr";
     if (root.style.gridTemplateColumns !== want) root.style.gridTemplateColumns = want;
   }
