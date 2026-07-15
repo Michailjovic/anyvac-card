@@ -269,12 +269,36 @@ export class AnyVacCard extends LitElement {
    *  absolutely-positioned inner div specifically so it doesn't feed back
    *  into layout, which also means it carries no intrinsic-size signal for
    *  track auto-sizing — so the split is measured and applied directly, same
-   *  as `_refineGridHeight` does for the root height. */
+   *  as `_refineGridHeight` does for the root height.
+   *
+   *  Field feedback 2026-07-16: giving `dock` a flat 1fr handed it EVERY px
+   *  the map's fit didn't need, even when the room list itself is much
+   *  narrower than that (dead black space in the sidebar, map smaller than
+   *  it could be). Fix: measure `dock`'s own natural (unconstrained) content
+   *  width the same way — briefly flip it to `width:max-content`, read it,
+   *  restore — and only let it keep up to that; any further surplus goes
+   *  back to `map`'s track (shows up as centered letterbox bars around the
+   *  map itself, same as the landscape contain-fit already does, instead of
+   *  as empty sidebar). */
   private _refineGridColumns(): void {
     if (this._profile !== "portrait" || !this._lastPortraitFitW) return;
     const root = this.renderRoot?.querySelector<HTMLElement>(".avc-grid");
     if (!root) return;
-    const want = Math.round(this._lastPortraitFitW) + "px 1fr";
+    const total = root.clientWidth;
+    const gapPx = parseFloat(getComputedStyle(root).columnGap || "0") || 0;
+    const avail = total - gapPx;
+    let mapW = Math.round(this._lastPortraitFitW);
+    if (avail > 0) mapW = Math.min(mapW, avail);
+    const dockEl = this.renderRoot?.querySelector<HTMLElement>(".avc-region--dock .dock");
+    if (dockEl && avail > 0) {
+      const prevWidth = dockEl.style.width;
+      dockEl.style.width = "max-content";
+      const need = Math.ceil(dockEl.getBoundingClientRect().width);
+      dockEl.style.width = prevWidth;
+      const leftover = avail - mapW;
+      if (need < leftover) mapW = avail - need;
+    }
+    const want = Math.round(mapW) + "px 1fr";
     if (root.style.gridTemplateColumns !== want) root.style.gridTemplateColumns = want;
   }
 

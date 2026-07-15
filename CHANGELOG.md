@@ -14,6 +14,26 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   hints. Completion of the whole rebuild (this release + the follow-up)
   ships as **v1.0.0**.
 
+## [0.57.0] - 2026-07-16
+
+Field-test follow-up to 0.56.0's portrait column split: the sidebar was
+grabbing every leftover pixel from the map's fit, even when its own content
+needed far less. No backend change — still pairs with `anyvac` 0.50.0.
+
+### Fixed
+
+- **Portrait dock column wider than its content, map narrower than it could
+  be** — `_refineGridColumns` gave `dock` a flat `1fr`, i.e. *all* width the
+  height-fitted map didn't claim, regardless of whether the room list
+  actually needed it (field screenshot: a mostly-empty sidebar next to a
+  map that could have been noticeably bigger). It now also measures `dock`'s
+  own natural (unconstrained) content width — briefly flips it to
+  `width: max-content`, reads it, restores it, same temporary-measure trick
+  used elsewhere — and only lets the sidebar keep up to that. Any further
+  surplus goes back to the map's column instead, which shows up as centered
+  letterbox bars around the map itself (same behavior the landscape
+  contain-fit already has) rather than as dead sidebar space.
+
 ## [0.56.0] - 2026-07-15
 
 Landscape map height-cropping fix + portrait's map/dock column now sized to
