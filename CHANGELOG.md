@@ -13,6 +13,21 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   floating map tools, stats trio, exact rotated-map fit, per-room vacuum pinning),
   landscape cockpit. Completion of the rebuild ships as **v1.0.0**.
 
+## [0.42.3] - 2026-07-15
+
+Requires integration ≥ 0.19.1 for the fix to take effect (the segments are built
+on the backend; an older integration still sends a flat `path_dry_px`, which the
+card still renders correctly as a single segment — no breaking change).
+
+### Fixed
+
+- **Finished dry trace looked like a scribble compared to the clean live trace**
+  — `path_dry_px` is now a list of contiguous segments instead of one flat point
+  list (integration 0.19.1). The card now draws one `<polyline>` per segment
+  instead of one polyline across the whole array, so the straight line the
+  browser used to draw across every excluded transit/mop-wash gap (one per room
+  transition in a finished multi-room session) is gone.
+
 ## [0.42.2] - 2026-07-11
 
 Second field pass (docs/18 §10b).

@@ -1724,7 +1724,15 @@ export class AnyVacCard extends LitElement {
     const layersOn = this._layersEff();
     const showDry = layersOn.dry && ct.dry;
     const showWet = layersOn.wet && ct.wet;
-    const dryStr = showDry ? toPts(at.path_dry_px) : "";
+    // path_dry_px is a list of contiguous segments (docs/14 §3.9 — the backend never
+    // bridges an excluded transit/mop-wash gap with a straight line, so the card must
+    // not either). One <polyline> per segment; a single flat polyline across all
+    // segments used to draw a spurious diagonal line at every room transition, which
+    // is why a finished multi-room trace used to look like a scribble while the live
+    // in-progress trace (still one segment) looked clean (fixed 2026-07-15).
+    const drySegs: string[] = showDry && Array.isArray(at.path_dry_px)
+      ? at.path_dry_px.map((seg: any) => toPts(seg)).filter((s: string) => s.length > 0)
+      : [];
     const wetStr = showWet ? toPts(at.path_wet_px) : "";
     const vp = at.vacuum_position_px;
     const rob = vp ? { x: vp.x as number, y: vp.y as number } : null;
@@ -1754,8 +1762,8 @@ export class AnyVacCard extends LitElement {
     const mopLine = wetStr
       ? svg`<polyline points=${wetStr} fill="none" stroke=${wetColor} stroke-width=${sw} stroke-linejoin="round" stroke-linecap="round" opacity="0.9"></polyline>`
       : nothing;
-    const traceT = dryStr
-      ? svg`<polyline points=${dryStr} fill="none" stroke=${vac.path_color || color} stroke-width=${sw} stroke-linejoin="round" stroke-linecap="round" opacity="0.85"></polyline>`
+    const traceT = drySegs.length
+      ? svg`${drySegs.map((s) => svg`<polyline points=${s} fill="none" stroke=${vac.path_color || color} stroke-width=${sw} stroke-linejoin="round" stroke-linecap="round" opacity="0.85"></polyline>`)}`
       : nothing;
     const useImg = !!(vac.robot_image_on_map && vac.image);
     const robSize = rr * 2.6 * ((vac.robot_size ?? 100) / 100);
