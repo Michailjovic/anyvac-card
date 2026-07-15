@@ -919,8 +919,13 @@ export class AnyVacCard extends LitElement {
     }
     return Object.keys(out).length ? out : undefined;
   }
-  /** Backend plan preview (anyvac.plan, response-only): room key -> vacuum entity. */
-  @state() private _planPreview: { key: string; dry: Map<string, string>; wet: Map<string, string> } | null = null;
+  /** Backend plan preview (anyvac.plan, response-only): room key -> vacuum entity,
+   *  plus the sequence-aware ETA (docs/19) computed server-side from the real
+   *  per-robot assignment + the Roborock app's room order (room_sequence). */
+  @state() private _planPreview: {
+    key: string; dry: Map<string, string>; wet: Map<string, string>;
+    eta: number | null; unsequenced: string[];
+  } | null = null;
   private _planFetchKey = "";
   private _fetchPlan(selKeys: string[], mode: "dry" | "wet" | "both"): void {
     const key = JSON.stringify([selKeys, mode, this._v2Vacuums()]);
@@ -932,7 +937,7 @@ export class AnyVacCard extends LitElement {
           "anyvac", "plan",
           { rooms: selKeys, mode, vacuums: this._v2Vacuums() },
           undefined, false, true,
-        ) as { response?: { plan?: Record<string, Record<string, string[]>> } } | void;
+        ) as { response?: { plan?: Record<string, any> } } | void;
         if (this._planFetchKey !== key) return;  // stale response
         const plan = (res as any)?.response?.plan ?? {};
         const inv = (m: Record<string, string[]> | undefined) => {
@@ -940,12 +945,26 @@ export class AnyVacCard extends LitElement {
           for (const [ent, rooms] of Object.entries(m ?? {})) for (const r of rooms) out.set(r, ent);
           return out;
         };
-        this._planPreview = { key, dry: inv(plan.dry), wet: inv(plan.wet) };
+        this._planPreview = {
+          key, dry: inv(plan.dry), wet: inv(plan.wet),
+          eta: typeof plan.eta_min === "number" ? plan.eta_min : null,
+          unsequenced: Array.isArray(plan.unsequenced) ? plan.unsequenced : [],
+        };
       } catch (err) {
         console.warn("[anyvac-card] anyvac.plan preview failed:", err);
-        if (this._planFetchKey === key) this._planPreview = { key, dry: new Map(), wet: new Map() };
+        if (this._planFetchKey === key) this._planPreview = { key, dry: new Map(), wet: new Map(), eta: null, unsequenced: [] };
       }
     })();
+  }
+  /** Selection time estimate: prefer the backend's sequence-aware ETA (anyvac.plan,
+   *  docs/19) when the integration is present; otherwise (degraded mode — no
+   *  backend to ask) fall back to the rough client-side sum (docs/14 §8, direct
+   *  vac.* calls / local estimates are the accepted degraded-mode behavior). */
+  private _etaFor(selKeys: string[], mode: "dry" | "wet" | "both", hasInt: boolean): number {
+    if (hasInt && selKeys.length) this._fetchPlan(selKeys, mode);
+    const fromPlan = this._planPreview?.eta;
+    if (hasInt && fromPlan != null) return fromPlan;
+    return this._selEstMins(selKeys);
   }
   /** Send the clean intent — planning (capability, LPT assignment, segment resolve,
    *  dry→wet gating, repeat) is entirely backend-side now (anyvac.clean, docs/14
@@ -1118,8 +1137,12 @@ export class AnyVacCard extends LitElement {
     const bl = Number((this.hass.states[vac.entity]?.attributes as Record<string, unknown> | undefined)?.battery_level);
     return Number.isFinite(bl) ? bl : null;
   }
-  /** Estimated minutes for the current selection: per room the worst (max) estimate
-   *  across vacuums — a display aid only, the real plan is the backend's. */
+  /** DEGRADED-MODE FALLBACK ONLY (no integration → no backend to ask): per room
+   *  the worst (max) estimate across vacuums, summed with no notion of sequence,
+   *  parallelism or dry→wet gating. With the integration present, `_etaFor` uses
+   *  the backend's sequence-aware `eta_min` instead (docs/19) — this function
+   *  assumes a simultaneous dry/wet start, which is wrong, but there is no
+   *  backend to compute the real timeline for in degraded mode. */
   private _selEstMins(selKeys: string[]): number {
     let sum = 0;
     for (const k of selKeys) {
@@ -1136,7 +1159,8 @@ export class AnyVacCard extends LitElement {
   private _renderStatsTrio() {
     const vacs = this._config.vacuums;
     const selKeys = this._allRoomKeys().filter((k) => this._isRoomSelectedAny(k, vacs));
-    const est = this._selEstMins(selKeys);
+    const hasInt = vacs.some((v) => this._intAttrs(v));
+    const est = this._etaFor(selKeys, this._planMode, hasInt);
     const batts = vacs.map((v) => this._batteryPct(v)).filter((x): x is number => x !== null);
     const minB = batts.length ? Math.min(...batts) : null;
     return html`
@@ -1187,8 +1211,11 @@ export class AnyVacCard extends LitElement {
             const pinTap = this._pinCandidates(r.key).length > 1
               ? (e: Event) => { e.stopPropagation(); this._cycleRoomPin(r.key); }
               : undefined;
+            const locked = this._mapMode !== "normal";
             return html`
-              <button class="dock-row ${sel ? "on" : ""}" @click=${() => this._toggleRoomAcross(r.key, vacs)}>
+              <button class="dock-row ${sel ? "on" : ""} ${locked ? "room-overlay--locked" : ""}" ?disabled=${locked}
+                title=${locked ? "Room selection is off while placing a pin/zone" : ""}
+                @click=${() => { if (!locked) this._toggleRoomAcross(r.key, vacs); }}>
                 <ha-icon class="dock-ric" icon=${r.icon ?? "mdi:square"}></ha-icon>
                 <span class="dock-name">${r.name ?? r.key}</span>
                 <span class="dock-ages">
@@ -1205,7 +1232,7 @@ export class AnyVacCard extends LitElement {
         </div>
         ${withRun && hasInt ? html`
           <div class="dock-foot">
-            <span class="dock-est">${selKeys.length ? selKeys.length + " rooms · ~" + this._selEstMins(selKeys) + " min" : "Select rooms"}</span>
+            <span class="dock-est">${selKeys.length ? selKeys.length + " rooms · ~" + this._etaFor(selKeys, mode, hasInt) + " min" : "Select rooms"}</span>
             <button class="action-btn ${this._holdId === runHid ? "action-btn--holding" : ""}"
               style="flex:0 0 auto;padding:7px 14px;background:rgba(82,196,26,0.14);border:1px solid rgba(82,196,26,0.55);color:#fff"
               ?disabled=${!selKeys.length}
@@ -1244,7 +1271,7 @@ export class AnyVacCard extends LitElement {
         </button>`;
     }
     const canStart = hasInt && selKeys.length > 0;
-    const est = this._selEstMins(selKeys);
+    const est = this._etaFor(selKeys, this._planMode, hasInt);
     return html`
       <button class="start-bar ${canStart && this._holdId === hid ? "action-btn--holding" : ""}"
         ?disabled=${!canStart}
@@ -1469,6 +1496,16 @@ export class AnyVacCard extends LitElement {
     `;
   }
 
+  /** Landscape-only `picker` region (docs/19 A5): slim vertical vacuum
+   *  selector, right column, directly above the room-list `dock`. Reuses
+   *  `_renderBadge` (same tap-to-focus / hold-to-multiselect behaviour as the
+   *  old horizontal badge-row tabs) just stacked vertically instead. */
+  private _renderVacuumPicker() {
+    const vacs = this._config.vacuums;
+    if (!vacs.length) return nothing;
+    return html`<div class="vac-picker">${vacs.map((v, i) => this._renderBadge(v, i))}</div>`;
+  }
+
   private _renderGlobalBadge(ga: GlobalAction, idx: number) {
     const active = this._isGlobalActive(ga);
     const color = COLOR_HEX[ga.color ?? "orange"];
@@ -1618,6 +1655,64 @@ export class AnyVacCard extends LitElement {
       @click=${() => { for (const v of withMap) this._refreshMap(v); }}>
       <ha-icon icon="mdi:refresh"></ha-icon>
     </button>`;
+  }
+
+  /** Grid mode's consolidated meta bar (docs/19 A4) — replaces the old per-vacuum
+   *  Refresh/Pin & Go/Zone header rows (one row × N vacuums) AND the badges
+   *  region's stats-trio + refresh button with ONE row: Pin & Go, Zone, dry/wet
+   *  layer visibility + oldest age, selected room count, ETA, refresh. Legacy
+   *  (no `layout:` block) is untouched — `_renderMapTools`/`_renderStatsTrio`/
+   *  `_renderBadgesRefresh` below still exist for it. */
+  private _renderMetaBar(vacs: VacuumConfig[]) {
+    const withMap = vacs.filter((v) => v.map?.entity);
+    if (!withMap.length) return nothing;
+    // Target for Pin & Go / Zone: keep whichever vacuum is already armed, else
+    // the first integration+map-capable one, else just the first — there's no
+    // separate per-vacuum picker for this (single global mode toggle, docs/19).
+    const target = vacs.find((v) => this._modeEntity === v.entity)
+      ?? vacs.find((v) => this._intAttrs(v) && v.map?.entity)
+      ?? vacs[0];
+    const canCmd = !!target && !!this._intAttrs(target) && !!target.map?.entity && !this._narrow;
+    const cmdTitle = this._narrow
+      ? "Not available in the rotated mobile view"
+      : !canCmd ? "Requires the AnyVac integration (≥ 0.18) + map entity" : "";
+    const mode = (target && this._modeEntity === target.entity) ? this._mapMode : "normal";
+    const selKeys = this._allRoomKeys().filter((k) => this._isRoomSelectedAny(k, vacs));
+    const hasInt = vacs.some((v) => this._intAttrs(v));
+    const est = this._etaFor(selKeys, this._planMode, hasInt);
+    return html`
+      <div class="meta-bar">
+        <button class="mtbtn ${mode === "pin" ? "on" : ""}" ?disabled=${!canCmd}
+          @click=${() => target && this._toggleMode(target.entity, "pin")} title=${cmdTitle || "Pin & Go"}>
+          <ha-icon icon="mdi:map-marker-radius"></ha-icon><span>Pin &amp; Go</span>
+        </button>
+        <button class="mtbtn ${mode === "zone" ? "on" : ""}" ?disabled=${!canCmd}
+          @click=${() => target && this._toggleMode(target.entity, "zone")} title=${cmdTitle || "Zone clean"}>
+          <ha-icon icon="mdi:select-drag"></ha-icon><span>Zone</span>
+        </button>
+        ${this._renderLayerToggleCompact(vacs)}
+        <span class="mtbtn mtbtn--stat" title="Selected rooms">
+          <ha-icon icon="mdi:floor-plan"></ha-icon><b>${selKeys.length}</b>
+        </span>
+        ${est > 0 ? html`<span class="mtbtn mtbtn--stat" title="Estimated time">
+          <ha-icon icon="mdi:clock-outline"></ha-icon><b>${est}</b><small>min</small>
+        </span>` : nothing}
+        <button class="mtbtn mtbtn--push" title="Refresh maps"
+          @click=${() => { for (const v of withMap) this._refreshMap(v); }}>
+          <ha-icon icon="mdi:refresh"></ha-icon>
+        </button>
+      </div>
+      ${mode === "zone" && target ? html`<div class="calib-panel">
+        ${this._zonePending
+          ? html`<div>Zone clean with ${target.name ?? target.entity}?</div>
+              <div class="calib-actions">
+                <button class="mtbtn on" @click=${() => this._confirmZone(target!)}>Zone clean</button>
+                <button class="mtbtn" @click=${() => this._cancelZone()}>Cancel</button>
+              </div>`
+          : html`Drag a rectangle on ${target.name ?? target.entity}'s map to set a cleaning zone.`}
+      </div>` : nothing}
+      ${mode === "pin" && target ? html`<div class="calib-panel">Tap the map to send ${target.name ?? target.entity} there.</div>` : nothing}
+    `;
   }
 
   private _renderMapTools(vac: VacuumConfig) {
@@ -1847,22 +1942,50 @@ export class AnyVacCard extends LitElement {
     `;
   }
 
+  /** Oldest per-type (dry/wet) last-cleaned age across a set of vacuums \u2014 shared
+   *  by the legacy floating pill and the grid meta bar's compact toggle. */
+  private _oldestAgeDays(vacs: VacuumConfig[], type: "dry" | "wet"): number | null {
+    let max: number | null = null;
+    for (const v of vacs) {
+      if (!this._intAttrs(v)) continue;
+      const rlc = this._intAttrs(v)?.rooms_last_cleaned as Record<string, any> | undefined;
+      if (!rlc) continue;
+      for (const rec of Object.values(rlc)) {
+        const d = this._ageDaysFromIso((rec as any)?.[type]);
+        if (d !== null && (max === null || d > max)) max = d;
+      }
+    }
+    return max;
+  }
+  private _ageBadgeStr(d: number | null): string {
+    return d === null ? "\u2014" : d < 1 ? "<1d" : Math.round(d) + "d";
+  }
+  /** Compact dry/wet visibility toggle for the grid meta bar (docs/19 A4) \u2014 a
+   *  plain click-to-toggle icon+age chip, no hold-to-open per-room menu: that
+   *  menu duplicated the always-visible dock room list in landscape. The
+   *  legacy floating `_renderLayerToggles` (below) keeps its hold-menu \u2014 the
+   *  canon commitment is that render without a `layout:` block never changes. */
+  private _renderLayerToggleCompact(vacs: VacuumConfig[]) {
+    const withInt = vacs.filter((v) => this._intAttrs(v));
+    if (!withInt.length) return nothing;
+    const L = this._layersEff();
+    return html`
+      <button class="mtbtn ${L.dry ? "on" : ""}" title="Dry layer visibility \u2014 tap to toggle"
+        @click=${() => this._onLayerClick("dry")}>
+        <ha-icon icon="mdi:broom"></ha-icon><span>${this._ageBadgeStr(this._oldestAgeDays(withInt, "dry"))}</span>
+      </button>
+      <button class="mtbtn ${L.wet ? "on" : ""}" title="Wet layer visibility \u2014 tap to toggle"
+        @click=${() => this._onLayerClick("wet")}>
+        <ha-icon icon="mdi:water"></ha-icon><span>${this._ageBadgeStr(this._oldestAgeDays(withInt, "wet"))}</span>
+      </button>
+    `;
+  }
+
   private _renderLayerToggles(vacs: VacuumConfig[]) {
     const withInt = vacs.filter((v) => this._intAttrs(v));
     if (!withInt.length) return nothing;
-    const oldest = (type: "dry" | "wet"): number | null => {
-      let max: number | null = null;
-      for (const v of withInt) {
-        const rlc = this._intAttrs(v)?.rooms_last_cleaned as Record<string, any> | undefined;
-        if (!rlc) continue;
-        for (const rec of Object.values(rlc)) {
-          const d = this._ageDaysFromIso((rec as any)?.[type]);
-          if (d !== null && (max === null || d > max)) max = d;
-        }
-      }
-      return max;
-    };
-    const badge = (d: number | null) => (d === null ? "\u2014" : d < 1 ? "<1d" : Math.round(d) + "d");
+    const oldest = (type: "dry" | "wet") => this._oldestAgeDays(withInt, type);
+    const badge = (d: number | null) => this._ageBadgeStr(d);
     const L = this._layersEff();
     return html`
       <div class="layer-toggles">
@@ -1898,8 +2021,11 @@ export class AnyVacCard extends LitElement {
           const dry = this._ageDaysFromIso(rec?.dry);
           const wet = this._ageDaysFromIso(rec?.wet);
           const sel = this._isRoomSelectedAny(r.key, shown);
+          const locked = this._mapMode !== "normal";
           return html`
-            <button class="room-row ${sel ? "on" : ""}" @click=${() => this._toggleRoomAcross(r.key, shown)}>
+            <button class="room-row ${sel ? "on" : ""} ${locked ? "room-overlay--locked" : ""}" ?disabled=${locked}
+              title=${locked ? "Room selection is off while placing a pin/zone" : ""}
+              @click=${() => { if (!locked) this._toggleRoomAcross(r.key, shown); }}>
               <ha-icon class="rl-icon" icon=${r.icon ?? "mdi:square"}></ha-icon>
               <span class="rl-name">${r.name ?? r.key}</span>
               <span class="rl-age">${this._renderProgChip(this._roomProgForType(r, shown, "dry"))}<ha-icon icon="mdi:broom"></ha-icon><b style=${styleMap({ color: this._colorForAgeDays(dry) })}>${badge(dry)}</b></span>
@@ -2019,6 +2145,26 @@ export class AnyVacCard extends LitElement {
         ${shown.map((v) => (this._intAttrs(v) ? this._renderIntegrationOverlay(v, this._effectiveSeat(v)) : nothing))}
         ${this._config.layout ? nothing : this._renderLayerToggles(shown)}
         ${this._renderMergedRooms(shown)}
+        ${/* Pin & Go / Zone interaction layer — merged mode used to render NONE of
+           this (only split-mode _renderMap had it), so clicks fell straight through
+           to room-select regardless of the active mode (bugfix, docs/19). Mirrors
+           _renderMap 1:1, just scoped per shown vacuum since merged mode overlays
+           several .map-img elements in one wrapper. */
+        shown.map((v) => this._mapMode !== "normal" && this._modeEntity === v.entity
+          ? html`<div class="map-clickcatch" style="touch-action:none"
+              @click=${(e: MouseEvent) => this._onMapClick(v, e)}
+              @pointerdown=${(e: PointerEvent) => this._onZoneDown(v, e)}
+              @pointermove=${(e: PointerEvent) => this._onZoneMove(v, e)}
+              @pointerup=${(e: PointerEvent) => this._onZoneUp(v, e)}></div>`
+          : nothing)}
+        ${shown.map((v) => this._mapMode === "zone" && this._modeEntity === v.entity && this._zoneDrag
+          ? html`<div class="zone-rect" style=${styleMap({
+              left: Math.min(this._zoneDrag.x0, this._zoneDrag.x1) + "%",
+              top: Math.min(this._zoneDrag.y0, this._zoneDrag.y1) + "%",
+              width: Math.abs(this._zoneDrag.x1 - this._zoneDrag.x0) + "%",
+              height: Math.abs(this._zoneDrag.y1 - this._zoneDrag.y0) + "%",
+            })}></div>`
+          : nothing)}
       </div>
     `;
   }
@@ -2081,9 +2227,20 @@ export class AnyVacCard extends LitElement {
 
   private _renderRoomOverlay(room: RoomConfig, vac: VacuumConfig, opts?: { vacs?: VacuumConfig[] }) {
     const selected = opts?.vacs ? this._isRoomSelectedAny(room.key, opts.vacs) : this._isRoomSelected(room, vac);
-    const color = this._color(vac);
     const ageColor = this._roomBorderColor(room, vac);
     const anchor = room.icon_anchor ?? "c";
+    // Mutual exclusion (docs/19 A3): while Pin & Go / Zone is active, room
+    // selection is a different, contradictory intent (targeting a point/zone,
+    // not a whole room) — disable it entirely rather than let both interpret
+    // the same click.
+    const locked = this._mapMode !== "normal";
+    // Selection = a neutral highlight, never a vacuum's identity color (docs/19
+    // A1): the old `this._color(vac)` fill collided with the age-gradient (S6's
+    // green == "cleaned <2 days ago" green) and, in merged mode, was arbitrary
+    // anyway — `vac` here is whichever vacuum's room list happened to define
+    // this room, not necessarily who actually cleans it. Who's assigned is now
+    // shown via avatar chips (reused from the dock) instead of area tinting.
+    const SEL = "#ffffff";
 
     if (room.map_w !== undefined && room.map_h !== undefined) {
       // ── Rectangle mód ──────────────────────────────────────────
@@ -2096,12 +2253,17 @@ export class AnyVacCard extends LitElement {
       const borderW = (selected
         ? (this._config.room_border_selected ?? 4)
         : (this._config.room_border_normal ?? 2)) + "px";
-      const borderC = selected ? color + "E0" : ageColor;
-      const bg = selected ? color + "44" : "rgba(0,0,0,0.06)";
-      const shadow = selected ? "0 0 18px " + color + "60" : "none";
+      const borderC = selected ? SEL + "E0" : ageColor;
+      const bg = selected ? SEL + "22" : "rgba(0,0,0,0.06)";
+      const shadow = selected ? "0 0 18px rgba(255,255,255,0.7)" : "none";
+      // Who's assigned (dry/wet), from the backend plan preview — only known
+      // once selected (the preview is computed for the current selection).
+      const dryEnt = selected ? this._planPreview?.dry.get(room.key) : undefined;
+      const wetEnt = selected ? this._planPreview?.wet.get(room.key) : undefined;
       return html`
         <button
-          class="room-overlay"
+          class="room-overlay ${locked ? "room-overlay--locked" : ""}"
+          ?disabled=${locked}
           style=${styleMap({
             left: room.map_x + "%", top: room.map_y + "%",
             width: room.map_w + "%", height: room.map_h + "%",
@@ -2109,8 +2271,8 @@ export class AnyVacCard extends LitElement {
             background: bg, boxShadow: shadow,
             justifyContent: jc, alignItems: ai,
           })}
-          @click=${() => (opts?.vacs ? this._toggleRoomAcross(room.key, opts.vacs) : this._toggleRoom(room, vac))}
-          title=${room.name} aria-label=${room.name}
+          @click=${() => { if (!locked) (opts?.vacs ? this._toggleRoomAcross(room.key, opts.vacs) : this._toggleRoom(room, vac)); }}
+          title=${locked ? "Room selection is off while placing a pin/zone" : room.name} aria-label=${room.name}
           aria-pressed=${selected ? "true" : "false"}
         >
           ${!this._config.room_icon_hidden && anchor !== "none" && room.icon ? html`
@@ -2118,25 +2280,32 @@ export class AnyVacCard extends LitElement {
               style=${styleMap({ color: selected ? "white" : ageColor, "--mdc-icon-size": "16px" })}>
             </ha-icon>
           ` : nothing}
+          ${(dryEnt || wetEnt) ? html`
+            <span class="room-overlay-assign">
+              ${dryEnt ? this._vacChip(dryEnt, false) : nothing}
+              ${wetEnt ? this._vacChip(wetEnt, false) : nothing}
+            </span>
+          ` : nothing}
           ${this._renderRoomGauge(opts?.vacs ?? [vac], room)}
         </button>
       `;
     }
 
     // ── Point mód (legacy) ──────────────────────────────────────
-    const bg = selected ? color + "A8" : "rgba(0,0,0,0.55)";
-    const shadow = selected ? "0 0 12px " + color + "80" : "none";
+    const bg = selected ? SEL + "A8" : "rgba(0,0,0,0.55)";
+    const shadow = selected ? "0 0 12px rgba(255,255,255,0.8)" : "none";
     return html`
       <button
-        class="room-btn"
+        class="room-btn ${locked ? "room-overlay--locked" : ""}"
+        ?disabled=${locked}
         style=${styleMap({
           left: room.map_x + "%", top: room.map_y + "%",
           background: bg,
           border: "4px solid " + ageColor,
           boxShadow: shadow,
         })}
-        @click=${() => (opts?.vacs ? this._toggleRoomAcross(room.key, opts.vacs) : this._toggleRoom(room, vac))}
-        title=${room.name} aria-label=${room.name}
+        @click=${() => { if (!locked) (opts?.vacs ? this._toggleRoomAcross(room.key, opts.vacs) : this._toggleRoom(room, vac)); }}
+        title=${locked ? "Room selection is off while placing a pin/zone" : room.name} aria-label=${room.name}
         aria-pressed=${selected ? "true" : "false"}
       >
         ${!this._config.room_icon_hidden ? html`
@@ -2436,33 +2605,31 @@ export class AnyVacCard extends LitElement {
     const vacsOf = (idxs: number[]) => idxs.map((i) => this._config.vacuums[i]);
     switch (name) {
       case "badges":
-        // Stats trio only in landscape — portrait has no room for it (the START
-        // bar shows the selection count + estimate there instead).
+        // Stats/refresh/layer-toggles moved into the consolidated meta bar
+        // (docs/19 A4, `tools` region). Landscape also moves vacuum picking
+        // into the vertical `picker` region (docs/19 A5) — badges there is
+        // global actions only; portrait keeps vacuum badges as its
+        // single-focus switcher (no `picker` region placed there).
         return html`<div class="badges-row badges-row--grid">
-          ${this._config.vacuums.map((v, i) => this._renderBadge(v, i))}
+          ${this._profile === "landscape" ? nothing : this._config.vacuums.map((v, i) => this._renderBadge(v, i))}
           ${(this._config.global_actions ?? []).map((ga, i) => this._renderGlobalBadge(ga, i))}
-          ${this._profile === "landscape" ? this._renderStatsTrio() : nothing}
-          ${this._renderBadgesRefresh()}
         </div>`;
       case "autobar":
         return this._renderAutoBar();
       case "plan":
         return this._renderPlanPreview();
+      case "picker":
+        return this._renderVacuumPicker();
       case "map": {
-        // Layer toggles render at REGION level: upright (outside the portrait
-        // rotation wrapper) and never overlapping the on-map gauges. Pin&go/zone
-        // tools live in the `tools` region (landscape, under the map); when it is
-        // not placed (portrait — the commands are disabled in rotation anyway),
-        // the map gets a single floating refresh-all button instead.
-        const maps = merged
+        // Layer toggles + refresh + Pin&go/zone all moved into the `tools`
+        // region's consolidated meta bar (docs/19 A4) — the map region is
+        // just the map(s) now.
+        return merged
           ? this._renderResponsive(this._renderMergedMap())
           : html`${shown.map((i) => this._renderResponsive(this._renderMap(this._config.vacuums[i])))}`;
-        const vacs = vacsOf(shown);
-        return html`${maps}
-          ${this._renderLayerToggles(vacs)}`;
       }
       case "tools":
-        return html`${vacsOf(shown).map((v) => this._renderMapTools(v))}`;
+        return this._renderMetaBar(vacsOf(shown));
       case "dock":
         // The dock carries the orchestrated run footer when no `start` region is
         // placed in this profile (landscape, docs/18 §7d).
@@ -2586,6 +2753,20 @@ export class AnyVacCard extends LitElement {
     .stat ha-icon { --mdc-icon-size: 15px; color: rgba(255, 255, 255, 0.4); }
     .stat b { font-weight: 700; }
     .stat small { font-size: 10px; color: rgba(255, 255, 255, 0.4); }
+
+    /* Vacuum picker (docs/19 A5): landscape's vertical replacement for the
+     *  horizontal badge-row tabs, sits right above the dock room-list. */
+    .vac-picker {
+      display: flex;
+      flex-direction: column;
+      gap: 6px;
+      padding: 6px;
+      box-sizing: border-box;
+      background: rgba(255, 255, 255, 0.03);
+      border: 1px solid rgba(255, 255, 255, 0.08);
+      border-radius: 12px;
+    }
+    .vac-picker .badge { width: 100%; box-sizing: border-box; }
 
     /* Dock (docs/12 §3): selection + plan + pinning in one column */
     .dock {
@@ -2918,6 +3099,22 @@ export class AnyVacCard extends LitElement {
       padding: 3px;
       transition: background 0.2s, border 0.3s, box-shadow 0.3s;
     }
+    /* Mutual exclusion: room selection disabled while Pin & Go / Zone is active
+       (docs/19 A3) — dim + not-allowed cursor, no color-only distinction so it
+       reads even on the age-gradient border colors. */
+    .room-overlay--locked { opacity: 0.4; cursor: not-allowed; }
+    /* Who's assigned to a selected room (docs/19 A1) — small chips, not area
+       tinting, so assignment doesn't fight with the selection highlight or the
+       age-gradient colors. */
+    .room-overlay-assign {
+      position: absolute;
+      bottom: 2px;
+      left: 2px;
+      display: flex;
+      gap: 2px;
+      pointer-events: none;
+      z-index: 4;
+    }
 
     /* ── Debug per-room progress gauges (dry + wet) ──────────────────── */
     .room-gauges {
@@ -3117,6 +3314,11 @@ export class AnyVacCard extends LitElement {
     .mtbtn.on { background: rgba(59,130,246,0.25); border-color: #3b82f6; }
     .mtbtn:disabled { opacity: 0.4; cursor: default; }
     .mtbtn ha-icon { --mdc-icon-size: 16px; }
+    .mtbtn--stat { cursor: default; background: transparent; border-color: transparent; gap: 3px; padding: 5px 6px; }
+    .mtbtn--stat b { font-weight: 700; }
+    .mtbtn--stat small { opacity: 0.7; font-weight: 500; }
+    .mtbtn--push { margin-left: auto; }
+    .meta-bar { display: flex; align-items: center; gap: 6px; flex-wrap: wrap; padding: 4px 0; }
     .calib-panel { margin-top: 4px; font-size: 12px; opacity: 0.9; padding: 6px 8px; background: rgba(59,130,246,0.12); border-radius: 8px; }
     .calib-panel > div { margin-bottom: 4px; }
     .calib-actions { display: flex; gap: 6px; flex-wrap: wrap; }

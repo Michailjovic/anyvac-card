@@ -74,6 +74,10 @@ export class AnyVacCardEditor extends LitElement {
   // ── Navigation state ──────────────────────────────────────────────────────
   @state() private _tab: ActiveTab = "vacuums";
   @state() private _dragRoom: { vac: number; idx: number } | null = null;
+  // Cleaning-sequence reorder drag state (docs/19) — separate from _dragRoom
+  // since this list is keyed by position in the backend-owned room_sequence,
+  // not by index into a vacuum's own `rooms` config array.
+  @state() private _dragSeq: number | null = null;
 
   // Accordion open state — always create new instances to trigger Lit reactivity
   @state() private _openVac     = new Set<number>();
@@ -205,6 +209,36 @@ export class AnyVacCardEditor extends LitElement {
           (id) => reg![id]?.device_id === dev && reg![id]?.platform === "anyvac" && id.startsWith("sensor.")
         )
       : undefined;
+  }
+
+  /** Backend-owned room cleaning sequence (docs/19): {room_key: 1-based position},
+   *  read from the AnyVac sensor. It's coordinator-wide (same value on every
+   *  vacuum's sensor), so any vacuum with the integration works as the source. */
+  private _roomSequence(vac: { entity: string; integration_entity?: string } | undefined): Record<string, number> {
+    const ie = this._intEntityFor(vac);
+    const at = ie ? (this.hass?.states?.[ie]?.attributes as Record<string, any> | undefined) : undefined;
+    return (at?.room_sequence as Record<string, number> | undefined) ?? {};
+  }
+
+  /** Rooms ordered for display in the sequence list: sequenced ones first (by
+   *  position), then anything not yet sequenced in its existing config order. */
+  private _roomsInSequenceOrder(rooms: RoomConfig[], seqMap: Record<string, number>): RoomConfig[] {
+    return rooms
+      .map((r, i) => ({ r, i, s: r.key ? seqMap[r.key] ?? Infinity : Infinity }))
+      .sort((a, b) => (a.s !== b.s ? a.s - b.s : a.i - b.i))
+      .map((x) => x.r);
+  }
+
+  /** Reorder the sequence list and push the whole new order to the backend
+   *  (anyvac.set_room_sequence) — it's coordinator state, not card config, so
+   *  there's nothing to write to `_config` here (docs/19, mirrors room_pins). */
+  private _moveSequence(vac: { entity: string; integration_entity?: string }, ordered: RoomConfig[], from: number, to: number): void {
+    if (from === to) return;
+    const keys = ordered.map((r) => r.key).filter((k): k is string => !!k);
+    if (from < 0 || from >= keys.length || to < 0 || to >= keys.length) return;
+    const [moved] = keys.splice(from, 1);
+    keys.splice(to, 0, moved);
+    void this.hass.callService("anyvac", "set_room_sequence", { rooms: keys });
   }
 
   /** Editor-side view of the effective seat (mirrors the card's _effectiveSeat). */
@@ -857,16 +891,8 @@ export class AnyVacCardEditor extends LitElement {
             <p class="hint">Tip: keep this identical to the room's name in the Roborock app — the <code>native-auto</code> strategy pairs rooms by this name.</p>
             ${this._textField("Display name", room.name,
               v => this._setRoom(vacIdx, roomIdx, { name: v }), "e.g. Bedroom")}
-            <div class="field field--row">
-              <label>Cleaning order</label>
-              <input class="text-input text-input--sm" type="number" min="1"
-                .value=${String(room.seq ?? "")} placeholder="e.g. 1"
-                @change=${(e: Event) => {
-                  const v = parseInt((e.target as HTMLInputElement).value);
-                  this._setRoom(vacIdx, roomIdx, { seq: isNaN(v) || v < 1 ? undefined : v });
-                }} />
-            </div>
-            <p class="hint">The order this room is cleaned in (match your Roborock app's room sequence). Used for multi-room progress and calibration.</p>
+            <p class="hint">Cleaning sequence moved to a shared, backend-owned reorderable
+              list — see the <strong>Maps tab</strong> (requires the AnyVac integration + merged mode).</p>
             ${(this._config.vacuums[vacIdx]?.clean_action?.type === "native-area" ||
                this._config.vacuums[vacIdx]?.clean_action?.type === "native-auto")
               ? html`
@@ -1069,6 +1095,41 @@ export class AnyVacCardEditor extends LitElement {
               rooms only it has — it will be seated via the rooms you already share.</p>
           ` : nothing}
 
+          ${(this._config.map_mode === "merged" && this._intEntityFor(vac) && rooms.length) ? (() => {
+            const seqMap = this._roomSequence(vac);
+            const ordered = this._roomsInSequenceOrder(rooms, seqMap);
+            const unsequencedCount = rooms.filter((r) => !r.key || seqMap[r.key] === undefined).length;
+            return html`
+              <div class="section-title">Cleaning sequence</div>
+              <p class="hint">The order configured in the Roborock app — it's dominant regardless of
+                what HA sends, so the backend needs to know it to predict wet-clean timing correctly
+                (docs/19). Drag to match your app's order. Shared across all vacuums/dashboards
+                (backend-owned, like room pinning) — not saved in this card's config.</p>
+              ${unsequencedCount ? html`<p class="hint" style="color:#faad14">⚠ ${unsequencedCount}
+                room${unsequencedCount > 1 ? "s" : ""} not yet sequenced — dragged to the end,
+                ETA will be a rough estimate for ${unsequencedCount > 1 ? "them" : "it"} until set.</p>` : nothing}
+              <div class="seq-list">
+                ${ordered.map((r, ri) => html`
+                  <div class="seq-row ${this._dragSeq === ri ? "seq-row--dragging" : ""}"
+                    @dragover=${(e: DragEvent) => { if (this._dragSeq !== null) e.preventDefault(); }}
+                    @drop=${(e: DragEvent) => {
+                      e.preventDefault();
+                      if (this._dragSeq !== null) this._moveSequence(vac, ordered, this._dragSeq, ri);
+                      this._dragSeq = null;
+                    }}>
+                    <ha-icon icon="mdi:drag-horizontal-variant" title="Drag to reorder"
+                      draggable="true" style="cursor:grab;opacity:0.5;--mdc-icon-size:18px;flex-shrink:0"
+                      @dragstart=${(e: DragEvent) => { this._dragSeq = ri; if (e.dataTransfer) e.dataTransfer.effectAllowed = "move"; }}
+                      @dragend=${() => { this._dragSeq = null; }}></ha-icon>
+                    <span class="seq-pos">${ri + 1}</span>
+                    <ha-icon icon=${r.icon || "mdi:square"} style="--mdc-icon-size:15px"></ha-icon>
+                    <span class="seq-name">${r.name || r.key || "Room " + (ri + 1)}</span>
+                    ${!r.key || seqMap[r.key] === undefined ? html`<span class="seq-flag" title="Not yet sequenced">?</span>` : nothing}
+                  </div>`)}
+              </div>
+            `;
+          })() : nothing}
+
           ${this._config.map_mode === "merged" ? html`<button class="btn btn--add btn--sm" style="align-self:flex-start;margin-top:4px" @click=${() => this._addEditedRoom()}><ha-icon icon="mdi:plus"></ha-icon> Add room</button>` : nothing}
           ${rooms.length ? html`
             <div class="section-title">Room positions</div>
@@ -1088,16 +1149,6 @@ export class AnyVacCardEditor extends LitElement {
               ${this._config.map_mode === "merged" ? html`
                 ${this._textField("Key (= Roborock room name)", rooms[this._mapRoom]?.key, v => this._setEditedRoom(this._mapRoom!, { key: v }), "Kitchen")}
                 ${this._textField("Name", rooms[this._mapRoom]?.name, v => this._setEditedRoom(this._mapRoom!, { name: v }), "Kitchen")}
-                <div class="field field--row">
-                  <label>Cleaning order</label>
-                  <input class="text-input text-input--sm" type="number" min="1"
-                    .value=${String(rooms[this._mapRoom]?.seq ?? "")} placeholder="e.g. 1"
-                    @change=${(e: Event) => {
-                      const v = parseInt((e.target as HTMLInputElement).value);
-                      this._setEditedRoom(this._mapRoom!, { seq: isNaN(v) || v < 1 ? undefined : v });
-                    }} />
-                </div>
-                <p class="hint">Order this room is cleaned in (match your Roborock app sequence).</p>
                 ${this._numberSlider("Dry clean time", rooms[this._mapRoom]?.clean_time_dry ?? 0, 0, 120, 1, v => this._setEditedRoom(this._mapRoom!, { clean_time_dry: v > 0 ? v : undefined }), " min")}
                 ${this._numberSlider("Wet clean time", rooms[this._mapRoom]?.clean_time_wet ?? 0, 0, 180, 1, v => this._setEditedRoom(this._mapRoom!, { clean_time_wet: v > 0 ? v : undefined }), " min")}
               ` : nothing}
@@ -1529,6 +1580,25 @@ export class AnyVacCardEditor extends LitElement {
     .badge {
       font-size:10px; font-weight:600; padding:2px 7px; border-radius:10px;
       background:rgba(0,0,0,.07); color:var(--secondary-text-color);
+    }
+
+    /* ── Cleaning sequence list (docs/19) ── */
+    .seq-list { display:flex; flex-direction:column; gap:2px; }
+    .seq-row {
+      display:flex; align-items:center; gap:8px; padding:6px 8px;
+      border-radius:6px; border:1px solid var(--divider-color,rgba(0,0,0,.1));
+      background:rgba(0,0,0,.015);
+    }
+    .seq-row--dragging { opacity:0.4; }
+    .seq-pos {
+      flex-shrink:0; width:20px; text-align:center; font-size:12px; font-weight:700;
+      color:var(--secondary-text-color);
+    }
+    .seq-name { flex:1; font-size:13px; }
+    .seq-flag {
+      flex-shrink:0; width:16px; height:16px; border-radius:50%; background:#faad14;
+      color:#000; font-size:11px; font-weight:700; display:flex; align-items:center;
+      justify-content:center;
     }
 
     /* ── Room accordion ── */

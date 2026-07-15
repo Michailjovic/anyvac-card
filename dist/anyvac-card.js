@@ -32,13 +32,20 @@ typeof SuppressedError === "function" ? SuppressedError : function (error, suppr
  * Copyright 2019 Google LLC
  * SPDX-License-Identifier: BSD-3-Clause
  */
-const t$3=globalThis,e$3=t$3.ShadowRoot&&(void 0===t$3.ShadyCSS||t$3.ShadyCSS.nativeShadow)&&"adoptedStyleSheets"in Document.prototype&&"replace"in CSSStyleSheet.prototype,s$2=Symbol(),o$5=new WeakMap;let n$4 = class n{constructor(t,e,o){if(this._$cssResult$=true,o!==s$2)throw Error("CSSResult is not constructable. Use `unsafeCSS` or `css` instead.");this.cssText=t,this.t=e;}get styleSheet(){let t=this.o;const s=this.t;if(e$3&&void 0===t){const e=void 0!==s&&1===s.length;e&&(t=o$5.get(s)),void 0===t&&((this.o=t=new CSSStyleSheet).replaceSync(this.cssText),e&&o$5.set(s,t));}return t}toString(){return this.cssText}};const r$4=t=>new n$4("string"==typeof t?t:t+"",void 0,s$2),i$5=(t,...e)=>{const o=1===t.length?t[0]:e.reduce((e,s,o)=>e+(t=>{if(true===t._$cssResult$)return t.cssText;if("number"==typeof t)return t;throw Error("Value passed to 'css' function must be a 'css' function result: "+t+". Use 'unsafeCSS' to pass non-literal values, but take care to ensure page security.")})(s)+t[o+1],t[0]);return new n$4(o,t,s$2)},S$1=(s,o)=>{if(e$3)s.adoptedStyleSheets=o.map(t=>t instanceof CSSStyleSheet?t:t.styleSheet);else for(const e of o){const o=document.createElement("style"),n=t$3.litNonce;void 0!==n&&o.setAttribute("nonce",n),o.textContent=e.cssText,s.appendChild(o);}},c$2=e$3?t=>t:t=>t instanceof CSSStyleSheet?(t=>{let e="";for(const s of t.cssRules)e+=s.cssText;return r$4(e)})(t):t;
+const t$4=globalThis,e$4=t$4.ShadowRoot&&(void 0===t$4.ShadyCSS||t$4.ShadyCSS.nativeShadow)&&"adoptedStyleSheets"in Document.prototype&&"replace"in CSSStyleSheet.prototype,s$3=Symbol(),o$6=new WeakMap;let n$5 = class n{constructor(t,e,o){if(this._$cssResult$=true,o!==s$3)throw Error("CSSResult is not constructable. Use `unsafeCSS` or `css` instead.");this.cssText=t,this.t=e;}get styleSheet(){let t=this.o;const s=this.t;if(e$4&&void 0===t){const e=void 0!==s&&1===s.length;e&&(t=o$6.get(s)),void 0===t&&((this.o=t=new CSSStyleSheet).replaceSync(this.cssText),e&&o$6.set(s,t));}return t}toString(){return this.cssText}};const r$5=t=>new n$5("string"==typeof t?t:t+"",void 0,s$3),i$6=(t,...e)=>{const o=1===t.length?t[0]:e.reduce((e,s,o)=>e+(t=>{if(true===t._$cssResult$)return t.cssText;if("number"==typeof t)return t;throw Error("Value passed to 'css' function must be a 'css' function result: "+t+". Use 'unsafeCSS' to pass non-literal values, but take care to ensure page security.")})(s)+t[o+1],t[0]);return new n$5(o,t,s$3)},S$2=(s,o)=>{if(e$4)s.adoptedStyleSheets=o.map(t=>t instanceof CSSStyleSheet?t:t.styleSheet);else for(const e of o){const o=document.createElement("style"),n=t$4.litNonce;void 0!==n&&o.setAttribute("nonce",n),o.textContent=e.cssText,s.appendChild(o);}},c$3=e$4?t=>t:t=>t instanceof CSSStyleSheet?(t=>{let e="";for(const s of t.cssRules)e+=s.cssText;return r$5(e)})(t):t;
 
 /**
  * @license
  * Copyright 2017 Google LLC
  * SPDX-License-Identifier: BSD-3-Clause
- */const{is:i$4,defineProperty:e$2,getOwnPropertyDescriptor:h$1,getOwnPropertyNames:r$3,getOwnPropertySymbols:o$4,getPrototypeOf:n$3}=Object,a$1=globalThis,c$1=a$1.trustedTypes,l$1=c$1?c$1.emptyScript:"",p$1=a$1.reactiveElementPolyfillSupport,d$1=(t,s)=>t,u$1={toAttribute(t,s){switch(s){case Boolean:t=t?l$1:null;break;case Object:case Array:t=null==t?t:JSON.stringify(t);}return t},fromAttribute(t,s){let i=t;switch(s){case Boolean:i=null!==t;break;case Number:i=null===t?null:Number(t);break;case Object:case Array:try{i=JSON.parse(t);}catch(t){i=null;}}return i}},f$1=(t,s)=>!i$4(t,s),b$1={attribute:true,type:String,converter:u$1,reflect:false,useDefault:false,hasChanged:f$1};Symbol.metadata??=Symbol("metadata"),a$1.litPropertyMetadata??=new WeakMap;let y$1 = class y extends HTMLElement{static addInitializer(t){this._$Ei(),(this.l??=[]).push(t);}static get observedAttributes(){return this.finalize(),this._$Eh&&[...this._$Eh.keys()]}static createProperty(t,s=b$1){if(s.state&&(s.attribute=false),this._$Ei(),this.prototype.hasOwnProperty(t)&&((s=Object.create(s)).wrapped=true),this.elementProperties.set(t,s),!s.noAccessor){const i=Symbol(),h=this.getPropertyDescriptor(t,i,s);void 0!==h&&e$2(this.prototype,t,h);}}static getPropertyDescriptor(t,s,i){const{get:e,set:r}=h$1(this.prototype,t)??{get(){return this[s]},set(t){this[s]=t;}};return {get:e,set(s){const h=e?.call(this);r?.call(this,s),this.requestUpdate(t,h,i);},configurable:true,enumerable:true}}static getPropertyOptions(t){return this.elementProperties.get(t)??b$1}static _$Ei(){if(this.hasOwnProperty(d$1("elementProperties")))return;const t=n$3(this);t.finalize(),void 0!==t.l&&(this.l=[...t.l]),this.elementProperties=new Map(t.elementProperties);}static finalize(){if(this.hasOwnProperty(d$1("finalized")))return;if(this.finalized=true,this._$Ei(),this.hasOwnProperty(d$1("properties"))){const t=this.properties,s=[...r$3(t),...o$4(t)];for(const i of s)this.createProperty(i,t[i]);}const t=this[Symbol.metadata];if(null!==t){const s=litPropertyMetadata.get(t);if(void 0!==s)for(const[t,i]of s)this.elementProperties.set(t,i);}this._$Eh=new Map;for(const[t,s]of this.elementProperties){const i=this._$Eu(t,s);void 0!==i&&this._$Eh.set(i,t);}this.elementStyles=this.finalizeStyles(this.styles);}static finalizeStyles(s){const i=[];if(Array.isArray(s)){const e=new Set(s.flat(1/0).reverse());for(const s of e)i.unshift(c$2(s));}else void 0!==s&&i.push(c$2(s));return i}static _$Eu(t,s){const i=s.attribute;return  false===i?void 0:"string"==typeof i?i:"string"==typeof t?t.toLowerCase():void 0}constructor(){super(),this._$Ep=void 0,this.isUpdatePending=false,this.hasUpdated=false,this._$Em=null,this._$Ev();}_$Ev(){this._$ES=new Promise(t=>this.enableUpdating=t),this._$AL=new Map,this._$E_(),this.requestUpdate(),this.constructor.l?.forEach(t=>t(this));}addController(t){(this._$EO??=new Set).add(t),void 0!==this.renderRoot&&this.isConnected&&t.hostConnected?.();}removeController(t){this._$EO?.delete(t);}_$E_(){const t=new Map,s=this.constructor.elementProperties;for(const i of s.keys())this.hasOwnProperty(i)&&(t.set(i,this[i]),delete this[i]);t.size>0&&(this._$Ep=t);}createRenderRoot(){const t=this.shadowRoot??this.attachShadow(this.constructor.shadowRootOptions);return S$1(t,this.constructor.elementStyles),t}connectedCallback(){this.renderRoot??=this.createRenderRoot(),this.enableUpdating(true),this._$EO?.forEach(t=>t.hostConnected?.());}enableUpdating(t){}disconnectedCallback(){this._$EO?.forEach(t=>t.hostDisconnected?.());}attributeChangedCallback(t,s,i){this._$AK(t,i);}_$ET(t,s){const i=this.constructor.elementProperties.get(t),e=this.constructor._$Eu(t,i);if(void 0!==e&&true===i.reflect){const h=(void 0!==i.converter?.toAttribute?i.converter:u$1).toAttribute(s,i.type);this._$Em=t,null==h?this.removeAttribute(e):this.setAttribute(e,h),this._$Em=null;}}_$AK(t,s){const i=this.constructor,e=i._$Eh.get(t);if(void 0!==e&&this._$Em!==e){const t=i.getPropertyOptions(e),h="function"==typeof t.converter?{fromAttribute:t.converter}:void 0!==t.converter?.fromAttribute?t.converter:u$1;this._$Em=e;const r=h.fromAttribute(s,t.type);this[e]=r??this._$Ej?.get(e)??r,this._$Em=null;}}requestUpdate(t,s,i,e=false,h){if(void 0!==t){const r=this.constructor;if(false===e&&(h=this[t]),i??=r.getPropertyOptions(t),!((i.hasChanged??f$1)(h,s)||i.useDefault&&i.reflect&&h===this._$Ej?.get(t)&&!this.hasAttribute(r._$Eu(t,i))))return;this.C(t,s,i);} false===this.isUpdatePending&&(this._$ES=this._$EP());}C(t,s,{useDefault:i,reflect:e,wrapped:h},r){i&&!(this._$Ej??=new Map).has(t)&&(this._$Ej.set(t,r??s??this[t]),true!==h||void 0!==r)||(this._$AL.has(t)||(this.hasUpdated||i||(s=void 0),this._$AL.set(t,s)),true===e&&this._$Em!==t&&(this._$Eq??=new Set).add(t));}async _$EP(){this.isUpdatePending=true;try{await this._$ES;}catch(t){Promise.reject(t);}const t=this.scheduleUpdate();return null!=t&&await t,!this.isUpdatePending}scheduleUpdate(){return this.performUpdate()}performUpdate(){if(!this.isUpdatePending)return;if(!this.hasUpdated){if(this.renderRoot??=this.createRenderRoot(),this._$Ep){for(const[t,s]of this._$Ep)this[t]=s;this._$Ep=void 0;}const t=this.constructor.elementProperties;if(t.size>0)for(const[s,i]of t){const{wrapped:t}=i,e=this[s];true!==t||this._$AL.has(s)||void 0===e||this.C(s,void 0,i,e);}}let t=false;const s=this._$AL;try{t=this.shouldUpdate(s),t?(this.willUpdate(s),this._$EO?.forEach(t=>t.hostUpdate?.()),this.update(s)):this._$EM();}catch(s){throw t=false,this._$EM(),s}t&&this._$AE(s);}willUpdate(t){}_$AE(t){this._$EO?.forEach(t=>t.hostUpdated?.()),this.hasUpdated||(this.hasUpdated=true,this.firstUpdated(t)),this.updated(t);}_$EM(){this._$AL=new Map,this.isUpdatePending=false;}get updateComplete(){return this.getUpdateComplete()}getUpdateComplete(){return this._$ES}shouldUpdate(t){return  true}update(t){this._$Eq&&=this._$Eq.forEach(t=>this._$ET(t,this[t])),this._$EM();}updated(t){}firstUpdated(t){}};y$1.elementStyles=[],y$1.shadowRootOptions={mode:"open"},y$1[d$1("elementProperties")]=new Map,y$1[d$1("finalized")]=new Map,p$1?.({ReactiveElement:y$1}),(a$1.reactiveElementVersions??=[]).push("2.1.2");
+ */const{is:i$5,defineProperty:e$3,getOwnPropertyDescriptor:h$2,getOwnPropertyNames:r$4,getOwnPropertySymbols:o$5,getPrototypeOf:n$4}=Object,a$2=globalThis,c$2=a$2.trustedTypes,l$2=c$2?c$2.emptyScript:"",p$2=a$2.reactiveElementPolyfillSupport,d$2=(t,s)=>t,u$2={toAttribute(t,s){switch(s){case Boolean:t=t?l$2:null;break;case Object:case Array:t=null==t?t:JSON.stringify(t);}return t},fromAttribute(t,s){let i=t;switch(s){case Boolean:i=null!==t;break;case Number:i=null===t?null:Number(t);break;case Object:case Array:try{i=JSON.parse(t);}catch(t){i=null;}}return i}},f$2=(t,s)=>!i$5(t,s),b$1={attribute:true,type:String,converter:u$2,reflect:false,useDefault:false,hasChanged:f$2};Symbol.metadata??=Symbol("metadata"),a$2.litPropertyMetadata??=new WeakMap;let y$2 = class y extends HTMLElement{static addInitializer(t){this._$Ei(),(this.l??=[]).push(t);}static get observedAttributes(){return this.finalize(),this._$Eh&&[...this._$Eh.keys()]}static createProperty(t,s=b$1){if(s.state&&(s.attribute=false),this._$Ei(),this.prototype.hasOwnProperty(t)&&((s=Object.create(s)).wrapped=true),this.elementProperties.set(t,s),!s.noAccessor){const i=Symbol(),h=this.getPropertyDescriptor(t,i,s);void 0!==h&&e$3(this.prototype,t,h);}}static getPropertyDescriptor(t,s,i){const{get:e,set:r}=h$2(this.prototype,t)??{get(){return this[s]},set(t){this[s]=t;}};return {get:e,set(s){const h=e?.call(this);r?.call(this,s),this.requestUpdate(t,h,i);},configurable:true,enumerable:true}}static getPropertyOptions(t){return this.elementProperties.get(t)??b$1}static _$Ei(){if(this.hasOwnProperty(d$2("elementProperties")))return;const t=n$4(this);t.finalize(),void 0!==t.l&&(this.l=[...t.l]),this.elementProperties=new Map(t.elementProperties);}static finalize(){if(this.hasOwnProperty(d$2("finalized")))return;if(this.finalized=true,this._$Ei(),this.hasOwnProperty(d$2("properties"))){const t=this.properties,s=[...r$4(t),...o$5(t)];for(const i of s)this.createProperty(i,t[i]);}const t=this[Symbol.metadata];if(null!==t){const s=litPropertyMetadata.get(t);if(void 0!==s)for(const[t,i]of s)this.elementProperties.set(t,i);}this._$Eh=new Map;for(const[t,s]of this.elementProperties){const i=this._$Eu(t,s);void 0!==i&&this._$Eh.set(i,t);}this.elementStyles=this.finalizeStyles(this.styles);}static finalizeStyles(s){const i=[];if(Array.isArray(s)){const e=new Set(s.flat(1/0).reverse());for(const s of e)i.unshift(c$3(s));}else void 0!==s&&i.push(c$3(s));return i}static _$Eu(t,s){const i=s.attribute;return  false===i?void 0:"string"==typeof i?i:"string"==typeof t?t.toLowerCase():void 0}constructor(){super(),this._$Ep=void 0,this.isUpdatePending=false,this.hasUpdated=false,this._$Em=null,this._$Ev();}_$Ev(){this._$ES=new Promise(t=>this.enableUpdating=t),this._$AL=new Map,this._$E_(),this.requestUpdate(),this.constructor.l?.forEach(t=>t(this));}addController(t){(this._$EO??=new Set).add(t),void 0!==this.renderRoot&&this.isConnected&&t.hostConnected?.();}removeController(t){this._$EO?.delete(t);}_$E_(){const t=new Map,s=this.constructor.elementProperties;for(const i of s.keys())this.hasOwnProperty(i)&&(t.set(i,this[i]),delete this[i]);t.size>0&&(this._$Ep=t);}createRenderRoot(){const t=this.shadowRoot??this.attachShadow(this.constructor.shadowRootOptions);return S$2(t,this.constructor.elementStyles),t}connectedCallback(){this.renderRoot??=this.createRenderRoot(),this.enableUpdating(true),this._$EO?.forEach(t=>t.hostConnected?.());}enableUpdating(t){}disconnectedCallback(){this._$EO?.forEach(t=>t.hostDisconnected?.());}attributeChangedCallback(t,s,i){this._$AK(t,i);}_$ET(t,s){const i=this.constructor.elementProperties.get(t),e=this.constructor._$Eu(t,i);if(void 0!==e&&true===i.reflect){const h=(void 0!==i.converter?.toAttribute?i.converter:u$2).toAttribute(s,i.type);this._$Em=t,null==h?this.removeAttribute(e):this.setAttribute(e,h),this._$Em=null;}}_$AK(t,s){const i=this.constructor,e=i._$Eh.get(t);if(void 0!==e&&this._$Em!==e){const t=i.getPropertyOptions(e),h="function"==typeof t.converter?{fromAttribute:t.converter}:void 0!==t.converter?.fromAttribute?t.converter:u$2;this._$Em=e;const r=h.fromAttribute(s,t.type);this[e]=r??this._$Ej?.get(e)??r,this._$Em=null;}}requestUpdate(t,s,i,e=false,h){if(void 0!==t){const r=this.constructor;if(false===e&&(h=this[t]),i??=r.getPropertyOptions(t),!((i.hasChanged??f$2)(h,s)||i.useDefault&&i.reflect&&h===this._$Ej?.get(t)&&!this.hasAttribute(r._$Eu(t,i))))return;this.C(t,s,i);} false===this.isUpdatePending&&(this._$ES=this._$EP());}C(t,s,{useDefault:i,reflect:e,wrapped:h},r){i&&!(this._$Ej??=new Map).has(t)&&(this._$Ej.set(t,r??s??this[t]),true!==h||void 0!==r)||(this._$AL.has(t)||(this.hasUpdated||i||(s=void 0),this._$AL.set(t,s)),true===e&&this._$Em!==t&&(this._$Eq??=new Set).add(t));}async _$EP(){this.isUpdatePending=true;try{await this._$ES;}catch(t){Promise.reject(t);}const t=this.scheduleUpdate();return null!=t&&await t,!this.isUpdatePending}scheduleUpdate(){return this.performUpdate()}performUpdate(){if(!this.isUpdatePending)return;if(!this.hasUpdated){if(this.renderRoot??=this.createRenderRoot(),this._$Ep){for(const[t,s]of this._$Ep)this[t]=s;this._$Ep=void 0;}const t=this.constructor.elementProperties;if(t.size>0)for(const[s,i]of t){const{wrapped:t}=i,e=this[s];true!==t||this._$AL.has(s)||void 0===e||this.C(s,void 0,i,e);}}let t=false;const s=this._$AL;try{t=this.shouldUpdate(s),t?(this.willUpdate(s),this._$EO?.forEach(t=>t.hostUpdate?.()),this.update(s)):this._$EM();}catch(s){throw t=false,this._$EM(),s}t&&this._$AE(s);}willUpdate(t){}_$AE(t){this._$EO?.forEach(t=>t.hostUpdated?.()),this.hasUpdated||(this.hasUpdated=true,this.firstUpdated(t)),this.updated(t);}_$EM(){this._$AL=new Map,this.isUpdatePending=false;}get updateComplete(){return this.getUpdateComplete()}getUpdateComplete(){return this._$ES}shouldUpdate(t){return  true}update(t){this._$Eq&&=this._$Eq.forEach(t=>this._$ET(t,this[t])),this._$EM();}updated(t){}firstUpdated(t){}};y$2.elementStyles=[],y$2.shadowRootOptions={mode:"open"},y$2[d$2("elementProperties")]=new Map,y$2[d$2("finalized")]=new Map,p$2?.({ReactiveElement:y$2}),(a$2.reactiveElementVersions??=[]).push("2.1.2");
+
+/**
+ * @license
+ * Copyright 2017 Google LLC
+ * SPDX-License-Identifier: BSD-3-Clause
+ */
+const t$3=globalThis,i$4=t=>t,s$2=t$3.trustedTypes,e$2=s$2?s$2.createPolicy("lit-html",{createHTML:t=>t}):void 0,h$1="$lit$",o$4=`lit$${Math.random().toFixed(9).slice(2)}$`,n$3="?"+o$4,r$3=`<${n$3}>`,l$1=document,c$1=()=>l$1.createComment(""),a$1=t=>null===t||"object"!=typeof t&&"function"!=typeof t,u$1=Array.isArray,d$1=t=>u$1(t)||"function"==typeof t?.[Symbol.iterator],f$1="[ \t\n\f\r]",v$1=/<(?:(!--|\/[^a-zA-Z])|(\/?[a-zA-Z][^>\s]*)|(\/?$))/g,_$1=/-->/g,m$1=/>/g,p$1=RegExp(`>|${f$1}(?:([^\\s"'>=/]+)(${f$1}*=${f$1}*(?:[^ \t\n\f\r"'\`<>=]|("|')|))|$)`,"g"),g$1=/'/g,$$1=/"/g,y$1=/^(?:script|style|textarea|title)$/i,E$1=Symbol.for("lit-noChange"),A$1=Symbol.for("lit-nothing"),C$1=new WeakMap,P$1=l$1.createTreeWalker(l$1,129);function V$1(t,i){if(!u$1(t)||!t.hasOwnProperty("raw"))throw Error("invalid template strings array");return void 0!==e$2?e$2.createHTML(i):i}const N$1=(t,i)=>{const s=t.length-1,e=[];let n,l=2===i?"<svg>":3===i?"<math>":"",c=v$1;for(let i=0;i<s;i++){const s=t[i];let a,u,d=-1,f=0;for(;f<s.length&&(c.lastIndex=f,u=c.exec(s),null!==u);)f=c.lastIndex,c===v$1?"!--"===u[1]?c=_$1:void 0!==u[1]?c=m$1:void 0!==u[2]?(y$1.test(u[2])&&(n=RegExp("</"+u[2],"g")),c=p$1):void 0!==u[3]&&(c=p$1):c===p$1?">"===u[0]?(c=n??v$1,d=-1):void 0===u[1]?d=-2:(d=c.lastIndex-u[2].length,a=u[1],c=void 0===u[3]?p$1:'"'===u[3]?$$1:g$1):c===$$1||c===g$1?c=p$1:c===_$1||c===m$1?c=v$1:(c=p$1,n=void 0);const x=c===p$1&&t[i+1].startsWith("/>")?" ":"";l+=c===v$1?s+r$3:d>=0?(e.push(a),s.slice(0,d)+h$1+s.slice(d)+o$4+x):s+o$4+(-2===d?i:x);}return [V$1(t,l+(t[s]||"<?>")+(2===i?"</svg>":3===i?"</math>":"")),e]};let S$1 = class S{constructor({strings:t,_$litType$:i},e){let r;this.parts=[];let l=0,a=0;const u=t.length-1,d=this.parts,[f,v]=N$1(t,i);if(this.el=S.createElement(f,e),P$1.currentNode=this.el.content,2===i||3===i){const t=this.el.content.firstChild;t.replaceWith(...t.childNodes);}for(;null!==(r=P$1.nextNode())&&d.length<u;){if(1===r.nodeType){if(r.hasAttributes())for(const t of r.getAttributeNames())if(t.endsWith(h$1)){const i=v[a++],s=r.getAttribute(t).split(o$4),e=/([.?@])?(.*)/.exec(i);d.push({type:1,index:l,name:e[2],strings:s,ctor:"."===e[1]?I$1:"?"===e[1]?L$1:"@"===e[1]?z$1:H$1}),r.removeAttribute(t);}else t.startsWith(o$4)&&(d.push({type:6,index:l}),r.removeAttribute(t));if(y$1.test(r.tagName)){const t=r.textContent.split(o$4),i=t.length-1;if(i>0){r.textContent=s$2?s$2.emptyScript:"";for(let s=0;s<i;s++)r.append(t[s],c$1()),P$1.nextNode(),d.push({type:2,index:++l});r.append(t[i],c$1());}}}else if(8===r.nodeType)if(r.data===n$3)d.push({type:2,index:l});else {let t=-1;for(;-1!==(t=r.data.indexOf(o$4,t+1));)d.push({type:7,index:l}),t+=o$4.length-1;}l++;}}static createElement(t,i){const s=l$1.createElement("template");return s.innerHTML=t,s}};function M$1(t,i,s=t,e){if(i===E$1)return i;let h=void 0!==e?s._$Co?.[e]:s._$Cl;const o=a$1(i)?void 0:i._$litDirective$;return h?.constructor!==o&&(h?._$AO?.(false),void 0===o?h=void 0:(h=new o(t),h._$AT(t,s,e)),void 0!==e?(s._$Co??=[])[e]=h:s._$Cl=h),void 0!==h&&(i=M$1(t,h._$AS(t,i.values),h,e)),i}let R$1 = class R{constructor(t,i){this._$AV=[],this._$AN=void 0,this._$AD=t,this._$AM=i;}get parentNode(){return this._$AM.parentNode}get _$AU(){return this._$AM._$AU}u(t){const{el:{content:i},parts:s}=this._$AD,e=(t?.creationScope??l$1).importNode(i,true);P$1.currentNode=e;let h=P$1.nextNode(),o=0,n=0,r=s[0];for(;void 0!==r;){if(o===r.index){let i;2===r.type?i=new k$1(h,h.nextSibling,this,t):1===r.type?i=new r.ctor(h,r.name,r.strings,this,t):6===r.type&&(i=new Z$1(h,this,t)),this._$AV.push(i),r=s[++n];}o!==r?.index&&(h=P$1.nextNode(),o++);}return P$1.currentNode=l$1,e}p(t){let i=0;for(const s of this._$AV) void 0!==s&&(void 0!==s.strings?(s._$AI(t,s,i),i+=s.strings.length-2):s._$AI(t[i])),i++;}};let k$1 = class k{get _$AU(){return this._$AM?._$AU??this._$Cv}constructor(t,i,s,e){this.type=2,this._$AH=A$1,this._$AN=void 0,this._$AA=t,this._$AB=i,this._$AM=s,this.options=e,this._$Cv=e?.isConnected??true;}get parentNode(){let t=this._$AA.parentNode;const i=this._$AM;return void 0!==i&&11===t?.nodeType&&(t=i.parentNode),t}get startNode(){return this._$AA}get endNode(){return this._$AB}_$AI(t,i=this){t=M$1(this,t,i),a$1(t)?t===A$1||null==t||""===t?(this._$AH!==A$1&&this._$AR(),this._$AH=A$1):t!==this._$AH&&t!==E$1&&this._(t):void 0!==t._$litType$?this.$(t):void 0!==t.nodeType?this.T(t):d$1(t)?this.k(t):this._(t);}O(t){return this._$AA.parentNode.insertBefore(t,this._$AB)}T(t){this._$AH!==t&&(this._$AR(),this._$AH=this.O(t));}_(t){this._$AH!==A$1&&a$1(this._$AH)?this._$AA.nextSibling.data=t:this.T(l$1.createTextNode(t)),this._$AH=t;}$(t){const{values:i,_$litType$:s}=t,e="number"==typeof s?this._$AC(t):(void 0===s.el&&(s.el=S$1.createElement(V$1(s.h,s.h[0]),this.options)),s);if(this._$AH?._$AD===e)this._$AH.p(i);else {const t=new R$1(e,this),s=t.u(this.options);t.p(i),this.T(s),this._$AH=t;}}_$AC(t){let i=C$1.get(t.strings);return void 0===i&&C$1.set(t.strings,i=new S$1(t)),i}k(t){u$1(this._$AH)||(this._$AH=[],this._$AR());const i=this._$AH;let s,e=0;for(const h of t)e===i.length?i.push(s=new k(this.O(c$1()),this.O(c$1()),this,this.options)):s=i[e],s._$AI(h),e++;e<i.length&&(this._$AR(s&&s._$AB.nextSibling,e),i.length=e);}_$AR(t=this._$AA.nextSibling,s){for(this._$AP?.(false,true,s);t!==this._$AB;){const s=i$4(t).nextSibling;i$4(t).remove(),t=s;}}setConnected(t){ void 0===this._$AM&&(this._$Cv=t,this._$AP?.(t));}};let H$1 = class H{get tagName(){return this.element.tagName}get _$AU(){return this._$AM._$AU}constructor(t,i,s,e,h){this.type=1,this._$AH=A$1,this._$AN=void 0,this.element=t,this.name=i,this._$AM=e,this.options=h,s.length>2||""!==s[0]||""!==s[1]?(this._$AH=Array(s.length-1).fill(new String),this.strings=s):this._$AH=A$1;}_$AI(t,i=this,s,e){const h=this.strings;let o=false;if(void 0===h)t=M$1(this,t,i,0),o=!a$1(t)||t!==this._$AH&&t!==E$1,o&&(this._$AH=t);else {const e=t;let n,r;for(t=h[0],n=0;n<h.length-1;n++)r=M$1(this,e[s+n],i,n),r===E$1&&(r=this._$AH[n]),o||=!a$1(r)||r!==this._$AH[n],r===A$1?t=A$1:t!==A$1&&(t+=(r??"")+h[n+1]),this._$AH[n]=r;}o&&!e&&this.j(t);}j(t){t===A$1?this.element.removeAttribute(this.name):this.element.setAttribute(this.name,t??"");}};let I$1 = class I extends H$1{constructor(){super(...arguments),this.type=3;}j(t){this.element[this.name]=t===A$1?void 0:t;}};let L$1 = class L extends H$1{constructor(){super(...arguments),this.type=4;}j(t){this.element.toggleAttribute(this.name,!!t&&t!==A$1);}};let z$1 = class z extends H$1{constructor(t,i,s,e,h){super(t,i,s,e,h),this.type=5;}_$AI(t,i=this){if((t=M$1(this,t,i,0)??A$1)===E$1)return;const s=this._$AH,e=t===A$1&&s!==A$1||t.capture!==s.capture||t.once!==s.once||t.passive!==s.passive,h=t!==A$1&&(s===A$1||e);e&&this.element.removeEventListener(this.name,this,s),h&&this.element.addEventListener(this.name,this,t),this._$AH=t;}handleEvent(t){"function"==typeof this._$AH?this._$AH.call(this.options?.host??this.element,t):this._$AH.handleEvent(t);}};let Z$1 = class Z{constructor(t,i,s){this.element=t,this.type=6,this._$AN=void 0,this._$AM=i,this.options=s;}get _$AU(){return this._$AM._$AU}_$AI(t){M$1(this,t);}};const B$1=t$3.litHtmlPolyfillSupport;B$1?.(S$1,k$1),(t$3.litHtmlVersions??=[]).push("3.3.3");
 
 /**
  * @license
@@ -51,7 +58,7 @@ const t$2=globalThis,i$3=t=>t,s$1=t$2.trustedTypes,e$1=s$1?s$1.createPolicy("lit
  * @license
  * Copyright 2017 Google LLC
  * SPDX-License-Identifier: BSD-3-Clause
- */const s=globalThis;let i$2 = class i extends y$1{constructor(){super(...arguments),this.renderOptions={host:this},this._$Do=void 0;}createRenderRoot(){const t=super.createRenderRoot();return this.renderOptions.renderBefore??=t.firstChild,t}update(t){const r=this.render();this.hasUpdated||(this.renderOptions.isConnected=this.isConnected),super.update(t),this._$Do=D(r,this.renderRoot,this.renderOptions);}connectedCallback(){super.connectedCallback(),this._$Do?.setConnected(true);}disconnectedCallback(){super.disconnectedCallback(),this._$Do?.setConnected(false);}render(){return E}};i$2._$litElement$=true,i$2["finalized"]=true,s.litElementHydrateSupport?.({LitElement:i$2});const o$2=s.litElementPolyfillSupport;o$2?.({LitElement:i$2});(s.litElementVersions??=[]).push("4.2.2");
+ */const s=globalThis;let i$2 = class i extends y$2{constructor(){super(...arguments),this.renderOptions={host:this},this._$Do=void 0;}createRenderRoot(){const t=super.createRenderRoot();return this.renderOptions.renderBefore??=t.firstChild,t}update(t){const r=this.render();this.hasUpdated||(this.renderOptions.isConnected=this.isConnected),super.update(t),this._$Do=D(r,this.renderRoot,this.renderOptions);}connectedCallback(){super.connectedCallback(),this._$Do?.setConnected(true);}disconnectedCallback(){super.disconnectedCallback(),this._$Do?.setConnected(false);}render(){return E}};i$2._$litElement$=true,i$2["finalized"]=true,s.litElementHydrateSupport?.({LitElement:i$2});const o$2=s.litElementPolyfillSupport;o$2?.({LitElement:i$2});(s.litElementVersions??=[]).push("4.2.2");
 
 /**
  * @license
@@ -64,7 +71,7 @@ const t$1=t=>(e,o)=>{ void 0!==o?o.addInitializer(()=>{customElements.define(t,e
  * @license
  * Copyright 2017 Google LLC
  * SPDX-License-Identifier: BSD-3-Clause
- */const o$1={attribute:true,type:String,converter:u$1,reflect:false,hasChanged:f$1},r$1=(t=o$1,e,r)=>{const{kind:n,metadata:i}=r;let s=globalThis.litPropertyMetadata.get(i);if(void 0===s&&globalThis.litPropertyMetadata.set(i,s=new Map),"setter"===n&&((t=Object.create(t)).wrapped=true),s.set(r.name,t),"accessor"===n){const{name:o}=r;return {set(r){const n=e.get.call(this);e.set.call(this,r),this.requestUpdate(o,n,t,true,r);},init(e){return void 0!==e&&this.C(o,void 0,t,e),e}}}if("setter"===n){const{name:o}=r;return function(r){const n=this[o];e.call(this,r),this.requestUpdate(o,n,t,true,r);}}throw Error("Unsupported decorator location: "+n)};function n$1(t){return (e,o)=>"object"==typeof o?r$1(t,e,o):((t,e,o)=>{const r=e.hasOwnProperty(o);return e.constructor.createProperty(o,t),r?Object.getOwnPropertyDescriptor(e,o):void 0})(t,e,o)}
+ */const o$1={attribute:true,type:String,converter:u$2,reflect:false,hasChanged:f$2},r$1=(t=o$1,e,r)=>{const{kind:n,metadata:i}=r;let s=globalThis.litPropertyMetadata.get(i);if(void 0===s&&globalThis.litPropertyMetadata.set(i,s=new Map),"setter"===n&&((t=Object.create(t)).wrapped=true),s.set(r.name,t),"accessor"===n){const{name:o}=r;return {set(r){const n=e.get.call(this);e.set.call(this,r),this.requestUpdate(o,n,t,true,r);},init(e){return void 0!==e&&this.C(o,void 0,t,e),e}}}if("setter"===n){const{name:o}=r;return function(r){const n=this[o];e.call(this,r),this.requestUpdate(o,n,t,true,r);}}throw Error("Unsupported decorator location: "+n)};function n$1(t){return (e,o)=>"object"==typeof o?r$1(t,e,o):((t,e,o)=>{const r=e.hasOwnProperty(o);return e.constructor.createProperty(o,t),r?Object.getOwnPropertyDescriptor(e,o):void 0})(t,e,o)}
 
 /**
  * @license
@@ -83,7 +90,7 @@ const t={ATTRIBUTE:1},e=t=>(...e)=>({_$litDirective$:t,values:e});let i$1 = clas
  * @license
  * Copyright 2018 Google LLC
  * SPDX-License-Identifier: BSD-3-Clause
- */const n="important",i=" !"+n,o=e(class extends i$1{constructor(t$1){if(super(t$1),t$1.type!==t.ATTRIBUTE||"style"!==t$1.name||t$1.strings?.length>2)throw Error("The `styleMap` directive must be used in the `style` attribute and must be the only part in the attribute.")}render(t){return Object.keys(t).reduce((e,r)=>{const s=t[r];return null==s?e:e+`${r=r.includes("-")?r:r.replace(/(?:^(webkit|moz|ms|o)|)(?=[A-Z])/g,"-$&").toLowerCase()}:${s};`},"")}update(e,[r]){const{style:s}=e.element;if(void 0===this.ft)return this.ft=new Set(Object.keys(r)),this.render(r);for(const t of this.ft)null==r[t]&&(this.ft.delete(t),t.includes("-")?s.removeProperty(t):s[t]=null);for(const t in r){const e=r[t];if(null!=e){this.ft.add(t);const r="string"==typeof e&&e.endsWith(i);t.includes("-")||r?s.setProperty(t,r?e.slice(0,-11):e,r?n:""):s[t]=e;}}return E}});
+ */const n="important",i=" !"+n,o=e(class extends i$1{constructor(t$1){if(super(t$1),t$1.type!==t.ATTRIBUTE||"style"!==t$1.name||t$1.strings?.length>2)throw Error("The `styleMap` directive must be used in the `style` attribute and must be the only part in the attribute.")}render(t){return Object.keys(t).reduce((e,r)=>{const s=t[r];return null==s?e:e+`${r=r.includes("-")?r:r.replace(/(?:^(webkit|moz|ms|o)|)(?=[A-Z])/g,"-$&").toLowerCase()}:${s};`},"")}update(e,[r]){const{style:s}=e.element;if(void 0===this.ft)return this.ft=new Set(Object.keys(r)),this.render(r);for(const t of this.ft)null==r[t]&&(this.ft.delete(t),t.includes("-")?s.removeProperty(t):s[t]=null);for(const t in r){const e=r[t];if(null!=e){this.ft.add(t);const r="string"==typeof e&&e.endsWith(i);t.includes("-")||r?s.setProperty(t,r?e.slice(0,-11):e,r?n:""):s[t]=e;}}return E$1}});
 
 const CARD_NAME = "anyvac-card";
 const EDITOR_NAME = "anyvac-card-editor";
@@ -398,18 +405,21 @@ function roomBboxToRect(ir, at, seat, ar) {
  */
 const DEFAULT_PROFILES = {
     landscape: {
-        // `auto` map track: the map takes its intrinsic height (a 3.6:1 floorplan in
-        // a 70 % column needs ~25 % of the screen, a fixed 56 % track left a huge
-        // dead hole — field feedback 2026-07-11). Tools sit right under the map,
-        // status cards fill the rest of the left column; dock owns the full right.
+        // Phase C (docs/19 A5): map + meta bar go full-width — the map is the main
+        // instrument, not a 70%-column tenant. Below that the cockpit splits in
+        // two: left column = per-robot status/controller cards (unchanged);
+        // right column = a slim vertical vacuum picker (replaces the old
+        // horizontal badge-row tabs for this purpose) with the room list docked
+        // directly beneath it.
         columns: [70, 30],
-        rows: [9, "auto", "auto", "1fr"],
+        rows: [9, "auto", "auto", "auto", "1fr"],
         place: {
-            badges: { row: 1, col: 1 },
-            map: { row: 2, col: 1 },
-            tools: { row: 3, col: 1, align: "start" },
-            status: { row: 4, col: 1, overflow: "auto" },
-            dock: { row: "1/5", col: 2 },
+            badges: { row: 1, col: "1/3" },
+            map: { row: 2, col: "1/3" },
+            tools: { row: 3, col: "1/3", align: "start" },
+            status: { row: "4/6", col: 1, overflow: "auto" },
+            picker: { row: 4, col: 2, align: "start" },
+            dock: { row: 5, col: 2, overflow: "auto" },
         },
     },
     portrait: {
@@ -556,7 +566,9 @@ let AnyVacCard = class AnyVacCard extends i$2 {
         this._holdEnd = () => {
             this._cancelHold();
         };
-        /** Backend plan preview (anyvac.plan, response-only): room key -> vacuum entity. */
+        /** Backend plan preview (anyvac.plan, response-only): room key -> vacuum entity,
+         *  plus the sequence-aware ETA (docs/19) computed server-side from the real
+         *  per-robot assignment + the Roborock app's room order (room_sequence). */
         this._planPreview = null;
         this._planFetchKey = "";
         /** Learn the floorplan's aspect ratio once it loads, for the rotation maths. */
@@ -1444,14 +1456,30 @@ let AnyVacCard = class AnyVacCard extends i$2 {
                             out.set(r, ent);
                     return out;
                 };
-                this._planPreview = { key, dry: inv(plan.dry), wet: inv(plan.wet) };
+                this._planPreview = {
+                    key, dry: inv(plan.dry), wet: inv(plan.wet),
+                    eta: typeof plan.eta_min === "number" ? plan.eta_min : null,
+                    unsequenced: Array.isArray(plan.unsequenced) ? plan.unsequenced : [],
+                };
             }
             catch (err) {
                 console.warn("[anyvac-card] anyvac.plan preview failed:", err);
                 if (this._planFetchKey === key)
-                    this._planPreview = { key, dry: new Map(), wet: new Map() };
+                    this._planPreview = { key, dry: new Map(), wet: new Map(), eta: null, unsequenced: [] };
             }
         })();
+    }
+    /** Selection time estimate: prefer the backend's sequence-aware ETA (anyvac.plan,
+     *  docs/19) when the integration is present; otherwise (degraded mode — no
+     *  backend to ask) fall back to the rough client-side sum (docs/14 §8, direct
+     *  vac.* calls / local estimates are the accepted degraded-mode behavior). */
+    _etaFor(selKeys, mode, hasInt) {
+        if (hasInt && selKeys.length)
+            this._fetchPlan(selKeys, mode);
+        const fromPlan = this._planPreview?.eta;
+        if (hasInt && fromPlan != null)
+            return fromPlan;
+        return this._selEstMins(selKeys);
     }
     /** Send the clean intent — planning (capability, LPT assignment, segment resolve,
      *  dry→wet gating, repeat) is entirely backend-side now (anyvac.clean, docs/14
@@ -1640,8 +1668,12 @@ let AnyVacCard = class AnyVacCard extends i$2 {
         const bl = Number(this.hass.states[vac.entity]?.attributes?.battery_level);
         return Number.isFinite(bl) ? bl : null;
     }
-    /** Estimated minutes for the current selection: per room the worst (max) estimate
-     *  across vacuums — a display aid only, the real plan is the backend's. */
+    /** DEGRADED-MODE FALLBACK ONLY (no integration → no backend to ask): per room
+     *  the worst (max) estimate across vacuums, summed with no notion of sequence,
+     *  parallelism or dry→wet gating. With the integration present, `_etaFor` uses
+     *  the backend's sequence-aware `eta_min` instead (docs/19) — this function
+     *  assumes a simultaneous dry/wet start, which is wrong, but there is no
+     *  backend to compute the real timeline for in degraded mode. */
     _selEstMins(selKeys) {
         let sum = 0;
         for (const k of selKeys) {
@@ -1659,7 +1691,8 @@ let AnyVacCard = class AnyVacCard extends i$2 {
     _renderStatsTrio() {
         const vacs = this._config.vacuums;
         const selKeys = this._allRoomKeys().filter((k) => this._isRoomSelectedAny(k, vacs));
-        const est = this._selEstMins(selKeys);
+        const hasInt = vacs.some((v) => this._intAttrs(v));
+        const est = this._etaFor(selKeys, this._planMode, hasInt);
         const batts = vacs.map((v) => this._batteryPct(v)).filter((x) => x !== null);
         const minB = batts.length ? Math.min(...batts) : null;
         return b `
@@ -1711,8 +1744,12 @@ let AnyVacCard = class AnyVacCard extends i$2 {
             const pinTap = this._pinCandidates(r.key).length > 1
                 ? (e) => { e.stopPropagation(); this._cycleRoomPin(r.key); }
                 : undefined;
+            const locked = this._mapMode !== "normal";
             return b `
-              <button class="dock-row ${sel ? "on" : ""}" @click=${() => this._toggleRoomAcross(r.key, vacs)}>
+              <button class="dock-row ${sel ? "on" : ""} ${locked ? "room-overlay--locked" : ""}" ?disabled=${locked}
+                title=${locked ? "Room selection is off while placing a pin/zone" : ""}
+                @click=${() => { if (!locked)
+                this._toggleRoomAcross(r.key, vacs); }}>
                 <ha-icon class="dock-ric" icon=${r.icon ?? "mdi:square"}></ha-icon>
                 <span class="dock-name">${r.name ?? r.key}</span>
                 <span class="dock-ages">
@@ -1729,7 +1766,7 @@ let AnyVacCard = class AnyVacCard extends i$2 {
         </div>
         ${withRun && hasInt ? b `
           <div class="dock-foot">
-            <span class="dock-est">${selKeys.length ? selKeys.length + " rooms · ~" + this._selEstMins(selKeys) + " min" : "Select rooms"}</span>
+            <span class="dock-est">${selKeys.length ? selKeys.length + " rooms · ~" + this._etaFor(selKeys, mode, hasInt) + " min" : "Select rooms"}</span>
             <button class="action-btn ${this._holdId === runHid ? "action-btn--holding" : ""}"
               style="flex:0 0 auto;padding:7px 14px;background:rgba(82,196,26,0.14);border:1px solid rgba(82,196,26,0.55);color:#fff"
               ?disabled=${!selKeys.length}
@@ -1772,7 +1809,7 @@ let AnyVacCard = class AnyVacCard extends i$2 {
         </button>`;
         }
         const canStart = hasInt && selKeys.length > 0;
-        const est = this._selEstMins(selKeys);
+        const est = this._etaFor(selKeys, this._planMode, hasInt);
         return b `
       <button class="start-bar ${canStart && this._holdId === hid ? "action-btn--holding" : ""}"
         ?disabled=${!canStart}
@@ -1991,6 +2028,16 @@ let AnyVacCard = class AnyVacCard extends i$2 {
       </button>
     `;
     }
+    /** Landscape-only `picker` region (docs/19 A5): slim vertical vacuum
+     *  selector, right column, directly above the room-list `dock`. Reuses
+     *  `_renderBadge` (same tap-to-focus / hold-to-multiselect behaviour as the
+     *  old horizontal badge-row tabs) just stacked vertically instead. */
+    _renderVacuumPicker() {
+        const vacs = this._config.vacuums;
+        if (!vacs.length)
+            return A;
+        return b `<div class="vac-picker">${vacs.map((v, i) => this._renderBadge(v, i))}</div>`;
+    }
     _renderGlobalBadge(ga, idx) {
         const active = this._isGlobalActive(ga);
         const color = COLOR_HEX[ga.color ?? "orange"];
@@ -2153,6 +2200,65 @@ let AnyVacCard = class AnyVacCard extends i$2 {
             this._refreshMap(v); }}>
       <ha-icon icon="mdi:refresh"></ha-icon>
     </button>`;
+    }
+    /** Grid mode's consolidated meta bar (docs/19 A4) — replaces the old per-vacuum
+     *  Refresh/Pin & Go/Zone header rows (one row × N vacuums) AND the badges
+     *  region's stats-trio + refresh button with ONE row: Pin & Go, Zone, dry/wet
+     *  layer visibility + oldest age, selected room count, ETA, refresh. Legacy
+     *  (no `layout:` block) is untouched — `_renderMapTools`/`_renderStatsTrio`/
+     *  `_renderBadgesRefresh` below still exist for it. */
+    _renderMetaBar(vacs) {
+        const withMap = vacs.filter((v) => v.map?.entity);
+        if (!withMap.length)
+            return A;
+        // Target for Pin & Go / Zone: keep whichever vacuum is already armed, else
+        // the first integration+map-capable one, else just the first — there's no
+        // separate per-vacuum picker for this (single global mode toggle, docs/19).
+        const target = vacs.find((v) => this._modeEntity === v.entity)
+            ?? vacs.find((v) => this._intAttrs(v) && v.map?.entity)
+            ?? vacs[0];
+        const canCmd = !!target && !!this._intAttrs(target) && !!target.map?.entity && !this._narrow;
+        const cmdTitle = this._narrow
+            ? "Not available in the rotated mobile view"
+            : !canCmd ? "Requires the AnyVac integration (≥ 0.18) + map entity" : "";
+        const mode = (target && this._modeEntity === target.entity) ? this._mapMode : "normal";
+        const selKeys = this._allRoomKeys().filter((k) => this._isRoomSelectedAny(k, vacs));
+        const hasInt = vacs.some((v) => this._intAttrs(v));
+        const est = this._etaFor(selKeys, this._planMode, hasInt);
+        return b `
+      <div class="meta-bar">
+        <button class="mtbtn ${mode === "pin" ? "on" : ""}" ?disabled=${!canCmd}
+          @click=${() => target && this._toggleMode(target.entity, "pin")} title=${cmdTitle || "Pin & Go"}>
+          <ha-icon icon="mdi:map-marker-radius"></ha-icon><span>Pin &amp; Go</span>
+        </button>
+        <button class="mtbtn ${mode === "zone" ? "on" : ""}" ?disabled=${!canCmd}
+          @click=${() => target && this._toggleMode(target.entity, "zone")} title=${cmdTitle || "Zone clean"}>
+          <ha-icon icon="mdi:select-drag"></ha-icon><span>Zone</span>
+        </button>
+        ${this._renderLayerToggleCompact(vacs)}
+        <span class="mtbtn mtbtn--stat" title="Selected rooms">
+          <ha-icon icon="mdi:floor-plan"></ha-icon><b>${selKeys.length}</b>
+        </span>
+        ${est > 0 ? b `<span class="mtbtn mtbtn--stat" title="Estimated time">
+          <ha-icon icon="mdi:clock-outline"></ha-icon><b>${est}</b><small>min</small>
+        </span>` : A}
+        <button class="mtbtn mtbtn--push" title="Refresh maps"
+          @click=${() => { for (const v of withMap)
+            this._refreshMap(v); }}>
+          <ha-icon icon="mdi:refresh"></ha-icon>
+        </button>
+      </div>
+      ${mode === "zone" && target ? b `<div class="calib-panel">
+        ${this._zonePending
+            ? b `<div>Zone clean with ${target.name ?? target.entity}?</div>
+              <div class="calib-actions">
+                <button class="mtbtn on" @click=${() => this._confirmZone(target)}>Zone clean</button>
+                <button class="mtbtn" @click=${() => this._cancelZone()}>Cancel</button>
+              </div>`
+            : b `Drag a rectangle on ${target.name ?? target.entity}'s map to set a cleaning zone.`}
+      </div>` : A}
+      ${mode === "pin" && target ? b `<div class="calib-panel">Tap the map to send ${target.name ?? target.entity} there.</div>` : A}
+    `;
     }
     _renderMapTools(vac) {
         if (!vac.map && !vac.image_base)
@@ -2392,25 +2498,54 @@ let AnyVacCard = class AnyVacCard extends i$2 {
       </div>
     `;
     }
+    /** Oldest per-type (dry/wet) last-cleaned age across a set of vacuums \u2014 shared
+     *  by the legacy floating pill and the grid meta bar's compact toggle. */
+    _oldestAgeDays(vacs, type) {
+        let max = null;
+        for (const v of vacs) {
+            if (!this._intAttrs(v))
+                continue;
+            const rlc = this._intAttrs(v)?.rooms_last_cleaned;
+            if (!rlc)
+                continue;
+            for (const rec of Object.values(rlc)) {
+                const d = this._ageDaysFromIso(rec?.[type]);
+                if (d !== null && (max === null || d > max))
+                    max = d;
+            }
+        }
+        return max;
+    }
+    _ageBadgeStr(d) {
+        return d === null ? "\u2014" : d < 1 ? "<1d" : Math.round(d) + "d";
+    }
+    /** Compact dry/wet visibility toggle for the grid meta bar (docs/19 A4) \u2014 a
+     *  plain click-to-toggle icon+age chip, no hold-to-open per-room menu: that
+     *  menu duplicated the always-visible dock room list in landscape. The
+     *  legacy floating `_renderLayerToggles` (below) keeps its hold-menu \u2014 the
+     *  canon commitment is that render without a `layout:` block never changes. */
+    _renderLayerToggleCompact(vacs) {
+        const withInt = vacs.filter((v) => this._intAttrs(v));
+        if (!withInt.length)
+            return A;
+        const L = this._layersEff();
+        return b `
+      <button class="mtbtn ${L.dry ? "on" : ""}" title="Dry layer visibility \u2014 tap to toggle"
+        @click=${() => this._onLayerClick("dry")}>
+        <ha-icon icon="mdi:broom"></ha-icon><span>${this._ageBadgeStr(this._oldestAgeDays(withInt, "dry"))}</span>
+      </button>
+      <button class="mtbtn ${L.wet ? "on" : ""}" title="Wet layer visibility \u2014 tap to toggle"
+        @click=${() => this._onLayerClick("wet")}>
+        <ha-icon icon="mdi:water"></ha-icon><span>${this._ageBadgeStr(this._oldestAgeDays(withInt, "wet"))}</span>
+      </button>
+    `;
+    }
     _renderLayerToggles(vacs) {
         const withInt = vacs.filter((v) => this._intAttrs(v));
         if (!withInt.length)
             return A;
-        const oldest = (type) => {
-            let max = null;
-            for (const v of withInt) {
-                const rlc = this._intAttrs(v)?.rooms_last_cleaned;
-                if (!rlc)
-                    continue;
-                for (const rec of Object.values(rlc)) {
-                    const d = this._ageDaysFromIso(rec?.[type]);
-                    if (d !== null && (max === null || d > max))
-                        max = d;
-                }
-            }
-            return max;
-        };
-        const badge = (d) => (d === null ? "\u2014" : d < 1 ? "<1d" : Math.round(d) + "d");
+        const oldest = (type) => this._oldestAgeDays(withInt, type);
+        const badge = (d) => this._ageBadgeStr(d);
         const L = this._layersEff();
         return b `
       <div class="layer-toggles">
@@ -2451,8 +2586,12 @@ let AnyVacCard = class AnyVacCard extends i$2 {
             const dry = this._ageDaysFromIso(rec?.dry);
             const wet = this._ageDaysFromIso(rec?.wet);
             const sel = this._isRoomSelectedAny(r.key, shown);
+            const locked = this._mapMode !== "normal";
             return b `
-            <button class="room-row ${sel ? "on" : ""}" @click=${() => this._toggleRoomAcross(r.key, shown)}>
+            <button class="room-row ${sel ? "on" : ""} ${locked ? "room-overlay--locked" : ""}" ?disabled=${locked}
+              title=${locked ? "Room selection is off while placing a pin/zone" : ""}
+              @click=${() => { if (!locked)
+                this._toggleRoomAcross(r.key, shown); }}>
               <ha-icon class="rl-icon" icon=${r.icon ?? "mdi:square"}></ha-icon>
               <span class="rl-name">${r.name ?? r.key}</span>
               <span class="rl-age">${this._renderProgChip(this._roomProgForType(r, shown, "dry"))}<ha-icon icon="mdi:broom"></ha-icon><b style=${o({ color: this._colorForAgeDays(dry) })}>${badge(dry)}</b></span>
@@ -2573,6 +2712,25 @@ let AnyVacCard = class AnyVacCard extends i$2 {
         ${shown.map((v) => (this._intAttrs(v) ? this._renderIntegrationOverlay(v, this._effectiveSeat(v)) : A))}
         ${this._config.layout ? A : this._renderLayerToggles(shown)}
         ${this._renderMergedRooms(shown)}
+        ${ /* Pin & Go / Zone interaction layer — merged mode used to render NONE of
+           this (only split-mode _renderMap had it), so clicks fell straight through
+           to room-select regardless of the active mode (bugfix, docs/19). Mirrors
+           _renderMap 1:1, just scoped per shown vacuum since merged mode overlays
+           several .map-img elements in one wrapper. */shown.map((v) => this._mapMode !== "normal" && this._modeEntity === v.entity
+            ? b `<div class="map-clickcatch" style="touch-action:none"
+              @click=${(e) => this._onMapClick(v, e)}
+              @pointerdown=${(e) => this._onZoneDown(v, e)}
+              @pointermove=${(e) => this._onZoneMove(v, e)}
+              @pointerup=${(e) => this._onZoneUp(v, e)}></div>`
+            : A)}
+        ${shown.map((v) => this._mapMode === "zone" && this._modeEntity === v.entity && this._zoneDrag
+            ? b `<div class="zone-rect" style=${o({
+                left: Math.min(this._zoneDrag.x0, this._zoneDrag.x1) + "%",
+                top: Math.min(this._zoneDrag.y0, this._zoneDrag.y1) + "%",
+                width: Math.abs(this._zoneDrag.x1 - this._zoneDrag.x0) + "%",
+                height: Math.abs(this._zoneDrag.y1 - this._zoneDrag.y0) + "%",
+            })}></div>`
+            : A)}
       </div>
     `;
     }
@@ -2633,9 +2791,20 @@ let AnyVacCard = class AnyVacCard extends i$2 {
     }
     _renderRoomOverlay(room, vac, opts) {
         const selected = opts?.vacs ? this._isRoomSelectedAny(room.key, opts.vacs) : this._isRoomSelected(room, vac);
-        const color = this._color(vac);
         const ageColor = this._roomBorderColor(room, vac);
         const anchor = room.icon_anchor ?? "c";
+        // Mutual exclusion (docs/19 A3): while Pin & Go / Zone is active, room
+        // selection is a different, contradictory intent (targeting a point/zone,
+        // not a whole room) — disable it entirely rather than let both interpret
+        // the same click.
+        const locked = this._mapMode !== "normal";
+        // Selection = a neutral highlight, never a vacuum's identity color (docs/19
+        // A1): the old `this._color(vac)` fill collided with the age-gradient (S6's
+        // green == "cleaned <2 days ago" green) and, in merged mode, was arbitrary
+        // anyway — `vac` here is whichever vacuum's room list happened to define
+        // this room, not necessarily who actually cleans it. Who's assigned is now
+        // shown via avatar chips (reused from the dock) instead of area tinting.
+        const SEL = "#ffffff";
         if (room.map_w !== undefined && room.map_h !== undefined) {
             // ── Rectangle mód ──────────────────────────────────────────
             const ANCHOR = {
@@ -2647,12 +2816,17 @@ let AnyVacCard = class AnyVacCard extends i$2 {
             const borderW = (selected
                 ? (this._config.room_border_selected ?? 4)
                 : (this._config.room_border_normal ?? 2)) + "px";
-            const borderC = selected ? color + "E0" : ageColor;
-            const bg = selected ? color + "44" : "rgba(0,0,0,0.06)";
-            const shadow = selected ? "0 0 18px " + color + "60" : "none";
+            const borderC = selected ? SEL + "E0" : ageColor;
+            const bg = selected ? SEL + "22" : "rgba(0,0,0,0.06)";
+            const shadow = selected ? "0 0 18px rgba(255,255,255,0.7)" : "none";
+            // Who's assigned (dry/wet), from the backend plan preview — only known
+            // once selected (the preview is computed for the current selection).
+            const dryEnt = selected ? this._planPreview?.dry.get(room.key) : undefined;
+            const wetEnt = selected ? this._planPreview?.wet.get(room.key) : undefined;
             return b `
         <button
-          class="room-overlay"
+          class="room-overlay ${locked ? "room-overlay--locked" : ""}"
+          ?disabled=${locked}
           style=${o({
                 left: room.map_x + "%", top: room.map_y + "%",
                 width: room.map_w + "%", height: room.map_h + "%",
@@ -2660,8 +2834,9 @@ let AnyVacCard = class AnyVacCard extends i$2 {
                 background: bg, boxShadow: shadow,
                 justifyContent: jc, alignItems: ai,
             })}
-          @click=${() => (opts?.vacs ? this._toggleRoomAcross(room.key, opts.vacs) : this._toggleRoom(room, vac))}
-          title=${room.name} aria-label=${room.name}
+          @click=${() => { if (!locked)
+                (opts?.vacs ? this._toggleRoomAcross(room.key, opts.vacs) : this._toggleRoom(room, vac)); }}
+          title=${locked ? "Room selection is off while placing a pin/zone" : room.name} aria-label=${room.name}
           aria-pressed=${selected ? "true" : "false"}
         >
           ${!this._config.room_icon_hidden && anchor !== "none" && room.icon ? b `
@@ -2669,24 +2844,32 @@ let AnyVacCard = class AnyVacCard extends i$2 {
               style=${o({ color: selected ? "white" : ageColor, "--mdc-icon-size": "16px" })}>
             </ha-icon>
           ` : A}
+          ${(dryEnt || wetEnt) ? b `
+            <span class="room-overlay-assign">
+              ${dryEnt ? this._vacChip(dryEnt, false) : A}
+              ${wetEnt ? this._vacChip(wetEnt, false) : A}
+            </span>
+          ` : A}
           ${this._renderRoomGauge(opts?.vacs ?? [vac], room)}
         </button>
       `;
         }
         // ── Point mód (legacy) ──────────────────────────────────────
-        const bg = selected ? color + "A8" : "rgba(0,0,0,0.55)";
-        const shadow = selected ? "0 0 12px " + color + "80" : "none";
+        const bg = selected ? SEL + "A8" : "rgba(0,0,0,0.55)";
+        const shadow = selected ? "0 0 12px rgba(255,255,255,0.8)" : "none";
         return b `
       <button
-        class="room-btn"
+        class="room-btn ${locked ? "room-overlay--locked" : ""}"
+        ?disabled=${locked}
         style=${o({
             left: room.map_x + "%", top: room.map_y + "%",
             background: bg,
             border: "4px solid " + ageColor,
             boxShadow: shadow,
         })}
-        @click=${() => (opts?.vacs ? this._toggleRoomAcross(room.key, opts.vacs) : this._toggleRoom(room, vac))}
-        title=${room.name} aria-label=${room.name}
+        @click=${() => { if (!locked)
+            (opts?.vacs ? this._toggleRoomAcross(room.key, opts.vacs) : this._toggleRoom(room, vac)); }}
+        title=${locked ? "Room selection is off while placing a pin/zone" : room.name} aria-label=${room.name}
         aria-pressed=${selected ? "true" : "false"}
       >
         ${!this._config.room_icon_hidden ? b `
@@ -2968,33 +3151,31 @@ let AnyVacCard = class AnyVacCard extends i$2 {
         const vacsOf = (idxs) => idxs.map((i) => this._config.vacuums[i]);
         switch (name) {
             case "badges":
-                // Stats trio only in landscape — portrait has no room for it (the START
-                // bar shows the selection count + estimate there instead).
+                // Stats/refresh/layer-toggles moved into the consolidated meta bar
+                // (docs/19 A4, `tools` region). Landscape also moves vacuum picking
+                // into the vertical `picker` region (docs/19 A5) — badges there is
+                // global actions only; portrait keeps vacuum badges as its
+                // single-focus switcher (no `picker` region placed there).
                 return b `<div class="badges-row badges-row--grid">
-          ${this._config.vacuums.map((v, i) => this._renderBadge(v, i))}
+          ${this._profile === "landscape" ? A : this._config.vacuums.map((v, i) => this._renderBadge(v, i))}
           ${(this._config.global_actions ?? []).map((ga, i) => this._renderGlobalBadge(ga, i))}
-          ${this._profile === "landscape" ? this._renderStatsTrio() : A}
-          ${this._renderBadgesRefresh()}
         </div>`;
             case "autobar":
                 return this._renderAutoBar();
             case "plan":
                 return this._renderPlanPreview();
+            case "picker":
+                return this._renderVacuumPicker();
             case "map": {
-                // Layer toggles render at REGION level: upright (outside the portrait
-                // rotation wrapper) and never overlapping the on-map gauges. Pin&go/zone
-                // tools live in the `tools` region (landscape, under the map); when it is
-                // not placed (portrait — the commands are disabled in rotation anyway),
-                // the map gets a single floating refresh-all button instead.
-                const maps = merged
+                // Layer toggles + refresh + Pin&go/zone all moved into the `tools`
+                // region's consolidated meta bar (docs/19 A4) — the map region is
+                // just the map(s) now.
+                return merged
                     ? this._renderResponsive(this._renderMergedMap())
                     : b `${shown.map((i) => this._renderResponsive(this._renderMap(this._config.vacuums[i])))}`;
-                const vacs = vacsOf(shown);
-                return b `${maps}
-          ${this._renderLayerToggles(vacs)}`;
             }
             case "tools":
-                return b `${vacsOf(shown).map((v) => this._renderMapTools(v))}`;
+                return this._renderMetaBar(vacsOf(shown));
             case "dock":
                 // The dock carries the orchestrated run footer when no `start` region is
                 // placed in this profile (landscape, docs/18 §7d).
@@ -3066,7 +3247,7 @@ let AnyVacCard = class AnyVacCard extends i$2 {
     }
 };
 // ── Styles ──────────────────────────────────────────────────────────────
-AnyVacCard.styles = i$5 `
+AnyVacCard.styles = i$6 `
     :host {
       display: block;
       width: 100%;
@@ -3117,6 +3298,20 @@ AnyVacCard.styles = i$5 `
     .stat ha-icon { --mdc-icon-size: 15px; color: rgba(255, 255, 255, 0.4); }
     .stat b { font-weight: 700; }
     .stat small { font-size: 10px; color: rgba(255, 255, 255, 0.4); }
+
+    /* Vacuum picker (docs/19 A5): landscape's vertical replacement for the
+     *  horizontal badge-row tabs, sits right above the dock room-list. */
+    .vac-picker {
+      display: flex;
+      flex-direction: column;
+      gap: 6px;
+      padding: 6px;
+      box-sizing: border-box;
+      background: rgba(255, 255, 255, 0.03);
+      border: 1px solid rgba(255, 255, 255, 0.08);
+      border-radius: 12px;
+    }
+    .vac-picker .badge { width: 100%; box-sizing: border-box; }
 
     /* Dock (docs/12 §3): selection + plan + pinning in one column */
     .dock {
@@ -3449,6 +3644,22 @@ AnyVacCard.styles = i$5 `
       padding: 3px;
       transition: background 0.2s, border 0.3s, box-shadow 0.3s;
     }
+    /* Mutual exclusion: room selection disabled while Pin & Go / Zone is active
+       (docs/19 A3) — dim + not-allowed cursor, no color-only distinction so it
+       reads even on the age-gradient border colors. */
+    .room-overlay--locked { opacity: 0.4; cursor: not-allowed; }
+    /* Who's assigned to a selected room (docs/19 A1) — small chips, not area
+       tinting, so assignment doesn't fight with the selection highlight or the
+       age-gradient colors. */
+    .room-overlay-assign {
+      position: absolute;
+      bottom: 2px;
+      left: 2px;
+      display: flex;
+      gap: 2px;
+      pointer-events: none;
+      z-index: 4;
+    }
 
     /* ── Debug per-room progress gauges (dry + wet) ──────────────────── */
     .room-gauges {
@@ -3648,6 +3859,11 @@ AnyVacCard.styles = i$5 `
     .mtbtn.on { background: rgba(59,130,246,0.25); border-color: #3b82f6; }
     .mtbtn:disabled { opacity: 0.4; cursor: default; }
     .mtbtn ha-icon { --mdc-icon-size: 16px; }
+    .mtbtn--stat { cursor: default; background: transparent; border-color: transparent; gap: 3px; padding: 5px 6px; }
+    .mtbtn--stat b { font-weight: 700; }
+    .mtbtn--stat small { opacity: 0.7; font-weight: 500; }
+    .mtbtn--push { margin-left: auto; }
+    .meta-bar { display: flex; align-items: center; gap: 6px; flex-wrap: wrap; padding: 4px 0; }
     .calib-panel { margin-top: 4px; font-size: 12px; opacity: 0.9; padding: 6px 8px; background: rgba(59,130,246,0.12); border-radius: 8px; }
     .calib-panel > div { margin-bottom: 4px; }
     .calib-actions { display: flex; gap: 6px; flex-wrap: wrap; }
@@ -3764,6 +3980,10 @@ let AnyVacCardEditor = class AnyVacCardEditor extends i$2 {
         // ── Navigation state ──────────────────────────────────────────────────────
         this._tab = "vacuums";
         this._dragRoom = null;
+        // Cleaning-sequence reorder drag state (docs/19) — separate from _dragRoom
+        // since this list is keyed by position in the backend-owned room_sequence,
+        // not by index into a vacuum's own `rooms` config array.
+        this._dragSeq = null;
         // Accordion open state — always create new instances to trigger Lit reactivity
         this._openVac = new Set();
         this._openSensors = new Set();
@@ -3890,6 +4110,35 @@ let AnyVacCardEditor = class AnyVacCardEditor extends i$2 {
         return dev
             ? Object.keys(reg).find((id) => reg[id]?.device_id === dev && reg[id]?.platform === "anyvac" && id.startsWith("sensor."))
             : undefined;
+    }
+    /** Backend-owned room cleaning sequence (docs/19): {room_key: 1-based position},
+     *  read from the AnyVac sensor. It's coordinator-wide (same value on every
+     *  vacuum's sensor), so any vacuum with the integration works as the source. */
+    _roomSequence(vac) {
+        const ie = this._intEntityFor(vac);
+        const at = ie ? this.hass?.states?.[ie]?.attributes : undefined;
+        return at?.room_sequence ?? {};
+    }
+    /** Rooms ordered for display in the sequence list: sequenced ones first (by
+     *  position), then anything not yet sequenced in its existing config order. */
+    _roomsInSequenceOrder(rooms, seqMap) {
+        return rooms
+            .map((r, i) => ({ r, i, s: r.key ? seqMap[r.key] ?? Infinity : Infinity }))
+            .sort((a, b) => (a.s !== b.s ? a.s - b.s : a.i - b.i))
+            .map((x) => x.r);
+    }
+    /** Reorder the sequence list and push the whole new order to the backend
+     *  (anyvac.set_room_sequence) — it's coordinator state, not card config, so
+     *  there's nothing to write to `_config` here (docs/19, mirrors room_pins). */
+    _moveSequence(vac, ordered, from, to) {
+        if (from === to)
+            return;
+        const keys = ordered.map((r) => r.key).filter((k) => !!k);
+        if (from < 0 || from >= keys.length || to < 0 || to >= keys.length)
+            return;
+        const [moved] = keys.splice(from, 1);
+        keys.splice(to, 0, moved);
+        void this.hass.callService("anyvac", "set_room_sequence", { rooms: keys });
     }
     /** Editor-side view of the effective seat (mirrors the card's _effectiveSeat). */
     _editorSeat(vacIdx) {
@@ -4503,16 +4752,8 @@ let AnyVacCardEditor = class AnyVacCardEditor extends i$2 {
             ${this._textField("Key (unique ID)", room.key, v => this._setRoom(vacIdx, roomIdx, { key: v }), "e.g. bedroom")}
             <p class="hint">Tip: keep this identical to the room's name in the Roborock app — the <code>native-auto</code> strategy pairs rooms by this name.</p>
             ${this._textField("Display name", room.name, v => this._setRoom(vacIdx, roomIdx, { name: v }), "e.g. Bedroom")}
-            <div class="field field--row">
-              <label>Cleaning order</label>
-              <input class="text-input text-input--sm" type="number" min="1"
-                .value=${String(room.seq ?? "")} placeholder="e.g. 1"
-                @change=${(e) => {
-            const v = parseInt(e.target.value);
-            this._setRoom(vacIdx, roomIdx, { seq: isNaN(v) || v < 1 ? undefined : v });
-        }} />
-            </div>
-            <p class="hint">The order this room is cleaned in (match your Roborock app's room sequence). Used for multi-room progress and calibration.</p>
+            <p class="hint">Cleaning sequence moved to a shared, backend-owned reorderable
+              list — see the <strong>Maps tab</strong> (requires the AnyVac integration + merged mode).</p>
             ${(this._config.vacuums[vacIdx]?.clean_action?.type === "native-area" ||
             this._config.vacuums[vacIdx]?.clean_action?.type === "native-auto")
             ? b `
@@ -4693,6 +4934,44 @@ let AnyVacCardEditor = class AnyVacCardEditor extends i$2 {
               rooms only it has — it will be seated via the rooms you already share.</p>
           ` : A}
 
+          ${(this._config.map_mode === "merged" && this._intEntityFor(vac) && rooms.length) ? (() => {
+            const seqMap = this._roomSequence(vac);
+            const ordered = this._roomsInSequenceOrder(rooms, seqMap);
+            const unsequencedCount = rooms.filter((r) => !r.key || seqMap[r.key] === undefined).length;
+            return b `
+              <div class="section-title">Cleaning sequence</div>
+              <p class="hint">The order configured in the Roborock app — it's dominant regardless of
+                what HA sends, so the backend needs to know it to predict wet-clean timing correctly
+                (docs/19). Drag to match your app's order. Shared across all vacuums/dashboards
+                (backend-owned, like room pinning) — not saved in this card's config.</p>
+              ${unsequencedCount ? b `<p class="hint" style="color:#faad14">⚠ ${unsequencedCount}
+                room${unsequencedCount > 1 ? "s" : ""} not yet sequenced — dragged to the end,
+                ETA will be a rough estimate for ${unsequencedCount > 1 ? "them" : "it"} until set.</p>` : A}
+              <div class="seq-list">
+                ${ordered.map((r, ri) => b `
+                  <div class="seq-row ${this._dragSeq === ri ? "seq-row--dragging" : ""}"
+                    @dragover=${(e) => { if (this._dragSeq !== null)
+                e.preventDefault(); }}
+                    @drop=${(e) => {
+                e.preventDefault();
+                if (this._dragSeq !== null)
+                    this._moveSequence(vac, ordered, this._dragSeq, ri);
+                this._dragSeq = null;
+            }}>
+                    <ha-icon icon="mdi:drag-horizontal-variant" title="Drag to reorder"
+                      draggable="true" style="cursor:grab;opacity:0.5;--mdc-icon-size:18px;flex-shrink:0"
+                      @dragstart=${(e) => { this._dragSeq = ri; if (e.dataTransfer)
+                e.dataTransfer.effectAllowed = "move"; }}
+                      @dragend=${() => { this._dragSeq = null; }}></ha-icon>
+                    <span class="seq-pos">${ri + 1}</span>
+                    <ha-icon icon=${r.icon || "mdi:square"} style="--mdc-icon-size:15px"></ha-icon>
+                    <span class="seq-name">${r.name || r.key || "Room " + (ri + 1)}</span>
+                    ${!r.key || seqMap[r.key] === undefined ? b `<span class="seq-flag" title="Not yet sequenced">?</span>` : A}
+                  </div>`)}
+              </div>
+            `;
+        })() : A}
+
           ${this._config.map_mode === "merged" ? b `<button class="btn btn--add btn--sm" style="align-self:flex-start;margin-top:4px" @click=${() => this._addEditedRoom()}><ha-icon icon="mdi:plus"></ha-icon> Add room</button>` : A}
           ${rooms.length ? b `
             <div class="section-title">Room positions</div>
@@ -4712,16 +4991,6 @@ let AnyVacCardEditor = class AnyVacCardEditor extends i$2 {
               ${this._config.map_mode === "merged" ? b `
                 ${this._textField("Key (= Roborock room name)", rooms[this._mapRoom]?.key, v => this._setEditedRoom(this._mapRoom, { key: v }), "Kitchen")}
                 ${this._textField("Name", rooms[this._mapRoom]?.name, v => this._setEditedRoom(this._mapRoom, { name: v }), "Kitchen")}
-                <div class="field field--row">
-                  <label>Cleaning order</label>
-                  <input class="text-input text-input--sm" type="number" min="1"
-                    .value=${String(rooms[this._mapRoom]?.seq ?? "")} placeholder="e.g. 1"
-                    @change=${(e) => {
-            const v = parseInt(e.target.value);
-            this._setEditedRoom(this._mapRoom, { seq: isNaN(v) || v < 1 ? undefined : v });
-        }} />
-                </div>
-                <p class="hint">Order this room is cleaned in (match your Roborock app sequence).</p>
                 ${this._numberSlider("Dry clean time", rooms[this._mapRoom]?.clean_time_dry ?? 0, 0, 120, 1, v => this._setEditedRoom(this._mapRoom, { clean_time_dry: v > 0 ? v : undefined }), " min")}
                 ${this._numberSlider("Wet clean time", rooms[this._mapRoom]?.clean_time_wet ?? 0, 0, 180, 1, v => this._setEditedRoom(this._mapRoom, { clean_time_wet: v > 0 ? v : undefined }), " min")}
               ` : A}
@@ -5054,7 +5323,7 @@ let AnyVacCardEditor = class AnyVacCardEditor extends i$2 {
     }
 };
 // ── Styles ────────────────────────────────────────────────────────────────
-AnyVacCardEditor.styles = i$5 `
+AnyVacCardEditor.styles = i$6 `
     .editor-root { display:flex; flex-direction:column; }
 
     /* ── Tabs ── */
@@ -5129,6 +5398,25 @@ AnyVacCardEditor.styles = i$5 `
     .badge {
       font-size:10px; font-weight:600; padding:2px 7px; border-radius:10px;
       background:rgba(0,0,0,.07); color:var(--secondary-text-color);
+    }
+
+    /* ── Cleaning sequence list (docs/19) ── */
+    .seq-list { display:flex; flex-direction:column; gap:2px; }
+    .seq-row {
+      display:flex; align-items:center; gap:8px; padding:6px 8px;
+      border-radius:6px; border:1px solid var(--divider-color,rgba(0,0,0,.1));
+      background:rgba(0,0,0,.015);
+    }
+    .seq-row--dragging { opacity:0.4; }
+    .seq-pos {
+      flex-shrink:0; width:20px; text-align:center; font-size:12px; font-weight:700;
+      color:var(--secondary-text-color);
+    }
+    .seq-name { flex:1; font-size:13px; }
+    .seq-flag {
+      flex-shrink:0; width:16px; height:16px; border-radius:50%; background:#faad14;
+      color:#000; font-size:11px; font-weight:700; display:flex; align-items:center;
+      justify-content:center;
     }
 
     /* ── Room accordion ── */
@@ -5313,6 +5601,9 @@ __decorate([
 __decorate([
     r()
 ], AnyVacCardEditor.prototype, "_dragRoom", void 0);
+__decorate([
+    r()
+], AnyVacCardEditor.prototype, "_dragSeq", void 0);
 __decorate([
     r()
 ], AnyVacCardEditor.prototype, "_openVac", void 0);

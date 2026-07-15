@@ -9,12 +9,48 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Planned
 
 - Rooms from the integration (real room polygons / names) for clickable cleaning on the floorplan.
-- Responsive rebuild Phase C (docs/18) — landscape cockpit UX pass (map tools
-  currently top-right per-vacuum button grid → floating/collapsed, per-vacuum
-  START moved into the status cards, badge role clarified as glanceable
-  status not a pseudo-controller). Phase A (runtime/grid) and Phase B
-  (portrait profile: dock, start bar, pinning) already shipped in 0.42.0.
-  Completion of the rebuild ships as **v1.0.0**.
+- Responsive rebuild Phase C follow-up (docs/19) — real-hardware polish pass
+  on the new landscape cockpit below, plus user-facing sequence-optimisation
+  hints. Completion of the whole rebuild (this release + the follow-up)
+  ships as **v1.0.0**.
+
+## [0.50.0] - 2026-07-15
+
+Landscape cockpit rebuild (docs/19, Phase C) + sequence-aware ETA. Ships in
+lockstep with `anyvac` 0.50.0 (the new `room_sequence` contract).
+
+### Added
+
+- **Consolidated meta bar** — Pin & Go, Zone, dry/wet layer visibility with
+  oldest-age badges, selected-room count, ETA, and a single global map
+  refresh now live in one row (`tools` region) instead of a per-vacuum
+  Refresh/Pin&Go/Zone block repeated once per robot. Zone's pending-confirm
+  and Pin & Go's armed state show as an inline panel under the bar.
+- **Full-width map + two-column cockpit (landscape)** — the map and the new
+  meta bar now span the full card width instead of a 70% column. Below them:
+  left column = the existing per-robot status/controller cards (unchanged);
+  right column = a new slim vertical vacuum picker (`picker` region, replaces
+  the old horizontal badge-row tabs for vacuum selection) with the room list
+  (`dock`) docked directly beneath it.
+- **Room-selection colour decoupled from vacuum identity** — selected rooms
+  now highlight in neutral white instead of the acting vacuum's colour,
+  removing the collision with the age-gradient colour (e.g. green identity ==
+  green "cleaned recently"). Selected rooms show avatar chips of the
+  dry/wet-assigned vacuum instead.
+- **Mutual exclusion: room selection vs. Pin & Go / Zone** — room tap targets
+  (map overlay, dock rows, legacy room list) disable while Pin & Go or Zone
+  mode is armed, and vice versa. Also fixes Pin & Go / Zone never having
+  worked in merged map mode (the click/drag capture layer only existed in
+  split mode).
+- **Sequence-aware ETA** — the estimated clean time (stats trio, dock
+  footer, START bar) now comes from `anyvac.plan`'s `eta_min`, which accounts
+  for the Roborock app's configured room order (always dominant, regardless
+  of HA command order) and per-room wet-after-dry gating, instead of a flat
+  sum of per-room estimates.
+- **Cleaning-sequence editor** — Maps tab (merged mode) gained a
+  drag-to-reorder room list mirroring the sequence configured in the
+  Roborock app, pushed to the backend via `anyvac.set_room_sequence`. Flags
+  rooms not yet given a position.
 
 ## [0.43.0] - 2026-07-15
 
