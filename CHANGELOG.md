@@ -9,9 +9,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Planned
 
 - Rooms from the integration (real room polygons / names) for clickable cleaning on the floorplan.
-- Responsive rebuild Phase B/C (docs/18): portrait profile per docs/12 (dock + START bar,
-  floating map tools, stats trio, exact rotated-map fit, per-room vacuum pinning),
-  landscape cockpit. Completion of the rebuild ships as **v1.0.0**.
+- Responsive rebuild Phase C (docs/18) — landscape cockpit UX pass (map tools
+  currently top-right per-vacuum button grid → floating/collapsed, per-vacuum
+  START moved into the status cards, badge role clarified as glanceable
+  status not a pseudo-controller). Phase A (runtime/grid) and Phase B
+  (portrait profile: dock, start bar, pinning) already shipped in 0.42.0.
+  Completion of the rebuild ships as **v1.0.0**.
 
 ## [0.43.0] - 2026-07-15
 
