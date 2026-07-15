@@ -165,14 +165,25 @@ export function resolveHeightCss(cfg: LayoutConfig): string {
   return h;
 }
 
-/** Inline styles for the grid root (static styles can't express a dynamic grid). */
+/** Inline styles for the grid root (static styles can't express a dynamic grid).
+ *
+ *  `height` and `gridTemplateColumns` are deliberately NOT included here — the
+ *  card sets both directly via JS in `updated()` (`_refineGridHeight` /
+ *  `_refineGridColumns`), because those two need a post-render *measurement*
+ *  to get right (exact viewport height, portrait's content-fit column split).
+ *  Lit's `styleMap` re-applies every key in the object it's given on every
+ *  render, which was silently fighting those JS overrides — the override
+ *  would stick for a frame and then get stomped back to the static value on
+ *  the next unrelated re-render (a hass update, the debug clock tick, ...).
+ *  Keeping them out of styleMap entirely means Lit never touches them, so
+ *  whatever the JS last set is what stays. The JS side always sets a sane
+ *  static fallback first (same values that used to live here) before any
+ *  measurement is available, so there's no gap where they're unset. */
 export function gridRootStyles(cfg: LayoutConfig, prof: Required<Omit<ProfileGridConfig, "crop">>): Record<string, string> {
   return {
     display: "grid",
     width: "100%",
-    height: resolveHeightCss(cfg),
     alignContent: "start",
-    gridTemplateColumns: trackList(prof.columns),
     gridTemplateRows: trackList(prof.rows),
     gap: cfg.gap ?? "6px",
     boxSizing: "border-box",

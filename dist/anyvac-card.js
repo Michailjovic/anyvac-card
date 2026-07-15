@@ -87,7 +87,7 @@ const t={ATTRIBUTE:1},e=t=>(...e)=>({_$litDirective$:t,values:e});let i$1 = clas
 
 const CARD_NAME = "anyvac-card";
 const EDITOR_NAME = "anyvac-card-editor";
-const CARD_VERSION = "0.58.0";
+const CARD_VERSION = "0.59.0";
 /** Hold duration in ms required to trigger START / PAUSE actions */
 const HOLD_DURATION_MS = 600;
 /**
@@ -501,14 +501,25 @@ function resolveHeightCss(cfg) {
         return "100%";
     return h;
 }
-/** Inline styles for the grid root (static styles can't express a dynamic grid). */
+/** Inline styles for the grid root (static styles can't express a dynamic grid).
+ *
+ *  `height` and `gridTemplateColumns` are deliberately NOT included here — the
+ *  card sets both directly via JS in `updated()` (`_refineGridHeight` /
+ *  `_refineGridColumns`), because those two need a post-render *measurement*
+ *  to get right (exact viewport height, portrait's content-fit column split).
+ *  Lit's `styleMap` re-applies every key in the object it's given on every
+ *  render, which was silently fighting those JS overrides — the override
+ *  would stick for a frame and then get stomped back to the static value on
+ *  the next unrelated re-render (a hass update, the debug clock tick, ...).
+ *  Keeping them out of styleMap entirely means Lit never touches them, so
+ *  whatever the JS last set is what stays. The JS side always sets a sane
+ *  static fallback first (same values that used to live here) before any
+ *  measurement is available, so there's no gap where they're unset. */
 function gridRootStyles(cfg, prof) {
     return {
         display: "grid",
         width: "100%",
-        height: resolveHeightCss(cfg),
         alignContent: "start",
-        gridTemplateColumns: trackList(prof.columns),
         gridTemplateRows: trackList(prof.rows),
         gap: cfg.gap ?? "6px",
         boxSizing: "border-box",
@@ -710,7 +721,10 @@ let AnyVacCard = class AnyVacCard extends i$2 {
     }
     /** Measured refinement of the grid height: innerHeight − rootTop beats the raw
      *  `calc(100svh − header)` when the root is offset (padding, safe-area). Applied
-     *  directly to the element — no state, no re-render loop. */
+     *  directly to the element — no state, no re-render loop.
+     *  `height` is NOT in `gridRootStyles()`'s styleMap object (see that function's
+     *  doc comment) — this is now the ONLY thing that ever sets it, so it always
+     *  seeds the static fallback first, then refines. */
     _refineGridHeight() {
         const lay = this._config?.layout;
         if (!lay)
@@ -718,6 +732,8 @@ let AnyVacCard = class AnyVacCard extends i$2 {
         const root = this.renderRoot?.querySelector(".avc-grid");
         if (!root)
             return;
+        if (!root.style.height)
+            root.style.height = resolveHeightCss(lay);
         if ((lay.height ?? "viewport") === "viewport") {
             const top = root.getBoundingClientRect().top;
             if (top >= 0 && top < window.innerHeight) {
@@ -799,13 +815,43 @@ let AnyVacCard = class AnyVacCard extends i$2 {
      *  influence at all), appended into this same shadow root so the
      *  component's scoped CSS still applies, `width:max-content` on a node
      *  with no surrounding constraints is the one case that's reliably
-     *  supported everywhere. */
+     *  supported everywhere.
+     *
+     *  Root cause found 2026-07-16, AFTER both attempts above still showed
+     *  zero visible change: `gridTemplateColumns` was ALSO listed in
+     *  `gridRootStyles()`, which is bound via Lit's `styleMap` in `render()`.
+     *  `styleMap` re-applies every property in the object it's given on
+     *  EVERY render — not just when the value changes from what IT last set,
+     *  but unconditionally — so any unrelated re-render (a hass update, the
+     *  debug-progress clock tick, anything) stomped this function's override
+     *  right back to the static declarative value, and since `updated()`
+     *  (where this runs) fires straight after `render()` in the same cycle,
+     *  the two were fighting every single cycle with styleMap always
+     *  winning first, this function's write landing after. Whatever this
+     *  function computed should therefore have "won" for the paint frame
+     *  every time — except that's only true if this function actually ran
+     *  after that particular render, and it does — so in principle it should
+     *  have worked regardless of the styleMap conflict. Removing
+     *  `gridTemplateColumns` from `gridRootStyles()` entirely (see that
+     *  function's doc comment) makes this function the sole, uncontested
+     *  owner either way, closing off that entire class of doubt. Also now
+     *  handles landscape (previously untouched — its fixed split lived
+     *  purely in styleMap, so it needs its own JS-applied fallback now that
+     *  styleMap no longer carries it at all). */
     _refineGridColumns() {
-        if (this._profile !== "portrait" || !this._lastPortraitFitW)
+        const lay = this._config?.layout;
+        if (!lay)
             return;
         const root = this.renderRoot?.querySelector(".avc-grid");
         if (!root)
             return;
+        const prof = resolveProfile(lay, this._profile);
+        const fallback = trackList(prof.columns);
+        if (this._profile !== "portrait" || !this._lastPortraitFitW) {
+            if (root.style.gridTemplateColumns !== fallback)
+                root.style.gridTemplateColumns = fallback;
+            return;
+        }
         const total = root.clientWidth;
         const gapPx = parseFloat(getComputedStyle(root).columnGap || "0") || 0;
         const avail = total - gapPx;

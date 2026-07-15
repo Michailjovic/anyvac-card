@@ -14,6 +14,38 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   hints. Completion of the whole rebuild (this release + the follow-up)
   ships as **v1.0.0**.
 
+## [0.59.0] - 2026-07-16
+
+Same-day follow-up to 0.58.0: user correctly noticed the map still showed a
+large black bar beside it after that fix too — the real, root cause. No
+backend change — still pairs with `anyvac` 0.50.0.
+
+### Fixed
+
+- **`_refineGridColumns`'s override was being silently stomped every
+  render** — `gridTemplateColumns` (and `height`, same mechanism) was
+  listed in `gridRootStyles()`, which is bound via Lit's `styleMap` in
+  `render()`. `styleMap` unconditionally re-applies every property in the
+  object it's handed on every single render — including ones triggered by
+  something unrelated (a hass state update, the debug-progress clock tick,
+  ...) — so the declarative 72%/28% fallback kept getting written back,
+  fighting this function's measured override on every cycle. This is why
+  0.56/0.57/0.58 all computed progressively better numbers but the visible
+  result never changed: whichever value actually reached the screen wasn't
+  reliably this function's. `gridTemplateColumns` and `height` are now
+  removed from `gridRootStyles()`'s styleMap object entirely — `_refineGridHeight`
+  / `_refineGridColumns` are the sole owners of both, seeding the same
+  static fallback first so there's no unset gap before the first
+  measurement lands. Landscape (previously relying on styleMap for its
+  fixed 70/30 split) now gets that same fallback applied via JS too, for
+  consistency, since styleMap no longer carries it at all.
+- This also explains the black bar the user specifically pointed out next
+  to the map: with the column override never actually sticking, the map's
+  region box stayed at its old (too-wide) size, so the map's own
+  contain-fit centered it with empty bars on both sides *inside* that
+  oversized cell — visually indistinguishable from "the fix doesn't work"
+  even though the fit math itself was correct all along.
+
 ## [0.58.0] - 2026-07-16
 
 Same-day follow-up to 0.57.0: field test with the console version banner
