@@ -14,6 +14,44 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   hints. Completion of the whole rebuild (this release + the follow-up)
   ships as **v1.0.0**.
 
+## [0.56.0] - 2026-07-15
+
+Landscape map height-cropping fix + portrait's map/dock column now sized to
+content, from more panel-view field testing. No backend change — still pairs
+with `anyvac` 0.50.0.
+
+### Fixed
+
+- **Landscape map cropped vertically after 0.55.0's row-flex change** — the
+  map's on-screen box was never actually fit to its grid cell in landscape
+  (only portrait's rotated view had that logic); the plain `.map-wrap` CSS
+  sizes purely from width, so once the map's row could grow tall (0.55.0),
+  its width-driven natural height either fell short of the available space or
+  overflowed it — and the region's `overflow: hidden` silently clipped the
+  overflow case. The same measured contain/cover fit used for portrait's
+  rotated map now applies to landscape too (no rotation, otherwise identical
+  math), so the map is always fit to its actual box: height-priority when the
+  box is relatively short and wide (typical for a full-width floorplan photo
+  in a normal panel), with empty bars on the sides rather than any cropping.
+  `layout.landscape.crop` works the same way as portrait's.
+- Found and fixed a sign error in my own mental model while re-deriving this:
+  the general contain/cover formula is `rW = min/max(boxW, boxH * ar_eff)`
+  (multiply, not divide) — verified against the already-shipped portrait
+  rotated fit, which was using the correct form all along (`ar_eff = 1/ar`
+  there); the landscape case just needed `ar_eff = ar` plugged into the same,
+  now-shared, formula.
+
+### Changed
+
+- **Portrait: the map/dock column split now follows the map's actual fitted
+  width** instead of a fixed 72/28 — since the map is height-fit and usually
+  narrower than 72% of the width, the dock sidebar now picks up whatever the
+  map doesn't need (measured and applied in JS post-render, same settle
+  pattern as the existing grid-height refinement — a CSS "auto" track can't
+  do this on its own here, since the fitted width lives on an
+  absolutely-positioned element that carries no intrinsic-size signal for
+  track auto-sizing).
+
 ## [0.55.0] - 2026-07-15
 
 Landscape row-flex inversion, from panel-view field testing. No backend

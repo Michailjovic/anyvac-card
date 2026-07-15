@@ -97,6 +97,12 @@ export class AnyVacCard extends LitElement {
   /** Measured inner box of the map region (grid mode) for the exact rotated fit. */
   @state() private _mapRegW = 0;
   @state() private _mapRegH = 0;
+  /** Portrait only: the map's last computed fitted width (`_renderResponsive`),
+   *  fed into `_refineGridColumns` to override the map/dock column split so the
+   *  sidebar gets whatever width the height-fitted map doesn't need. Plain
+   *  field (not @state) — read post-render in `updated()`, never drives a
+   *  render itself. */
+  private _lastPortraitFitW = 0;
   private _ro: ResizeObserver | null = null;
   private _onWinResize: (() => void) | null = null;
   private _measureRaf = 0;
@@ -252,6 +258,24 @@ export class AnyVacCard extends LitElement {
     // Grid mode: re-apply the measured height after every render (the declarative
     // svh calc stays as the pre-measure fallback).
     this._refineGridHeight();
+    this._refineGridColumns();
+  }
+
+  /** Portrait only (docs/19 follow-up): the map is height-fit
+   *  (`_renderResponsive`), which usually leaves it narrower than the fixed
+   *  72% column — override the actual column split so `dock` picks up
+   *  whatever `map` doesn't need, instead of that width sitting empty. A CSS
+   *  "auto" track can't do this on its own: the fitted width lives on an
+   *  absolutely-positioned inner div specifically so it doesn't feed back
+   *  into layout, which also means it carries no intrinsic-size signal for
+   *  track auto-sizing — so the split is measured and applied directly, same
+   *  as `_refineGridHeight` does for the root height. */
+  private _refineGridColumns(): void {
+    if (this._profile !== "portrait" || !this._lastPortraitFitW) return;
+    const root = this.renderRoot?.querySelector<HTMLElement>(".avc-grid");
+    if (!root) return;
+    const want = Math.round(this._lastPortraitFitW) + "px 1fr";
+    if (root.style.gridTemplateColumns !== want) root.style.gridTemplateColumns = want;
   }
 
   /**
@@ -2224,53 +2248,82 @@ export class AnyVacCard extends LitElement {
    *  In grid mode (docs/18 §7) the rotated map is fitted EXACTLY into the measured
    *  map-region box instead of the legacy width × cap heuristic — no scroll, no cap. */
   private _renderResponsive(mapHtml: unknown) {
-    if (!this._narrow) return mapHtml;
-    const ar = this._mapAR > 0.1 ? this._mapAR : 3.636;
-    // Rotated-map fit (docs/19 follow-up): "contain" (default) sizes the box to
-    // exactly match the content — no cropping, but a mismatched region aspect
-    // ratio leaves empty bars. "cover" makes the content the box's size or
-    // BIGGER in both axes so it always fills the region; offset_x/offset_y then
-    // pick what gets cropped (0 = centered) instead of it always centering by
-    // construction the way "contain" does.
-    const crop = this._config.layout?.[this._profile]?.crop;
-    const cover = crop?.fit === "cover";
-    let rW: number, rH: number, boxW: number, boxH: number;
-    if (this._config.layout && this._mapRegW > 4 && this._mapRegH > 4) {
-      boxW = this._mapRegW;
-      boxH = this._mapRegH;
-      if (cover) {
-        rW = Math.max(boxW, boxH / ar);
-        rH = Math.max(boxH, rW * ar);
-      } else {
-        rW = Math.min(boxW, boxH / ar);
-        rH = Math.min(boxH, rW * ar);
-      }
-      rW = Math.floor(rW);
-      rH = Math.floor(rH);
-    } else {
+    if (!this._config.layout) {
+      // Legacy (no `layout:` block) — completely unchanged, width×cap heuristic.
+      if (!this._narrow) return mapHtml;
+      const ar = this._mapAR > 0.1 ? this._mapAR : 3.636;
       const W = this._cardW || this.clientWidth || 360;
       const capH = (typeof window !== "undefined" ? window.innerHeight : 800) * 1.4;
       const visH = W * ar;
       const scale = visH > capH ? capH / visH : 1;
-      rW = Math.round(W * scale);
-      rH = Math.round(visH * scale);
-      boxW = rW; boxH = rH;
-    }
-    // The rotated content (rW×rH on screen) may now be bigger than the clipping
-    // box (boxW×boxH) in one or both axes — center it there by default, offset
-    // by the configured pan. When rW===boxW/rH===boxH (the default contain
-    // case, always, since Math.min guarantees it) this is exactly 0 either way,
-    // so the default render is unchanged.
-    const panX = -(rW - boxW) / 2 + ((crop?.offset_x ?? 0) / 100) * ((rW - boxW) / 2);
-    const panY = -(rH - boxH) / 2 + ((crop?.offset_y ?? 0) / 100) * ((rH - boxH) / 2);
-    // .avc-rot lets CSS counter-rotate small on-map chips (gauges, prog chips,
-    // room icons) so their text stays upright while the map itself is rotated.
-    return html`
-      <div class="avc-rot" style="position:relative;width:${boxW}px;height:${boxH}px;margin:0 auto;overflow:hidden">
-        <div style="position:absolute;top:0;left:0;width:100%;height:100%;transform:translate(${panX}px,${panY}px)">
+      const rW = Math.round(W * scale);
+      const rH = Math.round(visH * scale);
+      return html`
+        <div class="avc-rot" style="position:relative;width:${rW}px;height:${rH}px;margin:0 auto;overflow:hidden">
           <div style="position:absolute;top:0;left:0;width:${rH}px;height:${rW}px;transform-origin:top left;transform:translateX(${rW}px) rotate(90deg)">
             ${mapHtml}
           </div>
+        </div>
+      `;
+    }
+
+    // Grid mode (docs/19 follow-up): fit the map into the measured region box —
+    // exact, since the box is whatever the grid ACTUALLY allocated, not a guess
+    // (this is what fixes landscape cropping content that didn't fit the "auto"
+    // row's real height). Portrait rotates 90° first; landscape doesn't.
+    if (this._mapRegW <= 4 || this._mapRegH <= 4) return mapHtml; // not measured yet
+    const ar = this._mapAR > 0.1 ? this._mapAR : 3.636;
+    const rotate = this._narrow;
+    // Content aspect AS IT SITS IN THE BOX: rotating a wide (ar > 1) floorplan
+    // makes it tall, i.e. 1/ar. General contain/cover formula below is the same
+    // shape either way with this one term swapped (verified against the
+    // previously-shipped rotated-only version, which is the ar_eff = 1/ar case).
+    const arEff = rotate ? 1 / ar : ar;
+    // "contain" (default) sizes the content to exactly fit the box — no
+    // cropping, but a mismatched aspect ratio leaves empty bars on whichever
+    // axis isn't the constraining one. "cover" makes the content the box's
+    // size or BIGGER in both axes so it always fills the region; offset_x/
+    // offset_y then pick what gets cropped (0 = centered) — note this can
+    // ONLY move the crop, not remove it: filling the previously-short axis
+    // necessarily overflows the other one when the aspect ratios don't match
+    // (uniform scaling can't do otherwise without distorting the image).
+    const crop = this._config.layout[this._profile]?.crop;
+    const cover = crop?.fit === "cover";
+    const boxW = this._mapRegW, boxH = this._mapRegH;
+    let rW: number, rH: number;
+    if (cover) { rW = Math.max(boxW, boxH * arEff); rH = Math.max(boxH, rW / arEff); }
+    else { rW = Math.min(boxW, boxH * arEff); rH = Math.min(boxH, rW / arEff); }
+    rW = Math.floor(rW);
+    rH = Math.floor(rH);
+    // The content (rW×rH on screen) may now be bigger than the clipping box
+    // (boxW×boxH) in one axis — center it there by default, offset by the
+    // configured pan. When rW===boxW and rH===boxH (the default contain case,
+    // whichever axis is the constraining one) this is exactly 0, so nothing
+    // shifts.
+    const panX = -(rW - boxW) / 2 + ((crop?.offset_x ?? 0) / 100) * ((rW - boxW) / 2);
+    const panY = -(rH - boxH) / 2 + ((crop?.offset_y ?? 0) / 100) * ((rH - boxH) / 2);
+
+    if (rotate) {
+      // Stashed for `_refineGridColumns` (portrait's map/dock column split) —
+      // plain field, doesn't trigger a render itself.
+      this._lastPortraitFitW = rW;
+      // .avc-rot lets CSS counter-rotate small on-map chips (gauges, prog
+      // chips, room icons) so their text stays upright while the map itself
+      // is rotated.
+      return html`
+        <div class="avc-rot" style="position:relative;width:${boxW}px;height:${boxH}px;margin:0 auto;overflow:hidden">
+          <div style="position:absolute;top:0;left:0;width:100%;height:100%;transform:translate(${panX}px,${panY}px)">
+            <div style="position:absolute;top:0;left:0;width:${rH}px;height:${rW}px;transform-origin:top left;transform:translateX(${rW}px) rotate(90deg)">
+              ${mapHtml}
+            </div>
+          </div>
+        </div>
+      `;
+    }
+    return html`
+      <div style="position:relative;width:${boxW}px;height:${boxH}px;margin:0 auto;overflow:hidden">
+        <div style="position:absolute;top:0;left:0;width:${rW}px;height:${rH}px;transform:translate(${panX}px,${panY}px)">
+          ${mapHtml}
         </div>
       </div>
     `;

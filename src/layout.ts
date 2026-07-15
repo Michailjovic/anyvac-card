@@ -94,6 +94,17 @@ export const DEFAULT_PROFILES: Record<LayoutProfile, Required<Omit<ProfileGridCo
     // The map takes that space back; each vacuum's emergency more-info access
     // moves into a small icon strip at the top of the dock column instead
     // (`_renderVacuumIconStrip`, portrait-only).
+    // Declarative fallback columns (used until the first fit measurement lands,
+    // see `_refineGridColumns`): the map is height-fit (fills row 1's full
+    // height, `_renderResponsive`), which usually leaves it NARROWER than a
+    // fixed 72% column. A CSS "auto" track can't pick that up on its own — the
+    // fitted width lives on an absolutely-positioned inner div precisely so it
+    // does NOT feed back into layout/reflow, which also means it carries no
+    // intrinsic-size signal for track auto-sizing. So the actual column split
+    // is measured-and-applied in JS instead (same settle-and-stop pattern as
+    // `_refineGridHeight`), col2 = 1fr picks up whatever col1 doesn't need
+    // (field feedback 2026-07-15: "the freed-up width should go to the
+    // sidebar, not sit empty").
     columns: [72, 28],
     rows: [90, 10],
     place: {
