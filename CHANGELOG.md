@@ -14,6 +14,21 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   hints. Completion of the whole rebuild (this release + the follow-up)
   ships as **v1.0.0**.
 
+## [0.55.0] - 2026-07-15
+
+Landscape row-flex inversion, from panel-view field testing. No backend
+change — still pairs with `anyvac` 0.50.0.
+
+### Changed
+
+- **Landscape: the map now gets the leftover height, not the chrome below
+  it** — the row flex (`1fr`) used to sit on the status/picker/dock row,
+  meaning THEY stretched to fill a tall viewport (panel view especially)
+  while the map stayed at its own natural (often comparatively small) size.
+  The `1fr` now lives on the map's row instead; badges/tools/status/picker/
+  dock all size to their own natural content height, and the map absorbs
+  whatever vertical space is left over.
+
 ## [0.54.0] - 2026-07-15
 
 Landscape dead-space fix + configurable crop for portrait's rotated map. No

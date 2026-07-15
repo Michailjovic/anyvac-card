@@ -70,9 +70,15 @@ export const DEFAULT_PROFILES: Record<LayoutProfile, Required<Omit<ProfileGridCo
     // badges now (vacuum picking moved to `picker`, docs/19 A5) — a hardcoded
     // percentage reserved dead black space whenever no global_actions are
     // configured (field-caught 2026-07-15). "auto" collapses to whatever the
-    // row actually contains, same as the map/tools rows below it.
+    // row actually contains, same as the tools/status/picker/dock rows below.
+    // The "1fr" lives on the MAP's row instead (field feedback from a tall
+    // panel-view page 2026-07-15): everything below the map should size to
+    // its own natural content height, and the map should get whatever's left
+    // over — not the other way around, which is what put the flex on the
+    // status/dock row before and left the map a fixed, often-too-small size
+    // on tall viewports.
     columns: [70, 30],
-    rows: ["auto", "auto", "auto", "auto", "1fr"],
+    rows: ["auto", "1fr", "auto", "auto", "auto"],
     place: {
       badges: { row: 1, col: "1/3" },
       map: { row: 2, col: "1/3" },
