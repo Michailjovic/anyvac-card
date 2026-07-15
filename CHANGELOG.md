@@ -14,6 +14,31 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   hints. Completion of the whole rebuild (this release + the follow-up)
   ships as **v1.0.0**.
 
+## [0.51.0] - 2026-07-15
+
+Field-test fixes for the 0.50.0 meta bar's Pin & Go / Zone, caught immediately
+after shipping (merged mode, `layout:` grid). No backend change — still pairs
+with `anyvac` 0.50.0.
+
+### Fixed
+
+- **Zone drag never released** — releasing the pointer after drawing a zone
+  rectangle left the internal drag state set, so `pointermove` (which only
+  checked "is a drag in progress", not "is the button still down") kept
+  resizing the rectangle on any subsequent mouse movement even after the
+  drop/confirm panel had already appeared underneath it. The drag state is
+  now always cleared the instant the drag ends.
+- **Pin & Go / Zone sent to one auto-picked vacuum with no way to choose** —
+  the 0.50.0 meta bar armed Pin & Go / Zone against a single guessed target
+  and (for Pin & Go) fired immediately on click. Arming from the meta bar now
+  captures the click/drag once on the shared merged map, translates it
+  through every candidate vacuum's own map transform, and shows a
+  highlighted "send/clean here" action on each candidate's own status
+  card — the user picks which specific robot executes it, same as the
+  original plan and consistent with how split mode's per-vacuum tools
+  already behaved (unchanged there — no ambiguity to begin with, so still
+  immediate/single-target).
+
 ## [0.50.0] - 2026-07-15
 
 Landscape cockpit rebuild (docs/19, Phase C) + sequence-aware ETA. Ships in
@@ -26,6 +51,8 @@ lockstep with `anyvac` 0.50.0 (the new `room_sequence` contract).
   refresh now live in one row (`tools` region) instead of a per-vacuum
   Refresh/Pin&Go/Zone block repeated once per robot. Zone's pending-confirm
   and Pin & Go's armed state show as an inline panel under the bar.
+  (Superseded by 0.51.0: see below — the single auto-picked target and the
+  drag-release bug were caught in the very next field test.)
 - **Full-width map + two-column cockpit (landscape)** — the map and the new
   meta bar now span the full card width instead of a 70% column. Below them:
   left column = the existing per-robot status/controller cards (unchanged);

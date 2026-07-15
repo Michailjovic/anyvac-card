@@ -63,7 +63,15 @@ export class AnyVacCard extends LitElement {
   @state() private _modeEntity: string | null = null;
   @state() private _dbg = "";
   @state() private _zoneDrag: { x0: number; y0: number; x1: number; y1: number } | null = null;
-  @state() private _zonePending: { x1: number; y1: number; x2: number; y2: number } | null = null;
+  /** Pending zone(s) awaiting per-vacuum confirmation, keyed by entity_id (docs/19
+   *  §Pin&Go/Zone fix). Legacy single-target flow (split mode / per-vacuum tools)
+   *  only ever populates one key; the merged multi-candidate flow (meta bar) may
+   *  populate several at once — the user confirms on whichever vacuum's own
+   *  status card they want to execute it. */
+  @state() private _zonePending: Record<string, { x1: number; y1: number; x2: number; y2: number }> | null = null;
+  /** Pending pin(s) awaiting per-vacuum confirmation, keyed by entity_id — same
+   *  shape/reasoning as `_zonePending`, but for Pin & Go. */
+  @state() private _pinPending: Record<string, { x: number; y: number }> | null = null;
   @state() private _layers: { dry: boolean; wet: boolean } = { dry: true, wet: false };
   @state() private _layerMenu: "dry" | "wet" | null = null;
   private _layerHoldTimer: number | null = null;
@@ -1550,6 +1558,31 @@ export class AnyVacCard extends LitElement {
     if (this._mapMode === mode && this._modeEntity === entity) { this._mapMode = "normal"; this._modeEntity = null; }
     else { this._mapMode = mode; this._modeEntity = entity; }
   }
+  /** Arm Pin & Go / Zone from the consolidated meta bar (docs/19) — a "*" sentinel
+   *  instead of one hard-coded vacuum. In merged mode this defers the target choice:
+   *  the capture (click/drag) happens once on the shared map, then the user picks
+   *  which vacuum executes it on that vacuum's own status card (`_confirmPin`/
+   *  `_confirmZone`). In split mode each vacuum has its own separate map region, so
+   *  "*" just means "whichever map you click into" — unambiguous, same immediate
+   *  execution as the legacy per-vacuum tools. Distinct from `_toggleMode`, which
+   *  still drives the legacy single-target flow untouched. */
+  private _armMode(mode: "pin" | "zone"): void {
+    if (this._mapMode === mode && this._modeEntity === "*") { this._mapMode = "normal"; this._modeEntity = null; }
+    else { this._mapMode = mode; this._modeEntity = "*"; this._pinPending = null; this._zonePending = null; }
+  }
+  /** Candidate vacuums for a merged-mode multi-candidate Pin & Go / Zone capture —
+   *  anything with the integration + its own map entity (each has its own
+   *  auto-seated transform, so one screen point/rectangle translates independently
+   *  per vacuum via `_clickToContent`). */
+  private _modeCandidates(): VacuumConfig[] {
+    return this._config.vacuums.filter((v) => this._intAttrs(v) && v.map?.entity);
+  }
+  /** Whether this vacuum's map should render the click-catch / zone-rect layer:
+   *  either it's the legacy hard-coded single target, or mode is armed "*" (meta
+   *  bar) and this vacuum is a valid candidate. */
+  private _isModeCandidate(v: VacuumConfig): boolean {
+    return this._modeEntity === v.entity || (this._modeEntity === "*" && !!this._intAttrs(v) && !!v.map?.entity);
+  }
   private _refreshMap(vac: VacuumConfig): void {
     const ent = vac.map?.entity;
     if (ent) void this.hass.callService("homeassistant", "update_entity", { entity_id: ent });
@@ -1558,20 +1591,36 @@ export class AnyVacCard extends LitElement {
     return Math.min(100, Math.max(0, v));
   }
   private _onMapClick(vac: VacuumConfig, e: MouseEvent): void {
-    const content = this._clickToContent(vac, e.clientX, e.clientY);
-    if (this._mapMode === "pin") {
-      this._dbg = content
-        ? "goto " + content.x.toFixed(1) + "%, " + content.y.toFixed(1) + "%"
-        : "(map element not found)";
-      if (content) {
-        void this._call("anyvac", "goto", {
-          entity_id: vac.entity,
-          x_pct: this._clampPct(content.x),
-          y_pct: this._clampPct(content.y),
-        });
+    if (this._mapMode !== "pin") return;
+    if (!this._isModeCandidate(vac)) return;
+    if (this._modeEntity === "*" && this._config.map_mode === "merged") {
+      // Merged multi-candidate: capture the SAME screen point through every
+      // candidate vacuum's own map transform. Nothing is sent yet — the user picks
+      // who actually goes there next, on that vacuum's own status card.
+      const pts: Record<string, { x: number; y: number }> = {};
+      for (const cand of this._modeCandidates()) {
+        const c = this._clickToContent(cand, e.clientX, e.clientY);
+        if (c) pts[cand.entity] = { x: this._clampPct(c.x), y: this._clampPct(c.y) };
       }
+      this._pinPending = Object.keys(pts).length ? pts : null;
       this._mapMode = "normal"; this._modeEntity = null;
+      return;
     }
+    // Legacy single-target immediate send (per-vacuum tools, and "*" in split mode
+    // where each map is its own on-screen region — clicking it IS the unambiguous
+    // choice of vacuum, so there's nothing to defer).
+    const content = this._clickToContent(vac, e.clientX, e.clientY);
+    this._dbg = content
+      ? "goto " + content.x.toFixed(1) + "%, " + content.y.toFixed(1) + "%"
+      : "(map element not found)";
+    if (content) {
+      void this._call("anyvac", "goto", {
+        entity_id: vac.entity,
+        x_pct: this._clampPct(content.x),
+        y_pct: this._clampPct(content.y),
+      });
+    }
+    this._mapMode = "normal"; this._modeEntity = null;
   }
   // Map a viewport click into THIS vacuum's map content space (undo its
   // rotation/scale/offset) so pin&go / zones are seating-independent.
@@ -1599,7 +1648,7 @@ export class AnyVacCard extends LitElement {
     return { x: (lx / w + 0.5) * 100, y: (ly / h + 0.5) * 100 };
   }
   private _onZoneDown(vac: VacuumConfig, e: PointerEvent): void {
-    if (this._mapMode !== "zone" || this._modeEntity !== vac.entity) return;
+    if (this._mapMode !== "zone" || !this._isModeCandidate(vac)) return;
     const el = e.currentTarget as HTMLElement;
     (el as any).setPointerCapture?.(e.pointerId);
     const r = el.getBoundingClientRect();
@@ -1609,41 +1658,84 @@ export class AnyVacCard extends LitElement {
     this._zoneDrag = { x0: x, y0: y, x1: x, y1: y };
   }
   private _onZoneMove(vac: VacuumConfig, e: PointerEvent): void {
-    if (!this._zoneDrag || this._mapMode !== "zone" || this._modeEntity !== vac.entity) return;
+    if (!this._zoneDrag || this._mapMode !== "zone" || !this._isModeCandidate(vac)) return;
     const el = e.currentTarget as HTMLElement;
     const r = el.getBoundingClientRect();
     this._zoneDrag = { x0: this._zoneDrag.x0, y0: this._zoneDrag.y0,
       x1: ((e.clientX - r.left) / r.width) * 100, y1: ((e.clientY - r.top) / r.height) * 100 };
   }
   private _onZoneUp(vac: VacuumConfig, e: PointerEvent): void {
-    if (!this._zoneDrag || this._mapMode !== "zone" || this._modeEntity !== vac.entity) return;
+    if (!this._zoneDrag || this._mapMode !== "zone" || !this._isModeCandidate(vac)) return;
     const el = e.currentTarget as HTMLElement;
     const r = el.getBoundingClientRect();
     const ax = r.left + (this._zoneDrag.x0 / 100) * r.width;
     const ay = r.top + (this._zoneDrag.y0 / 100) * r.height;
-    // Both corners as PERCENT of the map image content (mm math is backend-side).
-    const ca = this._clickToContent(vac, ax, ay);
-    const cb = this._clickToContent(vac, e.clientX, e.clientY);
+    const bx = e.clientX, by = e.clientY;
     const big = Math.abs(this._zoneDrag.x1 - this._zoneDrag.x0) > 2 || Math.abs(this._zoneDrag.y1 - this._zoneDrag.y0) > 2;
-    if (ca && cb && big) {
+    // Always drop the live drag state here — this used to only clear on cancel,
+    // so releasing the pointer left `_zoneDrag` set and `_onZoneMove` (which only
+    // gates on it being non-null, not on the button still being down) kept
+    // resizing the rectangle on every subsequent mouse move (bugfix, docs/19).
+    this._zoneDrag = null;
+    if (!big) return;
+    if (this._modeEntity === "*" && this._config.map_mode === "merged") {
+      // Merged multi-candidate: same two screen corners, translated through every
+      // candidate vacuum's own map transform. Nothing sent yet — confirm per
+      // vacuum on its own status card.
+      const rects: Record<string, { x1: number; y1: number; x2: number; y2: number }> = {};
+      for (const cand of this._modeCandidates()) {
+        const ca = this._clickToContent(cand, ax, ay);
+        const cb = this._clickToContent(cand, bx, by);
+        if (ca && cb) {
+          rects[cand.entity] = {
+            x1: this._clampPct(Math.min(ca.x, cb.x)), y1: this._clampPct(Math.min(ca.y, cb.y)),
+            x2: this._clampPct(Math.max(ca.x, cb.x)), y2: this._clampPct(Math.max(ca.y, cb.y)),
+          };
+        }
+      }
+      this._zonePending = Object.keys(rects).length ? rects : null;
+      this._mapMode = "normal"; this._modeEntity = null;
+      return;
+    }
+    // Legacy single-target (per-vacuum tools, and "*" in split mode — each map is
+    // its own on-screen region, so the vacuum that received the drag IS the
+    // unambiguous choice).
+    const ca = this._clickToContent(vac, ax, ay);
+    const cb = this._clickToContent(vac, bx, by);
+    if (ca && cb) {
       this._zonePending = {
-        x1: this._clampPct(Math.min(ca.x, cb.x)), y1: this._clampPct(Math.min(ca.y, cb.y)),
-        x2: this._clampPct(Math.max(ca.x, cb.x)), y2: this._clampPct(Math.max(ca.y, cb.y)),
+        [vac.entity]: {
+          x1: this._clampPct(Math.min(ca.x, cb.x)), y1: this._clampPct(Math.min(ca.y, cb.y)),
+          x2: this._clampPct(Math.max(ca.x, cb.x)), y2: this._clampPct(Math.max(ca.y, cb.y)),
+        },
       };
-    } else {
-      this._zoneDrag = null;
     }
   }
   private _confirmZone(vac: VacuumConfig): void {
-    const z = this._zonePending; if (!z) return;
+    const z = this._zonePending?.[vac.entity]; if (!z) return;
     void this._call("anyvac", "zone_clean", {
       entity_id: vac.entity,
       x1_pct: z.x1, y1_pct: z.y1, x2_pct: z.x2, y2_pct: z.y2,
       repeat: 1,
     });
-    this._zonePending = null; this._zoneDrag = null;
+    if (this._zonePending) {
+      const next = { ...this._zonePending };
+      delete next[vac.entity];
+      this._zonePending = Object.keys(next).length ? next : null;
+    }
+    this._zoneDrag = null;
     this._mapMode = "normal"; this._modeEntity = null;
   }
+  private _confirmPin(vac: VacuumConfig): void {
+    const p = this._pinPending?.[vac.entity]; if (!p) return;
+    void this._call("anyvac", "goto", { entity_id: vac.entity, x_pct: p.x, y_pct: p.y });
+    if (this._pinPending) {
+      const next = { ...this._pinPending };
+      delete next[vac.entity];
+      this._pinPending = Object.keys(next).length ? next : null;
+    }
+  }
+  private _cancelPin(): void { this._pinPending = null; }
   private _cancelZone(): void { this._zonePending = null; this._zoneDrag = null; }
 
   /** Refresh-all button in the badges row (grid mode) — the map corner variant
@@ -1666,28 +1758,31 @@ export class AnyVacCard extends LitElement {
   private _renderMetaBar(vacs: VacuumConfig[]) {
     const withMap = vacs.filter((v) => v.map?.entity);
     if (!withMap.length) return nothing;
-    // Target for Pin & Go / Zone: keep whichever vacuum is already armed, else
-    // the first integration+map-capable one, else just the first — there's no
-    // separate per-vacuum picker for this (single global mode toggle, docs/19).
-    const target = vacs.find((v) => this._modeEntity === v.entity)
-      ?? vacs.find((v) => this._intAttrs(v) && v.map?.entity)
-      ?? vacs[0];
-    const canCmd = !!target && !!this._intAttrs(target) && !!target.map?.entity && !this._narrow;
+    // Pin & Go / Zone here is armed for ALL candidates at once ("*", `_armMode`) —
+    // in merged mode the capture (click/drag) happens once on the shared map and
+    // the choice of WHICH vacuum executes it is made afterwards on that vacuum's
+    // own status card (`_confirmPin`/`_confirmZone`, docs/19). No single
+    // auto-picked target here anymore — that was the bug (immediate send with no
+    // way to choose the robot).
+    const candidates = this._modeCandidates();
+    const canCmd = candidates.length > 0 && !this._narrow;
     const cmdTitle = this._narrow
       ? "Not available in the rotated mobile view"
       : !canCmd ? "Requires the AnyVac integration (≥ 0.18) + map entity" : "";
-    const mode = (target && this._modeEntity === target.entity) ? this._mapMode : "normal";
+    const mode = this._modeEntity === "*" ? this._mapMode : "normal";
     const selKeys = this._allRoomKeys().filter((k) => this._isRoomSelectedAny(k, vacs));
     const hasInt = vacs.some((v) => this._intAttrs(v));
     const est = this._etaFor(selKeys, this._planMode, hasInt);
+    const pinCount = this._pinPending ? Object.keys(this._pinPending).length : 0;
+    const zoneCount = this._zonePending ? Object.keys(this._zonePending).length : 0;
     return html`
       <div class="meta-bar">
         <button class="mtbtn ${mode === "pin" ? "on" : ""}" ?disabled=${!canCmd}
-          @click=${() => target && this._toggleMode(target.entity, "pin")} title=${cmdTitle || "Pin & Go"}>
+          @click=${() => this._armMode("pin")} title=${cmdTitle || "Pin & Go"}>
           <ha-icon icon="mdi:map-marker-radius"></ha-icon><span>Pin &amp; Go</span>
         </button>
         <button class="mtbtn ${mode === "zone" ? "on" : ""}" ?disabled=${!canCmd}
-          @click=${() => target && this._toggleMode(target.entity, "zone")} title=${cmdTitle || "Zone clean"}>
+          @click=${() => this._armMode("zone")} title=${cmdTitle || "Zone clean"}>
           <ha-icon icon="mdi:select-drag"></ha-icon><span>Zone</span>
         </button>
         ${this._renderLayerToggleCompact(vacs)}
@@ -1702,16 +1797,17 @@ export class AnyVacCard extends LitElement {
           <ha-icon icon="mdi:refresh"></ha-icon>
         </button>
       </div>
-      ${mode === "zone" && target ? html`<div class="calib-panel">
-        ${this._zonePending
-          ? html`<div>Zone clean with ${target.name ?? target.entity}?</div>
-              <div class="calib-actions">
-                <button class="mtbtn on" @click=${() => this._confirmZone(target!)}>Zone clean</button>
-                <button class="mtbtn" @click=${() => this._cancelZone()}>Cancel</button>
-              </div>`
-          : html`Drag a rectangle on ${target.name ?? target.entity}'s map to set a cleaning zone.`}
-      </div>` : nothing}
-      ${mode === "pin" && target ? html`<div class="calib-panel">Tap the map to send ${target.name ?? target.entity} there.</div>` : nothing}
+      ${/* Capture finishes (and resets _mapMode to normal) the instant a click/drag
+           lands — so pending state, not the armed mode, drives this panel. Only the
+           "arm but haven't captured yet" hint depends on `mode`. */
+        zoneCount ? html`<div class="calib-panel">
+          <div>Zone ready for ${zoneCount} vacuum${zoneCount > 1 ? "s" : ""} — pick one on its status card below.</div>
+          <div class="calib-actions"><button class="mtbtn" @click=${() => this._cancelZone()}>Cancel</button></div>
+        </div>` : mode === "zone" ? html`<div class="calib-panel">Drag a rectangle on the map to set a cleaning zone.</div>` : nothing}
+      ${pinCount ? html`<div class="calib-panel">
+          <div>Pin ready for ${pinCount} vacuum${pinCount > 1 ? "s" : ""} — pick one on its status card below.</div>
+          <div class="calib-actions"><button class="mtbtn" @click=${() => this._cancelPin()}>Cancel</button></div>
+        </div>` : mode === "pin" ? html`<div class="calib-panel">Tap the map to drop a pin.</div>` : nothing}
     `;
   }
 
@@ -1746,7 +1842,7 @@ export class AnyVacCard extends LitElement {
       </div>
       ${mode === "pin" ? html`<div class="calib-panel">Tap the map to send the robot there.</div>` : nothing}
       ${mode === "zone" ? html`<div class="calib-panel">
-        ${this._zonePending
+        ${this._zonePending?.[vac.entity]
           ? html`<div>Clean this zone?</div>
               <div class="calib-actions">
                 <button class="mtbtn on" @click=${() => this._confirmZone(vac)}>Clean zone</button>
@@ -2150,14 +2246,14 @@ export class AnyVacCard extends LitElement {
            to room-select regardless of the active mode (bugfix, docs/19). Mirrors
            _renderMap 1:1, just scoped per shown vacuum since merged mode overlays
            several .map-img elements in one wrapper. */
-        shown.map((v) => this._mapMode !== "normal" && this._modeEntity === v.entity
+        shown.map((v) => this._mapMode !== "normal" && this._isModeCandidate(v)
           ? html`<div class="map-clickcatch" style="touch-action:none"
               @click=${(e: MouseEvent) => this._onMapClick(v, e)}
               @pointerdown=${(e: PointerEvent) => this._onZoneDown(v, e)}
               @pointermove=${(e: PointerEvent) => this._onZoneMove(v, e)}
               @pointerup=${(e: PointerEvent) => this._onZoneUp(v, e)}></div>`
           : nothing)}
-        ${shown.map((v) => this._mapMode === "zone" && this._modeEntity === v.entity && this._zoneDrag
+        ${shown.map((v) => this._mapMode === "zone" && this._isModeCandidate(v) && this._zoneDrag
           ? html`<div class="zone-rect" style=${styleMap({
               left: Math.min(this._zoneDrag.x0, this._zoneDrag.x1) + "%",
               top: Math.min(this._zoneDrag.y0, this._zoneDrag.y1) + "%",
@@ -2206,14 +2302,14 @@ export class AnyVacCard extends LitElement {
         ${showMap ? this._renderIntegrationOverlay(vac, seat) : nothing}
         ${this._config.layout ? nothing : this._renderLayerToggles([vac])}
         ${(this._roomsFor(vac)).map((r) => this._renderRoomOverlay(r, vac))}
-        ${this._mapMode !== "normal" && this._modeEntity === vac.entity
+        ${this._mapMode !== "normal" && this._isModeCandidate(vac)
           ? html`<div class="map-clickcatch" style="touch-action:none"
               @click=${(e: MouseEvent) => this._onMapClick(vac, e)}
               @pointerdown=${(e: PointerEvent) => this._onZoneDown(vac, e)}
               @pointermove=${(e: PointerEvent) => this._onZoneMove(vac, e)}
               @pointerup=${(e: PointerEvent) => this._onZoneUp(vac, e)}></div>`
           : nothing}
-        ${this._mapMode === "zone" && this._modeEntity === vac.entity && this._zoneDrag
+        ${this._mapMode === "zone" && this._isModeCandidate(vac) && this._zoneDrag
           ? html`<div class="zone-rect" style=${styleMap({
               left: Math.min(this._zoneDrag.x0, this._zoneDrag.x1) + "%",
               top: Math.min(this._zoneDrag.y0, this._zoneDrag.y1) + "%",
@@ -2513,11 +2609,34 @@ export class AnyVacCard extends LitElement {
           `}
         </div>
         <div class="status-right">
+          ${this._renderModeAction(vac)}
           ${this._renderStatusRow(vac)}
           ${this._renderProgress(vac)}
           ${this._renderActions(vac, vacIdx)}
           ${this._renderDebugProgress(vac)}
         </div>
+      </div>
+    `;
+  }
+
+  /** Per-vacuum Pin & Go / Zone execute banner (docs/19 fix): when the merged
+   *  meta bar has captured a pin/zone for multiple candidates, this is where the
+   *  user actually picks WHICH robot goes — one tap on its own controller card,
+   *  same surface as everything else that vacuum does. */
+  private _renderModeAction(vac: VacuumConfig) {
+    const pin = this._pinPending?.[vac.entity];
+    const zone = this._zonePending?.[vac.entity];
+    if (!pin && !zone) return nothing;
+    return html`
+      <div class="mode-action">
+        ${pin ? html`
+          <button class="mtbtn on" @click=${() => this._confirmPin(vac)}>
+            <ha-icon icon="mdi:map-marker-radius"></ha-icon><span>Send ${vac.name ?? vac.entity} here</span>
+          </button>` : nothing}
+        ${zone ? html`
+          <button class="mtbtn on" @click=${() => this._confirmZone(vac)}>
+            <ha-icon icon="mdi:select-drag"></ha-icon><span>Clean zone with ${vac.name ?? vac.entity}</span>
+          </button>` : nothing}
       </div>
     `;
   }
@@ -3319,6 +3438,9 @@ export class AnyVacCard extends LitElement {
     .mtbtn--stat small { opacity: 0.7; font-weight: 500; }
     .mtbtn--push { margin-left: auto; }
     .meta-bar { display: flex; align-items: center; gap: 6px; flex-wrap: wrap; padding: 4px 0; }
+    .mode-action { display: flex; flex-wrap: wrap; gap: 6px; margin-bottom: 6px; }
+    .mode-action .mtbtn { width: 100%; justify-content: center; box-sizing: border-box; animation: avc-mode-action-pulse 1.6s ease-in-out infinite; }
+    @keyframes avc-mode-action-pulse { 0%,100% { box-shadow: 0 0 0 rgba(59,130,246,0); } 50% { box-shadow: 0 0 12px rgba(59,130,246,0.55); } }
     .calib-panel { margin-top: 4px; font-size: 12px; opacity: 0.9; padding: 6px 8px; background: rgba(59,130,246,0.12); border-radius: 8px; }
     .calib-panel > div { margin-bottom: 4px; }
     .calib-actions { display: flex; gap: 6px; flex-wrap: wrap; }
