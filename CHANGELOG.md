@@ -13,6 +13,19 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   floating map tools, stats trio, exact rotated-map fit, per-room vacuum pinning),
   landscape cockpit. Completion of the rebuild ships as **v1.0.0**.
 
+## [0.42.4] - 2026-07-15
+
+### Fixed
+
+- **Integration-vector editor fields invisible without an explicit `integration_entity`**
+  — "Hide vacuum map", path colour/width, mop band colour/opacity/width, robot
+  image options, and "Import missing rooms" were gated in the editor on the raw
+  `integration_entity` config key. Since docs/14 Fáze 3 the card (and the editor's
+  own auto-seating) auto-resolve the AnyVac sensor from the entity registry, so
+  most users never set that key — the whole section silently never appeared.
+  The editor now uses the same `_intEntityFor` auto-resolve as rendering/seating,
+  so the fields show whenever the integration is actually active.
+
 ## [0.42.3] - 2026-07-15
 
 Requires integration ≥ 0.19.1 for the fix to take effect (the segments are built

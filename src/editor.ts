@@ -955,11 +955,11 @@ export class AnyVacCardEditor extends LitElement {
         ${this._entityPicker("AnyVac integration sensor", vac.integration_entity, ["sensor"],
           v => this._setVacuum(mapVac, { integration_entity: v }))}
 
-        ${(vac.integration_entity || this._config.map_mode === "merged") ? this._selectField("Hide vacuum map (show only floorplan + robot/path)", vac.hide_map ? "yes" : "no",
+        ${(this._intEntityFor(vac) || this._config.map_mode === "merged") ? this._selectField("Hide vacuum map (show only floorplan + robot/path)", vac.hide_map ? "yes" : "no",
           [{ value: "no", label: "no" }, { value: "yes", label: "yes" }],
           v => this._setVacuum(mapVac, { hide_map: v === "yes" })) : nothing}
 
-        ${vac.integration_entity ? html`
+        ${this._intEntityFor(vac) ? html`
           ${this._textField("Path colour (hex)", vac.path_color, v => this._setVacuum(mapVac, { path_color: v || undefined }), "#69d2ff")}
           ${this._numberSlider("Path width", vac.path_width ?? 100, 20, 300, 10, v => this._setVacuum(mapVac, { path_width: v }), "%")}
           ${this._textField("Mop band colour (hex)", vac.mop_path_color, v => this._setVacuum(mapVac, { mop_path_color: v || undefined }), "#40a9ff")}
@@ -1058,7 +1058,7 @@ export class AnyVacCardEditor extends LitElement {
             ${this._numberSlider("Offset X",  map.offset_x  ?? 0,  -50,  50,  1, v => this._setMap(mapVac, { offset_x:  v }), "%")}
             ${this._numberSlider("Offset Y",  map.offset_y  ?? 0,  -50,  50,  1, v => this._setMap(mapVac, { offset_y:  v }), "%")}
           ` : nothing}
-          ${vac.integration_entity ? html`
+          ${this._intEntityFor(vac) ? html`
             <button class="btn btn--add btn--sm" style="align-self:flex-start"
               @click=${() => this._importRooms(mapVac)}>
               <ha-icon icon="mdi:import"></ha-icon> Import missing rooms from this vacuum

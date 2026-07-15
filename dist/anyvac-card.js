@@ -87,7 +87,7 @@ const t={ATTRIBUTE:1},e=t=>(...e)=>({_$litDirective$:t,values:e});let i$1 = clas
 
 const CARD_NAME = "anyvac-card";
 const EDITOR_NAME = "anyvac-card-editor";
-const CARD_VERSION = "0.42.2";
+const CARD_VERSION = "0.42.4";
 /** Hold duration in ms required to trigger START / PAUSE actions */
 const HOLD_DURATION_MS = 600;
 /**
@@ -2265,7 +2265,15 @@ let AnyVacCard = class AnyVacCard extends i$2 {
         const layersOn = this._layersEff();
         const showDry = layersOn.dry && ct.dry;
         const showWet = layersOn.wet && ct.wet;
-        const dryStr = showDry ? toPts(at.path_dry_px) : "";
+        // path_dry_px is a list of contiguous segments (docs/14 §3.9 — the backend never
+        // bridges an excluded transit/mop-wash gap with a straight line, so the card must
+        // not either). One <polyline> per segment; a single flat polyline across all
+        // segments used to draw a spurious diagonal line at every room transition, which
+        // is why a finished multi-room trace used to look like a scribble while the live
+        // in-progress trace (still one segment) looked clean (fixed 2026-07-15).
+        const drySegs = showDry && Array.isArray(at.path_dry_px)
+            ? at.path_dry_px.map((seg) => toPts(seg)).filter((s) => s.length > 0)
+            : [];
         const wetStr = showWet ? toPts(at.path_wet_px) : "";
         const vp = at.vacuum_position_px;
         const rob = vp ? { x: vp.x, y: vp.y } : null;
@@ -2295,8 +2303,8 @@ let AnyVacCard = class AnyVacCard extends i$2 {
         const mopLine = wetStr
             ? w `<polyline points=${wetStr} fill="none" stroke=${wetColor} stroke-width=${sw} stroke-linejoin="round" stroke-linecap="round" opacity="0.9"></polyline>`
             : A;
-        const traceT = dryStr
-            ? w `<polyline points=${dryStr} fill="none" stroke=${vac.path_color || color} stroke-width=${sw} stroke-linejoin="round" stroke-linecap="round" opacity="0.85"></polyline>`
+        const traceT = drySegs.length
+            ? w `${drySegs.map((s) => w `<polyline points=${s} fill="none" stroke=${vac.path_color || color} stroke-width=${sw} stroke-linejoin="round" stroke-linecap="round" opacity="0.85"></polyline>`)}`
             : A;
         const useImg = !!(vac.robot_image_on_map && vac.image);
         const robSize = rr * 2.6 * ((vac.robot_size ?? 100) / 100);
@@ -4559,9 +4567,9 @@ let AnyVacCardEditor = class AnyVacCardEditor extends i$2 {
 
         ${this._entityPicker("AnyVac integration sensor", vac.integration_entity, ["sensor"], v => this._setVacuum(mapVac, { integration_entity: v }))}
 
-        ${(vac.integration_entity || this._config.map_mode === "merged") ? this._selectField("Hide vacuum map (show only floorplan + robot/path)", vac.hide_map ? "yes" : "no", [{ value: "no", label: "no" }, { value: "yes", label: "yes" }], v => this._setVacuum(mapVac, { hide_map: v === "yes" })) : A}
+        ${(this._intEntityFor(vac) || this._config.map_mode === "merged") ? this._selectField("Hide vacuum map (show only floorplan + robot/path)", vac.hide_map ? "yes" : "no", [{ value: "no", label: "no" }, { value: "yes", label: "yes" }], v => this._setVacuum(mapVac, { hide_map: v === "yes" })) : A}
 
-        ${vac.integration_entity ? b `
+        ${this._intEntityFor(vac) ? b `
           ${this._textField("Path colour (hex)", vac.path_color, v => this._setVacuum(mapVac, { path_color: v || undefined }), "#69d2ff")}
           ${this._numberSlider("Path width", vac.path_width ?? 100, 20, 300, 10, v => this._setVacuum(mapVac, { path_width: v }), "%")}
           ${this._textField("Mop band colour (hex)", vac.mop_path_color, v => this._setVacuum(mapVac, { mop_path_color: v || undefined }), "#40a9ff")}
@@ -4652,7 +4660,7 @@ let AnyVacCardEditor = class AnyVacCardEditor extends i$2 {
             ${this._numberSlider("Offset X", map.offset_x ?? 0, -50, 50, 1, v => this._setMap(mapVac, { offset_x: v }), "%")}
             ${this._numberSlider("Offset Y", map.offset_y ?? 0, -50, 50, 1, v => this._setMap(mapVac, { offset_y: v }), "%")}
           ` : A}
-          ${vac.integration_entity ? b `
+          ${this._intEntityFor(vac) ? b `
             <button class="btn btn--add btn--sm" style="align-self:flex-start"
               @click=${() => this._importRooms(mapVac)}>
               <ha-icon icon="mdi:import"></ha-icon> Import missing rooms from this vacuum
