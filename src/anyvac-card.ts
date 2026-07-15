@@ -274,12 +274,20 @@ export class AnyVacCard extends LitElement {
    *  Field feedback 2026-07-16: giving `dock` a flat 1fr handed it EVERY px
    *  the map's fit didn't need, even when the room list itself is much
    *  narrower than that (dead black space in the sidebar, map smaller than
-   *  it could be). Fix: measure `dock`'s own natural (unconstrained) content
-   *  width the same way — briefly flip it to `width:max-content`, read it,
-   *  restore — and only let it keep up to that; any further surplus goes
-   *  back to `map`'s track (shows up as centered letterbox bars around the
-   *  map itself, same as the landscape contain-fit already does, instead of
-   *  as empty sidebar). */
+   *  it could be). First fix attempt measured `dock`'s natural width in
+   *  place (`width:max-content` on the live, still-attached node) — that
+   *  produced no visible change at all in the field: `.dock` is a
+   *  column-flex container whose own children (`.dock-rows`, itself a
+   *  column-flex container of row-flex `.dock-row` buttons) sit inside a
+   *  CSS Grid track, and max-content sizing through that many nested flex
+   *  levels while still attached/stretched apparently doesn't resolve the
+   *  way the spec suggests it should (or not consistently across engines).
+   *  Fixed by measuring a detached CLONE instead: `position:absolute`
+   *  removes it from flow entirely (no ambient stretch/grid-track
+   *  influence at all), appended into this same shadow root so the
+   *  component's scoped CSS still applies, `width:max-content` on a node
+   *  with no surrounding constraints is the one case that's reliably
+   *  supported everywhere. */
   private _refineGridColumns(): void {
     if (this._profile !== "portrait" || !this._lastPortraitFitW) return;
     const root = this.renderRoot?.querySelector<HTMLElement>(".avc-grid");
@@ -291,12 +299,19 @@ export class AnyVacCard extends LitElement {
     if (avail > 0) mapW = Math.min(mapW, avail);
     const dockEl = this.renderRoot?.querySelector<HTMLElement>(".avc-region--dock .dock");
     if (dockEl && avail > 0) {
-      const prevWidth = dockEl.style.width;
-      dockEl.style.width = "max-content";
-      const need = Math.ceil(dockEl.getBoundingClientRect().width);
-      dockEl.style.width = prevWidth;
+      const clone = dockEl.cloneNode(true) as HTMLElement;
+      clone.style.position = "absolute";
+      clone.style.visibility = "hidden";
+      clone.style.pointerEvents = "none";
+      clone.style.left = "-9999px";
+      clone.style.top = "0";
+      clone.style.height = "auto";
+      clone.style.width = "max-content";
+      this.renderRoot.appendChild(clone);
+      const need = Math.ceil(clone.getBoundingClientRect().width);
+      clone.remove();
       const leftover = avail - mapW;
-      if (need < leftover) mapW = avail - need;
+      if (need > 0 && need < leftover) mapW = avail - need;
     }
     const want = Math.round(mapW) + "px 1fr";
     if (root.style.gridTemplateColumns !== want) root.style.gridTemplateColumns = want;

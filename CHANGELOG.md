@@ -14,6 +14,29 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   hints. Completion of the whole rebuild (this release + the follow-up)
   ships as **v1.0.0**.
 
+## [0.58.0] - 2026-07-16
+
+Same-day follow-up to 0.57.0: field test with the console version banner
+confirmed 0.57.0 was actually loaded, but the portrait column split was
+pixel-identical to before — the fix itself didn't take effect. No backend
+change — still pairs with `anyvac` 0.50.0.
+
+### Fixed
+
+- **`dock`'s natural-width measurement produced no change at all** —
+  0.57.0 measured it in place (`width: max-content` on the live,
+  still-attached `.dock` node). `.dock` is a column-flex container, its
+  `.dock-rows` child is itself a column-flex container of row-flex
+  `.dock-row` buttons — max-content sizing through that many nested flex
+  levels while still stretched inside a CSS Grid track apparently doesn't
+  resolve the way it should. Switched to measuring a **detached clone**:
+  `cloneNode(true)`, `position: absolute` (fully out of flow, no ambient
+  grid/flex influence at all), appended into the same shadow root (so the
+  card's scoped CSS still applies to it), measured, then removed. This is
+  the standard reliable pattern for "how wide does this content want to be
+  with nothing constraining it" and doesn't depend on intrinsic-sizing
+  behavior through nested flex containers.
+
 ## [0.57.0] - 2026-07-16
 
 Field-test follow-up to 0.56.0's portrait column split: the sidebar was
