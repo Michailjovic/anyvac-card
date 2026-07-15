@@ -63,6 +63,11 @@ export class AnyVacCard extends LitElement {
   @state() private _modeEntity: string | null = null;
   @state() private _dbg = "";
   @state() private _zoneDrag: { x0: number; y0: number; x1: number; y1: number } | null = null;
+  /** Frozen copy of `_zoneDrag` at drop time, in the same wrap-relative % — kept
+   *  around purely so the drawn rectangle stays visible while `_zonePending` is
+   *  awaiting a per-vacuum confirm (drag itself is cleared right away to fix the
+   *  "won't let go" bug, but the box shouldn't just vanish on release). */
+  @state() private _zoneRectShown: { x0: number; y0: number; x1: number; y1: number } | null = null;
   /** Pending zone(s) awaiting per-vacuum confirmation, keyed by entity_id (docs/19
    *  §Pin&Go/Zone fix). Legacy single-target flow (split mode / per-vacuum tools)
    *  only ever populates one key; the merged multi-candidate flow (meta bar) may
@@ -1568,7 +1573,7 @@ export class AnyVacCard extends LitElement {
    *  still drives the legacy single-target flow untouched. */
   private _armMode(mode: "pin" | "zone"): void {
     if (this._mapMode === mode && this._modeEntity === "*") { this._mapMode = "normal"; this._modeEntity = null; }
-    else { this._mapMode = mode; this._modeEntity = "*"; this._pinPending = null; this._zonePending = null; }
+    else { this._mapMode = mode; this._modeEntity = "*"; this._pinPending = null; this._zonePending = null; this._zoneRectShown = null; }
   }
   /** Candidate vacuums for a merged-mode multi-candidate Pin & Go / Zone capture —
    *  anything with the integration + its own map entity (each has its own
@@ -1582,6 +1587,20 @@ export class AnyVacCard extends LitElement {
    *  bar) and this vacuum is a valid candidate. */
   private _isModeCandidate(v: VacuumConfig): boolean {
     return this._modeEntity === v.entity || (this._modeEntity === "*" && !!this._intAttrs(v) && !!v.map?.entity);
+  }
+  /** The rectangle to draw for this vacuum's map: the live drag while dragging,
+   *  or the frozen box while a zone is pending confirm. Merged mode's multi
+   *  candidate capture resets `_mapMode`/`_modeEntity` the instant the drag ends
+   *  (§`_onZoneUp`), so the frozen box can't reuse `_isModeCandidate` — it's no
+   *  longer "armed", it's "awaiting confirm". All candidates share the exact
+   *  same on-screen rect there (that's the premise of merged mode), so it's
+   *  drawn once, on the first shown vacuum; split mode draws it on whichever
+   *  vacuum's own map it was actually dragged on. */
+  private _zoneRectFor(v: VacuumConfig, isFirstShown: boolean): { x0: number; y0: number; x1: number; y1: number } | null {
+    if (this._mapMode === "zone" && this._isModeCandidate(v) && this._zoneDrag) return this._zoneDrag;
+    if (!this._zoneRectShown) return null;
+    if (this._config.map_mode === "merged") return isFirstShown ? this._zoneRectShown : null;
+    return this._zonePending?.[v.entity] ? this._zoneRectShown : null;
   }
   private _refreshMap(vac: VacuumConfig): void {
     const ent = vac.map?.entity;
@@ -1655,6 +1674,7 @@ export class AnyVacCard extends LitElement {
     const x = ((e.clientX - r.left) / r.width) * 100;
     const y = ((e.clientY - r.top) / r.height) * 100;
     this._zonePending = null;
+    this._zoneRectShown = null;
     this._zoneDrag = { x0: x, y0: y, x1: x, y1: y };
   }
   private _onZoneMove(vac: VacuumConfig, e: PointerEvent): void {
@@ -1672,10 +1692,12 @@ export class AnyVacCard extends LitElement {
     const ay = r.top + (this._zoneDrag.y0 / 100) * r.height;
     const bx = e.clientX, by = e.clientY;
     const big = Math.abs(this._zoneDrag.x1 - this._zoneDrag.x0) > 2 || Math.abs(this._zoneDrag.y1 - this._zoneDrag.y0) > 2;
-    // Always drop the live drag state here — this used to only clear on cancel,
+    // Freeze the drawn box (so it stays visible while pending) before dropping
+    // the LIVE drag state — the live state is what used to only clear on cancel,
     // so releasing the pointer left `_zoneDrag` set and `_onZoneMove` (which only
     // gates on it being non-null, not on the button still being down) kept
     // resizing the rectangle on every subsequent mouse move (bugfix, docs/19).
+    this._zoneRectShown = big ? this._zoneDrag : null;
     this._zoneDrag = null;
     if (!big) return;
     if (this._modeEntity === "*" && this._config.map_mode === "merged") {
@@ -1722,6 +1744,7 @@ export class AnyVacCard extends LitElement {
       const next = { ...this._zonePending };
       delete next[vac.entity];
       this._zonePending = Object.keys(next).length ? next : null;
+      if (!this._zonePending) this._zoneRectShown = null;
     }
     this._zoneDrag = null;
     this._mapMode = "normal"; this._modeEntity = null;
@@ -1736,7 +1759,7 @@ export class AnyVacCard extends LitElement {
     }
   }
   private _cancelPin(): void { this._pinPending = null; }
-  private _cancelZone(): void { this._zonePending = null; this._zoneDrag = null; }
+  private _cancelZone(): void { this._zonePending = null; this._zoneDrag = null; this._zoneRectShown = null; }
 
   /** Refresh-all button in the badges row (grid mode) — the map corner variant
    *  floated in dead space (field feedback 2026-07-11). */
@@ -2253,14 +2276,15 @@ export class AnyVacCard extends LitElement {
               @pointermove=${(e: PointerEvent) => this._onZoneMove(v, e)}
               @pointerup=${(e: PointerEvent) => this._onZoneUp(v, e)}></div>`
           : nothing)}
-        ${shown.map((v) => this._mapMode === "zone" && this._isModeCandidate(v) && this._zoneDrag
-          ? html`<div class="zone-rect" style=${styleMap({
-              left: Math.min(this._zoneDrag.x0, this._zoneDrag.x1) + "%",
-              top: Math.min(this._zoneDrag.y0, this._zoneDrag.y1) + "%",
-              width: Math.abs(this._zoneDrag.x1 - this._zoneDrag.x0) + "%",
-              height: Math.abs(this._zoneDrag.y1 - this._zoneDrag.y0) + "%",
-            })}></div>`
-          : nothing)}
+        ${shown.map((v, idx) => {
+          const box = this._zoneRectFor(v, idx === 0);
+          return box ? html`<div class="zone-rect" style=${styleMap({
+              left: Math.min(box.x0, box.x1) + "%",
+              top: Math.min(box.y0, box.y1) + "%",
+              width: Math.abs(box.x1 - box.x0) + "%",
+              height: Math.abs(box.y1 - box.y0) + "%",
+            })}></div>` : nothing;
+        })}
       </div>
     `;
   }
@@ -2309,14 +2333,15 @@ export class AnyVacCard extends LitElement {
               @pointermove=${(e: PointerEvent) => this._onZoneMove(vac, e)}
               @pointerup=${(e: PointerEvent) => this._onZoneUp(vac, e)}></div>`
           : nothing}
-        ${this._mapMode === "zone" && this._isModeCandidate(vac) && this._zoneDrag
-          ? html`<div class="zone-rect" style=${styleMap({
-              left: Math.min(this._zoneDrag.x0, this._zoneDrag.x1) + "%",
-              top: Math.min(this._zoneDrag.y0, this._zoneDrag.y1) + "%",
-              width: Math.abs(this._zoneDrag.x1 - this._zoneDrag.x0) + "%",
-              height: Math.abs(this._zoneDrag.y1 - this._zoneDrag.y0) + "%",
-            })}></div>`
-          : nothing}
+        ${(() => {
+          const box = this._zoneRectFor(vac, true);
+          return box ? html`<div class="zone-rect" style=${styleMap({
+              left: Math.min(box.x0, box.x1) + "%",
+              top: Math.min(box.y0, box.y1) + "%",
+              width: Math.abs(box.x1 - box.x0) + "%",
+              height: Math.abs(box.y1 - box.y0) + "%",
+            })}></div>` : nothing;
+        })()}
       </div>
     `;
   }
@@ -2337,6 +2362,10 @@ export class AnyVacCard extends LitElement {
     // this room, not necessarily who actually cleans it. Who's assigned is now
     // shown via avatar chips (reused from the dock) instead of area tinting.
     const SEL = "#ffffff";
+    // Selected border as a white → light-blue → white gradient (user's revived
+    // idea) instead of a flat tint — via `border-image` (needs a real border
+    // shorthand for width/style first; unselected rooms keep a flat colour).
+    const SEL_GRADIENT = "linear-gradient(135deg, #ffffff, #8ecbff 50%, #ffffff) 1";
 
     if (room.map_w !== undefined && room.map_h !== undefined) {
       // ── Rectangle mód ──────────────────────────────────────────
@@ -2364,6 +2393,7 @@ export class AnyVacCard extends LitElement {
             left: room.map_x + "%", top: room.map_y + "%",
             width: room.map_w + "%", height: room.map_h + "%",
             border: borderW + " solid " + borderC,
+            borderImage: selected ? SEL_GRADIENT : "none",
             background: bg, boxShadow: shadow,
             justifyContent: jc, alignItems: ai,
           })}
@@ -2397,7 +2427,8 @@ export class AnyVacCard extends LitElement {
         style=${styleMap({
           left: room.map_x + "%", top: room.map_y + "%",
           background: bg,
-          border: "4px solid " + ageColor,
+          border: "4px solid " + (selected ? SEL : ageColor),
+          borderImage: selected ? SEL_GRADIENT : "none",
           boxShadow: shadow,
         })}
         @click=${() => { if (!locked) (opts?.vacs ? this._toggleRoomAcross(room.key, opts.vacs) : this._toggleRoom(room, vac)); }}
@@ -2480,11 +2511,43 @@ export class AnyVacCard extends LitElement {
   }
 
   private _renderActions(vac: VacuumConfig, vacIdx: number) {
+    const color = this._color(vac);
+    const ck = this._colorKey(vac);
+
+    // Pending Pin & Go / Zone for THIS vacuum (docs/19 meta bar fix): the START
+    // slot itself becomes the mode-aware action — "send here" / "clean zone
+    // here" — instead of a separate banner stacked above the controller. Takes
+    // priority over the normal start/pause/resume states: picking a vacuum for
+    // a pin/zone is itself the intent, and in practice the vacuum is idle
+    // whenever this is relevant.
+    const pin = this._pinPending?.[vac.entity];
+    const zone = this._zonePending?.[vac.entity];
+    if (pin || zone) {
+      const hId = "modeaction-" + vacIdx;
+      const label = zone ? "Clean zone here" : "Send here";
+      const icon = zone ? "mdi:select-drag" : "mdi:map-marker-radius";
+      const action = () => { if (zone) this._confirmZone(vac); else this._confirmPin(vac); };
+      return html`
+        <div class="actions">
+          <button
+            class="action-btn ${this._holdId === hId ? "action-btn--holding" : ""}"
+            style=${styleMap({ background: COLOR_BG[ck], border: "1px solid " + color + "80" })}
+            @pointerdown=${this._holdStart(hId, action)}
+            @pointerup=${this._holdEnd}
+            @pointerleave=${this._holdEnd}
+            @pointercancel=${this._holdEnd}
+          >
+            <div class="hold-ring"></div>
+            <ha-icon icon=${icon} style=${styleMap({ color })}></ha-icon>
+            <span>${label}</span>
+          </button>
+        </div>
+      `;
+    }
+
     const cleaning = this._isCleaning(vac);
     const paused = this._isPaused(vac);
     const hasRooms = this._hasSelectedRooms(vac);
-    const color = this._color(vac);
-    const ck = this._colorKey(vac);
     const mins = this._totalCleanMins(vac);
     const timeStr = this._timeStr(mins);
 
@@ -2609,34 +2672,11 @@ export class AnyVacCard extends LitElement {
           `}
         </div>
         <div class="status-right">
-          ${this._renderModeAction(vac)}
           ${this._renderStatusRow(vac)}
           ${this._renderProgress(vac)}
           ${this._renderActions(vac, vacIdx)}
           ${this._renderDebugProgress(vac)}
         </div>
-      </div>
-    `;
-  }
-
-  /** Per-vacuum Pin & Go / Zone execute banner (docs/19 fix): when the merged
-   *  meta bar has captured a pin/zone for multiple candidates, this is where the
-   *  user actually picks WHICH robot goes — one tap on its own controller card,
-   *  same surface as everything else that vacuum does. */
-  private _renderModeAction(vac: VacuumConfig) {
-    const pin = this._pinPending?.[vac.entity];
-    const zone = this._zonePending?.[vac.entity];
-    if (!pin && !zone) return nothing;
-    return html`
-      <div class="mode-action">
-        ${pin ? html`
-          <button class="mtbtn on" @click=${() => this._confirmPin(vac)}>
-            <ha-icon icon="mdi:map-marker-radius"></ha-icon><span>Send ${vac.name ?? vac.entity} here</span>
-          </button>` : nothing}
-        ${zone ? html`
-          <button class="mtbtn on" @click=${() => this._confirmZone(vac)}>
-            <ha-icon icon="mdi:select-drag"></ha-icon><span>Clean zone with ${vac.name ?? vac.entity}</span>
-          </button>` : nothing}
       </div>
     `;
   }

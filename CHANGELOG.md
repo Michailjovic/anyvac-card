@@ -14,6 +14,35 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   hints. Completion of the whole rebuild (this release + the follow-up)
   ships as **v1.0.0**.
 
+## [0.52.0] - 2026-07-15
+
+Second round of field-test fixes on 0.51.0's Pin & Go / Zone, plus a revived
+UX idea for room selection. No backend change — still pairs with `anyvac`
+0.50.0.
+
+### Fixed
+
+- **Pin & Go / Zone execute stacked a whole new banner on the status card
+  instead of taking over START** — 0.51.0's per-vacuum "send/clean here"
+  action rendered as a separate bar above the existing START button, so each
+  card briefly had two overlapping action rows. The START slot itself is now
+  the mode-aware action (hold to confirm, same as START always has been) —
+  matches the originally agreed design ("START becomes mode-aware for
+  Pin/Zone"), one action element per card instead of two.
+- **Drawn zone rectangle vanished the instant you released the pointer** —
+  fixing the "won't let go" bug in 0.51.0 by clearing the live drag state on
+  drop also made the rectangle disappear immediately, with no visual
+  confirmation of what was actually captured while picking a vacuum on the
+  status cards below. The box is now frozen in place (from the pending
+  capture, not the live drag) until confirmed or cancelled.
+
+### Changed
+
+- **Selected-room highlight is now a gradient** (white → light blue → white)
+  instead of a flat white tint, via `border-image` — a revived idea from
+  earlier design discussion, applied now that the selection colour is no
+  longer tied to vacuum identity (0.50.0's A1).
+
 ## [0.51.0] - 2026-07-15
 
 Field-test fixes for the 0.50.0 meta bar's Pin & Go / Zone, caught immediately
