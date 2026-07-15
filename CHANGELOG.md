@@ -14,6 +14,35 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   hints. Completion of the whole rebuild (this release + the follow-up)
   ships as **v1.0.0**.
 
+## [0.54.0] - 2026-07-15
+
+Landscape dead-space fix + configurable crop for portrait's rotated map. No
+backend change — still pairs with `anyvac` 0.50.0.
+
+### Fixed
+
+- **Landscape: large empty black strip above the map** — the `badges` region's
+  row was a hardcoded 9% of height, but badges only ever holds global-action
+  badges now (vacuum picking moved to `picker` in 0.50.0's A5) — with none
+  configured, that 9% rendered nothing and just sat there empty. The row is
+  now `"auto"`-sized like the rows below it, so it collapses to whatever it
+  actually contains instead of reserving fixed dead space.
+
+### Added
+
+- **Configurable crop for portrait's rotated map** (`layout.portrait.crop`) —
+  the 90°-rotated map has always used a "contain" fit: sized to fit entirely
+  inside the measured region, which can leave empty bars alongside it when
+  the region's aspect ratio doesn't match the floorplan's (visible as black
+  space either side of the map). Setting `crop: { fit: cover }` now fills the
+  region completely instead, cropping the overflow; `offset_x`/`offset_y`
+  (-100..100, 0 = centered) control what gets cropped rather than it always
+  centering. Left as "contain" by default — switching to "cover" isn't safe
+  to do silently, since depending on the floorplan image it could crop off a
+  real room. As a side effect, "contain" letterboxing is now centered in the
+  gap axis instead of pinned to one side (previously top/left-anchored with
+  all the empty space on the other side).
+
 ## [0.53.0] - 2026-07-15
 
 Portrait layout follow-up + more field-test polish. No backend change — still

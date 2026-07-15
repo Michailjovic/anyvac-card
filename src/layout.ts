@@ -18,12 +18,26 @@ export interface RegionPlace {
   align?: "stretch" | "start" | "center" | "end";
 }
 
+/** Rotated-map fit (docs/19 follow-up). Portrait's 90°-rotated map defaults to
+ *  "contain" — fits entirely inside the measured map region, which can leave
+ *  empty bars alongside it when the region's aspect ratio doesn't match the
+ *  floorplan's. "cover" fills the region completely instead, cropping the
+ *  overflow; offset_x/offset_y pan within that overflow so the user controls
+ *  what gets cropped rather than it always centering. */
+export interface MapCropConfig {
+  fit?: "contain" | "cover";
+  /** -100..100, 0 = centered. Only meaningful with fit: "cover". */
+  offset_x?: number;
+  offset_y?: number;
+}
+
 export interface ProfileGridConfig {
   /** Track sizes: numbers are % of available viewport, strings pass through
    *  ("1fr", "auto", "120px"). */
   columns?: Array<number | string>;
   rows?: Array<number | string>;
   place?: Record<string, RegionPlace>;
+  crop?: MapCropConfig;
 }
 
 export interface LayoutConfig {
@@ -44,7 +58,7 @@ export interface LayoutConfig {
  * and per-robot status cards right. Portrait = docs/12: slim badges bar, tall
  * rotated map, right thumb dock, full-width START bar. Overridable per config.
  */
-export const DEFAULT_PROFILES: Record<LayoutProfile, Required<Omit<ProfileGridConfig, never>>> = {
+export const DEFAULT_PROFILES: Record<LayoutProfile, Required<Omit<ProfileGridConfig, "crop">>> = {
   landscape: {
     // Phase C (docs/19 A5): map + meta bar go full-width — the map is the main
     // instrument, not a 70%-column tenant. Below that the cockpit splits in
@@ -52,8 +66,13 @@ export const DEFAULT_PROFILES: Record<LayoutProfile, Required<Omit<ProfileGridCo
     // right column = a slim vertical vacuum picker (replaces the old
     // horizontal badge-row tabs for this purpose) with the room list docked
     // directly beneath it.
+    // Row 1 is "auto", not a fixed %: badges only ever holds global-action
+    // badges now (vacuum picking moved to `picker`, docs/19 A5) — a hardcoded
+    // percentage reserved dead black space whenever no global_actions are
+    // configured (field-caught 2026-07-15). "auto" collapses to whatever the
+    // row actually contains, same as the map/tools rows below it.
     columns: [70, 30],
-    rows: [9, "auto", "auto", "auto", "1fr"],
+    rows: ["auto", "auto", "auto", "auto", "1fr"],
     place: {
       badges: { row: 1, col: "1/3" },
       map: { row: 2, col: "1/3" },
@@ -98,8 +117,10 @@ export function headerPx(el: Element): number {
   }
 }
 
-/** Merge the profile's grid config with the built-in defaults. */
-export function resolveProfile(cfg: LayoutConfig, profile: LayoutProfile): Required<ProfileGridConfig> {
+/** Merge the profile's grid config with the built-in defaults. `crop` isn't
+ *  merged here (it has no "default profile" data to fall back to — it's just
+ *  present or absent) — callers read `cfg[profile]?.crop` directly. */
+export function resolveProfile(cfg: LayoutConfig, profile: LayoutProfile): Required<Omit<ProfileGridConfig, "crop">> {
   const p = cfg[profile] ?? {};
   const d = DEFAULT_PROFILES[profile];
   return {
@@ -128,7 +149,7 @@ export function resolveHeightCss(cfg: LayoutConfig): string {
 }
 
 /** Inline styles for the grid root (static styles can't express a dynamic grid). */
-export function gridRootStyles(cfg: LayoutConfig, prof: Required<ProfileGridConfig>): Record<string, string> {
+export function gridRootStyles(cfg: LayoutConfig, prof: Required<Omit<ProfileGridConfig, "crop">>): Record<string, string> {
   return {
     display: "grid",
     width: "100%",

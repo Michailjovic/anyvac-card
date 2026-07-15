@@ -94,7 +94,7 @@ const t={ATTRIBUTE:1},e=t=>(...e)=>({_$litDirective$:t,values:e});let i$1 = clas
 
 const CARD_NAME = "anyvac-card";
 const EDITOR_NAME = "anyvac-card-editor";
-const CARD_VERSION = "0.53.0";
+const CARD_VERSION = "0.54.0";
 /** Hold duration in ms required to trigger START / PAUSE actions */
 const HOLD_DURATION_MS = 600;
 /**
@@ -411,8 +411,13 @@ const DEFAULT_PROFILES = {
         // right column = a slim vertical vacuum picker (replaces the old
         // horizontal badge-row tabs for this purpose) with the room list docked
         // directly beneath it.
+        // Row 1 is "auto", not a fixed %: badges only ever holds global-action
+        // badges now (vacuum picking moved to `picker`, docs/19 A5) — a hardcoded
+        // percentage reserved dead black space whenever no global_actions are
+        // configured (field-caught 2026-07-15). "auto" collapses to whatever the
+        // row actually contains, same as the map/tools rows below it.
         columns: [70, 30],
-        rows: [9, "auto", "auto", "auto", "1fr"],
+        rows: ["auto", "auto", "auto", "auto", "1fr"],
         place: {
             badges: { row: 1, col: "1/3" },
             map: { row: 2, col: "1/3" },
@@ -457,7 +462,9 @@ function headerPx(el) {
         return 0;
     }
 }
-/** Merge the profile's grid config with the built-in defaults. */
+/** Merge the profile's grid config with the built-in defaults. `crop` isn't
+ *  merged here (it has no "default profile" data to fall back to — it's just
+ *  present or absent) — callers read `cfg[profile]?.crop` directly. */
 function resolveProfile(cfg, profile) {
     const p = cfg[profile] ?? {};
     const d = DEFAULT_PROFILES[profile];
@@ -2814,11 +2821,26 @@ let AnyVacCard = class AnyVacCard extends i$2 {
         if (!this._narrow)
             return mapHtml;
         const ar = this._mapAR > 0.1 ? this._mapAR : 3.636;
-        let rW;
-        let rH;
+        // Rotated-map fit (docs/19 follow-up): "contain" (default) sizes the box to
+        // exactly match the content — no cropping, but a mismatched region aspect
+        // ratio leaves empty bars. "cover" makes the content the box's size or
+        // BIGGER in both axes so it always fills the region; offset_x/offset_y then
+        // pick what gets cropped (0 = centered) instead of it always centering by
+        // construction the way "contain" does.
+        const crop = this._config.layout?.[this._profile]?.crop;
+        const cover = crop?.fit === "cover";
+        let rW, rH, boxW, boxH;
         if (this._config.layout && this._mapRegW > 4 && this._mapRegH > 4) {
-            rW = Math.min(this._mapRegW, this._mapRegH / ar);
-            rH = Math.min(this._mapRegH, rW * ar);
+            boxW = this._mapRegW;
+            boxH = this._mapRegH;
+            if (cover) {
+                rW = Math.max(boxW, boxH / ar);
+                rH = Math.max(boxH, rW * ar);
+            }
+            else {
+                rW = Math.min(boxW, boxH / ar);
+                rH = Math.min(boxH, rW * ar);
+            }
             rW = Math.floor(rW);
             rH = Math.floor(rH);
         }
@@ -2829,13 +2851,24 @@ let AnyVacCard = class AnyVacCard extends i$2 {
             const scale = visH > capH ? capH / visH : 1;
             rW = Math.round(W * scale);
             rH = Math.round(visH * scale);
+            boxW = rW;
+            boxH = rH;
         }
+        // The rotated content (rW×rH on screen) may now be bigger than the clipping
+        // box (boxW×boxH) in one or both axes — center it there by default, offset
+        // by the configured pan. When rW===boxW/rH===boxH (the default contain
+        // case, always, since Math.min guarantees it) this is exactly 0 either way,
+        // so the default render is unchanged.
+        const panX = -(rW - boxW) / 2 + ((crop?.offset_x ?? 0) / 100) * ((rW - boxW) / 2);
+        const panY = -(rH - boxH) / 2 + ((crop?.offset_y ?? 0) / 100) * ((rH - boxH) / 2);
         // .avc-rot lets CSS counter-rotate small on-map chips (gauges, prog chips,
         // room icons) so their text stays upright while the map itself is rotated.
         return b `
-      <div class="avc-rot" style="position:relative;width:${rW}px;height:${rH}px;margin:0 auto;overflow:hidden">
-        <div style="position:absolute;top:0;left:0;width:${rH}px;height:${rW}px;transform-origin:top left;transform:translateX(${rW}px) rotate(90deg)">
-          ${mapHtml}
+      <div class="avc-rot" style="position:relative;width:${boxW}px;height:${boxH}px;margin:0 auto;overflow:hidden">
+        <div style="position:absolute;top:0;left:0;width:100%;height:100%;transform:translate(${panX}px,${panY}px)">
+          <div style="position:absolute;top:0;left:0;width:${rH}px;height:${rW}px;transform-origin:top left;transform:translateX(${rW}px) rotate(90deg)">
+            ${mapHtml}
+          </div>
         </div>
       </div>
     `;

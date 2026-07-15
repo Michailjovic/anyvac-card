@@ -2226,11 +2226,25 @@ export class AnyVacCard extends LitElement {
   private _renderResponsive(mapHtml: unknown) {
     if (!this._narrow) return mapHtml;
     const ar = this._mapAR > 0.1 ? this._mapAR : 3.636;
-    let rW: number;
-    let rH: number;
+    // Rotated-map fit (docs/19 follow-up): "contain" (default) sizes the box to
+    // exactly match the content — no cropping, but a mismatched region aspect
+    // ratio leaves empty bars. "cover" makes the content the box's size or
+    // BIGGER in both axes so it always fills the region; offset_x/offset_y then
+    // pick what gets cropped (0 = centered) instead of it always centering by
+    // construction the way "contain" does.
+    const crop = this._config.layout?.[this._profile]?.crop;
+    const cover = crop?.fit === "cover";
+    let rW: number, rH: number, boxW: number, boxH: number;
     if (this._config.layout && this._mapRegW > 4 && this._mapRegH > 4) {
-      rW = Math.min(this._mapRegW, this._mapRegH / ar);
-      rH = Math.min(this._mapRegH, rW * ar);
+      boxW = this._mapRegW;
+      boxH = this._mapRegH;
+      if (cover) {
+        rW = Math.max(boxW, boxH / ar);
+        rH = Math.max(boxH, rW * ar);
+      } else {
+        rW = Math.min(boxW, boxH / ar);
+        rH = Math.min(boxH, rW * ar);
+      }
       rW = Math.floor(rW);
       rH = Math.floor(rH);
     } else {
@@ -2240,13 +2254,23 @@ export class AnyVacCard extends LitElement {
       const scale = visH > capH ? capH / visH : 1;
       rW = Math.round(W * scale);
       rH = Math.round(visH * scale);
+      boxW = rW; boxH = rH;
     }
+    // The rotated content (rW×rH on screen) may now be bigger than the clipping
+    // box (boxW×boxH) in one or both axes — center it there by default, offset
+    // by the configured pan. When rW===boxW/rH===boxH (the default contain
+    // case, always, since Math.min guarantees it) this is exactly 0 either way,
+    // so the default render is unchanged.
+    const panX = -(rW - boxW) / 2 + ((crop?.offset_x ?? 0) / 100) * ((rW - boxW) / 2);
+    const panY = -(rH - boxH) / 2 + ((crop?.offset_y ?? 0) / 100) * ((rH - boxH) / 2);
     // .avc-rot lets CSS counter-rotate small on-map chips (gauges, prog chips,
     // room icons) so their text stays upright while the map itself is rotated.
     return html`
-      <div class="avc-rot" style="position:relative;width:${rW}px;height:${rH}px;margin:0 auto;overflow:hidden">
-        <div style="position:absolute;top:0;left:0;width:${rH}px;height:${rW}px;transform-origin:top left;transform:translateX(${rW}px) rotate(90deg)">
-          ${mapHtml}
+      <div class="avc-rot" style="position:relative;width:${boxW}px;height:${boxH}px;margin:0 auto;overflow:hidden">
+        <div style="position:absolute;top:0;left:0;width:100%;height:100%;transform:translate(${panX}px,${panY}px)">
+          <div style="position:absolute;top:0;left:0;width:${rH}px;height:${rW}px;transform-origin:top left;transform:translateX(${rW}px) rotate(90deg)">
+            ${mapHtml}
+          </div>
         </div>
       </div>
     `;
@@ -2790,7 +2814,7 @@ export class AnyVacCard extends LitElement {
 
   /** Named region template (docs/18 §3), built on demand — a region not placed
    *  in the active profile is never even computed. */
-  private _regionTemplate(name: string, prof: Required<ProfileGridConfig>): unknown {
+  private _regionTemplate(name: string, prof: Required<Omit<ProfileGridConfig, "crop">>): unknown {
     const shown = this._gridShown();
     const merged = this._config.map_mode === "merged";
     const vacsOf = (idxs: number[]) => idxs.map((i) => this._config.vacuums[i]);
