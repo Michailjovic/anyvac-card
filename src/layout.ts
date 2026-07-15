@@ -64,13 +64,17 @@ export const DEFAULT_PROFILES: Record<LayoutProfile, Required<Omit<ProfileGridCo
     },
   },
   portrait: {
+    // Phase C follow-up (docs/19): the top badges row is dropped — merged mode
+    // has no split-mode "shown" focus to switch, so it was only costing height.
+    // The map takes that space back; each vacuum's emergency more-info access
+    // moves into a small icon strip at the top of the dock column instead
+    // (`_renderVacuumIconStrip`, portrait-only).
     columns: [72, 28],
-    rows: [8, 82, 10],
+    rows: [90, 10],
     place: {
-      badges: { row: 1, col: "1/3" },
-      map: { row: 2, col: 1 },
-      dock: { row: 2, col: 2 },
-      start: { row: 3, col: "1/3" },
+      map: { row: 1, col: 1 },
+      dock: { row: 1, col: 2, overflow: "auto" },
+      start: { row: 2, col: "1/3" },
     },
   },
 };

@@ -14,6 +14,34 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   hints. Completion of the whole rebuild (this release + the follow-up)
   ships as **v1.0.0**.
 
+## [0.53.0] - 2026-07-15
+
+Portrait layout follow-up + more field-test polish. No backend change — still
+pairs with `anyvac` 0.50.0.
+
+### Changed
+
+- **Portrait: dropped the top vacuum-badges row, map goes full height** —
+  merged mode's map has no split-mode "shown" focus to switch, so that row
+  was only spending height without doing much beyond a path to more-info.
+  The map and dock now take the space it used to occupy.
+- **Portrait: small icon-only vacuum buttons at the top of the dock
+  column** — tapping one opens that vacuum's more-info dialog (emergency
+  manual control), replacing what the removed badges row used to offer.
+  Landscape is unaffected — it keeps the full `picker` region (name + live
+  status).
+- **Portrait: per-room dry/wet assignment chips hidden on the map** — same
+  assignment is already shown in the dock's room list right next to it, and
+  on the rotated portrait map these chips render tiny and sideways. Landscape
+  keeps them (more room, no nearby duplicate).
+- **Selection gradient sharpened** — the white → light-blue → white border
+  is now a crisp blue accent right in the middle instead of a broad 50%
+  blend, per feedback that the soft version read as muddy at this size.
+
+### Fixed
+
+- Zone confirm button read "Clean zone here" — shortened to "Clean zone".
+
 ## [0.52.0] - 2026-07-15
 
 Second round of field-test fixes on 0.51.0's Pin & Go / Zone, plus a revived

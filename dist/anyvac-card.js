@@ -94,7 +94,7 @@ const t={ATTRIBUTE:1},e=t=>(...e)=>({_$litDirective$:t,values:e});let i$1 = clas
 
 const CARD_NAME = "anyvac-card";
 const EDITOR_NAME = "anyvac-card-editor";
-const CARD_VERSION = "0.52.0";
+const CARD_VERSION = "0.53.0";
 /** Hold duration in ms required to trigger START / PAUSE actions */
 const HOLD_DURATION_MS = 600;
 /**
@@ -423,13 +423,17 @@ const DEFAULT_PROFILES = {
         },
     },
     portrait: {
+        // Phase C follow-up (docs/19): the top badges row is dropped — merged mode
+        // has no split-mode "shown" focus to switch, so it was only costing height.
+        // The map takes that space back; each vacuum's emergency more-info access
+        // moves into a small icon strip at the top of the dock column instead
+        // (`_renderVacuumIconStrip`, portrait-only).
         columns: [72, 28],
-        rows: [8, 82, 10],
+        rows: [90, 10],
         place: {
-            badges: { row: 1, col: "1/3" },
-            map: { row: 2, col: 1 },
-            dock: { row: 2, col: 2 },
-            start: { row: 3, col: "1/3" },
+            map: { row: 1, col: 1 },
+            dock: { row: 1, col: 2, overflow: "auto" },
+            start: { row: 2, col: "1/3" },
         },
     },
 };
@@ -1720,6 +1724,34 @@ let AnyVacCard = class AnyVacCard extends i$2 {
      *  one block. Row = room (tap toggles selection); the avatar shows the BACKEND's
      *  real assignment per pass; tapping the avatar cycles the room's vacuum pin.
      *  `withRun` adds the orchestrated run footer (landscape — no `start` region). */
+    /** Emergency manual-control strip (portrait-only, docs/19 follow-up): small
+     *  icon-only vacuum buttons at the top of the dock column, tapping straight
+     *  into that vacuum's more-info dialog. Portrait dropped the top badges row
+     *  entirely to give the map back that height — merged mode's map has no
+     *  split-mode "shown" focus to switch, so a name-and-status badge row wasn't
+     *  doing much there beyond being a path to more-info. Landscape keeps the
+     *  full `picker` region instead (name + live status), this is just the
+     *  fallback for the cramped portrait column. */
+    _renderVacuumIconStrip() {
+        if (this._profile !== "portrait")
+            return A;
+        const vacs = this._config.vacuums;
+        if (!vacs.length)
+            return A;
+        return b `
+      <div class="vac-icon-strip">
+        ${vacs.map((v) => b `
+          <button class="vac-icon-btn" style=${o({ borderColor: this._color(v) + "80" })}
+            @click=${() => this._fireMoreInfo(v.entity)}
+            title=${v.name ?? v.entity} aria-label=${v.name ?? v.entity}>
+            ${v.image
+            ? b `<img src=${v.image} alt="" />`
+            : b `<ha-icon icon="mdi:robot-vacuum" style=${o({ color: this._color(v) })}></ha-icon>`}
+          </button>
+        `)}
+      </div>
+    `;
+    }
     _renderDock(withRun) {
         const vacs = this._config.vacuums;
         const rooms = this._mergedRoomDefs(vacs);
@@ -1744,6 +1776,7 @@ let AnyVacCard = class AnyVacCard extends i$2 {
         const runHid = "dock-run";
         return b `
       <div class="dock">
+        ${this._renderVacuumIconStrip()}
         <div class="dock-head">
           ${modeBtn("dry", "mdi:broom", "Dry")}${modeBtn("wet", "mdi:water", "Wet")}${modeBtn("both", "mdi:water-plus", "Both")}
         </div>
@@ -2944,10 +2977,11 @@ let AnyVacCard = class AnyVacCard extends i$2 {
         // this room, not necessarily who actually cleans it. Who's assigned is now
         // shown via avatar chips (reused from the dock) instead of area tinting.
         const SEL = "#ffffff";
-        // Selected border as a white → light-blue → white gradient (user's revived
-        // idea) instead of a flat tint — via `border-image` (needs a real border
-        // shorthand for width/style first; unselected rooms keep a flat colour).
-        const SEL_GRADIENT = "linear-gradient(135deg, #ffffff, #8ecbff 50%, #ffffff) 1";
+        // Selected border as white with a crisp light-blue accent right in the
+        // middle (user's revived idea, refined: a thin bright seam reads better at
+        // this size than a broad 50% blend) — via `border-image` (needs a real
+        // border shorthand for width/style first; unselected rooms keep a flat colour).
+        const SEL_GRADIENT = "linear-gradient(135deg, #ffffff 0%, #ffffff 46%, #8ecbff 50%, #ffffff 54%, #ffffff 100%) 1";
         if (room.map_w !== undefined && room.map_h !== undefined) {
             // ── Rectangle mód ──────────────────────────────────────────
             const ANCHOR = {
@@ -2988,7 +3022,9 @@ let AnyVacCard = class AnyVacCard extends i$2 {
               style=${o({ color: selected ? "white" : ageColor, "--mdc-icon-size": "16px" })}>
             </ha-icon>
           ` : A}
-          ${(dryEnt || wetEnt) ? b `
+          ${ /* Portrait's rotated map makes these tiny and sideways, and the
+                 same assignment is already legible in the dock room list right
+                 next to it — only show them where there's room to read them. */(dryEnt || wetEnt) && this._profile !== "portrait" ? b `
             <span class="room-overlay-assign">
               ${dryEnt ? this._vacChip(dryEnt, false) : A}
               ${wetEnt ? this._vacChip(wetEnt, false) : A}
@@ -3099,7 +3135,7 @@ let AnyVacCard = class AnyVacCard extends i$2 {
         const zone = this._zonePending?.[vac.entity];
         if (pin || zone) {
             const hId = "modeaction-" + vacIdx;
-            const label = zone ? "Clean zone here" : "Send here";
+            const label = zone ? "Clean zone" : "Send here";
             const icon = zone ? "mdi:select-drag" : "mdi:map-marker-radius";
             const action = () => { if (zone)
                 this._confirmZone(vac);
@@ -3476,6 +3512,16 @@ AnyVacCard.styles = i$6 `
     .stat ha-icon { --mdc-icon-size: 15px; color: rgba(255, 255, 255, 0.4); }
     .stat b { font-weight: 700; }
     .stat small { font-size: 10px; color: rgba(255, 255, 255, 0.4); }
+
+    /* Emergency manual-control icon strip (docs/19 follow-up, portrait only) */
+    .vac-icon-strip { display: flex; gap: 6px; flex-wrap: wrap; margin-bottom: 6px; }
+    .vac-icon-btn {
+      width: 34px; height: 34px; border-radius: 50%; padding: 0; overflow: hidden;
+      display: flex; align-items: center; justify-content: center;
+      background: rgba(255,255,255,0.05); border: 2px solid rgba(255,255,255,0.2); cursor: pointer;
+    }
+    .vac-icon-btn img { width: 100%; height: 100%; object-fit: cover; border-radius: 50%; }
+    .vac-icon-btn ha-icon { --mdc-icon-size: 18px; }
 
     /* Vacuum picker (docs/19 A5): landscape's vertical replacement for the
      *  horizontal badge-row tabs, sits right above the dock room-list. */

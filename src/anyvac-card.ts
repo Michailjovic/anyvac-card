@@ -1189,6 +1189,33 @@ export class AnyVacCard extends LitElement {
    *  one block. Row = room (tap toggles selection); the avatar shows the BACKEND's
    *  real assignment per pass; tapping the avatar cycles the room's vacuum pin.
    *  `withRun` adds the orchestrated run footer (landscape — no `start` region). */
+  /** Emergency manual-control strip (portrait-only, docs/19 follow-up): small
+   *  icon-only vacuum buttons at the top of the dock column, tapping straight
+   *  into that vacuum's more-info dialog. Portrait dropped the top badges row
+   *  entirely to give the map back that height — merged mode's map has no
+   *  split-mode "shown" focus to switch, so a name-and-status badge row wasn't
+   *  doing much there beyond being a path to more-info. Landscape keeps the
+   *  full `picker` region instead (name + live status), this is just the
+   *  fallback for the cramped portrait column. */
+  private _renderVacuumIconStrip() {
+    if (this._profile !== "portrait") return nothing;
+    const vacs = this._config.vacuums;
+    if (!vacs.length) return nothing;
+    return html`
+      <div class="vac-icon-strip">
+        ${vacs.map((v) => html`
+          <button class="vac-icon-btn" style=${styleMap({ borderColor: this._color(v) + "80" })}
+            @click=${() => this._fireMoreInfo(v.entity)}
+            title=${v.name ?? v.entity} aria-label=${v.name ?? v.entity}>
+            ${v.image
+              ? html`<img src=${v.image} alt="" />`
+              : html`<ha-icon icon="mdi:robot-vacuum" style=${styleMap({ color: this._color(v) })}></ha-icon>`}
+          </button>
+        `)}
+      </div>
+    `;
+  }
+
   private _renderDock(withRun: boolean) {
     const vacs = this._config.vacuums;
     const rooms = this._mergedRoomDefs(vacs);
@@ -1211,6 +1238,7 @@ export class AnyVacCard extends LitElement {
     const runHid = "dock-run";
     return html`
       <div class="dock">
+        ${this._renderVacuumIconStrip()}
         <div class="dock-head">
           ${modeBtn("dry", "mdi:broom", "Dry")}${modeBtn("wet", "mdi:water", "Wet")}${modeBtn("both", "mdi:water-plus", "Both")}
         </div>
@@ -2362,10 +2390,11 @@ export class AnyVacCard extends LitElement {
     // this room, not necessarily who actually cleans it. Who's assigned is now
     // shown via avatar chips (reused from the dock) instead of area tinting.
     const SEL = "#ffffff";
-    // Selected border as a white → light-blue → white gradient (user's revived
-    // idea) instead of a flat tint — via `border-image` (needs a real border
-    // shorthand for width/style first; unselected rooms keep a flat colour).
-    const SEL_GRADIENT = "linear-gradient(135deg, #ffffff, #8ecbff 50%, #ffffff) 1";
+    // Selected border as white with a crisp light-blue accent right in the
+    // middle (user's revived idea, refined: a thin bright seam reads better at
+    // this size than a broad 50% blend) — via `border-image` (needs a real
+    // border shorthand for width/style first; unselected rooms keep a flat colour).
+    const SEL_GRADIENT = "linear-gradient(135deg, #ffffff 0%, #ffffff 46%, #8ecbff 50%, #ffffff 54%, #ffffff 100%) 1";
 
     if (room.map_w !== undefined && room.map_h !== undefined) {
       // ── Rectangle mód ──────────────────────────────────────────
@@ -2406,7 +2435,10 @@ export class AnyVacCard extends LitElement {
               style=${styleMap({ color: selected ? "white" : ageColor, "--mdc-icon-size": "16px" })}>
             </ha-icon>
           ` : nothing}
-          ${(dryEnt || wetEnt) ? html`
+          ${/* Portrait's rotated map makes these tiny and sideways, and the
+               same assignment is already legible in the dock room list right
+               next to it — only show them where there's room to read them. */
+            (dryEnt || wetEnt) && this._profile !== "portrait" ? html`
             <span class="room-overlay-assign">
               ${dryEnt ? this._vacChip(dryEnt, false) : nothing}
               ${wetEnt ? this._vacChip(wetEnt, false) : nothing}
@@ -2524,7 +2556,7 @@ export class AnyVacCard extends LitElement {
     const zone = this._zonePending?.[vac.entity];
     if (pin || zone) {
       const hId = "modeaction-" + vacIdx;
-      const label = zone ? "Clean zone here" : "Send here";
+      const label = zone ? "Clean zone" : "Send here";
       const icon = zone ? "mdi:select-drag" : "mdi:map-marker-radius";
       const action = () => { if (zone) this._confirmZone(vac); else this._confirmPin(vac); };
       return html`
@@ -2912,6 +2944,16 @@ export class AnyVacCard extends LitElement {
     .stat ha-icon { --mdc-icon-size: 15px; color: rgba(255, 255, 255, 0.4); }
     .stat b { font-weight: 700; }
     .stat small { font-size: 10px; color: rgba(255, 255, 255, 0.4); }
+
+    /* Emergency manual-control icon strip (docs/19 follow-up, portrait only) */
+    .vac-icon-strip { display: flex; gap: 6px; flex-wrap: wrap; margin-bottom: 6px; }
+    .vac-icon-btn {
+      width: 34px; height: 34px; border-radius: 50%; padding: 0; overflow: hidden;
+      display: flex; align-items: center; justify-content: center;
+      background: rgba(255,255,255,0.05); border: 2px solid rgba(255,255,255,0.2); cursor: pointer;
+    }
+    .vac-icon-btn img { width: 100%; height: 100%; object-fit: cover; border-radius: 50%; }
+    .vac-icon-btn ha-icon { --mdc-icon-size: 18px; }
 
     /* Vacuum picker (docs/19 A5): landscape's vertical replacement for the
      *  horizontal badge-row tabs, sits right above the dock room-list. */
