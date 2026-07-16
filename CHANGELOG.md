@@ -14,6 +14,22 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   hints. Completion of the whole rebuild (this release + the follow-up)
   ships as **v1.0.0**.
 
+## [0.63.0] - 2026-07-16
+
+Field-test bugfix from today's zone-clean testing. No backend change —
+still pairs with `anyvac` 0.50.0.
+
+### Fixed
+
+- **Zone clean always ran a single pass, ignoring the vacuum's configured
+  repeat count** — `_confirmZone` hardcoded `repeat: 1` in the
+  `anyvac.zone_clean` call instead of reading `vac.clean_action.repeat`
+  (e.g. 2), so a zone clean did one pass even when the vacuum's normal
+  setting is two. Zone clean is a WHERE action (docs/07 UX canon) — it
+  should still run with the vacuum's normal HOW settings, same as room
+  cleaning already does via `_settingPresets`/`clean_action`. Now reads
+  `vac.clean_action?.repeat ?? 1`.
+
 ## [0.62.0] - 2026-07-16
 
 Portrait dock/map split cosmetics, now that the mobile crash is confirmed

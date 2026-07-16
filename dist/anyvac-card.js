@@ -87,7 +87,7 @@ const t={ATTRIBUTE:1},e=t=>(...e)=>({_$litDirective$:t,values:e});let i$1 = clas
 
 const CARD_NAME = "anyvac-card";
 const EDITOR_NAME = "anyvac-card-editor";
-const CARD_VERSION = "0.62.0";
+const CARD_VERSION = "0.63.0";
 /** Hold duration in ms required to trigger START / PAUSE actions */
 const HOLD_DURATION_MS = 600;
 /**
@@ -2428,10 +2428,17 @@ let AnyVacCard = class AnyVacCard extends i$2 {
         const z = this._zonePending?.[vac.entity];
         if (!z)
             return;
+        // Bugfix 2026-07-16 (field test): this hardcoded `repeat: 1`, silently
+        // ignoring the vacuum's own configured pass count (`clean_action.repeat`,
+        // e.g. 2) — a zone clean ran with only one pass regardless of what the
+        // user set up. Zone clean is a WHERE action (docs/07 UX canon), it should
+        // still run with the vacuum's normal HOW settings, same as room cleaning
+        // does via `_settingPresets`/`clean_action`.
+        const ca = vac.clean_action;
         void this._call("anyvac", "zone_clean", {
             entity_id: vac.entity,
             x1_pct: z.x1, y1_pct: z.y1, x2_pct: z.x2, y2_pct: z.y2,
-            repeat: 1,
+            repeat: ca?.repeat ?? 1,
         });
         if (this._zonePending) {
             const next = { ...this._zonePending };

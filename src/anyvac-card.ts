@@ -1830,10 +1830,17 @@ export class AnyVacCard extends LitElement {
   }
   private _confirmZone(vac: VacuumConfig): void {
     const z = this._zonePending?.[vac.entity]; if (!z) return;
+    // Bugfix 2026-07-16 (field test): this hardcoded `repeat: 1`, silently
+    // ignoring the vacuum's own configured pass count (`clean_action.repeat`,
+    // e.g. 2) — a zone clean ran with only one pass regardless of what the
+    // user set up. Zone clean is a WHERE action (docs/07 UX canon), it should
+    // still run with the vacuum's normal HOW settings, same as room cleaning
+    // does via `_settingPresets`/`clean_action`.
+    const ca = vac.clean_action as Partial<NativeAutoCleanAction> | undefined;
     void this._call("anyvac", "zone_clean", {
       entity_id: vac.entity,
       x1_pct: z.x1, y1_pct: z.y1, x2_pct: z.x2, y2_pct: z.y2,
-      repeat: 1,
+      repeat: ca?.repeat ?? 1,
     });
     if (this._zonePending) {
       const next = { ...this._zonePending };
