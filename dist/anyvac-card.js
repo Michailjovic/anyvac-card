@@ -87,7 +87,7 @@ const t={ATTRIBUTE:1},e=t=>(...e)=>({_$litDirective$:t,values:e});let i$1 = clas
 
 const CARD_NAME = "anyvac-card";
 const EDITOR_NAME = "anyvac-card-editor";
-const CARD_VERSION = "0.61.0";
+const CARD_VERSION = "0.62.0";
 /** Hold duration in ms required to trigger START / PAUSE actions */
 const HOLD_DURATION_MS = 600;
 /**
@@ -816,8 +816,26 @@ let AnyVacCard = class AnyVacCard extends i$2 {
      *  right now: same simple map-only fit as 0.56.0 (`mapW = rW`, `dock`
      *  stays `1fr`) — the sidebar-overshoot cosmetic issue is back, on
      *  purpose, in exchange for confirmed mobile stability. */
+    /** 2026-07-16 addendum: dropped the idea of auto-shrinking `dock` to its
+     *  own "natural" content width entirely — `.dock-row` uses `flex-wrap:
+     *  wrap` in portrait (deliberately, so long room names/badges reflow
+     *  instead of overflowing), which means it doesn't HAVE a fixed natural
+     *  width the way non-wrapping content would: any max-content-style
+     *  measurement returns the *unwrapped* single-line size, which is often
+     *  wider than the space actually available, i.e. never smaller than
+     *  what's already allocated — that's almost certainly why every earlier
+     *  attempt measured "no room to spare" and left the split unchanged, not
+     *  a bug in the measurement itself. There's no single objectively-right
+     *  split to compute here; it's a visual trade-off. So: respect an
+     *  explicit `layout.portrait.columns` in the user's own config as a
+     *  manual override (skip the dynamic fit entirely, let the declarative
+     *  value stand) — that's the fast, safe way to actually tune this to
+     *  taste, instead of chasing an auto-computed number that doesn't really
+     *  exist for wrapping content. */
     _refineGridColumns() {
         if (this._profile !== "portrait" || !this._lastPortraitFitW)
+            return;
+        if (this._config.layout?.portrait?.columns?.length)
             return;
         const root = this.renderRoot?.querySelector(".avc-grid");
         if (!root)

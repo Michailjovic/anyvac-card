@@ -14,6 +14,34 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   hints. Completion of the whole rebuild (this release + the follow-up)
   ships as **v1.0.0**.
 
+## [0.62.0] - 2026-07-16
+
+Portrait dock/map split cosmetics, now that the mobile crash is confirmed
+fixed (0.61.0). No backend change — still pairs with `anyvac` 0.50.0.
+
+### Added
+
+- **`layout.portrait.columns` now works as a manual override** for the
+  map/dock split — if set, the dynamic height-fit auto-sizing is skipped
+  entirely and the declarative value is used as-is. Previously this key
+  was silently ignored in portrait once the dynamic fit kicked in.
+
+### Changed
+
+- Gave up on auto-shrinking `dock` to its own "natural" content width
+  (attempted in 0.57/0.58, reverted for an unrelated mobile crash in
+  0.59–0.61): `.dock-row` uses `flex-wrap: wrap` in portrait by design, so
+  long room names/badges reflow instead of overflowing — which means the
+  row has no fixed natural width the way non-wrapping content would. Any
+  max-content-style measurement returns the *unwrapped* single-line size,
+  which is generally wider than the space actually available, so it never
+  found "room to spare" — that's almost certainly why 0.57/0.58 measured
+  correctly but never changed anything, not a bug in the measurement.
+  There isn't a single objectively-right split to compute for wrapping
+  content; it's a visual trade-off. Exposing it as a config override (see
+  Added above) is the honest fix — dial it in directly instead of chasing
+  an auto-computed number that doesn't really exist.
+
 ## [0.61.0] - 2026-07-16
 
 **Confirmed crash fix.** User precisely bisected the mobile companion-app
