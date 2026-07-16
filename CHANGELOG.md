@@ -10,9 +10,25 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 - Rooms from the integration (real room polygons / names) for clickable cleaning on the floorplan.
 - Responsive rebuild Phase C follow-up (docs/19) — real-hardware polish pass
-  on the new landscape cockpit below, plus user-facing sequence-optimisation
-  hints. Completion of the whole rebuild (this release + the follow-up)
-  ships as **v1.0.0**.
+  on the new landscape cockpit below. Completion of the whole rebuild (this
+  release + the follow-up) ships as **v1.0.0**.
+
+## [0.65.0] - 2026-07-16
+
+Surfaces a gap the backend already had data for: `anyvac.plan`/`anyvac.clean`
+return `unsequenced` (rooms missing from the Roborock app's own cleaning
+order, which the firmware follows regardless of what order HA sends,
+docs/19) but the card never showed it. No backend change — still pairs with
+`anyvac` 0.50.0.
+
+### Added
+
+- Sequence hint: when a selected room has no position in the shared
+  `room_sequence`, the card now says so instead of silently showing a time
+  estimate the user has no reason to trust. Shown as an amber count in the
+  landscape meta bar (next to the ETA stat), as a per-room icon in the dock's
+  room rows, and as a summary icon next to the dock's own ETA line — all with
+  a tooltip pointing at the card editor's Maps tab, where the order is set.
 
 ## [0.64.0] - 2026-07-16
 

@@ -1307,6 +1307,9 @@ export class AnyVacCard extends LitElement {
     if (hasInt && selKeys.length) this._fetchPlan(selKeys, mode);
     const dryOf = this._planPreview?.dry ?? new Map<string, string>();
     const wetOf = this._planPreview?.wet ?? new Map<string, string>();
+    // Sequence hint (docs/19 follow-up, TODO #2) — see _renderMetaBar for the
+    // same idea in the landscape meta bar; here it's per-row instead of a count.
+    const unsequenced = new Set(hasInt ? (this._planPreview?.unsequenced ?? []) : []);
     const pins = this._pinsAttr();
     const showDry = mode !== "wet";
     const showWet = mode !== "dry";
@@ -1340,6 +1343,8 @@ export class AnyVacCard extends LitElement {
                 @click=${() => { if (!locked) this._toggleRoomAcross(r.key, vacs); }}>
                 <ha-icon class="dock-ric" icon=${r.icon ?? "mdi:square"}></ha-icon>
                 <span class="dock-name">${r.name ?? r.key}</span>
+                ${sel && unsequenced.has(r.key) ? html`<ha-icon class="dock-unseq" icon="mdi:sort-variant-off"
+                  title="No cleaning order set for this room — the time estimate may be off. Set the order in the card editor's Maps tab."></ha-icon>` : nothing}
                 <span class="dock-ages">
                   <span class="dock-age">${this._renderProgChip(this._roomProgForType(r, vacs, "dry"))}<ha-icon icon="mdi:broom"></ha-icon><b style=${styleMap({ color: this._colorForAgeDays(dry) })}>${badge(dry)}</b></span>
                   <span class="dock-age">${this._renderProgChip(this._roomProgForType(r, vacs, "wet"))}<ha-icon icon="mdi:water"></ha-icon><b style=${styleMap({ color: this._colorForAgeDays(wet) })}>${badge(wet)}</b></span>
@@ -1354,7 +1359,9 @@ export class AnyVacCard extends LitElement {
         </div>
         ${withRun && hasInt ? html`
           <div class="dock-foot">
-            <span class="dock-est">${selKeys.length ? selKeys.length + " rooms · ~" + this._etaFor(selKeys, mode, hasInt) + " min" : "Select rooms"}</span>
+            <span class="dock-est">${selKeys.length ? selKeys.length + " rooms · ~" + this._etaFor(selKeys, mode, hasInt) + " min" : "Select rooms"}
+              ${unsequenced.size ? html`<ha-icon class="dock-unseq" icon="mdi:sort-variant-off"
+                title="${unsequenced.size} selected room${unsequenced.size > 1 ? "s have" : " has"} no cleaning order set — the time above may be off. Set the order in the card editor's Maps tab."></ha-icon>` : nothing}</span>
             <button class="action-btn ${this._holdId === runHid ? "action-btn--holding" : ""}"
               style="flex:0 0 auto;padding:7px 14px;background:rgba(82,196,26,0.14);border:1px solid rgba(82,196,26,0.55);color:#fff"
               ?disabled=${!selKeys.length}
@@ -2020,6 +2027,12 @@ export class AnyVacCard extends LitElement {
     const selKeys = this._allRoomKeys().filter((k) => this._isRoomSelectedAny(k, vacs));
     const hasInt = vacs.some((v) => this._intAttrs(v));
     const est = this._etaFor(selKeys, this._planMode, hasInt);
+    // Sequence hint (docs/19 follow-up, TODO #2): the backend's ETA is only as
+    // good as `room_sequence` (the Roborock app's own room order, which the
+    // firmware follows regardless of what order HA sends). Rooms missing from
+    // it come back in `plan.unsequenced` — surface that instead of silently
+    // showing a number the user has no reason to trust.
+    const unsequenced = hasInt ? (this._planPreview?.unsequenced ?? []) : [];
     const pinCount = this._pinPending ? Object.keys(this._pinPending).length : 0;
     const zoneCount = this._zonePending ? Object.keys(this._zonePending).length : 0;
     return html`
@@ -2038,6 +2051,10 @@ export class AnyVacCard extends LitElement {
         </span>
         ${est > 0 ? html`<span class="mtbtn mtbtn--stat" title="Estimated time">
           <ha-icon icon="mdi:clock-outline"></ha-icon><b>${est}</b><small>min</small>
+        </span>` : nothing}
+        ${unsequenced.length ? html`<span class="mtbtn mtbtn--stat mtbtn--warn"
+            title="${unsequenced.length} selected room${unsequenced.length > 1 ? "s have" : " has"} no cleaning order set — the time above may be off. Set the order in the card editor's Maps tab.">
+          <ha-icon icon="mdi:sort-variant-off"></ha-icon><b>${unsequenced.length}</b>
         </span>` : nothing}
         <button class="mtbtn mtbtn--push" title="Refresh maps"
           @click=${() => { for (const v of withMap) this._refreshMap(v); }}>
@@ -3290,6 +3307,9 @@ export class AnyVacCard extends LitElement {
       font-size: 12px;
       font-weight: 600;
     }
+    /* Sequence hint (docs/19 follow-up, TODO #2) — amber, not red: it's a
+       heads-up about ETA accuracy, not an error blocking the clean. */
+    .dock-unseq { --mdc-icon-size: 13px; color: #d4a017; flex-shrink: 0; margin: 0 2px; }
     .dock-ages { display: inline-flex; gap: 6px; flex-shrink: 0; }
     .dock-age { display: inline-flex; align-items: center; gap: 2px; font-size: 10px; }
     .dock-age ha-icon { --mdc-icon-size: 12px; color: rgba(255, 255, 255, 0.3); }
@@ -3778,6 +3798,10 @@ export class AnyVacCard extends LitElement {
     .mtbtn--stat { cursor: default; background: transparent; border-color: transparent; gap: 3px; padding: 5px 6px; }
     .mtbtn--stat b { font-weight: 700; }
     .mtbtn--stat small { opacity: 0.7; font-weight: 500; }
+    /* Sequence hint (docs/19 follow-up, TODO #2) — amber to read as "heads up",
+       distinct from the neutral stat pills either side of it. */
+    .mtbtn--warn { color: #d4a017; }
+    .mtbtn--warn ha-icon { color: #d4a017; }
     .mtbtn--push { margin-left: auto; }
     .meta-bar { display: flex; align-items: center; gap: 6px; flex-wrap: wrap; padding: 4px 0; }
     .mode-action { display: flex; flex-wrap: wrap; gap: 6px; margin-bottom: 6px; }
