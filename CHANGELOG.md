@@ -14,6 +14,36 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   hints. Completion of the whole rebuild (this release + the follow-up)
   ships as **v1.0.0**.
 
+## [0.61.0] - 2026-07-16
+
+**Confirmed crash fix.** User precisely bisected the mobile companion-app
+crash to 0.59.0: 0.55.0 through 0.58.0 are all stable, 0.59.0 is the first
+to crash (0.60.0, which had already reverted the *clone* measurement but
+kept the styleMap change, still crashed — narrowing it down further). No
+backend change — still pairs with `anyvac` 0.50.0.
+
+### Fixed
+
+- **Reverted 0.59.0's `gridTemplateColumns`/`height` styleMap removal** —
+  that change made `_refineGridHeight`/`_refineGridColumns` the sole JS
+  owners of both properties, on the theory that Lit's `styleMap`
+  re-applying the static declarative value on every render was fighting
+  the measured override (true, and still the reason portrait's column
+  split doesn't visibly improve — see the parked dock-capping work). That
+  fix is what broke the mobile app; exact mechanism unconfirmed, but the
+  user's bisection is unambiguous. Both properties are back in
+  `gridRootStyles()`, and the JS refinement goes back to layering a
+  measured override on top of that declarative value (0.58.0's approach),
+  not replacing it. `resolveHeightCss`/`trackList` imports and the
+  landscape/pre-measurement fallback branch added for 0.59.0 are removed
+  along with it — back to portrait-only, same as 0.56.0–0.58.0.
+- Net result: same simple map-only column fit as 0.56.0 (`mapW = rW`,
+  `dock` stays `1fr`) — the sidebar-overshoot cosmetic issue is back,
+  deliberately, in exchange for confirmed mobile stability. Do not remove
+  `gridTemplateColumns`/`height` from `gridRootStyles()`'s styleMap object
+  again without a mobile-companion-app test confirming it doesn't
+  reproduce this crash.
+
 ## [0.60.0] - 2026-07-16
 
 **Stability fix** — user reported a full crash of the HA mobile companion

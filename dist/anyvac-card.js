@@ -87,7 +87,7 @@ const t={ATTRIBUTE:1},e=t=>(...e)=>({_$litDirective$:t,values:e});let i$1 = clas
 
 const CARD_NAME = "anyvac-card";
 const EDITOR_NAME = "anyvac-card-editor";
-const CARD_VERSION = "0.60.0";
+const CARD_VERSION = "0.61.0";
 /** Hold duration in ms required to trigger START / PAUSE actions */
 const HOLD_DURATION_MS = 600;
 /**
@@ -503,23 +503,25 @@ function resolveHeightCss(cfg) {
 }
 /** Inline styles for the grid root (static styles can't express a dynamic grid).
  *
- *  `height` and `gridTemplateColumns` are deliberately NOT included here — the
- *  card sets both directly via JS in `updated()` (`_refineGridHeight` /
- *  `_refineGridColumns`), because those two need a post-render *measurement*
- *  to get right (exact viewport height, portrait's content-fit column split).
- *  Lit's `styleMap` re-applies every key in the object it's given on every
- *  render, which was silently fighting those JS overrides — the override
- *  would stick for a frame and then get stomped back to the static value on
- *  the next unrelated re-render (a hass update, the debug clock tick, ...).
- *  Keeping them out of styleMap entirely means Lit never touches them, so
- *  whatever the JS last set is what stays. The JS side always sets a sane
- *  static fallback first (same values that used to live here) before any
- *  measurement is available, so there's no gap where they're unset. */
+ *  REVERTED 2026-07-16 (mobile crash, card 0.59.0 → 0.61.0): `height` and
+ *  `gridTemplateColumns` were pulled out of this object on the theory that
+ *  Lit's `styleMap` re-applying every key on every render was silently
+ *  fighting the JS-measured overrides in `updated()`. That was true (and
+ *  is the reason portrait's column split never visibly changed across
+ *  0.56–0.58), but the fix itself is what broke the HA mobile companion
+ *  app — user bisected it precisely to 0.59.0, with 0.55.0–0.58.0 all
+ *  confirmed non-crashing. Exact mechanism not fully confirmed, but the
+ *  safe move is putting both properties back here and accepting that the
+ *  JS refinement in `updated()` fights (and mostly loses) against this
+ *  declarative object again — a cosmetic imperfection, not a crash. Do NOT
+ *  remove these from styleMap again without a mobile-tested alternative. */
 function gridRootStyles(cfg, prof) {
     return {
         display: "grid",
         width: "100%",
+        height: resolveHeightCss(cfg),
         alignContent: "start",
+        gridTemplateColumns: trackList(prof.columns),
         gridTemplateRows: trackList(prof.rows),
         gap: cfg.gap ?? "6px",
         boxSizing: "border-box",
@@ -721,10 +723,9 @@ let AnyVacCard = class AnyVacCard extends i$2 {
     }
     /** Measured refinement of the grid height: innerHeight − rootTop beats the raw
      *  `calc(100svh − header)` when the root is offset (padding, safe-area). Applied
-     *  directly to the element — no state, no re-render loop.
-     *  `height` is NOT in `gridRootStyles()`'s styleMap object (see that function's
-     *  doc comment) — this is now the ONLY thing that ever sets it, so it always
-     *  seeds the static fallback first, then refines. */
+     *  directly to the element on top of `gridRootStyles()`'s declarative fallback
+     *  (see that function's doc comment re: the 0.59.0 mobile-crash revert — this
+     *  layered approach, not sole JS ownership, is the confirmed-stable one). */
     _refineGridHeight() {
         const lay = this._config?.layout;
         if (!lay)
@@ -732,8 +733,6 @@ let AnyVacCard = class AnyVacCard extends i$2 {
         const root = this.renderRoot?.querySelector(".avc-grid");
         if (!root)
             return;
-        if (!root.style.height)
-            root.style.height = resolveHeightCss(lay);
         if ((lay.height ?? "viewport") === "viewport") {
             const top = root.getBoundingClientRect().top;
             if (top >= 0 && top < window.innerHeight) {
@@ -799,73 +798,30 @@ let AnyVacCard = class AnyVacCard extends i$2 {
      *  track auto-sizing — so the split is measured and applied directly, same
      *  as `_refineGridHeight` does for the root height.
      *
-     *  Field feedback 2026-07-16: giving `dock` a flat 1fr handed it EVERY px
-     *  the map's fit didn't need, even when the room list itself is much
-     *  narrower than that (dead black space in the sidebar, map smaller than
-     *  it could be). First fix attempt measured `dock`'s natural width in
-     *  place (`width:max-content` on the live, still-attached node) — that
-     *  produced no visible change at all in the field: `.dock` is a
-     *  column-flex container whose own children (`.dock-rows`, itself a
-     *  column-flex container of row-flex `.dock-row` buttons) sit inside a
-     *  CSS Grid track, and max-content sizing through that many nested flex
-     *  levels while still attached/stretched apparently doesn't resolve the
-     *  way the spec suggests it should (or not consistently across engines).
-     *  Fixed by measuring a detached CLONE instead: `position:absolute`
-     *  removes it from flow entirely (no ambient stretch/grid-track
-     *  influence at all), appended into this same shadow root so the
-     *  component's scoped CSS still applies, `width:max-content` on a node
-     *  with no surrounding constraints is the one case that's reliably
-     *  supported everywhere.
-     *
-     *  Root cause found 2026-07-16, AFTER both attempts above still showed
-     *  zero visible change: `gridTemplateColumns` was ALSO listed in
-     *  `gridRootStyles()`, which is bound via Lit's `styleMap` in `render()`.
-     *  `styleMap` re-applies every property in the object it's given on
-     *  EVERY render — not just when the value changes from what IT last set,
-     *  but unconditionally — so any unrelated re-render (a hass update, the
-     *  debug-progress clock tick, anything) stomped this function's override
-     *  right back to the static declarative value, and since `updated()`
-     *  (where this runs) fires straight after `render()` in the same cycle,
-     *  the two were fighting every single cycle with styleMap always
-     *  winning first, this function's write landing after. Whatever this
-     *  function computed should therefore have "won" for the paint frame
-     *  every time — except that's only true if this function actually ran
-     *  after that particular render, and it does — so in principle it should
-     *  have worked regardless of the styleMap conflict. Removing
-     *  `gridTemplateColumns` from `gridRootStyles()` entirely (see that
-     *  function's doc comment) makes this function the sole, uncontested
-     *  owner either way, closing off that entire class of doubt. Also now
-     *  handles landscape (previously untouched — its fixed split lived
-     *  purely in styleMap, so it needs its own JS-applied fallback now that
-     *  styleMap no longer carries it at all).
-     *
-     *  Reverted 2026-07-16 (crash report, mobile companion app): the
-     *  detached-clone dock measurement above ran on EVERY `updated()` cycle —
-     *  including the once-a-second `debug_room_progress` clock tick — which
-     *  means creating, appending and removing a full DOM subtree clone every
-     *  second for as long as the card is open. Cheap on desktop, but a
-     *  plausible crash source on a memory/CPU-constrained mobile WebView,
-     *  especially if `getBoundingClientRect()` or anything else in that path
-     *  ever threw before reaching `clone.remove()` — that would leak one
-     *  detached node per tick, unbounded, for the life of the session.
-     *  Dropped back to the simpler, already-safe map-only fit (`mapW = rW`,
-     *  `dock` stays a flat `1fr`) until this can be re-tried behind a
-     *  try/finally and confirmed not to reproduce the crash. Sidebar-width
-     *  overshoot is a cosmetic regression next to an app crash. */
+     *  History (2026-07-16, all same day): tried capping `dock` to its own
+     *  content width (first via live `width:max-content`, then via a detached
+     *  clone measurement) because a flat `1fr` handed it every px the map's
+     *  fit didn't need. Neither showed any visible effect in the field, which
+     *  led to a theory that Lit's `styleMap` (which also lists
+     *  `gridTemplateColumns` in `gridRootStyles()`) was re-applying the
+     *  static declarative value over this function's override on every
+     *  render — so `gridTemplateColumns`/`height` were pulled out of
+     *  `gridRootStyles()` entirely to make this function+`_refineGridHeight`
+     *  the sole owners. That "fix" (0.59.0) is what crashed the HA mobile
+     *  companion app (user-confirmed bisection: 0.55.0–0.58.0 fine, 0.59.0
+     *  first to crash) — reverted back to layering on top of the declarative
+     *  value (see `gridRootStyles()`'s doc comment), and the dock-content-cap
+     *  measurement is dropped too (parked, not reproduced as the crash cause
+     *  but not worth the added DOM-clone risk while re-verifying). Net effect
+     *  right now: same simple map-only fit as 0.56.0 (`mapW = rW`, `dock`
+     *  stays `1fr`) — the sidebar-overshoot cosmetic issue is back, on
+     *  purpose, in exchange for confirmed mobile stability. */
     _refineGridColumns() {
-        const lay = this._config?.layout;
-        if (!lay)
+        if (this._profile !== "portrait" || !this._lastPortraitFitW)
             return;
         const root = this.renderRoot?.querySelector(".avc-grid");
         if (!root)
             return;
-        const prof = resolveProfile(lay, this._profile);
-        const fallback = trackList(prof.columns);
-        if (this._profile !== "portrait" || !this._lastPortraitFitW) {
-            if (root.style.gridTemplateColumns !== fallback)
-                root.style.gridTemplateColumns = fallback;
-            return;
-        }
         const total = root.clientWidth;
         const gapPx = parseFloat(getComputedStyle(root).columnGap || "0") || 0;
         const avail = total - gapPx;

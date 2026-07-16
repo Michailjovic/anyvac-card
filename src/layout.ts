@@ -167,23 +167,25 @@ export function resolveHeightCss(cfg: LayoutConfig): string {
 
 /** Inline styles for the grid root (static styles can't express a dynamic grid).
  *
- *  `height` and `gridTemplateColumns` are deliberately NOT included here — the
- *  card sets both directly via JS in `updated()` (`_refineGridHeight` /
- *  `_refineGridColumns`), because those two need a post-render *measurement*
- *  to get right (exact viewport height, portrait's content-fit column split).
- *  Lit's `styleMap` re-applies every key in the object it's given on every
- *  render, which was silently fighting those JS overrides — the override
- *  would stick for a frame and then get stomped back to the static value on
- *  the next unrelated re-render (a hass update, the debug clock tick, ...).
- *  Keeping them out of styleMap entirely means Lit never touches them, so
- *  whatever the JS last set is what stays. The JS side always sets a sane
- *  static fallback first (same values that used to live here) before any
- *  measurement is available, so there's no gap where they're unset. */
+ *  REVERTED 2026-07-16 (mobile crash, card 0.59.0 → 0.61.0): `height` and
+ *  `gridTemplateColumns` were pulled out of this object on the theory that
+ *  Lit's `styleMap` re-applying every key on every render was silently
+ *  fighting the JS-measured overrides in `updated()`. That was true (and
+ *  is the reason portrait's column split never visibly changed across
+ *  0.56–0.58), but the fix itself is what broke the HA mobile companion
+ *  app — user bisected it precisely to 0.59.0, with 0.55.0–0.58.0 all
+ *  confirmed non-crashing. Exact mechanism not fully confirmed, but the
+ *  safe move is putting both properties back here and accepting that the
+ *  JS refinement in `updated()` fights (and mostly loses) against this
+ *  declarative object again — a cosmetic imperfection, not a crash. Do NOT
+ *  remove these from styleMap again without a mobile-tested alternative. */
 export function gridRootStyles(cfg: LayoutConfig, prof: Required<Omit<ProfileGridConfig, "crop">>): Record<string, string> {
   return {
     display: "grid",
     width: "100%",
+    height: resolveHeightCss(cfg),
     alignContent: "start",
+    gridTemplateColumns: trackList(prof.columns),
     gridTemplateRows: trackList(prof.rows),
     gap: cfg.gap ?? "6px",
     boxSizing: "border-box",
