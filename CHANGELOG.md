@@ -14,6 +14,21 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   hints. Completion of the whole rebuild (this release + the follow-up)
   ships as **v1.0.0**.
 
+## [0.64.0] - 2026-07-16
+
+Zone clean: a drawn rectangle can now be adjusted before confirming, instead
+of only being redrawn from scratch. No backend change — still pairs with
+`anyvac` 0.50.0.
+
+### Added
+
+- Zone clean rectangle is now editable after drawing: drag inside the box to
+  move it, drag a corner handle to resize it, in both merged (meta bar,
+  multi-candidate) and split/legacy per-vacuum tool flows. Clicking outside
+  the box still starts a fresh draw while the tool is actively armed; once a
+  zone is pending confirmation, Cancel is the explicit way to discard it
+  instead of a stray click silently replacing it.
+
 ## [0.63.0] - 2026-07-16
 
 Field-test bugfix from today's zone-clean testing. No backend change —

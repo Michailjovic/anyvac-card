@@ -74,6 +74,20 @@ export class AnyVacCard extends LitElement {
    *  populate several at once — the user confirms on whichever vacuum's own
    *  status card they want to execute it. */
   @state() private _zonePending: Record<string, { x1: number; y1: number; x2: number; y2: number }> | null = null;
+  /** Whether the current `_zoneRectShown`/`_zonePending` capture is the merged
+   *  multi-candidate flow (meta bar, "*") vs. the legacy single-target flow
+   *  (per-vacuum tools / split mode). Set once at draw time so post-drop editing
+   *  (move/resize, docs/19 follow-up) knows how to recompute `_zonePending`
+   *  without depending on `_modeEntity`, which is already reset to null by then. */
+  private _zoneMulti = false;
+  /** Active move/resize drag on an already-drawn `_zoneRectShown`, distinct from
+   *  `_zoneDrag` (drawing a brand new rectangle). `move` carries the grab offset
+   *  from the box's top-left corner plus its fixed width/height; the corner
+   *  variants just say which corner is being dragged. */
+  @state() private _zoneEdit:
+    | { type: "move"; offsetX: number; offsetY: number; width: number; height: number }
+    | { type: "nw" | "ne" | "sw" | "se" }
+    | null = null;
   /** Pending pin(s) awaiting per-vacuum confirmation, keyed by entity_id — same
    *  shape/reasoning as `_zonePending`, but for Pin & Go. */
   @state() private _pinPending: Record<string, { x: number; y: number }> | null = null;
@@ -1668,7 +1682,10 @@ export class AnyVacCard extends LitElement {
    *  still drives the legacy single-target flow untouched. */
   private _armMode(mode: "pin" | "zone"): void {
     if (this._mapMode === mode && this._modeEntity === "*") { this._mapMode = "normal"; this._modeEntity = null; }
-    else { this._mapMode = mode; this._modeEntity = "*"; this._pinPending = null; this._zonePending = null; this._zoneRectShown = null; }
+    else {
+      this._mapMode = mode; this._modeEntity = "*"; this._pinPending = null;
+      this._zonePending = null; this._zoneRectShown = null; this._zoneEdit = null;
+    }
   }
   /** Candidate vacuums for a merged-mode multi-candidate Pin & Go / Zone capture —
    *  anything with the integration + its own map entity (each has its own
@@ -1682,6 +1699,44 @@ export class AnyVacCard extends LitElement {
    *  bar) and this vacuum is a valid candidate. */
   private _isModeCandidate(v: VacuumConfig): boolean {
     return this._modeEntity === v.entity || (this._modeEntity === "*" && !!this._intAttrs(v) && !!v.map?.entity);
+  }
+  /** Whether `v` still has a stake in the current zone capture once arming has
+   *  already ended — i.e. it's awaiting confirm (`_zonePending`) or it's still
+   *  mid-draw (`_isModeCandidate`). Needed because move/resize editing of an
+   *  already-drawn box (below) must keep working after the merged multi-candidate
+   *  flow resets `_mapMode`/`_modeEntity` to normal/null on drop. */
+  private _hasZoneEditTarget(v: VacuumConfig): boolean {
+    return this._isModeCandidate(v) || !!this._zonePending?.[v.entity];
+  }
+  /** Hit-test a point (wrap-relative %) against a frozen zone box: a corner
+   *  (within `H` percent) wins for resize, otherwise inside the box means move,
+   *  otherwise null (click missed the box — caller should start a fresh draw). */
+  private _zoneHit(
+    box: { x0: number; y0: number; x1: number; y1: number }, x: number, y: number
+  ): "nw" | "ne" | "sw" | "se" | "move" | null {
+    const minX = Math.min(box.x0, box.x1), maxX = Math.max(box.x0, box.x1);
+    const minY = Math.min(box.y0, box.y1), maxY = Math.max(box.y0, box.y1);
+    const H = 4;
+    const corners: Array<["nw" | "ne" | "sw" | "se", number, number]> = [
+      ["nw", minX, minY], ["ne", maxX, minY], ["sw", minX, maxY], ["se", maxX, maxY],
+    ];
+    for (const [name, cx, cy] of corners) {
+      if (Math.abs(x - cx) <= H && Math.abs(y - cy) <= H) return name;
+    }
+    if (x >= minX && x <= maxX && y >= minY && y <= maxY) return "move";
+    return null;
+  }
+  /** Purely visual corner squares on a drawn zone box — the actual drag/resize
+   *  hit-testing happens in `_onZoneDown` via `_zoneHit` against the overlaying
+   *  `.map-clickcatch`, so these carry no pointer handlers of their own
+   *  (`pointer-events: none`, same as `.zone-rect` itself). */
+  private _renderZoneHandles() {
+    return html`
+      <div class="zone-handle zone-handle--nw"></div>
+      <div class="zone-handle zone-handle--ne"></div>
+      <div class="zone-handle zone-handle--sw"></div>
+      <div class="zone-handle zone-handle--se"></div>
+    `;
   }
   /** The rectangle to draw for this vacuum's map: the live drag while dragging,
    *  or the frozen box while a zone is pending confirm. Merged mode's multi
@@ -1762,17 +1817,65 @@ export class AnyVacCard extends LitElement {
     return { x: (lx / w + 0.5) * 100, y: (ly / h + 0.5) * 100 };
   }
   private _onZoneDown(vac: VacuumConfig, e: PointerEvent): void {
-    if (this._mapMode !== "zone" || !this._isModeCandidate(vac)) return;
+    const editing = !!this._zoneRectShown && this._hasZoneEditTarget(vac);
+    if (!editing && (this._mapMode !== "zone" || !this._isModeCandidate(vac))) return;
     const el = e.currentTarget as HTMLElement;
     (el as any).setPointerCapture?.(e.pointerId);
     const r = el.getBoundingClientRect();
     const x = ((e.clientX - r.left) / r.width) * 100;
     const y = ((e.clientY - r.top) / r.height) * 100;
+    if (this._zoneRectShown) {
+      const hit = this._zoneHit(this._zoneRectShown, x, y);
+      if (hit) {
+        const b = this._zoneRectShown;
+        const minX = Math.min(b.x0, b.x1), maxX = Math.max(b.x0, b.x1);
+        const minY = Math.min(b.y0, b.y1), maxY = Math.max(b.y0, b.y1);
+        // Normalize to x0<x1 / y0<y1 so resize below can address each corner
+        // as one fixed field instead of re-deriving min/max on every move.
+        this._zoneRectShown = { x0: minX, y0: minY, x1: maxX, y1: maxY };
+        this._zoneEdit = hit === "move"
+          ? { type: "move", offsetX: x - minX, offsetY: y - minY, width: maxX - minX, height: maxY - minY }
+          : { type: hit };
+        return;
+      }
+      // Missed the box. Once dropped and awaiting confirm, `_mapMode` may
+      // already be back to "normal" (merged multi-candidate flow) — a stray
+      // click there shouldn't silently discard the pending zone, Cancel is
+      // explicit for that. Only actively-armed drawing (`_mapMode === "zone"`)
+      // may start a fresh rectangle over an old one.
+      if (this._mapMode !== "zone") return;
+    }
+    // Start a fresh rectangle, same as before move/resize existed.
     this._zonePending = null;
     this._zoneRectShown = null;
+    this._zoneEdit = null;
+    this._zoneMulti = this._modeEntity === "*" && this._config.map_mode === "merged";
     this._zoneDrag = { x0: x, y0: y, x1: x, y1: y };
   }
   private _onZoneMove(vac: VacuumConfig, e: PointerEvent): void {
+    if (this._zoneEdit && this._zoneRectShown) {
+      const el = e.currentTarget as HTMLElement;
+      const r = el.getBoundingClientRect();
+      const x = ((e.clientX - r.left) / r.width) * 100;
+      const y = ((e.clientY - r.top) / r.height) * 100;
+      const MIN = 3; // smallest box side, in %, so a resize can't collapse to a point
+      const edit = this._zoneEdit;
+      if (edit.type === "move") {
+        const { offsetX, offsetY, width, height } = edit;
+        const nx0 = Math.min(100 - width, Math.max(0, x - offsetX));
+        const ny0 = Math.min(100 - height, Math.max(0, y - offsetY));
+        this._zoneRectShown = { x0: nx0, y0: ny0, x1: nx0 + width, y1: ny0 + height };
+      } else {
+        let { x0, y0, x1, y1 } = this._zoneRectShown;
+        const cx = this._clampPct(x), cy = this._clampPct(y);
+        if (edit.type === "nw") { x0 = Math.min(cx, x1 - MIN); y0 = Math.min(cy, y1 - MIN); }
+        else if (edit.type === "ne") { x1 = Math.max(cx, x0 + MIN); y0 = Math.min(cy, y1 - MIN); }
+        else if (edit.type === "sw") { x0 = Math.min(cx, x1 - MIN); y1 = Math.max(cy, y0 + MIN); }
+        else /* se */ { x1 = Math.max(cx, x0 + MIN); y1 = Math.max(cy, y0 + MIN); }
+        this._zoneRectShown = { x0, y0, x1, y1 };
+      }
+      return;
+    }
     if (!this._zoneDrag || this._mapMode !== "zone" || !this._isModeCandidate(vac)) return;
     const el = e.currentTarget as HTMLElement;
     const r = el.getBoundingClientRect();
@@ -1780,12 +1883,13 @@ export class AnyVacCard extends LitElement {
       x1: ((e.clientX - r.left) / r.width) * 100, y1: ((e.clientY - r.top) / r.height) * 100 };
   }
   private _onZoneUp(vac: VacuumConfig, e: PointerEvent): void {
-    if (!this._zoneDrag || this._mapMode !== "zone" || !this._isModeCandidate(vac)) return;
     const el = e.currentTarget as HTMLElement;
-    const r = el.getBoundingClientRect();
-    const ax = r.left + (this._zoneDrag.x0 / 100) * r.width;
-    const ay = r.top + (this._zoneDrag.y0 / 100) * r.height;
-    const bx = e.clientX, by = e.clientY;
+    if (this._zoneEdit) {
+      this._zoneEdit = null;
+      this._commitZoneRect(vac, el);
+      return;
+    }
+    if (!this._zoneDrag || this._mapMode !== "zone" || !this._isModeCandidate(vac)) return;
     const big = Math.abs(this._zoneDrag.x1 - this._zoneDrag.x0) > 2 || Math.abs(this._zoneDrag.y1 - this._zoneDrag.y0) > 2;
     // Freeze the drawn box (so it stays visible while pending) before dropping
     // the LIVE drag state — the live state is what used to only clear on cancel,
@@ -1795,7 +1899,23 @@ export class AnyVacCard extends LitElement {
     this._zoneRectShown = big ? this._zoneDrag : null;
     this._zoneDrag = null;
     if (!big) return;
-    if (this._modeEntity === "*" && this._config.map_mode === "merged") {
+    const multi = this._zoneMulti;
+    if (multi) { this._mapMode = "normal"; this._modeEntity = null; }
+    this._commitZoneRect(vac, el);
+  }
+  /** Convert the current `_zoneRectShown` (wrap-relative %) back to screen
+   *  coordinates via `el`'s rect, then project through each relevant vacuum's
+   *  own map transform (`_clickToContent`) into `_zonePending`. Shared by the
+   *  initial draw-drop and by every subsequent move/resize edit, so a box can
+   *  be nudged into place after the fact without redrawing it from scratch. */
+  private _commitZoneRect(vac: VacuumConfig, el: HTMLElement): void {
+    const box = this._zoneRectShown; if (!box) return;
+    const r = el.getBoundingClientRect();
+    const ax = r.left + (Math.min(box.x0, box.x1) / 100) * r.width;
+    const ay = r.top + (Math.min(box.y0, box.y1) / 100) * r.height;
+    const bx = r.left + (Math.max(box.x0, box.x1) / 100) * r.width;
+    const by = r.top + (Math.max(box.y0, box.y1) / 100) * r.height;
+    if (this._zoneMulti) {
       // Merged multi-candidate: same two screen corners, translated through every
       // candidate vacuum's own map transform. Nothing sent yet — confirm per
       // vacuum on its own status card.
@@ -1811,7 +1931,6 @@ export class AnyVacCard extends LitElement {
         }
       }
       this._zonePending = Object.keys(rects).length ? rects : null;
-      this._mapMode = "normal"; this._modeEntity = null;
       return;
     }
     // Legacy single-target (per-vacuum tools, and "*" in split mode — each map is
@@ -1849,6 +1968,7 @@ export class AnyVacCard extends LitElement {
       if (!this._zonePending) this._zoneRectShown = null;
     }
     this._zoneDrag = null;
+    this._zoneEdit = null;
     this._mapMode = "normal"; this._modeEntity = null;
   }
   private _confirmPin(vac: VacuumConfig): void {
@@ -1861,7 +1981,9 @@ export class AnyVacCard extends LitElement {
     }
   }
   private _cancelPin(): void { this._pinPending = null; }
-  private _cancelZone(): void { this._zonePending = null; this._zoneDrag = null; this._zoneRectShown = null; }
+  private _cancelZone(): void {
+    this._zonePending = null; this._zoneDrag = null; this._zoneRectShown = null; this._zoneEdit = null;
+  }
 
   /** Refresh-all button in the badges row (grid mode) — the map corner variant
    *  floated in dead space (field feedback 2026-07-11). */
@@ -1926,7 +2048,7 @@ export class AnyVacCard extends LitElement {
            lands — so pending state, not the armed mode, drives this panel. Only the
            "arm but haven't captured yet" hint depends on `mode`. */
         zoneCount ? html`<div class="calib-panel">
-          <div>Zone ready for ${zoneCount} vacuum${zoneCount > 1 ? "s" : ""} — pick one on its status card below.</div>
+          <div>Zone ready for ${zoneCount} vacuum${zoneCount > 1 ? "s" : ""} — drag the box or its corners to adjust, then pick one on its status card below.</div>
           <div class="calib-actions"><button class="mtbtn" @click=${() => this._cancelZone()}>Cancel</button></div>
         </div>` : mode === "zone" ? html`<div class="calib-panel">Drag a rectangle on the map to set a cleaning zone.</div>` : nothing}
       ${pinCount ? html`<div class="calib-panel">
@@ -1968,7 +2090,7 @@ export class AnyVacCard extends LitElement {
       ${mode === "pin" ? html`<div class="calib-panel">Tap the map to send the robot there.</div>` : nothing}
       ${mode === "zone" ? html`<div class="calib-panel">
         ${this._zonePending?.[vac.entity]
-          ? html`<div>Clean this zone?</div>
+          ? html`<div>Clean this zone? Drag the box or its corners to adjust.</div>
               <div class="calib-actions">
                 <button class="mtbtn on" @click=${() => this._confirmZone(vac)}>Clean zone</button>
                 <button class="mtbtn" @click=${() => this._cancelZone()}>Cancel</button>
@@ -2423,8 +2545,10 @@ export class AnyVacCard extends LitElement {
            this (only split-mode _renderMap had it), so clicks fell straight through
            to room-select regardless of the active mode (bugfix, docs/19). Mirrors
            _renderMap 1:1, just scoped per shown vacuum since merged mode overlays
-           several .map-img elements in one wrapper. */
-        shown.map((v) => this._mapMode !== "normal" && this._isModeCandidate(v)
+           several .map-img elements in one wrapper. Also stays mounted once a zone
+           box exists and is still awaiting confirm (`_hasZoneEditTarget`), even
+           after mode resets to normal, so the box can still be dragged/resized. */
+        shown.map((v) => (this._mapMode !== "normal" && this._isModeCandidate(v)) || (this._zoneRectShown && this._hasZoneEditTarget(v))
           ? html`<div class="map-clickcatch" style="touch-action:none"
               @click=${(e: MouseEvent) => this._onMapClick(v, e)}
               @pointerdown=${(e: PointerEvent) => this._onZoneDown(v, e)}
@@ -2438,7 +2562,7 @@ export class AnyVacCard extends LitElement {
               top: Math.min(box.y0, box.y1) + "%",
               width: Math.abs(box.x1 - box.x0) + "%",
               height: Math.abs(box.y1 - box.y0) + "%",
-            })}></div>` : nothing;
+            })}>${this._renderZoneHandles()}</div>` : nothing;
         })}
       </div>
     `;
@@ -2481,7 +2605,7 @@ export class AnyVacCard extends LitElement {
         ${showMap ? this._renderIntegrationOverlay(vac, seat) : nothing}
         ${this._config.layout ? nothing : this._renderLayerToggles([vac])}
         ${(this._roomsFor(vac)).map((r) => this._renderRoomOverlay(r, vac))}
-        ${this._mapMode !== "normal" && this._isModeCandidate(vac)
+        ${(this._mapMode !== "normal" && this._isModeCandidate(vac)) || (this._zoneRectShown && this._hasZoneEditTarget(vac))
           ? html`<div class="map-clickcatch" style="touch-action:none"
               @click=${(e: MouseEvent) => this._onMapClick(vac, e)}
               @pointerdown=${(e: PointerEvent) => this._onZoneDown(vac, e)}
@@ -2495,7 +2619,7 @@ export class AnyVacCard extends LitElement {
               top: Math.min(box.y0, box.y1) + "%",
               width: Math.abs(box.x1 - box.x0) + "%",
               height: Math.abs(box.y1 - box.y0) + "%",
-            })}></div>` : nothing;
+            })}>${this._renderZoneHandles()}</div>` : nothing;
         })()}
       </div>
     `;
@@ -3379,6 +3503,15 @@ export class AnyVacCard extends LitElement {
     .avc-err-halo { animation: avc-err-pulse 1.3s ease-in-out infinite; }
     @keyframes avc-err-pulse { 0%,100% { opacity: 0.18; } 50% { opacity: 0.6; } }
     .zone-rect { position: absolute; border: 2px solid #fff; background: rgba(255,255,255,0.15); border-radius: 4px; pointer-events: none; box-shadow: 0 0 0 1px rgba(0,0,0,0.45); }
+    /* Move/resize handles (docs/19 follow-up) — decoration only, no pointer
+       handlers: the overlaying .map-clickcatch does the actual hit-testing
+       (_zoneHit) so a drag anywhere near a corner resizes, and inside the box
+       moves the whole rectangle. */
+    .zone-handle { position: absolute; width: 12px; height: 12px; margin: -6px; border-radius: 50%; background: #fff; border: 2px solid rgba(0,0,0,0.45); pointer-events: none; }
+    .zone-handle--nw { left: 0; top: 0; }
+    .zone-handle--ne { left: 100%; top: 0; }
+    .zone-handle--sw { left: 0; top: 100%; }
+    .zone-handle--se { left: 100%; top: 100%; }
     .layer-toggles { position: absolute; top: 8px; right: 8px; display: flex; gap: 6px; z-index: 3; }
     .layer-btn { display: flex; align-items: center; gap: 3px; padding: 3px 8px; border-radius: 999px; border: 1px solid rgba(255,255,255,0.2); background: rgba(0,0,0,0.45); color: rgba(255,255,255,0.55); font-size: 11px; font-weight: 600; cursor: pointer; --mdc-icon-size: 16px; user-select: none; -webkit-touch-callout: none; touch-action: manipulation; }
     .layer-btn.on { color: #fff; border-color: rgba(255,255,255,0.55); background: rgba(0,0,0,0.7); }
