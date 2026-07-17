@@ -87,7 +87,7 @@ const t={ATTRIBUTE:1},e=t=>(...e)=>({_$litDirective$:t,values:e});let i$1 = clas
 
 const CARD_NAME = "anyvac-card";
 const EDITOR_NAME = "anyvac-card-editor";
-const CARD_VERSION = "0.66.3";
+const CARD_VERSION = "0.66.4";
 /** Hold duration in ms required to trigger START / PAUSE actions */
 const HOLD_DURATION_MS = 600;
 /**
@@ -635,6 +635,24 @@ let AnyVacCard = class AnyVacCard extends i$2 {
          *  API) logs once, not on every failed lookup. */
         this._panelViewMo = null;
         this._panelViewWarned = false;
+        /** docs/21 §5b third follow-up (2026-07-17): the panel-view node the current
+         *  `_panelViewMo` is actually watching. HA can rebuild `hui-panel-view`'s
+         *  node identity across a hard refresh in multiple DOM-construction phases
+         *  — once `_panelViewMo` was set, the old code never re-checked whether the
+         *  watched node was still the live one, so a stale reference silently
+         *  stopped receiving edit-mode mutations (fixed only by a second toggle,
+         *  which happened to trigger a remeasure some other way). Reported live by
+         *  the user after a hard refresh. Ported from room-overlay-card v5.0, which
+         *  always re-verifies liveness instead of trusting a once-set flag. */
+        this._panelViewNode = null;
+        /** docs/21 §5b third follow-up: one-shot observer for the edit-mode actions
+         *  bar mounting AFTER the transition mutation `_panelViewMo` reacts to (see
+         *  `_watchEditBar`). */
+        this._barMo = null;
+        /** docs/21 §5b third follow-up: watches the actions bar's OWN box once
+         *  found, to catch its height CSS-transitioning in after it mounts (see
+         *  `_observeEditBar`) — confirmed live, not just in theory. */
+        this._editBarRo = null;
         /** Per-second clock for the debug progress timers (mm:ss). Only ticks while a vacuum is
          *  cleaning/paused and debug_room_progress is on, so it does not re-render otherwise. */
         this._now = Date.now();
@@ -877,8 +895,19 @@ let AnyVacCard = class AnyVacCard extends i$2 {
      *  shows up, and re-observing an already-observed target is a cheap
      *  no-op, so this is safe to do unconditionally rather than only once. */
     _setupPanelViewObserver() {
-        if (this._panelViewMo || typeof MutationObserver === "undefined")
+        if (typeof MutationObserver === "undefined")
             return;
+        // docs/21 §5b third follow-up: re-verify liveness on every call instead of
+        // early-returning forever once `_panelViewMo` is non-null — a stale
+        // watched node is otherwise indistinguishable from a healthy one until an
+        // edit-mode mutation silently fails to reach it.
+        if (this._panelViewMo && this._panelViewNode?.isConnected)
+            return;
+        if (this._panelViewMo) {
+            this._panelViewMo.disconnect();
+            this._panelViewMo = null;
+            this._panelViewNode = null;
+        }
         const panelView = this._findPanelViewAncestor();
         if (!panelView) {
             if (!this._panelViewWarned) {
@@ -894,6 +923,7 @@ let AnyVacCard = class AnyVacCard extends i$2 {
         }
         const mo = new MutationObserver(() => {
             this._scheduleMeasure();
+            this._watchEditBar();
             const opts = this._findCardOptionsAncestor();
             if (opts?.shadowRoot) {
                 try {
@@ -920,6 +950,82 @@ let AnyVacCard = class AnyVacCard extends i$2 {
             catch { /* noop */ }
         }
         this._panelViewMo = mo;
+        this._panelViewNode = panelView;
+        this._watchEditBar();
+    }
+    /** docs/21 §5b third follow-up (2026-07-17, ported from room-overlay-card
+     *  v5.0 + confirmed live, 2026-07-17, on the user's real dashboard): two
+     *  separate races around the edit-mode actions bar, not one.
+     *
+     *  (1) `hui-card-options` itself can appear in the DOM BEFORE it has been
+     *  upgraded to a custom element — its `shadowRoot` reads `null` for a beat
+     *  even though the wrapper node already exists. Confirmed live: instrumented
+     *  the real dashboard and captured `hui-card-options appeared, shadowRoot=
+     *  false` at the moment of the reparenting mutation. `_setupPanelViewObserver`
+     *  already re-checks on every mutation, but this dedicated one-shot watcher
+     *  is what specifically waits for the shadow root (and then the bar inside
+     *  it) to actually exist.
+     *
+     *  (2) Once `.card-actions` exists, HA animates its height in — it does NOT
+     *  just appear at full size. Confirmed live: the bar's own settled height
+     *  was 64.8px, but the grid only ever reserved 54px and stayed there
+     *  indefinitely (no further remeasure was ever triggered, since nothing
+     *  else on the card changed state) — a single remeasure right after the bar
+     *  *appears* races the transition and can permanently under-reserve. Fixed
+     *  by watching the bar's own box with a `ResizeObserver` once found: it
+     *  fires on every frame of the height transition, so whichever remeasure
+     *  runs last after the transition settles gets the real height — no fixed
+     *  delay, no guessing at a transition duration. */
+    _watchEditBar() {
+        if (this._barMo) {
+            this._barMo.disconnect();
+            this._barMo = null;
+        }
+        const opts = this._findCardOptionsAncestor();
+        if (!opts?.shadowRoot)
+            return;
+        const existing = opts.shadowRoot.querySelector(".card-actions");
+        if (existing) {
+            this._observeEditBar(existing);
+            return;
+        }
+        const root = opts.shadowRoot;
+        const mo = new MutationObserver(() => {
+            const bar = root.querySelector(".card-actions");
+            if (bar) {
+                mo.disconnect();
+                this._barMo = null;
+                this._observeEditBar(bar);
+            }
+        });
+        try {
+            mo.observe(root, { childList: true, subtree: true });
+        }
+        catch {
+            return;
+        }
+        this._barMo = mo;
+    }
+    /** Remeasure now, and keep remeasuring on every box change of the actions
+     *  bar itself until it's disconnected (edit-mode exit, or the card itself
+     *  disconnects) — see `_watchEditBar`'s doc comment for why a one-shot
+     *  measurement isn't enough. */
+    _observeEditBar(bar) {
+        this._scheduleMeasure();
+        if (typeof ResizeObserver === "undefined")
+            return;
+        if (this._editBarRo) {
+            this._editBarRo.disconnect();
+            this._editBarRo = null;
+        }
+        const ro = new ResizeObserver(() => this._scheduleMeasure());
+        try {
+            ro.observe(bar);
+        }
+        catch {
+            return;
+        }
+        this._editBarRo = ro;
     }
     /** Measured refinement of the grid height: innerHeight − rootTop beats the raw
      *  `calc(100svh − header)` when the root is offset (padding, safe-area). Applied
@@ -990,6 +1096,15 @@ let AnyVacCard = class AnyVacCard extends i$2 {
             this._panelViewMo.disconnect();
             this._panelViewMo = null;
         }
+        this._panelViewNode = null;
+        if (this._barMo) {
+            this._barMo.disconnect();
+            this._barMo = null;
+        }
+        if (this._editBarRo) {
+            this._editBarRo.disconnect();
+            this._editBarRo = null;
+        }
     }
     firstUpdated() {
         // Seed the width immediately; the ResizeObserver may not fire before the
@@ -1007,9 +1122,11 @@ let AnyVacCard = class AnyVacCard extends i$2 {
         // docs/21 §5b: re-attempt the panel-view observer hookup on every render,
         // not just connectedCallback — HA can disconnect/reconnect the card, and
         // the ancestor may not have been in the tree yet on the very first
-        // connectedCallback. No-op once _panelViewMo is set.
-        if (!this._panelViewMo)
-            this._setupPanelViewObserver();
+        // connectedCallback. docs/21 §5b third follow-up: no longer gated on
+        // `!this._panelViewMo` — the call itself now re-verifies liveness (a
+        // stale watched node needs the exact same re-hookup as never having
+        // found one), so this must run every render, not just until first set.
+        this._setupPanelViewObserver();
         // docs/21 §5b follow-up: one 250ms late-settling remeasure, see
         // `_settleTimer`'s doc comment. Cleared + rescheduled every render.
         if (this._settleTimer !== null)

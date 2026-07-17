@@ -219,4 +219,70 @@ test.describe("layout hardening (docs/21)", () => {
     // own right edge (small sub-pixel tolerance for rounding).
     expect((rects.badgesRight as number) - rects.gridRight).toBeLessThanOrEqual(1);
   });
+
+  test("5b third follow-up: a late-mounting edit-mode actions bar still gets reserved without a second toggle", async ({ page }) => {
+    // Live-reported (2026-07-17, real HA dashboard, hard refresh): the
+    // FIRST edit toggle after a fresh page load didn't reserve room for the
+    // actions bar; a SECOND toggle fixed it. Root cause: the actions bar's
+    // own first paint inside hui-card-options' shadow root can be slower
+    // than the reparenting mutation `_panelViewMo` reacts to, so the very
+    // first `_editBarHeight()` read races the bar and gets 0. `_watchEditBar`
+    // (docs/21 §5b third follow-up) is a one-shot observer that catches the
+    // bar showing up later and re-measures — no second toggle required.
+    await page.setViewportSize({ width: 1600, height: 900 });
+    await mountCard(page, { width: 1200, height: 800 });
+    await expect.poll(() => chipText(page)).toContain("landscape");
+
+    const before = await gridHeight(page);
+    expect(before).not.toBeNull();
+
+    await page.evaluate(() => (window as any).__mockHa.enterEditColdBar());
+    await page.waitForTimeout(150);
+
+    // Bar not mounted yet — height should be essentially unreserved.
+    const cold = await gridHeight(page);
+    expect(cold).not.toBeNull();
+    expect(Math.abs((cold as number) - (before as number))).toBeLessThan(5);
+
+    // Bar finishes its (slower, cold) first paint — no second edit toggle.
+    await page.evaluate(() => (window as any).__mockHa.mountLateActionsBar());
+    await page.waitForTimeout(300);
+
+    const settled = await gridHeight(page);
+    expect(settled).not.toBeNull();
+    const shrink = (before as number) - (settled as number);
+    expect(shrink).toBeGreaterThanOrEqual(25);
+    expect(shrink).toBeLessThanOrEqual(40);
+  });
+
+  test("5b fourth follow-up: the actions bar CSS-transitioning its own height in still settles without a second toggle", async ({ page }) => {
+    // Live-confirmed root cause (2026-07-17, instrumented the user's real
+    // dashboard): the actions bar doesn't appear at full height instantly —
+    // it CSS-transitions in (mock: 0 -> 32px over 80ms, tests/harness/
+    // mock-ha.html `_mountBar`). A remeasure triggered only by the bar
+    // *appearing* (MutationObserver) can fire while its height is still 0
+    // and never fire again — nothing else on the card naturally changes
+    // state from an edit-mode reservation alone. `_observeEditBar` (docs/21
+    // §5b third follow-up) tracks the bar's own box with a ResizeObserver so
+    // whichever remeasure runs last, after the transition settles, wins.
+    await page.setViewportSize({ width: 1600, height: 900 });
+    await mountCard(page, { width: 1200, height: 800 });
+    await expect.poll(() => chipText(page)).toContain("landscape");
+
+    const before = await gridHeight(page);
+    expect(before).not.toBeNull();
+
+    await page.evaluate(() => (window as any).__mockHa.enterEdit());
+
+    // Give the transition time to fully settle (80ms transition + 2 RAFs to
+    // start it), then confirm the FINAL, settled height was reserved — not
+    // whatever the grid happened to read mid-transition.
+    await page.waitForTimeout(400);
+
+    const settled = await gridHeight(page);
+    expect(settled).not.toBeNull();
+    const shrink = (before as number) - (settled as number);
+    expect(shrink).toBeGreaterThanOrEqual(25);
+    expect(shrink).toBeLessThanOrEqual(40);
+  });
 });

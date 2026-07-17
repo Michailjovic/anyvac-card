@@ -51,11 +51,35 @@
       // isn't real (caught empirically while building this harness).
       const slot = document.createElement("slot");
       root.appendChild(slot);
+      // docs/21 §5b third follow-up: the bar is NOT auto-mounted here — a
+      // constructor can't see attributes set by the caller right after
+      // `createElement` (they land after construction), so callers mount it
+      // explicitly (enterEdit()) or defer it (enterEditColdBar() +
+      // mountLateActionsBar()) to simulate the bar's real first-paint being
+      // slower than the reparenting mutation itself (observed live: hard
+      // refresh -> first edit toggle -> bar not there yet).
+    }
+    _mountBar() {
+      if (this.shadowRoot.querySelector(".card-actions")) return;
       const actions = document.createElement("div");
       actions.className = "card-actions";
       actions.textContent = "MOVE / EDIT / DELETE";
-      actions.style.height = "32px";
-      root.appendChild(actions);
+      // docs/21 §5b third follow-up (confirmed live 2026-07-17 on a real HA
+      // dashboard): the real actions bar does NOT appear at its full height
+      // instantly — it CSS-transitions in. A single measurement taken right
+      // when the element first mounts (height still 0/mid-transition) can
+      // permanently under-reserve space, since nothing else naturally
+      // re-triggers a remeasure once the transition finishes (`_cardW`/
+      // `_profile` don't change from this). Reproduce that here instead of
+      // an instant height, so a test can tell a one-shot mutation-triggered
+      // remeasure apart from one that also tracks the bar's OWN resizing.
+      actions.style.height = "0px";
+      actions.style.overflow = "hidden";
+      actions.style.transition = "height 80ms linear";
+      this.shadowRoot.appendChild(actions);
+      requestAnimationFrame(() => {
+        requestAnimationFrame(() => { actions.style.height = "32px"; });
+      });
     }
   }
   customElements.define("hui-card-options", HuiCardOptions);
@@ -93,6 +117,7 @@
       const card = cardWrap.firstElementChild;
       if (!card) return;
       const wrapper = document.createElement("hui-card-options");
+      wrapper._mountBar();
       cardWrap.removeChild(card);
       wrapper.appendChild(card);
       cardWrap.appendChild(wrapper);
@@ -104,6 +129,22 @@
       wrapper.removeChild(card);
       cardWrap.removeChild(wrapper);
       cardWrap.appendChild(card);
+    },
+    /** docs/21 §5b third follow-up: same reparenting as enterEdit(), but the
+     *  actions bar does NOT mount yet — call mountLateActionsBar() to
+     *  simulate it finishing its (slower, cold) first paint afterwards. */
+    enterEditColdBar() {
+      const card = cardWrap.firstElementChild;
+      if (!card) return null;
+      const wrapper = document.createElement("hui-card-options");
+      cardWrap.removeChild(card);
+      wrapper.appendChild(card);
+      cardWrap.appendChild(wrapper);
+      return wrapper;
+    },
+    mountLateActionsBar() {
+      const wrapper = cardWrap.querySelector("hui-card-options");
+      if (wrapper) wrapper._mountBar();
     },
   };
   window.__mockHaReady = true;

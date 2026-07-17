@@ -12,6 +12,47 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Real-hardware polish pass on the landscape cockpit (docs/18/19). Plus this
   release's layout hardening ship as **v1.0.0**.
 
+## [0.66.4] - 2026-07-17
+
+Found and fixed live, directly on the user's real dashboard again (Claude in
+Chrome session, this time with instrumentation + a live prototype patch to
+verify the fix before writing it into the build) — the actual mechanism
+behind "edit mode only lays out correctly on the second toggle after a hard
+refresh", which 0.66.1/0.66.2 did not fully resolve. No backend change —
+still pairs with `anyvac` 0.51.0.
+
+### Fixed
+
+- **The edit-mode actions bar's height reservation could get permanently
+  stuck at zero.** Instrumented the real dashboard: at the moment
+  `hui-card-options` appears in the DOM, its `shadowRoot` can still read
+  `null` for a beat (not yet upgraded to a custom element); and once
+  `.card-actions` does exist, HA does not give it its full height instantly —
+  it CSS-transitions in (confirmed live: bar's own settled height was
+  64.8px). A remeasure triggered only once, right when the bar element
+  *appears*, races that transition and can capture height 0 — and since
+  entering edit mode doesn't change any of the card's own reactive state
+  (`_cardW`/`_profile` stay the same), nothing naturally re-triggers another
+  remeasure afterwards, so the 0px reservation is permanent until some
+  unrelated trigger (like toggling edit again) happens to cause one.
+  Fixed with a new `_observeEditBar`: once the bar element is found, a
+  `ResizeObserver` watches its own box for as long as it's mounted, so
+  whichever remeasure runs last — after the transition settles — wins,
+  regardless of transition duration or timing jitter between cold/warm
+  loads. Ported/adapted from room-overlay-card v5.0's `_watchEditBar`
+  pattern, extended with this ResizeObserver step after live-confirming the
+  transition race wasn't otherwise covered.
+- **`_setupPanelViewObserver` no longer trusts a once-set observer forever.**
+  It now re-verifies the watched `hui-panel-view` node is still connected on
+  every call (not just the first), and re-wires from scratch if not — a
+  defensive port from room-overlay-card v5.0, which never assumes a
+  previously found ancestor is still the live one.
+- Playwright suite gained an 8th test that CSS-transitions the mock actions
+  bar's height in (0 → 32px over 80ms, matching the live-observed behavior)
+  and asserts the final reservation matches the *settled* height, not
+  whatever was measured mid-transition — verified to fail (received `0`,
+  matching the live bug exactly) without the `ResizeObserver` fix.
+
 ## [0.66.3] - 2026-07-17
 
 Found and fixed live, directly on the user's real dashboard (Claude in
