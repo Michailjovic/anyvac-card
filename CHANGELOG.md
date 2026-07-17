@@ -13,6 +13,30 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   on the new landscape cockpit below. Completion of the whole rebuild (this
   release + the follow-up) ships as **v1.0.0**.
 
+## [0.65.1] - 2026-07-17
+
+Field feedback on the portrait vac-icon-strip (docs/19 follow-up): with 3
+vacuums merged onto one floorplan, the map gets too cluttered to read in the
+cramped portrait column. No backend change — still pairs with `anyvac` 0.50.0.
+
+### Added
+
+- Vac-icon-strip hold gesture: holding a vacuum's icon toggles it in/out of
+  `_shownSet`, which `_renderMergedMap` already filters its map/path/room
+  layers by — so this actually hides that vacuum's clutter off the shared
+  floorplan, not just a focus switch. Tap keeps its existing behavior (opens
+  that vacuum's more-info dialog). Hidden vacuums render at reduced opacity
+  in the strip. New `_toggleShownMulti()` holds the plain multi-select toggle
+  logic, extracted out of `_toggleShown()` so the icon strip doesn't trigger
+  its portrait single-focus branch (that branch is for split-mode's
+  status-card focus, a different concern — badges still use it unchanged).
+
+### Changed
+
+- Vac-icon-strip now spans the full available width, one equal-width flex
+  slot per vacuum, matching the Dry/Wet/Both mode buttons directly below it
+  (`.dock-head`/`.dock-mode`) instead of clustering left with unused space.
+
 ## [0.65.0] - 2026-07-16
 
 Surfaces a gap the backend already had data for: `anyvac.plan`/`anyvac.clean`

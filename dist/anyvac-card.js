@@ -1368,6 +1368,15 @@ let AnyVacCard = class AnyVacCard extends i$2 {
             this._saveShown();
             return;
         }
+        this._toggleShownMulti(index);
+    }
+    /** Plain multi-select membership toggle (add/remove from `_shownSet`, never
+     *  collapsing to single-focus) — always keeps at least one vacuum shown.
+     *  Used directly by contexts that need "hide just this one" regardless of
+     *  profile, e.g. the portrait vac-icon-strip hold gesture, which must be
+     *  able to hide one of three merged-map vacuums while leaving the other
+     *  two visible (docs/19 follow-up, field feedback 2026-07-17). */
+    _toggleShownMulti(index) {
         const next = new Set(this._shownSet);
         if (next.has(index)) {
             if (next.size > 1)
@@ -1844,13 +1853,19 @@ let AnyVacCard = class AnyVacCard extends i$2 {
      *  real assignment per pass; tapping the avatar cycles the room's vacuum pin.
      *  `withRun` adds the orchestrated run footer (landscape — no `start` region). */
     /** Emergency manual-control strip (portrait-only, docs/19 follow-up): small
-     *  icon-only vacuum buttons at the top of the dock column, tapping straight
-     *  into that vacuum's more-info dialog. Portrait dropped the top badges row
-     *  entirely to give the map back that height — merged mode's map has no
-     *  split-mode "shown" focus to switch, so a name-and-status badge row wasn't
-     *  doing much there beyond being a path to more-info. Landscape keeps the
-     *  full `picker` region instead (name + live status), this is just the
-     *  fallback for the cramped portrait column. */
+     *  icon-only vacuum buttons at the top of the dock column, spread across the
+     *  full width (one equal-width slot per vacuum, same idea as the mode
+     *  buttons in `.dock-head` right below). Tap opens that vacuum's more-info
+     *  dialog (glanceable status, not a pseudo-controller — docs/18 §10b field
+     *  note). Hold toggles it in/out of `_shownSet` — merged mode's map DOES
+     *  filter its overlaid map/path/room layers by `_shownSet` (`_renderMergedMap`),
+     *  so this is a real "hide this robot's clutter off the shared floorplan"
+     *  action (field feedback 2026-07-17: 3 overlaid maps in portrait is too
+     *  much to read at once), not just a focus switch — deliberately NOT routed
+     *  through `_toggleShown`, whose portrait branch collapses to a single
+     *  shown vacuum (that's for split mode's per-vacuum status-card focus,
+     *  docs/18 §7b, a different concern). Landscape keeps the full `picker`
+     *  region instead (name + live status, docs/19 A5). */
     _renderVacuumIconStrip() {
         if (this._profile !== "portrait")
             return A;
@@ -1859,15 +1874,45 @@ let AnyVacCard = class AnyVacCard extends i$2 {
             return A;
         return b `
       <div class="vac-icon-strip">
-        ${vacs.map((v) => b `
-          <button class="vac-icon-btn" style=${o({ borderColor: this._color(v) + "80" })}
-            @click=${() => this._fireMoreInfo(v.entity)}
-            title=${v.name ?? v.entity} aria-label=${v.name ?? v.entity}>
-            ${v.image
-            ? b `<img src=${v.image} alt="" />`
-            : b `<ha-icon icon="mdi:robot-vacuum" style=${o({ color: this._color(v) })}></ha-icon>`}
-          </button>
-        `)}
+        ${vacs.map((v, i) => {
+            const shown = this._shownSet.has(i);
+            const holdId = "vacicon-" + i;
+            const holding = this._holdId === holdId;
+            return b `
+            <div class="vac-icon-slot">
+              <button class="vac-icon-btn ${holding ? "vac-icon-btn--holding" : ""} ${shown ? "" : "vac-icon-btn--hidden"}"
+                style=${o({ borderColor: this._color(v) + "80" })}
+                @pointerdown=${(e) => {
+                e.preventDefault();
+                this._cancelHold();
+                this._holdId = holdId;
+                this._holdTimer = setTimeout(() => {
+                    this._holdTimer = null;
+                    this._holdId = null;
+                    this._toggleShownMulti(i);
+                }, HOLD_DURATION_MS);
+            }}
+                @pointerup=${() => {
+                if (this._holdTimer !== null) {
+                    this._cancelHold();
+                    this._fireMoreInfo(v.entity);
+                }
+                else {
+                    this._holdId = null;
+                }
+            }}
+                @pointerleave=${this._holdEnd}
+                @pointercancel=${this._holdEnd}
+                title=${v.name ?? v.entity} aria-label=${v.name ?? v.entity}
+                aria-pressed=${shown ? "true" : "false"}>
+                <div class="hold-ring"></div>
+                ${v.image
+                ? b `<img src=${v.image} alt="" />`
+                : b `<ha-icon icon="mdi:robot-vacuum" style=${o({ color: this._color(v) })}></ha-icon>`}
+              </button>
+            </div>
+          `;
+        })}
       </div>
     `;
     }
@@ -3842,15 +3887,21 @@ AnyVacCard.styles = i$6 `
     .stat b { font-weight: 700; }
     .stat small { font-size: 10px; color: rgba(255, 255, 255, 0.4); }
 
-    /* Emergency manual-control icon strip (docs/19 follow-up, portrait only) */
-    .vac-icon-strip { display: flex; gap: 6px; flex-wrap: wrap; margin-bottom: 6px; }
+    /* Emergency manual-control icon strip (docs/19 follow-up, portrait only).
+       Full-width, one flex slot per vacuum (mirrors .dock-head/.dock-mode
+       below it) — the slot stretches, the circular button inside stays put. */
+    .vac-icon-strip { display: flex; gap: 6px; margin-bottom: 6px; }
+    .vac-icon-slot { flex: 1; display: flex; justify-content: center; }
     .vac-icon-btn {
+      position: relative;
       width: 34px; height: 34px; border-radius: 50%; padding: 0; overflow: hidden;
       display: flex; align-items: center; justify-content: center;
       background: rgba(255,255,255,0.05); border: 2px solid rgba(255,255,255,0.2); cursor: pointer;
+      transition: opacity 0.15s ease;
     }
     .vac-icon-btn img { width: 100%; height: 100%; object-fit: cover; border-radius: 50%; }
     .vac-icon-btn ha-icon { --mdc-icon-size: 18px; }
+    .vac-icon-btn--hidden { opacity: 0.35; }
 
     /* Vacuum picker (docs/19 A5): landscape's vertical replacement for the
      *  horizontal badge-row tabs, sits right above the dock room-list. */
@@ -4121,7 +4172,8 @@ AnyVacCard.styles = i$6 `
     }
 
     .action-btn--holding .hold-ring,
-    .badge--holding .hold-ring {
+    .badge--holding .hold-ring,
+    .vac-icon-btn--holding .hold-ring {
       animation: hold-fill var(--hold-ms) linear forwards;
     }
 
