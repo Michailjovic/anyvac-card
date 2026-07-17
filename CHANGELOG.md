@@ -12,6 +12,33 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Real-hardware polish pass on the landscape cockpit (docs/18/19). Plus this
   release's layout hardening ship as **v1.0.0**.
 
+## [0.66.3] - 2026-07-17
+
+Found and fixed live, directly on the user's real dashboard (Claude in
+Chrome session against a running HA instance) — a genuine CSS Grid bug
+distinct from the 0.66.0–0.66.2 timing/detection fixes. No backend change —
+still pairs with `anyvac` 0.51.0.
+
+### Fixed
+
+- **Multi-column-spanning grid regions (badges/map/tools in the default
+  landscape profile, `start` in portrait) overflowed the card's grid by
+  exactly the configured `gap`.** Numeric column/row tracks were rendered
+  as CSS `%` (e.g. `columns: [70, 30]` → `"70% 30%"`), which sums to 100%
+  and leaves no room for the `gap` between tracks — any region spanning
+  2+ tracks (`col: "1/3"`) then rendered `gap`-px wider than the grid
+  container. With the default 6px gap this pushed the page into a
+  horizontal AND (as a pure cascading side effect) vertical scrollbar,
+  even though the card's own pinned height was computed correctly. Fixed
+  by rendering numeric tracks as `fr` instead of `%` — CSS Grid's `fr` unit
+  distributes space *after* subtracting `gap`, so the same `[70, 30]` still
+  renders a 70:30 split, just without the overflow. Confirmed live: fixed
+  both the horizontal and vertical scrollbar simultaneously on the exact
+  dashboard that showed the bug.
+- Playwright suite gained a sixth test asserting a spanning region's right
+  edge never exceeds the grid's own right edge — verified to fail (by
+  exactly the configured gap) without this fix.
+
 ## [0.66.2] - 2026-07-17
 
 Second follow-up to 0.66.0/0.66.1, same source (`room-overlay-card` v5.0).

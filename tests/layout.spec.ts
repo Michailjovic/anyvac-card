@@ -193,4 +193,30 @@ test.describe("layout hardening (docs/21)", () => {
     expect(shrink).toBeGreaterThanOrEqual(120);
     expect(shrink).toBeLessThanOrEqual(170);
   });
+
+  test("5b second follow-up: multi-column-spanning regions never overflow the grid (gap accounted for)", async ({ page }) => {
+    // Live-confirmed bug (2026-07-17, real HA dashboard): percentage column
+    // tracks summing to 100% don't leave room for `gap` — any region
+    // spanning 2+ columns (col: "1/3", e.g. badges/map/tools in the default
+    // landscape profile) then overflows the grid by (gaps spanned × gap
+    // size), which cascades into a page-level scrollbar in both axes. Fixed
+    // by using `fr` instead of `%` for numeric tracks (layout.ts `track()`).
+    await page.setViewportSize({ width: 1600, height: 900 });
+    await mountCard(page, { width: 1200, height: 800 });
+    await expect.poll(() => chipText(page)).toContain("landscape");
+
+    const rects = await page.evaluate(() => {
+      const card = (window as any).__mockHa.cardWrap.querySelector("anyvac-card");
+      const grid = card.shadowRoot.querySelector(".avc-grid") as HTMLElement;
+      const badges = card.shadowRoot.querySelector(".avc-region--badges") as HTMLElement | null;
+      return {
+        gridRight: grid.getBoundingClientRect().right,
+        badgesRight: badges ? badges.getBoundingClientRect().right : null,
+      };
+    });
+    expect(rects.badgesRight).not.toBeNull();
+    // A spanning region's right edge must not exceed the grid container's
+    // own right edge (small sub-pixel tolerance for rounding).
+    expect((rects.badgesRight as number) - rects.gridRight).toBeLessThanOrEqual(1);
+  });
 });

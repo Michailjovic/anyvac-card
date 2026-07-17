@@ -87,7 +87,7 @@ const t={ATTRIBUTE:1},e=t=>(...e)=>({_$litDirective$:t,values:e});let i$1 = clas
 
 const CARD_NAME = "anyvac-card";
 const EDITOR_NAME = "anyvac-card-editor";
-const CARD_VERSION = "0.66.2";
+const CARD_VERSION = "0.66.3";
 /** Hold duration in ms required to trigger START / PAUSE actions */
 const HOLD_DURATION_MS = 600;
 /**
@@ -473,8 +473,19 @@ function resolveProfile(cfg, profile) {
         place: p.place && Object.keys(p.place).length ? p.place : d.place,
     };
 }
+/** `fr`, not `%` — CSS Grid's `fr` unit distributes space AFTER subtracting
+ *  `gap`, so proportional tracks never overflow their container by the gap
+ *  amount. Plain `%` tracks summing to 100% do: any region spanning 2+
+ *  tracks (e.g. `col: "1/3"`) then overflows the grid by (gaps spanned ×
+ *  gap size) — confirmed live on a real dashboard 2026-07-17 (docs/21 §5b
+ *  second follow-up): a landscape `columns: [70, 30]` with the default 6px
+ *  gap overflowed `badges`/`map`/`tools` (all `col: "1/3"`) by exactly 6px,
+ *  which cascaded into a page-level horizontal AND vertical scrollbar (the
+ *  vertical one was a pure side effect — fixing the column unit alone
+ *  removed both). Numerically identical ratio for the config author (a
+ *  `70`/`30` split still renders 70:30); only the CSS unit changes. */
 function track(v) {
-    return typeof v === "number" ? v + "%" : v;
+    return typeof v === "number" ? v + "fr" : v;
 }
 function trackList(list) {
     return list.map(track).join(" ");
