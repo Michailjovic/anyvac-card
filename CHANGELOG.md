@@ -12,6 +12,27 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Real-hardware polish pass on the landscape cockpit (docs/18/19). Plus this
   release's layout hardening ship as **v1.0.0**.
 
+## [0.66.2] - 2026-07-17
+
+Second follow-up to 0.66.0/0.66.1, same source (`room-overlay-card` v5.0).
+No backend change — still pairs with `anyvac` 0.51.0.
+
+### Fixed
+
+- **Fresh dashboard loads could leave stale dead scroll space below the
+  card, only fixing itself after toggling edit mode twice.** Fonts and
+  images (the floorplan `image_base`, per-vacuum `image`, map images) can
+  finish loading and shift the card's own position on the page — without
+  changing the card's own box size and without any DOM mutation our
+  `MutationObserver`/`ResizeObserver` could see. A new one-shot 250ms
+  "settle" remeasure runs after every render (cleared and rescheduled each
+  time, so it never piles up), catching exactly this class of "nothing we
+  observe actually changed, but the layout math needs redoing anyway" case.
+- Playwright suite gained a fifth test that grows an untracked sibling
+  element above the card (simulating this exact late-arriving-content
+  scenario) and confirms the grid self-corrects within the settle window
+  with no explicit trigger — verified to fail without this fix.
+
 ## [0.66.1] - 2026-07-17
 
 Follow-up to 0.66.0, ported from a sibling project's (`room-overlay-card`

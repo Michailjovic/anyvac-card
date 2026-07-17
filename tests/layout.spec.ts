@@ -159,4 +159,38 @@ test.describe("layout hardening (docs/21)", () => {
     const blockedRafCalls = await page.evaluate(() => (window as any).__rafBlockedCalls ?? 0);
     expect(blockedRafCalls).toBe(0);
   });
+
+  test("5b follow-up: a late position shift with no observable DOM mutation still settles (~250ms)", async ({ page }) => {
+    await page.setViewportSize({ width: 1600, height: 900 });
+    await mountCard(page, { width: 1200, height: 800 });
+    await expect.poll(() => chipText(page)).toContain("landscape");
+
+    const before = await gridHeight(page);
+    expect(before).not.toBeNull();
+
+    // Simulate late-loading content ABOVE the card (fonts/images finishing
+    // after first paint): grows an EXISTING element's inline style, so it
+    // fires neither our MutationObserver (no childList change on the
+    // watched trees) nor ResizeObserver(this) (the card's own box doesn't
+    // change, only its position). Only the docs/21 §5b follow-up settle
+    // timer can catch this.
+    await page.evaluate(() => {
+      (window as any).__mockHa.aboveSpacer.style.height = "150px";
+    });
+
+    // Immediately after: still stale — proves the scenario is real, not
+    // vacuously already-fixed by some other observer.
+    const immediately = await gridHeight(page);
+    expect(immediately).not.toBeNull();
+    expect(Math.abs((immediately as number) - (before as number))).toBeLessThan(5);
+
+    // Past the settle window: self-corrected with no explicit trigger from
+    // the test (no resize, no enterEdit/exitEdit, no window event).
+    await page.waitForTimeout(500);
+    const settled = await gridHeight(page);
+    expect(settled).not.toBeNull();
+    const shrink = (before as number) - (settled as number);
+    expect(shrink).toBeGreaterThanOrEqual(120);
+    expect(shrink).toBeLessThanOrEqual(170);
+  });
 });

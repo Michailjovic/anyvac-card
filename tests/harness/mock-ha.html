@@ -65,6 +65,17 @@
   view.appendChild(panelView);
   const cardSlot = panelView.shadowRoot.getElementById("cardSlot");
 
+  // Sibling BEFORE cardWrap whose height a test can grow later, to
+  // simulate late-loading content (fonts/images finishing after first
+  // paint) shifting the card's position WITHOUT any DOM mutation on the
+  // trees our MutationObserver watches and WITHOUT resizing the card's own
+  // box (so ResizeObserver(this) can't catch it either) — docs/21 §5b
+  // follow-up settle-timer scenario.
+  const aboveSpacer = document.createElement("div");
+  aboveSpacer.id = "aboveSpacer";
+  aboveSpacer.style.height = "0px";
+  cardSlot.appendChild(aboveSpacer);
+
   // Container the test controls the width/height of, to simulate the card
   // NOT spanning the full window (two-up cards, sections view, sidebar...).
   const cardWrap = document.createElement("div");
@@ -75,6 +86,7 @@
     panelView,
     cardSlot,
     cardWrap,
+    aboveSpacer,
     /** Reparent whatever is in cardWrap into a hui-card-options wrapper, IN
      *  PLACE (same parent chain) — matches real HA edit-mode behavior. */
     enterEdit() {

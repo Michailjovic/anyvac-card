@@ -125,6 +125,16 @@ export class AnyVacCard extends LitElement {
    *  popups), so a card measure scheduled while hidden would otherwise hang
    *  forever. Only one of `_measureRaf`/`_measureTimer` is ever active. */
   private _measureTimer: number | null = null;
+  /** docs/21 §5b follow-up (2026-07-17, ported from `room-overlay-card`
+   *  v5.0): one late-settling remeasure after every render, NOT tied to any
+   *  DOM mutation or resize. Fonts/images (the floorplan `image_base`,
+   *  per-vacuum `image`, map images) can finish loading and shift the
+   *  card's own position on the page — without changing the card's own box
+   *  size and without any observable DOM mutation — leaving the grid pinned
+   *  to a stale height (dead scroll space below it) until *something else*
+   *  happens to trigger a remeasure. Cleared and rescheduled every render,
+   *  so it never piles up timers. */
+  private _settleTimer: number | null = null;
   /** docs/21 §5b/§5c: nearest `hui-panel-view` ancestor observer. HA
    *  reparents the card into `hui-card-options` on edit-mode toggle without
    *  firing any event, and the host's own box doesn't always change size
@@ -421,6 +431,7 @@ export class AnyVacCard extends LitElement {
     this._cancelHold();
     if (this._measureRaf) { cancelAnimationFrame(this._measureRaf); this._measureRaf = 0; }
     if (this._measureTimer !== null) { clearTimeout(this._measureTimer); this._measureTimer = null; }
+    if (this._settleTimer !== null) { clearTimeout(this._settleTimer); this._settleTimer = null; }
     if (this._tickTimer) { clearInterval(this._tickTimer); this._tickTimer = null; }
     if (this._onWinResize) {
       window.removeEventListener("resize", this._onWinResize);
@@ -452,6 +463,13 @@ export class AnyVacCard extends LitElement {
     // the ancestor may not have been in the tree yet on the very first
     // connectedCallback. No-op once _panelViewMo is set.
     if (!this._panelViewMo) this._setupPanelViewObserver();
+    // docs/21 §5b follow-up: one 250ms late-settling remeasure, see
+    // `_settleTimer`'s doc comment. Cleared + rescheduled every render.
+    if (this._settleTimer !== null) clearTimeout(this._settleTimer);
+    this._settleTimer = window.setTimeout(() => {
+      this._settleTimer = null;
+      this._scheduleMeasure();
+    }, 250);
   }
 
   /** Portrait only (docs/19 follow-up): the map is height-fit
