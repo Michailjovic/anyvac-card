@@ -13,6 +13,19 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   on the new landscape cockpit below. Completion of the whole rebuild (this
   release + the follow-up) ships as **v1.0.0**.
 
+## [0.65.2] - 2026-07-17
+
+Follow-up to 0.65.1: the icon strip stayed fixed at 34px regardless of
+vacuum count, so 2 vacuums left the strip mostly empty and 4+ would have
+started overflowing. No backend change — still pairs with `anyvac` 0.50.0.
+
+### Changed
+
+- Vac-icon-strip buttons now fill their equal-width flex slot (`width: 100%`
+  clamped between 28px and 64px, `aspect-ratio: 1/1` keeps them circular at
+  any size) instead of a fixed 34px — fewer vacuums render bigger buttons,
+  more vacuums render smaller ones, always spanning the full row width.
+
 ## [0.65.1] - 2026-07-17
 
 Field feedback on the portrait vac-icon-strip (docs/19 follow-up): with 3

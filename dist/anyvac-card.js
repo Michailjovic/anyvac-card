@@ -94,7 +94,7 @@ const t={ATTRIBUTE:1},e=t=>(...e)=>({_$litDirective$:t,values:e});let i$1 = clas
 
 const CARD_NAME = "anyvac-card";
 const EDITOR_NAME = "anyvac-card-editor";
-const CARD_VERSION = "0.65.0";
+const CARD_VERSION = "0.65.1";
 /** Hold duration in ms required to trigger START / PAUSE actions */
 const HOLD_DURATION_MS = 600;
 /**
@@ -3889,18 +3889,24 @@ AnyVacCard.styles = i$6 `
 
     /* Emergency manual-control icon strip (docs/19 follow-up, portrait only).
        Full-width, one flex slot per vacuum (mirrors .dock-head/.dock-mode
-       below it) — the slot stretches, the circular button inside stays put. */
+       below it). The slot shares available width equally (n=2 → wide slots,
+       n=4 → narrower) and the button fills its slot (width: 100%, capped by
+       min/max-width) with aspect-ratio 1:1 keeping it a circle at any size —
+       so the strip actually uses the space it has instead of staying pinned
+       at a fixed 34px regardless of vacuum count (field feedback
+       2026-07-17). */
     .vac-icon-strip { display: flex; gap: 6px; margin-bottom: 6px; }
-    .vac-icon-slot { flex: 1; display: flex; justify-content: center; }
+    .vac-icon-slot { flex: 1; min-width: 0; display: flex; justify-content: center; }
     .vac-icon-btn {
       position: relative;
-      width: 34px; height: 34px; border-radius: 50%; padding: 0; overflow: hidden;
+      width: 100%; min-width: 28px; max-width: 64px; aspect-ratio: 1 / 1; height: auto;
+      border-radius: 50%; padding: 0; overflow: hidden;
       display: flex; align-items: center; justify-content: center;
       background: rgba(255,255,255,0.05); border: 2px solid rgba(255,255,255,0.2); cursor: pointer;
       transition: opacity 0.15s ease;
     }
     .vac-icon-btn img { width: 100%; height: 100%; object-fit: cover; border-radius: 50%; }
-    .vac-icon-btn ha-icon { --mdc-icon-size: 18px; }
+    .vac-icon-btn ha-icon { --mdc-icon-size: 20px; }
     .vac-icon-btn--hidden { opacity: 0.35; }
 
     /* Vacuum picker (docs/19 A5): landscape's vertical replacement for the
