@@ -275,19 +275,65 @@ export class AnyVacCard extends LitElement {
       return rect.height > 1 ? Math.round(rect.height) : window.innerHeight;
     }
     const top = rect.top;
-    if (top >= 0 && top < window.innerHeight) return Math.max(1, Math.round(window.innerHeight - top));
+    if (top >= 0 && top < window.innerHeight) {
+      return Math.max(1, Math.round(window.innerHeight - top - this._editBarHeight()));
+    }
     return window.innerHeight;
   }
 
-  /** docs/21 §5b: find the nearest `hui-panel-view` ancestor across shadow
-   *  root boundaries (HA nests the card several shadow roots deep). Internal
-   *  HA DOM, not public API — callers must degrade loudly (§5c), not assume
-   *  it's always found. */
+  /** docs/21 §5b follow-up (2026-07-17, ported from a sibling project's
+   *  battle-tested fix — room-overlay-card v5.0): HA's edit-mode "Move /
+   *  Edit / Delete" actions bar renders as a REAL sibling inside
+   *  `hui-card-options`' OWN shadow root — a separate shadow tree from both
+   *  the card's own and `hui-panel-view`'s, and NOT an overlay. A card
+   *  pinned to the full viewport height without reserving room for it gets
+   *  its content pushed under/behind that bar. Measure the bar's REAL
+   *  rendered height (never hardcoded — it isn't a constant across HA
+   *  versions/themes) so callers can subtract exactly that much. Internal
+   *  HA DOM, best-effort: any miss just returns 0 (today's behavior). */
+  private _editBarHeight(): number {
+    try {
+      const opts = this._findCardOptionsAncestor();
+      if (!opts?.shadowRoot) return 0;
+      const bar = opts.shadowRoot.querySelector(".card-actions") as HTMLElement | null;
+      if (!bar) return 0;
+      const br = bar.getBoundingClientRect();
+      if (!(br.height > 0)) return 0;
+      const bcs = getComputedStyle(bar);
+      return Math.ceil(br.height + (parseFloat(bcs.marginTop) || 0) + (parseFloat(bcs.marginBottom) || 0));
+    } catch {
+      return 0;
+    }
+  }
+
+  /** docs/21 §5b, widened 2026-07-17: find the nearest `hui-panel-view` OR
+   *  `hui-view` ancestor across shadow root boundaries (HA nests the card
+   *  several shadow roots deep). Watching both, not just `hui-panel-view`,
+   *  is a lesson learned the hard way in a sibling project — which HA
+   *  dashboard/view type resolves to which tag varies, and a card that only
+   *  ever checks one can silently never find its ancestor. Internal HA DOM,
+   *  not public API — callers must degrade loudly (§5c), not assume it's
+   *  always found. */
   private _findPanelViewAncestor(): Element | null {
     let node: Node | null = this.parentElement ?? (this.getRootNode() as ShadowRoot).host ?? null;
     let hops = 0;
     while (node && hops++ < 20) {
-      if (node instanceof Element && node.tagName === "HUI-PANEL-VIEW") return node;
+      if (node instanceof Element && (node.tagName === "HUI-PANEL-VIEW" || node.tagName === "HUI-VIEW")) return node;
+      const el = node as Element;
+      node = el.parentElement ?? (el.getRootNode() as ShadowRoot)?.host ?? null;
+    }
+    return null;
+  }
+
+  /** Nearest `hui-card-options` ancestor, if the card is currently wrapped
+   *  in one (edit mode). Its actions bar lives in ITS OWN shadow root — a
+   *  separate tree from `hui-panel-view`'s — so it needs to be watched
+   *  (and re-found) independently; see `_setupPanelViewObserver`. */
+  private _findCardOptionsAncestor(): Element | null {
+    let node: Node | null = this.parentElement ?? (this.getRootNode() as ShadowRoot).host ?? null;
+    let hops = 0;
+    while (node && hops++ < 12) {
+      if (node instanceof Element && node.tagName === "HUI-CARD-OPTIONS") return node;
       const el = node as Element;
       node = el.parentElement ?? (el.getRootNode() as ShadowRoot)?.host ?? null;
     }
@@ -299,7 +345,13 @@ export class AnyVacCard extends LitElement {
    *  change size when it happens — `ResizeObserver(this)` can miss it. Watch
    *  the nearest panel-view ancestor (and its shadow root, if any) for DOM
    *  mutations and force a remeasure on any change. `_scheduleMeasure` is
-   *  itself coalesced, so an extra call here is cheap. */
+   *  itself coalesced, so an extra call here is cheap.
+   *
+   *  2026-07-17: also (re-)adopt `hui-card-options`' own shadow root on every
+   *  mutation — its actions bar (whose height `_editBarHeight` reserves) is
+   *  a separate shadow tree that can appear/change after the wrapper itself
+   *  shows up, and re-observing an already-observed target is a cheap
+   *  no-op, so this is safe to do unconditionally rather than only once. */
   private _setupPanelViewObserver(): void {
     if (this._panelViewMo || typeof MutationObserver === "undefined") return;
     const panelView = this._findPanelViewAncestor();
@@ -308,18 +360,28 @@ export class AnyVacCard extends LitElement {
         this._panelViewWarned = true;
         try {
           console.warn(
-            "[anyvac-card] hui-panel-view ancestor not found (HA internal DOM may have " +
-            "changed) — edit-mode layout refresh via MutationObserver is disabled; " +
+            "[anyvac-card] hui-panel-view/hui-view ancestor not found (HA internal DOM may " +
+            "have changed) — edit-mode layout refresh via MutationObserver is disabled; " +
             "resize-based refresh still works."
           );
         } catch { /* noop */ }
       }
       return;
     }
-    const mo = new MutationObserver(() => this._scheduleMeasure());
+    const mo = new MutationObserver(() => {
+      this._scheduleMeasure();
+      const opts = this._findCardOptionsAncestor();
+      if (opts?.shadowRoot) {
+        try { mo.observe(opts.shadowRoot, { childList: true, subtree: true }); } catch { /* noop */ }
+      }
+    });
     try { mo.observe(panelView, { childList: true, subtree: true }); } catch { /* noop */ }
     if (panelView.shadowRoot) {
       try { mo.observe(panelView.shadowRoot, { childList: true, subtree: true }); } catch { /* noop */ }
+    }
+    const initialOpts = this._findCardOptionsAncestor();
+    if (initialOpts?.shadowRoot) {
+      try { mo.observe(initialOpts.shadowRoot, { childList: true, subtree: true }); } catch { /* noop */ }
     }
     this._panelViewMo = mo;
   }
@@ -328,7 +390,9 @@ export class AnyVacCard extends LitElement {
    *  `calc(100svh − header)` when the root is offset (padding, safe-area). Applied
    *  directly to the element on top of `gridRootStyles()`'s declarative fallback
    *  (see that function's doc comment re: the 0.59.0 mobile-crash revert — this
-   *  layered approach, not sole JS ownership, is the confirmed-stable one). */
+   *  layered approach, not sole JS ownership, is the confirmed-stable one).
+   *  2026-07-17: also reserves room for the edit-mode actions bar (`_editBarHeight`)
+   *  so entering edit mode doesn't push it under/behind the pinned-height grid. */
   private _refineGridHeight(): void {
     const lay = this._config?.layout;
     if (!lay) return;
@@ -337,7 +401,7 @@ export class AnyVacCard extends LitElement {
     if ((lay.height ?? "viewport") === "viewport") {
       const top = root.getBoundingClientRect().top;
       if (top >= 0 && top < window.innerHeight) {
-        const h = Math.round(window.innerHeight - top);
+        const h = Math.round(window.innerHeight - top - this._editBarHeight());
         if (h > 120) root.style.height = h + "px";
       }
     }

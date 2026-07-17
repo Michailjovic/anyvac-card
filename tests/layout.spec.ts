@@ -105,6 +105,12 @@ test.describe("layout hardening (docs/21)", () => {
     const duringEdit = await gridHeight(page);
     expect(duringEdit).not.toBeNull();
     expect(duringEdit as number).toBeGreaterThan(120);
+    // 2026-07-17 follow-up: the mock's hui-card-options actions bar is 32px
+    // tall (tests/harness/mock-ha.html) — _editBarHeight() should reserve
+    // roughly that much, not just avoid collapsing to zero.
+    const shrink = (before as number) - (duringEdit as number);
+    expect(shrink).toBeGreaterThanOrEqual(25);
+    expect(shrink).toBeLessThanOrEqual(40);
 
     await page.evaluate(() => (window as any).__mockHa.exitEdit());
     await page.waitForTimeout(200);

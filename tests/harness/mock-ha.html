@@ -40,18 +40,22 @@
     constructor() {
       super();
       const root = this.attachShadow({ mode: "open" });
-      // Real HA renders an actions bar (move/edit/delete) above the card
-      // here — it has real height, which shifts the card's own
-      // getBoundingClientRect().top down without changing the card's own
-      // width/height. That's precisely the case ResizeObserver(this) can
-      // miss (docs/21 §5b).
+      // Real HA renders an actions bar (move/edit/delete) here — it has
+      // real height, but doesn't change the card's own width/height, which
+      // is precisely the case ResizeObserver(this) can miss (docs/21 §5b).
+      // Real HA renders this toolbar BELOW the card (a following sibling in
+      // the wrapper's shadow tree), not above it — the card's own top
+      // position is unaffected; only the room available for its pinned
+      // height shrinks. Order here matters: get it backwards and a test
+      // built on this mock would "prove" a double-reservation bug that
+      // isn't real (caught empirically while building this harness).
+      const slot = document.createElement("slot");
+      root.appendChild(slot);
       const actions = document.createElement("div");
       actions.className = "card-actions";
       actions.textContent = "MOVE / EDIT / DELETE";
       actions.style.height = "32px";
       root.appendChild(actions);
-      const slot = document.createElement("slot");
-      root.appendChild(slot);
     }
   }
   customElements.define("hui-card-options", HuiCardOptions);

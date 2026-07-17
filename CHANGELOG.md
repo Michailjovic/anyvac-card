@@ -12,6 +12,35 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Real-hardware polish pass on the landscape cockpit (docs/18/19). Plus this
   release's layout hardening ship as **v1.0.0**.
 
+## [0.66.1] - 2026-07-17
+
+Follow-up to 0.66.0, ported from a sibling project's (`room-overlay-card`
+v5.0) battle-tested fixes for the same class of HA edit-mode DOM quirks.
+No backend change — still pairs with `anyvac` 0.51.0.
+
+### Fixed
+
+- Edit-mode ancestor lookup now matches `hui-panel-view` OR `hui-view`, not
+  just `hui-panel-view`. Which tag actually resolves as the nearest ancestor
+  varies by HA dashboard/view type — checking only one meant the
+  `MutationObserver` from 0.66.0 could silently never attach on setups where
+  the other tag was the real ancestor.
+- The `MutationObserver` now also (re-)adopts `hui-card-options`' own shadow
+  root on every mutation, not just `hui-panel-view`'s. HA's edit-mode
+  actions bar (Move / Edit / Delete) mounts in a separate shadow tree from
+  `hui-panel-view` — watching only the latter missed changes inside it.
+- **The grid's pinned height (viewport mode) now reserves real room for
+  that actions bar.** It renders as a genuine sibling below the card, not
+  an overlay — without reserving its height, entering edit mode could push
+  it under the fold or overlap it. New `_editBarHeight()` measures the
+  bar's actual rendered height (never hardcoded) and both `pickProfile`'s
+  input and the final grid height subtract it.
+- Playwright suite gained a fourth assertion (mock actions bar height
+  reserved, not just "doesn't collapse") — caught a mock-harness ordering
+  bug during development (actions bar placed above vs. below the card
+  changes whether the reservation is real or double-counted) before it
+  could look like a false pass.
+
 ## [0.66.0] - 2026-07-17
 
 Layout hardening + real device-independence (docs/21/22, roadmap to v1.0.0
