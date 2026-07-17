@@ -94,7 +94,7 @@ const t={ATTRIBUTE:1},e=t=>(...e)=>({_$litDirective$:t,values:e});let i$1 = clas
 
 const CARD_NAME = "anyvac-card";
 const EDITOR_NAME = "anyvac-card-editor";
-const CARD_VERSION = "0.65.1";
+const CARD_VERSION = "0.65.2";
 /** Hold duration in ms required to trigger START / PAUSE actions */
 const HOLD_DURATION_MS = 600;
 /**
@@ -1944,6 +1944,14 @@ let AnyVacCard = class AnyVacCard extends i$2 {
         return b `
       <div class="dock">
         ${this._renderVacuumIconStrip()}
+        ${ /* Dry/wet PATH visibility on the map (view_layers) — a different concern
+             from the dock-mode buttons below (which pick what to CLEAN). Landscape
+             already gets this from the meta bar's `tools` region (docs/19 A4), but
+             portrait has no `tools` region at all, so it silently had no way to
+             toggle path visibility (field feedback 2026-07-17). Reuses the same
+             compact toggle, just placed in the dock column instead of a meta bar. */this._profile === "portrait" ? b `
+            <div class="dock-layers">${this._renderLayerToggleCompact(vacs)}</div>
+          ` : A}
         <div class="dock-head">
           ${modeBtn("dry", "mdi:broom", "Dry")}${modeBtn("wet", "mdi:water", "Wet")}${modeBtn("both", "mdi:water-plus", "Both")}
         </div>
@@ -3935,6 +3943,10 @@ AnyVacCard.styles = i$6 `
       border: 1px solid rgba(255, 255, 255, 0.08);
       border-radius: 12px;
     }
+    /* Portrait-only dry/wet path visibility row (see _renderDock) — reuses
+       .mtbtn from the meta bar, wrapped to full width like .dock-head below. */
+    .dock-layers { display: flex; gap: 4px; margin-bottom: 4px; }
+    .dock-layers .mtbtn { flex: 1; justify-content: center; }
     .dock-head { display: flex; gap: 4px; }
     .dock-mode {
       flex: 1;

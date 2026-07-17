@@ -1,6 +1,6 @@
 {
   "name": "anyvac-card",
-  "version": "0.65.2",
+  "version": "0.65.3",
   "description": "Modern, universal Lovelace card for robot vacuums (Home Assistant)",
   "keywords": [
     "home-assistant",

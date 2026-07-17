@@ -13,6 +13,21 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   on the new landscape cockpit below. Completion of the whole rebuild (this
   release + the follow-up) ships as **v1.0.0**.
 
+## [0.65.3] - 2026-07-17
+
+Field feedback: the portrait grid profile has no `tools` region (docs/18
+§4), so it never got the dry/wet path visibility toggle that landscape's
+consolidated meta bar has — no way to show/hide cleaning paths on the map
+in portrait at all. No backend change — still pairs with `anyvac` 0.50.0.
+
+### Added
+
+- Dry/wet path visibility toggle in the portrait dock column (new
+  `.dock-layers` row, above the Dry/Wet/Both mode buttons), reusing the same
+  `_renderLayerToggleCompact` landscape already uses in its meta bar. This is
+  about map path VISIBILITY (`view_layers`), distinct from the Dry/Wet/Both
+  row right below it which picks what to clean.
+
 ## [0.65.2] - 2026-07-17
 
 Follow-up to 0.65.1: the icon strip stayed fixed at 34px regardless of
