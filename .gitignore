@@ -3,6 +3,12 @@ node_modules/
 *.tsbuildinfo
 .rollup.cache/
 
+# Playwright (docs/21 §5e layout hardening tests)
+test-results/
+playwright-report/
+blob-report/
+playwright/.cache/
+
 # NOTE: dist/ is intentionally NOT ignored — the built anyvac-card.js is
 # committed to the repo so HACS can install it (and the release workflow
 # attaches it to releases).

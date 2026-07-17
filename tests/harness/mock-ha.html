@@ -1,0 +1,97 @@
+<!doctype html>
+<html>
+<head>
+<meta charset="utf-8">
+<style>
+  html, body { margin: 0; padding: 0; height: 100%; }
+  hui-view-container, hui-view, hui-panel-view, hui-card-options { display: block; }
+  hui-view-container, hui-view, hui-panel-view { height: 100%; }
+  #cardWrap { display: block; }
+</style>
+</head>
+<body>
+<hui-view-container>
+  <hui-view>
+  </hui-view>
+</hui-view-container>
+<script type="module">
+  // Minimal mock of the HA internal DOM anyvac-card actually sits inside:
+  // hui-view-container > hui-view > hui-panel-view (shadow root) > ... >
+  // the card. Real HA elements are far more complex; this harness only
+  // reproduces the two structural facts the card's layout code (docs/21)
+  // depends on: (1) arbitrary shadow-root nesting between the card and the
+  // page, and (2) edit-mode reparenting the card into a `hui-card-options`
+  // wrapper without necessarily resizing the card's own box or firing any
+  // event.
+
+  class HuiPanelView extends HTMLElement {
+    constructor() {
+      super();
+      const root = this.attachShadow({ mode: "open" });
+      const slot = document.createElement("div");
+      slot.id = "cardSlot";
+      slot.style.display = "block";
+      root.appendChild(slot);
+    }
+  }
+  customElements.define("hui-panel-view", HuiPanelView);
+
+  class HuiCardOptions extends HTMLElement {
+    constructor() {
+      super();
+      const root = this.attachShadow({ mode: "open" });
+      // Real HA renders an actions bar (move/edit/delete) above the card
+      // here — it has real height, which shifts the card's own
+      // getBoundingClientRect().top down without changing the card's own
+      // width/height. That's precisely the case ResizeObserver(this) can
+      // miss (docs/21 §5b).
+      const actions = document.createElement("div");
+      actions.className = "card-actions";
+      actions.textContent = "MOVE / EDIT / DELETE";
+      actions.style.height = "32px";
+      root.appendChild(actions);
+      const slot = document.createElement("slot");
+      root.appendChild(slot);
+    }
+  }
+  customElements.define("hui-card-options", HuiCardOptions);
+
+  const view = document.querySelector("hui-view");
+  const panelView = document.createElement("hui-panel-view");
+  view.appendChild(panelView);
+  const cardSlot = panelView.shadowRoot.getElementById("cardSlot");
+
+  // Container the test controls the width/height of, to simulate the card
+  // NOT spanning the full window (two-up cards, sections view, sidebar...).
+  const cardWrap = document.createElement("div");
+  cardWrap.id = "cardWrap";
+  cardSlot.appendChild(cardWrap);
+
+  window.__mockHa = {
+    panelView,
+    cardSlot,
+    cardWrap,
+    /** Reparent whatever is in cardWrap into a hui-card-options wrapper, IN
+     *  PLACE (same parent chain) — matches real HA edit-mode behavior. */
+    enterEdit() {
+      const card = cardWrap.firstElementChild;
+      if (!card) return;
+      const wrapper = document.createElement("hui-card-options");
+      cardWrap.removeChild(card);
+      wrapper.appendChild(card);
+      cardWrap.appendChild(wrapper);
+    },
+    exitEdit() {
+      const wrapper = cardWrap.querySelector("hui-card-options");
+      if (!wrapper) return;
+      const card = wrapper.firstElementChild;
+      wrapper.removeChild(card);
+      cardWrap.removeChild(wrapper);
+      cardWrap.appendChild(card);
+    },
+  };
+  window.__mockHaReady = true;
+</script>
+<script type="module" src="/dist/anyvac-card.js"></script>
+</body>
+</html>

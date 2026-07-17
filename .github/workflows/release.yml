@@ -16,9 +16,31 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
-      - name: Attach JS to release
-        uses: softprops/action-gh-release@v2
-        with:
-          tag_name: ${{ github.event.release.tag_name }}
-          files: dist/anyvac-card.js
-          fail_on_unmatched_files: true
+      # docs/21 §5d: a single-shot upload can hit a transient GitHub 503 and
+      # leave the release without its asset — HACS would then just report an
+      # unhelpful "unknown error" with no indication anything failed here.
+      # Retry a few times with backoff before giving up.
+      - name: Attach JS to release (retry on transient GitHub errors)
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          TAG: ${{ github.event.release.tag_name }}
+        run: |
+          for i in 1 2 3 4 5; do
+            if gh release upload "$TAG" dist/anyvac-card.js --clobber; then
+              exit 0
+            fi
+            echo "Upload attempt $i failed, retrying in $((i*10))s..."
+            sleep $((i*10))
+          done
+          echo "::error::failed to upload dist/anyvac-card.js to release $TAG after 5 attempts"
+          exit 1
+
+      # Fail the build loudly if the asset isn't actually there, instead of a
+      # green CI run masking a release HACS users can't install from.
+      - name: Verify asset is attached
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          TAG: ${{ github.event.release.tag_name }}
+        run: |
+          gh release view "$TAG" --json assets --jq '.assets[].name' | grep -qx 'anyvac-card.js' \
+            || { echo "::error::asset anyvac-card.js NOT attached to release $TAG"; exit 1; }

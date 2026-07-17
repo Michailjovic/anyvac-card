@@ -35,7 +35,6 @@ import {
 } from "./seatfit";
 import {
   pickProfile,
-  headerPx,
   resolveProfile,
   gridRootStyles,
   regionStyles,
@@ -120,6 +119,20 @@ export class AnyVacCard extends LitElement {
   private _ro: ResizeObserver | null = null;
   private _onWinResize: (() => void) | null = null;
   private _measureRaf = 0;
+  /** docs/21 §5a: `setTimeout` handle used instead of `_measureRaf` when the
+   *  tab is backgrounded (`document.hidden`) — `requestAnimationFrame` never
+   *  fires on an inactive tab (kiosk/wall-mounted tablets, `browser_mod`
+   *  popups), so a card measure scheduled while hidden would otherwise hang
+   *  forever. Only one of `_measureRaf`/`_measureTimer` is ever active. */
+  private _measureTimer: number | null = null;
+  /** docs/21 §5b/§5c: nearest `hui-panel-view` ancestor observer. HA
+   *  reparents the card into `hui-card-options` on edit-mode toggle without
+   *  firing any event, and the host's own box doesn't always change size
+   *  when that happens — `ResizeObserver(this)` alone can miss it. `_warned`
+   *  is a one-shot flag so a missing ancestor (internal HA DOM, not public
+   *  API) logs once, not on every failed lookup. */
+  private _panelViewMo: MutationObserver | null = null;
+  private _panelViewWarned = false;
   /** Per-second clock for the debug progress timers (mm:ss). Only ticks while a vacuum is
    *  cleaning/paused and debug_room_progress is on, so it does not re-render otherwise. */
   @state() private _now = Date.now();
@@ -189,6 +202,7 @@ export class AnyVacCard extends LitElement {
       window.addEventListener("resize", this._onWinResize, { passive: true });
       window.addEventListener("orientationchange", this._onWinResize, { passive: true });
     }
+    this._setupPanelViewObserver();
     this._scheduleMeasure();
     if (!this._tickTimer) {
       this._tickTimer = window.setInterval(() => {
@@ -202,23 +216,112 @@ export class AnyVacCard extends LitElement {
     }
   }
 
-  /** Coalesce all width re-measures into one rAF tick (RO + window resize +
-   *  orientationchange). Also re-picks the layout profile (docs/18) from the
-   *  available viewport ratio and refines the grid height. */
+  /** Coalesce all width re-measures into one tick (RO + window resize +
+   *  orientationchange + edit-mode reparenting, docs/21 §5b). Also re-picks
+   *  the layout profile (docs/18) and refines the grid height.
+   *
+   *  docs/21 §5a: `requestAnimationFrame` never fires on a backgrounded tab
+   *  (kiosk/wall-mounted tablets, `browser_mod` popups, a second window) —
+   *  confirmed live, not just in theory. Fall back to `setTimeout(fn, 0)`
+   *  while `document.hidden`, so a measure scheduled in the background still
+   *  actually runs instead of hanging until the tab regains focus. */
   private _scheduleMeasure(): void {
-    if (this._measureRaf) return;
-    this._measureRaf = requestAnimationFrame(() => {
+    if (this._measureRaf || this._measureTimer !== null) return;
+    const run = (): void => {
       this._measureRaf = 0;
-      const w = Math.round(this.getBoundingClientRect().width);
-      if (w && Math.abs(w - this._cardW) >= 2) this._cardW = w;
-      const lay = this._config?.layout;
-      if (lay) {
-        const hh = headerPx(this);
-        const p = pickProfile(lay, window.innerWidth, Math.max(1, window.innerHeight - hh));
-        if (p !== this._profile) this._profile = p;
-        this._refineGridHeight();
+      this._measureTimer = null;
+      this._doMeasure();
+    };
+    if (typeof document !== "undefined" && document.hidden) {
+      this._measureTimer = window.setTimeout(run, 0);
+    } else {
+      this._measureRaf = requestAnimationFrame(run);
+    }
+  }
+
+  /** docs/21 §5f: pick the layout profile from the card's OWN measured box,
+   *  not `window.innerWidth`/`innerHeight`. The card previously used the
+   *  full browser viewport for this — correct only when the card happens to
+   *  span the whole window. On any dashboard where it doesn't (two cards
+   *  side by side, a sections/grid view, a sidebar, split-screen), the
+   *  viewport's aspect ratio can disagree with the card's own box, picking
+   *  the wrong profile regardless of how correct the profile's own grid math
+   *  is. `_cardW` already tracks the real width (ResizeObserver on `this`);
+   *  this adds the matching height side. */
+  private _doMeasure(): void {
+    const rect = this.getBoundingClientRect();
+    const w = Math.round(rect.width);
+    if (w && Math.abs(w - this._cardW) >= 2) this._cardW = w;
+    const lay = this._config?.layout;
+    if (lay) {
+      const availW = this._cardW || w || window.innerWidth;
+      const availH = this._availableHeight(lay, rect);
+      const p = pickProfile(lay, availW, availH);
+      if (p !== this._profile) this._profile = p;
+      this._refineGridHeight();
+    }
+  }
+
+  /** Available height for profile picking (docs/21 §5f) — mirrors the height
+   *  mode `resolveHeightCss`/`_refineGridHeight` already use, just applied
+   *  one tick earlier (profile choice happens before the grid root can be
+   *  measured on first paint, so it can't read `.avc-grid` yet). `"container"`
+   *  = the card's own rendered height (whatever its parent actually gave
+   *  it). `"viewport"` (default) and any custom CSS length: window bottom
+   *  minus the card's own top — the same technique `_refineGridHeight` uses
+   *  for the grid height itself, so profile picking and final sizing agree. */
+  private _availableHeight(lay: LayoutConfig, rect: DOMRect): number {
+    if ((lay.height ?? "viewport") === "container") {
+      return rect.height > 1 ? Math.round(rect.height) : window.innerHeight;
+    }
+    const top = rect.top;
+    if (top >= 0 && top < window.innerHeight) return Math.max(1, Math.round(window.innerHeight - top));
+    return window.innerHeight;
+  }
+
+  /** docs/21 §5b: find the nearest `hui-panel-view` ancestor across shadow
+   *  root boundaries (HA nests the card several shadow roots deep). Internal
+   *  HA DOM, not public API — callers must degrade loudly (§5c), not assume
+   *  it's always found. */
+  private _findPanelViewAncestor(): Element | null {
+    let node: Node | null = this.parentElement ?? (this.getRootNode() as ShadowRoot).host ?? null;
+    let hops = 0;
+    while (node && hops++ < 20) {
+      if (node instanceof Element && node.tagName === "HUI-PANEL-VIEW") return node;
+      const el = node as Element;
+      node = el.parentElement ?? (el.getRootNode() as ShadowRoot)?.host ?? null;
+    }
+    return null;
+  }
+
+  /** docs/21 §5b: HA reparents the card into `hui-card-options` on edit-mode
+   *  toggle without firing any event, and the host's own box doesn't always
+   *  change size when it happens — `ResizeObserver(this)` can miss it. Watch
+   *  the nearest panel-view ancestor (and its shadow root, if any) for DOM
+   *  mutations and force a remeasure on any change. `_scheduleMeasure` is
+   *  itself coalesced, so an extra call here is cheap. */
+  private _setupPanelViewObserver(): void {
+    if (this._panelViewMo || typeof MutationObserver === "undefined") return;
+    const panelView = this._findPanelViewAncestor();
+    if (!panelView) {
+      if (!this._panelViewWarned) {
+        this._panelViewWarned = true;
+        try {
+          console.warn(
+            "[anyvac-card] hui-panel-view ancestor not found (HA internal DOM may have " +
+            "changed) — edit-mode layout refresh via MutationObserver is disabled; " +
+            "resize-based refresh still works."
+          );
+        } catch { /* noop */ }
       }
-    });
+      return;
+    }
+    const mo = new MutationObserver(() => this._scheduleMeasure());
+    try { mo.observe(panelView, { childList: true, subtree: true }); } catch { /* noop */ }
+    if (panelView.shadowRoot) {
+      try { mo.observe(panelView.shadowRoot, { childList: true, subtree: true }); } catch { /* noop */ }
+    }
+    this._panelViewMo = mo;
   }
 
   /** Measured refinement of the grid height: innerHeight − rootTop beats the raw
@@ -253,6 +356,7 @@ export class AnyVacCard extends LitElement {
     super.disconnectedCallback();
     this._cancelHold();
     if (this._measureRaf) { cancelAnimationFrame(this._measureRaf); this._measureRaf = 0; }
+    if (this._measureTimer !== null) { clearTimeout(this._measureTimer); this._measureTimer = null; }
     if (this._tickTimer) { clearInterval(this._tickTimer); this._tickTimer = null; }
     if (this._onWinResize) {
       window.removeEventListener("resize", this._onWinResize);
@@ -260,6 +364,10 @@ export class AnyVacCard extends LitElement {
       this._onWinResize = null;
     }
     if (this._ro) { this._ro.disconnect(); this._ro = null; }
+    // _panelViewWarned is intentionally NOT reset here — if the panel-view
+    // ancestor lookup already failed once, a reconnect (HA can disconnect +
+    // reconnect the card) shouldn't spam a second identical warning.
+    if (this._panelViewMo) { this._panelViewMo.disconnect(); this._panelViewMo = null; }
   }
 
   protected firstUpdated(): void {
@@ -275,6 +383,11 @@ export class AnyVacCard extends LitElement {
     // svh calc stays as the pre-measure fallback).
     this._refineGridHeight();
     this._refineGridColumns();
+    // docs/21 §5b: re-attempt the panel-view observer hookup on every render,
+    // not just connectedCallback — HA can disconnect/reconnect the card, and
+    // the ancestor may not have been in the tree yet on the very first
+    // connectedCallback. No-op once _panelViewMo is set.
+    if (!this._panelViewMo) this._setupPanelViewObserver();
   }
 
   /** Portrait only (docs/19 follow-up): the map is height-fit

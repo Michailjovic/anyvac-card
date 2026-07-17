@@ -9,9 +9,52 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Planned
 
 - Rooms from the integration (real room polygons / names) for clickable cleaning on the floorplan.
-- Responsive rebuild Phase C follow-up (docs/19) — real-hardware polish pass
-  on the new landscape cockpit below. Completion of the whole rebuild (this
-  release + the follow-up) ships as **v1.0.0**.
+- Real-hardware polish pass on the landscape cockpit (docs/18/19). Plus this
+  release's layout hardening ship as **v1.0.0**.
+
+## [0.66.0] - 2026-07-17
+
+Layout hardening + real device-independence (docs/21/22, roadmap to v1.0.0
+Phase 1). No backend change — still pairs with `anyvac` 0.51.0.
+
+### Fixed
+
+- **Profile picking now measures the card's own box, not the browser
+  window.** `pickProfile()` previously received `window.innerWidth`/
+  `innerHeight`, so portrait/landscape was decided by the whole browser
+  viewport's aspect ratio — correct only when the card happens to fill the
+  entire window. On any dashboard where it doesn't (two cards side by side,
+  a sections/grid view, a sidebar, split-screen), the wrong profile could
+  get picked regardless of how correct that profile's own grid math is. Now
+  fed by `_cardW` (already measured) plus a matching height measurement
+  (`_availableHeight`, mirrors the `"container"`/`"viewport"` height modes
+  `_refineGridHeight` already uses).
+- `_scheduleMeasure` no longer hangs on a backgrounded tab.
+  `requestAnimationFrame` never fires while `document.hidden` is true (kiosk/
+  wall-mounted tablets, `browser_mod` popups, a second window) — confirmed
+  live, not just in theory. Falls back to `setTimeout(fn, 0)` while hidden.
+- Edit-mode layout refresh no longer depends solely on `ResizeObserver`/
+  window resize catching the reparent. HA moves the card into
+  `hui-card-options` on edit-mode toggle without firing any event, and the
+  host's own box doesn't always change size when that happens. A new
+  `MutationObserver` on the nearest `hui-panel-view` ancestor now forces a
+  remeasure on any DOM change there. Degrades loudly (one-shot
+  `console.warn`) if that ancestor can't be found — internal HA DOM, not
+  public API, so a future HA version could rename it.
+
+### Added
+
+- Playwright + mock HA DOM test harness (`tests/`, `npm run test:layout`) —
+  four regression tests against a minimal `hui-panel-view`/`hui-card-options`
+  DOM mock: profile picked from the card's own box (not the window) in both
+  a narrow and a landscape-shaped box, grid height stays healthy across
+  simulated edit-mode reparenting (regression guard for the 0.59.0–0.61.0
+  companion-app crash class of bug), and measurement completes on a
+  backgrounded tab even with `requestAnimationFrame` neutered. Verified to
+  actually fail against the pre-0.66.0 `pickProfile` call before merging.
+- HACS `release.yml`: asset upload now retries on transient GitHub errors
+  (5 attempts, backoff) and a follow-up step verifies the asset landed on
+  the release before the workflow reports success.
 
 ## [0.65.3] - 2026-07-17
 
