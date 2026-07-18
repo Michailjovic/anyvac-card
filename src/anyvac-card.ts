@@ -1287,6 +1287,31 @@ export class AnyVacCard extends LitElement {
     }
     return { dry, wet };
   }
+  /** Rooms the backend plan (anyvac.plan) could NOT assign a robot to for the
+   *  current mode — e.g. the mode needs a wet pass but every vacuum configured
+   *  with a wet role (docs/14 §3.7 `_v2Vacuums`) can't/didn't take the room.
+   *  Found live 2026-07-18: a "Both" run where the card's `clean_type` config
+   *  restricted wet to a single vacuum produced ZERO visible feedback when
+   *  that vacuum's assignment came back empty — the user just watched dry
+   *  finish and nothing else happen, with no error anywhere. This is derived
+   *  from the SAME plan preview already fetched for the ETA/avatars (a
+   *  selected room missing from `dryOf`/`wetOf` for a kind the mode requires
+   *  IS the unassigned signal) — no new backend call, no new event plumbing.
+   *  `plan.unassigned` also exists server-side (planner.py) but isn't needed
+   *  here; that field is for `anyvac.plan`/`anyvac.clean` callers outside the
+   *  card (automations), not for this. */
+  private _unassignedRooms(selKeys: string[], mode: "dry" | "wet" | "both", hasInt: boolean): string[] {
+    if (!hasInt || selKeys.length === 0) return [];
+    const preview = this._planPreview;
+    if (!preview || preview.key !== JSON.stringify([selKeys, mode, this._v2Vacuums()])) return [];
+    const needDry = mode !== "wet";
+    const needWet = mode !== "dry";
+    const out: string[] = [];
+    for (const k of selKeys) {
+      if ((needDry && !preview.dry.has(k)) || (needWet && !preview.wet.has(k))) out.push(k);
+    }
+    return out;
+  }
   /** Per-kind settings for anyvac.clean, from the first capable vacuum's matching
    *  preset (fan speed / mop mode / mop intensity / repeat). */
   private _v2Settings(): Record<string, Record<string, unknown>> | undefined {
@@ -1642,6 +1667,7 @@ export class AnyVacCard extends LitElement {
     // Sequence hint (docs/19 follow-up, TODO #2) — see _renderMetaBar for the
     // same idea in the landscape meta bar; here it's per-row instead of a count.
     const unsequenced = new Set(hasInt ? (this._planPreview?.unsequenced ?? []) : []);
+    const unassigned = new Set(this._unassignedRooms(selKeys, mode, hasInt));
     const pins = this._pinsAttr();
     const showDry = mode !== "wet";
     const showWet = mode !== "dry";
@@ -1684,6 +1710,8 @@ export class AnyVacCard extends LitElement {
                 @click=${() => { if (!locked) this._toggleRoomAcross(r.key, vacs); }}>
                 <ha-icon class="dock-ric" icon=${r.icon ?? "mdi:square"}></ha-icon>
                 <span class="dock-name">${r.name ?? r.key}</span>
+                ${sel && unassigned.has(r.key) ? html`<ha-icon class="dock-unassigned" icon="mdi:robot-off"
+                  title="No available robot for this room's ${mode} pass — check that a vacuum is configured with the right role and knows this room."></ha-icon>` : nothing}
                 ${sel && unsequenced.has(r.key) ? html`<ha-icon class="dock-unseq" icon="mdi:sort-variant-off"
                   title="No cleaning order set for this room — the time estimate may be off. Set the order in the card editor's Maps tab."></ha-icon>` : nothing}
                 <span class="dock-ages">
@@ -1701,6 +1729,8 @@ export class AnyVacCard extends LitElement {
         ${withRun && hasInt ? html`
           <div class="dock-foot">
             <span class="dock-est">${selKeys.length ? selKeys.length + " rooms · ~" + this._etaFor(selKeys, mode, hasInt) + " min" : "Select rooms"}
+              ${unassigned.size ? html`<ha-icon class="dock-unassigned" icon="mdi:robot-off"
+                title="${unassigned.size} selected room${unassigned.size > 1 ? "s have" : " has"} no available robot for the ${mode} pass — it/they will be silently skipped. Check vacuum roles/config."></ha-icon>` : nothing}
               ${unsequenced.size ? html`<ha-icon class="dock-unseq" icon="mdi:sort-variant-off"
                 title="${unsequenced.size} selected room${unsequenced.size > 1 ? "s have" : " has"} no cleaning order set — the time above may be off. Set the order in the card editor's Maps tab."></ha-icon>` : nothing}</span>
             <button class="action-btn ${this._holdId === runHid ? "action-btn--holding" : ""}"
@@ -2374,6 +2404,10 @@ export class AnyVacCard extends LitElement {
     // it come back in `plan.unsequenced` — surface that instead of silently
     // showing a number the user has no reason to trust.
     const unsequenced = hasInt ? (this._planPreview?.unsequenced ?? []) : [];
+    // Unassigned-rooms warning (found live 2026-07-18): see `_unassignedRooms`'s
+    // doc comment — a "Both" run silently skipped wet cleaning with zero
+    // feedback when the config-restricted wet vacuum couldn't take the rooms.
+    const unassigned = this._unassignedRooms(selKeys, this._planMode, hasInt);
     const pinCount = this._pinPending ? Object.keys(this._pinPending).length : 0;
     const zoneCount = this._zonePending ? Object.keys(this._zonePending).length : 0;
     return html`
@@ -2392,6 +2426,10 @@ export class AnyVacCard extends LitElement {
         </span>
         ${est > 0 ? html`<span class="mtbtn mtbtn--stat" title="Estimated time">
           <ha-icon icon="mdi:clock-outline"></ha-icon><b>${est}</b><small>min</small>
+        </span>` : nothing}
+        ${unassigned.length ? html`<span class="mtbtn mtbtn--stat mtbtn--err"
+            title="${unassigned.length} selected room${unassigned.length > 1 ? "s have" : " has"} no available robot for the ${this._planMode} pass — it/they will be silently skipped. Check vacuum roles/config.">
+          <ha-icon icon="mdi:robot-off"></ha-icon><b>${unassigned.length}</b>
         </span>` : nothing}
         ${unsequenced.length ? html`<span class="mtbtn mtbtn--stat mtbtn--warn"
             title="${unsequenced.length} selected room${unsequenced.length > 1 ? "s have" : " has"} no cleaning order set — the time above may be off. Set the order in the card editor's Maps tab.">
@@ -3667,6 +3705,7 @@ export class AnyVacCard extends LitElement {
     /* Sequence hint (docs/19 follow-up, TODO #2) — amber, not red: it's a
        heads-up about ETA accuracy, not an error blocking the clean. */
     .dock-unseq { --mdc-icon-size: 13px; color: #d4a017; flex-shrink: 0; margin: 0 2px; }
+    .dock-unassigned { --mdc-icon-size: 13px; color: #ff4d4f; flex-shrink: 0; margin: 0 2px; }
     .dock-ages { display: inline-flex; gap: 6px; flex-shrink: 0; }
     .dock-age { display: inline-flex; align-items: center; gap: 2px; font-size: 10px; }
     .dock-age ha-icon { --mdc-icon-size: 12px; color: rgba(255, 255, 255, 0.3); }
@@ -4160,6 +4199,8 @@ export class AnyVacCard extends LitElement {
        distinct from the neutral stat pills either side of it. */
     .mtbtn--warn { color: #d4a017; }
     .mtbtn--warn ha-icon { color: #d4a017; }
+    .mtbtn--err { color: #ff4d4f; }
+    .mtbtn--err ha-icon { color: #ff4d4f; }
     .mtbtn--push { margin-left: auto; }
     .meta-bar { display: flex; align-items: center; gap: 6px; flex-wrap: wrap; padding: 4px 0; }
     .mode-action { display: flex; flex-wrap: wrap; gap: 6px; margin-bottom: 6px; }

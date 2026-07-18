@@ -12,6 +12,35 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Real-hardware polish pass on the landscape cockpit (docs/18/19). Plus this
   release's layout hardening ship as **v1.0.0**.
 
+## [0.66.5] - 2026-07-18
+
+Found in the field: a "Both" clean where the wet pass was config-restricted
+to a single vacuum that couldn't take the rooms produced zero visible
+feedback — dry finished, wet silently never started, no error anywhere in
+the card. No backend change — still pairs with `anyvac` 0.51.0.
+
+### Added
+
+- **Unassigned-room warning.** The card now surfaces rooms the backend plan
+  (`anyvac.plan`) couldn't assign a robot to for the current mode — e.g. a
+  room needs a wet pass but every vacuum configured with a wet role
+  (`_v2Vacuums`, docs/14 §3.7) can't or didn't take it. Shown as a red
+  `mdi:robot-off` icon per affected room in the dock rows, an aggregate count
+  in the dock footer next to the ETA, and an aggregate stat in the landscape
+  meta bar (mirrors the existing amber "unsequenced" hint pattern). Derived
+  client-side from the plan preview already fetched for the ETA/avatars — no
+  new backend call or event plumbing.
+
+### Investigation notes
+
+- Traced live (2026-07-17 ~17:24 session): dry cleaning completed for all 5
+  rooms (S6 + S7 MaxV), but wet never ran. Root cause was **not** a bug —
+  the card's config marks S7 MaxV's `clean_type: "dry"` intentionally (a
+  hardware-wet-capable robot kept dry-only in this household), so `Both`
+  mode restricts the wet pass to S8 alone. The actual problem was that
+  nothing in the card would have told the user if S8's assignment came back
+  empty — that's the gap this release closes.
+
 ## [0.66.4] - 2026-07-17
 
 Found and fixed live, directly on the user's real dashboard again (Claude in
