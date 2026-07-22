@@ -31,6 +31,7 @@ import {
 import {
   assembleAnchors,
   computeSeatFit,
+  roomBboxToRect,
   type SeatParams,
 } from "./seatfit";
 import {
@@ -824,9 +825,47 @@ export class AnyVacCard extends LitElement {
     return this._layers;
   }
 
-  /** Rooms for a vacuum: card-level `rooms` if defined (merged config), else the vacuum's own. */
-  private _roomsFor(vac: VacuumConfig): RoomConfig[] {
+  /** Static (config-authored) rooms for a vacuum: card-level `rooms` if defined
+   *  (merged config), else the vacuum's own. Never touches the integration —
+   *  also the anchor source for auto-seating (see `_effectiveSeat`). */
+  private _staticRoomsFor(vac: VacuumConfig): RoomConfig[] {
     return (this._config.rooms?.length ? this._config.rooms : vac.rooms) ?? [];
+  }
+
+  /** Rooms z integrace (docs/20, RATIFIKOVÁNO 2026-07-22): live-merged view for
+   *  RENDERING — a room the integration reports this poll gets its geometry
+   *  computed on the fly from `bbox_px` at the vacuum's current effective seat
+   *  (`roomBboxToRect`, same maths the one-shot Import already used, just called
+   *  every render instead of once) UNLESS a matching static config room pins an
+   *  explicit `map_x`/`map_y` — that override always wins outright (and doubles
+   *  as an auto-seating anchor, see `_effectiveSeat`). Icon/name/threshold fields
+   *  from a matching static room are layered on top either way. A config room
+   *  with no live counterpart this poll (custom room, or the integration briefly
+   *  missing data) still renders as configured — never silently dropped. Falls
+   *  back to the plain static list whenever there's no usable integration data
+   *  or no floorplan seat yet (degraded mode, schema < 2, fresh install). */
+  private _roomsFor(vac: VacuumConfig): RoomConfig[] {
+    const at = this._intAttrs(vac);
+    const intRooms: Array<Record<string, any>> = Array.isArray(at?.rooms) ? at!.rooms : [];
+    if (!at || !intRooms.length) return this._staticRoomsFor(vac);
+    const seat = this._effectiveSeat(vac);
+    const ar = this._wrapAspect(this._baseHeightFor(vac));
+    const staticRooms = this._staticRoomsFor(vac);
+    const byKey = new Map(staticRooms.filter((r) => r.key).map((r) => [r.key, r]));
+    const seen = new Set<string>();
+    const out: RoomConfig[] = [];
+    for (const ir of intRooms) {
+      const nm = ir?.name as string | undefined;
+      if (!nm) continue;
+      seen.add(nm);
+      const cfg = byKey.get(nm);
+      if (cfg && cfg.map_x != null && cfg.map_y != null) { out.push(cfg); continue; } // explicit override/anchor wins
+      const rect = roomBboxToRect(ir, at, seat, ar);
+      if (!rect) { if (cfg) out.push(cfg); continue; } // no seat yet -> whatever static has, if anything
+      out.push({ ...(cfg ?? { key: nm, name: nm, icon: "mdi:floor-plan" }), ...rect });
+    }
+    for (const cfg of staticRooms) if (cfg.key && !seen.has(cfg.key)) out.push(cfg);
+    return out;
   }
   private _hasSelectedRooms(vac: VacuumConfig): boolean {
     return (this._roomsFor(vac)).some((r) => this._isRoomSelected(r, vac));
@@ -2498,6 +2537,15 @@ export class AnyVacCard extends LitElement {
 
   // ── Auto-seating (docs/15) ──────────────────────────────────────────────
 
+  /** Configured base_height for a vacuum's map wrap (merged config wins, mirrors
+   *  every other merged/per-vacuum config fallback in this file). */
+  private _baseHeightFor(vac: VacuumConfig): number | undefined {
+    const merged = this._config.map_mode === "merged";
+    return merged
+      ? (this._config.base_height ?? this._config.vacuums.find((v) => v.base_height)?.base_height)
+      : vac.base_height;
+  }
+
   /** Aspect ratio (W/H) of the map wrap, for the seat fit's unit conversions. */
   private _wrapAspect(baseHeight?: number): number {
     if (typeof baseHeight === "number" && baseHeight > 0 && this._cardW > 0) {
@@ -2529,11 +2577,12 @@ export class AnyVacCard extends LitElement {
     // Kontrakt v2: anchors come from rooms[].bbox_px (integration ≥ 0.18).
     const at = this._intAttrs(vac);
     if (!at) return manual;
-    const bh = merged
-      ? (this._config.base_height ?? this._config.vacuums.find((v) => v.base_height)?.base_height)
-      : vac.base_height;
-    const ar = this._wrapAspect(bh);
-    const fit = computeSeatFit(assembleAnchors(this._roomsFor(vac), at, ar), ar);
+    const ar = this._wrapAspect(this._baseHeightFor(vac));
+    // Anchors MUST come from the static (pinned/override) rooms only, never from
+    // `_roomsFor()`'s live-merged view (docs/20 §5) — that view's un-pinned rooms
+    // are themselves computed FROM this fit, so feeding them back in would be
+    // circular (residual ~0 regardless of whether the fit is actually right).
+    const fit = computeSeatFit(assembleAnchors(this._staticRoomsFor(vac), at, ar), ar);
     if (!fit) return manual;
     return {
       rotation: fit.rotation, scale: fit.scale,
@@ -2748,7 +2797,7 @@ export class AnyVacCard extends LitElement {
     if (!shown.some((v) => this._intAttrs(v))) return nothing;
     const seen = new Set<string>();
     const rooms: Array<{ r: RoomConfig; v: VacuumConfig }> = [];
-    for (const v of shown) for (const r of v.rooms ?? []) {
+    for (const v of shown) for (const r of this._roomsFor(v)) {
       if (r.key && !seen.has(r.key)) { seen.add(r.key); rooms.push({ r, v }); }
     }
     if (!rooms.length) return nothing;
@@ -2780,10 +2829,10 @@ export class AnyVacCard extends LitElement {
   /** Deduped room defs for merged mode: card-level rooms (rep = first vacuum) or per-vacuum dedup by key. */
   private _mergedRoomDefs(shown: VacuumConfig[]): Array<{ r: RoomConfig; v: VacuumConfig }> {
     const rep = shown[0];
-    if (this._config.rooms?.length && rep) return this._config.rooms.map((r) => ({ r, v: rep }));
+    if (this._config.rooms?.length && rep) return this._roomsFor(rep).map((r) => ({ r, v: rep }));
     const seen = new Set<string>();
     const out: Array<{ r: RoomConfig; v: VacuumConfig }> = [];
-    for (const v of shown) for (const r of v.rooms ?? []) {
+    for (const v of shown) for (const r of this._roomsFor(v)) {
       if (r.key && !seen.has(r.key)) { seen.add(r.key); out.push({ r, v }); }
     }
     return out;
@@ -3066,7 +3115,7 @@ export class AnyVacCard extends LitElement {
           class="room-overlay ${locked ? "room-overlay--locked" : ""}"
           ?disabled=${locked}
           style=${styleMap({
-            left: room.map_x + "%", top: room.map_y + "%",
+            left: (room.map_x ?? 0) + "%", top: (room.map_y ?? 0) + "%",
             width: room.map_w + "%", height: room.map_h + "%",
             border: borderW + " solid " + borderC,
             borderImage: selected ? SEL_GRADIENT : "none",
@@ -3104,7 +3153,7 @@ export class AnyVacCard extends LitElement {
         class="room-btn ${locked ? "room-overlay--locked" : ""}"
         ?disabled=${locked}
         style=${styleMap({
-          left: room.map_x + "%", top: room.map_y + "%",
+          left: (room.map_x ?? 0) + "%", top: (room.map_y ?? 0) + "%",
           background: bg,
           border: "4px solid " + (selected ? SEL : ageColor),
           borderImage: selected ? SEL_GRADIENT : "none",

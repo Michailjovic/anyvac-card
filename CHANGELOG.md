@@ -8,9 +8,49 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Planned
 
-- Rooms from the integration (real room polygons / names) for clickable cleaning on the floorplan.
 - Real-hardware polish pass on the landscape cockpit (docs/18/19). Plus this
   release's layout hardening ship as **v1.0.0**.
+
+## [0.67.0] - 2026-07-22
+
+Rooms from the integration (docs/20, variant A, ratified 2026-07-22): room
+geometry now tracks the Roborock app live, no more manual re-import after
+renaming/adding/splitting a room there.
+
+### Added
+
+- **Live room geometry.** `_roomsFor()` now merges each poll's integration
+  rooms (`rooms[].bbox_px`) with the static config: a room without an
+  explicit `map_x`/`map_y` gets its floorplan rectangle computed on the fly
+  via `roomBboxToRect` (the same math the one-shot Import already used,
+  reused here instead of duplicated) at the vacuum's current effective seat
+  — auto-fitted *or* manual, both work identically, no special-casing.
+  Icon/display-name/threshold overrides from a matching static config room
+  are still layered on top either way. A config room with no live
+  counterpart this poll (custom/manual room, or the integration briefly
+  missing data) still renders exactly as configured — nothing silently
+  disappears.
+- `RoomConfig.map_x`/`map_y` are now optional — omitting them on a room
+  entry (while still setting e.g. `icon`) is how you ask for "icon override,
+  live position." Setting them (same as today, e.g. via editor drag or the
+  Import button) pins the room's position outright and doubles as an
+  auto-seating fit anchor, unchanged from before.
+- Import button behavior is unchanged (still writes a one-shot pinned
+  position for missing rooms) — kept as the fallback for degraded mode (no
+  integration) and for placing the anchor room(s) auto-seating needs to
+  bootstrap its fit; see docs/20 §5 for the full decision record.
+
+### Fixed
+
+- `_effectiveSeat()`'s auto-seating anchor computation now explicitly reads
+  only the static/pinned room list, never the new live-merged view — the
+  latter would have been circular (a live room's position IS the fit's
+  output, so feeding it back in as a fit anchor would always show ~0
+  residual regardless of whether the fit is actually correct).
+- `_renderRoomList` and `_mergedRoomDefs` (merged mode) now go through
+  `_roomsFor()` instead of reading `vac.rooms`/`_config.rooms` directly, so
+  the room status list and merged-map overlay both pick up live rooms too —
+  previously only the per-vacuum overlay did.
 
 ## [0.66.5] - 2026-07-18
 

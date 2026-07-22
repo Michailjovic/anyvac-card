@@ -1056,7 +1056,7 @@ export class AnyVacCardEditor extends LitElement {
                 })} />` : nothing}
               ${rooms.map((r, ri) => html`
                 <div class="pos-dot ${ri === this._mapRoom ? "pos-dot--active" : ""}"
-                  style=${styleMap({ left: r.map_x + "%", top: r.map_y + "%" })}
+                  style=${styleMap({ left: (r.map_x ?? 0) + "%", top: (r.map_y ?? 0) + "%" })}
                   @click=${(e: Event) => { e.stopPropagation(); this._mapRoom = ri === this._mapRoom ? null : ri; }}>
                   <ha-icon icon=${r.icon || "mdi:square"} style="--mdc-icon-size:14px"></ha-icon>
                 </div>`)}

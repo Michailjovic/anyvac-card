@@ -79,8 +79,12 @@ export interface RoomConfig {
   /** Legacy input_datetime, READ-ONLY fallback for room age. The card never writes it —
    *  history is stamped by the anyvac integration (docs/14 §3.3). */
   last_clean_entity?: string;
-  map_x: number;
-  map_y: number;
+  /** Explicit pixel-anchor override. When set, this room's position is fixed (never
+   *  recomputed from the integration's live bbox_px) and it also serves as a fit
+   *  anchor for auto-seating (docs/15). Omit both to let the room's geometry be
+   *  computed live from the integration each render (docs/20, "Rooms z integrace"). */
+  map_x?: number;
+  map_y?: number;
   map_w?: number;                    // šířka % → aktivuje rectangle mód
   map_h?: number;                    // výška %
 }

@@ -1,6 +1,6 @@
 export const CARD_NAME = "anyvac-card";
 export const EDITOR_NAME = "anyvac-card-editor";
-export const CARD_VERSION = "0.66.5";
+export const CARD_VERSION = "0.67.0";
 
 /** Hold duration in ms required to trigger START / PAUSE actions */
 export const HOLD_DURATION_MS = 600;

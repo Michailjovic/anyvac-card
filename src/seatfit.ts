@@ -57,8 +57,8 @@ export function mapPxDims(dims: any): { NW: number; NH: number } | null {
 interface CardRoomLike {
   key: string;
   name?: string;
-  map_x: number;
-  map_y: number;
+  map_x?: number;
+  map_y?: number;
   map_w?: number;
   map_h?: number;
 }
