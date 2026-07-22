@@ -33,6 +33,19 @@ concept the user found useful.
   `_vacChip`; the chip is now purely an assignment label everywhere it's
   used (dock room rows and the on-map room overlay).
 
+## [0.67.2] - 2026-07-23
+
+### Fixed
+
+- The dock avatar didn't update after tapping to cycle a room's pin (0.67.1)
+  — the plan preview (`anyvac.plan`) is cached by a key of `[selKeys, mode,
+  vacuums]`, which pinning doesn't change, so `_fetchPlan` skipped the
+  re-fetch even though the backend's `room_pins` had already updated.
+  Deselecting/reselecting the room changed `selKeys` and incidentally
+  forced a refetch, which is why it "fixed itself" on a second toggle.
+  `room_pins` is now part of the cache key, so the avatar updates
+  immediately on tap.
+
 ## [0.67.0] - 2026-07-22
 
 Rooms from the integration (docs/20, variant A, ratified 2026-07-22): room

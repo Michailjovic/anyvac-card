@@ -1383,7 +1383,13 @@ export class AnyVacCard extends LitElement {
   } | null = null;
   private _planFetchKey = "";
   private _fetchPlan(selKeys: string[], mode: "dry" | "wet" | "both"): void {
-    const key = JSON.stringify([selKeys, mode, this._v2Vacuums()]);
+    // room_pins is part of the cache key (not just selKeys/mode/vacuums) so that
+    // tapping an avatar to cycle a room's pin (_cycleRoomPin → anyvac.pin_room)
+    // invalidates the cached plan and re-fetches as soon as the backend's
+    // room_pins attribute updates — without it the dock avatar stayed stuck on
+    // the old assignment until something else (e.g. deselecting/reselecting the
+    // room) happened to change selKeys and force a refetch (field-caught 2026-07-23).
+    const key = JSON.stringify([selKeys, mode, this._v2Vacuums(), this._pinsAttr()]);
     if (key === this._planFetchKey) return;
     this._planFetchKey = key;
     void (async () => {
