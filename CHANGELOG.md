@@ -11,6 +11,28 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Real-hardware polish pass on the landscape cockpit (docs/18/19). Plus this
   release's layout hardening ship as **v1.0.0**.
 
+## [0.67.1] - 2026-07-23
+
+Room-pin UX simplification (field feedback): the old auto → vac1 → vac2 →
+auto cycle relied on a "pinned" indicator (a 1.5px box-shadow ring plus a
+10px `mdi:pin` glyph inside a 17px chip) that turned out to be practically
+unreadable in the dashboard, and the auto/pinned distinction itself wasn't a
+concept the user found useful.
+
+### Changed
+
+- Tapping a room's vacuum avatar in the dock now cycles directly and only
+  between the room's real candidate vacuums (e.g. two dry-capable vacuums
+  alternate on every tap); there is no longer a manual "back to auto" step
+  in the UI. The backend's automatic clear-after-cleaning behaviour
+  (`anyvac.pin_room`, docs/18 §7e) is unchanged — pins still self-clear once
+  the room is next cleaned, only the manual UI cycle changed. A room with
+  fewer than two candidate vacuums (e.g. a wet-only room with one wet-capable
+  robot) still has no tap handler attached — nothing happens, as expected.
+- Removed the `mdi:pin` icon and the `.dock-chip--pinned` ring styling from
+  `_vacChip`; the chip is now purely an assignment label everywhere it's
+  used (dock room rows and the on-map room overlay).
+
 ## [0.67.0] - 2026-07-22
 
 Rooms from the integration (docs/20, variant A, ratified 2026-07-22): room

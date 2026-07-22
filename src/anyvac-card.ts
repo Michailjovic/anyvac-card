@@ -1560,28 +1560,36 @@ export class AnyVacCard extends LitElement {
   private _pinCandidates(key: string): VacuumConfig[] {
     return this._config.vacuums.filter((v) => this._roomsFor(v).some((r) => r.key === key));
   }
-  /** Cycle the room's pin: auto → vac1 → vac2 → … → auto (docs/18 §7e). The pin is
-   *  stored backend-side (anyvac.pin_room) so every browser sees the same override;
-   *  the planner treats it as the default and it auto-clears after the clean. */
+  /** Cycle the room's assigned vacuum: vac1 → vac2 → … → vac1 (docs/18 §7e,
+   *  simplified 2026-07-23 — field feedback: the old auto→vac1→vac2→auto cycle's
+   *  "pinned" indicator (a 1.5px ring + a 10px pin glyph inside a 17px chip) was
+   *  practically unreadable, and the auto/pinned distinction itself wasn't a
+   *  concept the user found useful — tap just reassigns to the next candidate,
+   *  full stop; a room with only one capable vacuum has nothing to cycle to, so
+   *  the tap handler isn't even attached (see `_pinCandidates`, used below).
+   *  Still stored backend-side (anyvac.pin_room) so every browser sees the same
+   *  override, and the planner still auto-clears it after the room is cleaned
+   *  (docs/18 §7e) — only the manual "back to auto" UI step is gone, not the
+   *  automatic one. */
   private _cycleRoomPin(key: string): void {
     const cands = this._pinCandidates(key);
-    if (cands.length < 2) return; // nothing to choose from
+    if (cands.length < 2) return; // nothing to switch to
     const cur = this._pinsAttr()[key];
     const idx = cands.findIndex((v) => v.entity === cur);
-    const next = idx < 0 ? cands[0] : idx + 1 < cands.length ? cands[idx + 1] : null;
-    void this._call("anyvac", "pin_room", next ? { room: key, vacuum: next.entity } : { room: key });
+    const next = cands[(idx + 1) % cands.length];
+    void this._call("anyvac", "pin_room", { room: key, vacuum: next.entity });
   }
-  /** Small vacuum-abbrev chip; `pinned` gets a solid ring + pin glyph. */
-  private _vacChip(entity: string | undefined, pinned: boolean, onTap?: (e: Event) => void) {
+  /** Small vacuum-abbrev chip showing who's assigned to clean this room/pass. */
+  private _vacChip(entity: string | undefined, onTap?: (e: Event) => void) {
     const v = this._config.vacuums.find((x) => x.entity === entity);
     if (!v) {
       return html`<span class="dock-chip dock-chip--empty" @click=${onTap ?? nothing}>—</span>`;
     }
     const c = this._color(v);
-    return html`<span class="dock-chip ${pinned ? "dock-chip--pinned" : ""}"
+    return html`<span class="dock-chip"
       style="color:#fff;background:${c}30;border-color:${c}"
-      title=${(v.name ?? v.entity) + (pinned ? " · pinned — tap to change" : " · tap to pin")}
-      @click=${onTap ?? nothing}>${pinned ? html`<ha-icon icon="mdi:pin" style="--mdc-icon-size:10px"></ha-icon>` : nothing}${this._vacAbbrev(v)}</span>`;
+      title=${(v.name ?? v.entity) + (onTap ? " · tap to assign a different vacuum" : "")}
+      @click=${onTap ?? nothing}>${this._vacAbbrev(v)}</span>`;
   }
 
   private _batteryPct(vac: VacuumConfig): number | null {
@@ -1707,7 +1715,6 @@ export class AnyVacCard extends LitElement {
     // same idea in the landscape meta bar; here it's per-row instead of a count.
     const unsequenced = new Set(hasInt ? (this._planPreview?.unsequenced ?? []) : []);
     const unassigned = new Set(this._unassignedRooms(selKeys, mode, hasInt));
-    const pins = this._pinsAttr();
     const showDry = mode !== "wet";
     const showWet = mode !== "dry";
     const badge = (d: number | null) => (d === null ? "—" : d < 1 ? "<1d" : Math.round(d) + "d");
@@ -1738,7 +1745,6 @@ export class AnyVacCard extends LitElement {
             const dry = this._ageDaysFromIso(rec?.dry);
             const wet = this._ageDaysFromIso(rec?.wet);
             const sel = this._isRoomSelectedAny(r.key, vacs);
-            const pinned = pins[r.key];
             const pinTap = this._pinCandidates(r.key).length > 1
               ? (e: Event) => { e.stopPropagation(); this._cycleRoomPin(r.key); }
               : undefined;
@@ -1759,8 +1765,8 @@ export class AnyVacCard extends LitElement {
                 </span>
                 ${hasInt && sel ? html`
                   <span class="dock-avatars">
-                    ${showDry ? this._vacChip(dryOf.get(r.key), pinned === dryOf.get(r.key) && !!pinned, pinTap) : nothing}
-                    ${showWet ? this._vacChip(wetOf.get(r.key), pinned === wetOf.get(r.key) && !!pinned, pinTap) : nothing}
+                    ${showDry ? this._vacChip(dryOf.get(r.key), pinTap) : nothing}
+                    ${showWet ? this._vacChip(wetOf.get(r.key), pinTap) : nothing}
                   </span>` : nothing}
               </button>`;
           })}
@@ -3136,8 +3142,8 @@ export class AnyVacCard extends LitElement {
                next to it — only show them where there's room to read them. */
             (dryEnt || wetEnt) && this._profile !== "portrait" ? html`
             <span class="room-overlay-assign">
-              ${dryEnt ? this._vacChip(dryEnt, false) : nothing}
-              ${wetEnt ? this._vacChip(wetEnt, false) : nothing}
+              ${dryEnt ? this._vacChip(dryEnt) : nothing}
+              ${wetEnt ? this._vacChip(wetEnt) : nothing}
             </span>
           ` : nothing}
           ${this._renderRoomGauge(opts?.vacs ?? [vac], room)}
@@ -3774,7 +3780,6 @@ export class AnyVacCard extends LitElement {
       cursor: pointer;
     }
     .dock-chip--empty { color: rgba(255, 255, 255, 0.25); border-color: rgba(255, 255, 255, 0.15); }
-    .dock-chip--pinned { box-shadow: 0 0 0 1.5px currentColor; }
     .dock-foot {
       display: flex;
       align-items: center;
