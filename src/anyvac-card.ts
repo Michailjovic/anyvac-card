@@ -1576,12 +1576,21 @@ export class AnyVacCard extends LitElement {
    *  Still stored backend-side (anyvac.pin_room) so every browser sees the same
    *  override, and the planner still auto-clears it after the room is cleaned
    *  (docs/18 §7e) — only the manual "back to auto" UI step is gone, not the
-   *  automatic one. */
-  private _cycleRoomPin(key: string): void {
+   *  automatic one.
+   *
+   *  `shown` is the vacuum the tapped chip is CURRENTLY displaying — i.e. the
+   *  planner's live assignment (auto or already-pinned), not the raw
+   *  `room_pins` store. Cycling from the stored pin instead of the displayed
+   *  value was the bug reported 2026-07-23: right after a room is selected
+   *  there's usually no stored pin yet, so the first tap resolved index -1 →
+   *  candidate 0 — which is a no-op whenever candidate 0 happens to already be
+   *  the auto-assigned (displayed) vacuum, making the cycle feel random
+   *  (S6→S7→S6→S6→S7). Cycling from what's actually shown always advances by
+   *  exactly one candidate on every tap. */
+  private _cycleRoomPin(key: string, shown: string | undefined): void {
     const cands = this._pinCandidates(key);
     if (cands.length < 2) return; // nothing to switch to
-    const cur = this._pinsAttr()[key];
-    const idx = cands.findIndex((v) => v.entity === cur);
+    const idx = cands.findIndex((v) => v.entity === shown);
     const next = cands[(idx + 1) % cands.length];
     void this._call("anyvac", "pin_room", { room: key, vacuum: next.entity });
   }
@@ -1751,8 +1760,11 @@ export class AnyVacCard extends LitElement {
             const dry = this._ageDaysFromIso(rec?.dry);
             const wet = this._ageDaysFromIso(rec?.wet);
             const sel = this._isRoomSelectedAny(r.key, vacs);
-            const pinTap = this._pinCandidates(r.key).length > 1
-              ? (e: Event) => { e.stopPropagation(); this._cycleRoomPin(r.key); }
+            // Cycle relative to what THIS chip currently shows (dry vs. wet
+            // can differ), not the raw pin store — see _cycleRoomPin.
+            const canCycle = this._pinCandidates(r.key).length > 1;
+            const pinTap = (shown: string | undefined) => canCycle
+              ? (e: Event) => { e.stopPropagation(); this._cycleRoomPin(r.key, shown); }
               : undefined;
             const locked = this._mapMode !== "normal";
             return html`
@@ -1771,8 +1783,8 @@ export class AnyVacCard extends LitElement {
                 </span>
                 ${hasInt && sel ? html`
                   <span class="dock-avatars">
-                    ${showDry ? this._vacChip(dryOf.get(r.key), pinTap) : nothing}
-                    ${showWet ? this._vacChip(wetOf.get(r.key), pinTap) : nothing}
+                    ${showDry ? this._vacChip(dryOf.get(r.key), pinTap(dryOf.get(r.key))) : nothing}
+                    ${showWet ? this._vacChip(wetOf.get(r.key), pinTap(wetOf.get(r.key))) : nothing}
                   </span>` : nothing}
               </button>`;
           })}

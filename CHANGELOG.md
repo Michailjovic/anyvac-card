@@ -46,6 +46,21 @@ concept the user found useful.
   `room_pins` is now part of the cache key, so the avatar updates
   immediately on tap.
 
+## [0.67.3] - 2026-07-23
+
+### Fixed
+
+- Cycling a room's pin (0.67.1) felt inconsistent — the same tap sometimes
+  advanced to the next vacuum, sometimes appeared to do nothing
+  (`S6→S7→S6→S6→S7`). Cause: `_cycleRoomPin` advanced from the raw
+  `room_pins` backend store, not from the vacuum the tapped chip was
+  actually displaying. Right after selecting a room there's usually no
+  stored pin yet, so the first tap resolved to "no current pin" → candidate
+  0 — a no-op whenever candidate 0 already matched the auto-assigned
+  vacuum being shown. Cycling now always starts from what the tapped chip
+  currently shows (dry and wet chips can differ and are tracked
+  independently), so every tap advances by exactly one candidate.
+
 ## [0.67.0] - 2026-07-22
 
 Rooms from the integration (docs/20, variant A, ratified 2026-07-22): room
