@@ -14,6 +14,31 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   (care & consumables as the pilot page), and the visual language pass —
   neither shipped yet.
 
+## [0.72.0] - 2026-07-24
+
+Docs/25 §7b: hold-to-inspect on the map, replacing the per-room detail that
+the minimalist portrait cockpit (0.70.0/0.70.1) hid from the dock room list.
+
+### Added
+
+- Hold a room on the map to open a small popup with its name, dry/wet age
+  badges and (when the room is selected) the assigned vacuum chips —
+  tappable to cycle the pin, same as the old dock row. A tap while the
+  popup is open dismisses it instead of toggling selection. Anchors below
+  the room by default, flips above for rooms in the bottom half of the map.
+- Works in both rectangle and legacy point room modes; reuses the existing
+  tap/hold pointer pattern from the vac-icon-strip (not `_holdStart`, so tap
+  and hold can do different things reliably across browsers).
+
+### Known limitations (v1)
+
+- Not edge-aware on the horizontal axis, and the map region still clips
+  overflow — a room very close to the left/right edge can get its popup
+  partly cut off.
+- No counter-rotation in the rotated portrait map (`.avc-rot`) — matches
+  existing precedent for the assignment chips/gauges, which also render
+  sideways there today.
+
 ## [0.71.0] - 2026-07-24
 
 Docs/25 §7c: portrait map/dock topology as a computed choice.

@@ -94,7 +94,7 @@ const t={ATTRIBUTE:1},e=t=>(...e)=>({_$litDirective$:t,values:e});let i$1 = clas
 
 const CARD_NAME = "anyvac-card";
 const EDITOR_NAME = "anyvac-card-editor";
-const CARD_VERSION = "0.71.0";
+const CARD_VERSION = "0.72.0";
 /** Hold duration in ms required to trigger START / PAUSE actions */
 const HOLD_DURATION_MS = 600;
 /**
@@ -640,6 +640,11 @@ let AnyVacCard = class AnyVacCard extends i$2 {
         /** ID of the button currently being held — drives the fill animation */
         this._holdId = null;
         this._mapMode = "normal";
+        /** docs/25 §7b: hold-to-inspect on a room — the room key whose detail
+         *  popup (age/pin) is currently open, or null. Set by a hold gesture on
+         *  the room overlay; a tap while open dismisses it instead of toggling
+         *  selection (see `_renderRoomOverlay`'s pointer handlers). */
+        this._inspectKey = null;
         this._modeEntity = null;
         this._dbg = "";
         this._zoneDrag = null;
@@ -4039,6 +4044,87 @@ let AnyVacCard = class AnyVacCard extends i$2 {
       </span>
     `;
     }
+    /** docs/25 §7b: pointerdown for hold-to-inspect on a room overlay — raw
+     *  pointer events (not `_holdStart`), same reason as the vac-icon-strip
+     *  hold gesture: tap and hold drive genuinely different actions, and
+     *  mixing `_holdStart`'s `preventDefault()` with a separate `@click`
+     *  handler is unreliable across browsers. */
+    _onRoomPointerDown(room, locked) {
+        return (e) => {
+            if (locked)
+                return;
+            e.preventDefault();
+            this._cancelHold();
+            this._holdId = "room-" + room.key;
+            this._holdTimer = setTimeout(() => {
+                this._holdTimer = null;
+                this._holdId = null;
+                this._inspectKey = this._inspectKey === room.key ? null : room.key;
+            }, HOLD_DURATION_MS);
+        };
+    }
+    /** Released before the hold fired → tap. If an inspect popup is open
+     *  (for this room or another), the tap just dismisses it instead of
+     *  toggling selection — avoids an accidental selection change on the
+     *  same tap that closes the popup. Released after the hold already fired
+     *  (popup just opened by the timer above) → swallow it, nothing to do. */
+    _onRoomPointerUp(room, vac, vacs, locked) {
+        return () => {
+            if (locked)
+                return;
+            if (this._holdTimer !== null) {
+                this._cancelHold();
+                if (this._inspectKey !== null) {
+                    this._inspectKey = null;
+                    return;
+                }
+                if (vacs)
+                    this._toggleRoomAcross(room.key, vacs);
+                else
+                    this._toggleRoom(room, vac);
+            }
+            else {
+                this._holdId = null;
+            }
+        };
+    }
+    /** docs/25 §7b: the per-room detail (age, assigned vacuum) that used to
+     *  live permanently in the portrait dock room list, which the minimalist
+     *  cockpit now hides by default (§7c/§7e). Anchored to the room's own box;
+     *  flips above/below depending on which half of the map the room sits in
+     *  so it's less likely to run off the visible area. `stopPropagation` on
+     *  the popup itself so a tap inside it (e.g. the pin-cycle chip) doesn't
+     *  also reach the room button underneath and re-toggle/dismiss.
+     *  KNOWN LIMITATION (v1): not edge-aware on the horizontal axis, and the
+     *  map region still clips overflow — a room very close to the left/right
+     *  edge can get its popup partly cut off. Revisit after field feedback. */
+    _renderRoomInspect(room, vac, selected, opts) {
+        const rec = this._intRoomRec(vac, room);
+        const dry = this._ageDaysFromIso(rec?.dry);
+        const wet = this._ageDaysFromIso(rec?.wet);
+        const badge = (d) => (d === null ? "—" : d < 1 ? "<1d" : Math.round(d) + "d");
+        const dryEnt = selected ? this._planPreview?.dry.get(room.key) : undefined;
+        const wetEnt = selected ? this._planPreview?.wet.get(room.key) : undefined;
+        const canCycle = this._pinCandidates(room.key).length > 1;
+        const pinTap = (shown) => canCycle
+            ? (e) => { e.stopPropagation(); this._cycleRoomPin(room.key, shown); }
+            : undefined;
+        const flip = (room.map_y ?? 50) > 55;
+        return b `
+      <div class="room-inspect ${flip ? "room-inspect--above" : ""}" @click=${(e) => e.stopPropagation()}>
+        <div class="room-inspect-name">${room.name ?? room.key}</div>
+        <div class="room-inspect-ages">
+          <span class="dock-age"><ha-icon icon="mdi:broom"></ha-icon><b style=${o({ color: this._colorForAgeDays(dry) })}>${badge(dry)}</b></span>
+          <span class="dock-age"><ha-icon icon="mdi:water"></ha-icon><b style=${o({ color: this._colorForAgeDays(wet) })}>${badge(wet)}</b></span>
+        </div>
+        ${dryEnt || wetEnt ? b `
+          <div class="dock-avatars">
+            ${dryEnt ? this._vacChip(dryEnt, pinTap(dryEnt)) : A}
+            ${wetEnt ? this._vacChip(wetEnt, pinTap(wetEnt)) : A}
+          </div>` : A}
+      </div>
+    `;
+    }
     _renderRoomOverlay(room, vac, opts) {
         const selected = opts?.vacs ? this._isRoomSelectedAny(room.key, opts.vacs) : this._isRoomSelected(room, vac);
         // docs/25 §5: nothing explicitly selected = whole home is the implicit
@@ -4100,9 +4186,10 @@ let AnyVacCard = class AnyVacCard extends i$2 {
             // once selected (the preview is computed for the current selection).
             const dryEnt = selected ? this._planPreview?.dry.get(room.key) : undefined;
             const wetEnt = selected ? this._planPreview?.wet.get(room.key) : undefined;
+            const holdId = "room-" + room.key;
             return b `
         <button
-          class="room-overlay ${locked ? "room-overlay--locked" : ""}"
+          class="room-overlay ${locked ? "room-overlay--locked" : ""} ${this._holdId === holdId ? "room-overlay--holding" : ""}"
           ?disabled=${locked}
           style=${o({
                 left: (room.map_x ?? 0) + "%", top: (room.map_y ?? 0) + "%",
@@ -4112,11 +4199,14 @@ let AnyVacCard = class AnyVacCard extends i$2 {
                 background: bg, boxShadow: shadow,
                 justifyContent: jc, alignItems: ai,
             })}
-          @click=${() => { if (!locked)
-                (opts?.vacs ? this._toggleRoomAcross(room.key, opts.vacs) : this._toggleRoom(room, vac)); }}
+          @pointerdown=${this._onRoomPointerDown(room, locked)}
+          @pointerup=${this._onRoomPointerUp(room, vac, opts?.vacs, locked)}
+          @pointerleave=${this._holdEnd}
+          @pointercancel=${this._holdEnd}
           title=${locked ? "Room selection is off while placing a pin/zone" : room.name} aria-label=${room.name}
           aria-pressed=${selected ? "true" : "false"}
         >
+          <div class="hold-ring"></div>
           ${!this._config.room_icon_hidden && anchor !== "none" && room.icon ? b `
             <ha-icon icon=${room.icon}
               style=${o({ color: selected ? "white" : NEUTRAL_ICON, "--mdc-icon-size": "16px" })}>
@@ -4124,23 +4214,25 @@ let AnyVacCard = class AnyVacCard extends i$2 {
           ` : A}
           ${this._renderRoomAgeDots(room, vac)}
           ${ /* Portrait's rotated map makes these tiny and sideways, and the
-                 same assignment is already legible in the dock room list right
-                 next to it — only show them where there's room to read them. */(dryEnt || wetEnt) && this._profile !== "portrait" ? b `
+                 same assignment is now reachable via hold-to-inspect (§7b)
+                 instead — only show them inline where there's room to read them. */(dryEnt || wetEnt) && this._profile !== "portrait" ? b `
             <span class="room-overlay-assign">
               ${dryEnt ? this._vacChip(dryEnt) : A}
               ${wetEnt ? this._vacChip(wetEnt) : A}
             </span>
           ` : A}
           ${this._renderRoomGauge(opts?.vacs ?? [vac], room)}
+          ${this._inspectKey === room.key ? this._renderRoomInspect(room, vac, selected, opts) : A}
         </button>
       `;
         }
         // ── Point mód (legacy) ──────────────────────────────────────
         const bg = selected ? SEL + "A8" : wholeHome ? "rgba(255,255,255,0.32)" : "rgba(0,0,0,0.55)";
         const shadow = selected ? "0 0 12px rgba(255,255,255,0.8)" : wholeHome ? "0 0 8px rgba(255,255,255,0.45)" : "none";
+        const holdIdPt = "room-" + room.key;
         return b `
       <button
-        class="room-btn ${locked ? "room-overlay--locked" : ""}"
+        class="room-btn ${locked ? "room-overlay--locked" : ""} ${this._holdId === holdIdPt ? "room-overlay--holding" : ""}"
         ?disabled=${locked}
         style=${o({
             left: (room.map_x ?? 0) + "%", top: (room.map_y ?? 0) + "%",
@@ -4149,11 +4241,14 @@ let AnyVacCard = class AnyVacCard extends i$2 {
             borderImage: selected ? SEL_GRADIENT : "none",
             boxShadow: shadow,
         })}
-        @click=${() => { if (!locked)
-            (opts?.vacs ? this._toggleRoomAcross(room.key, opts.vacs) : this._toggleRoom(room, vac)); }}
+        @pointerdown=${this._onRoomPointerDown(room, locked)}
+        @pointerup=${this._onRoomPointerUp(room, vac, opts?.vacs, locked)}
+        @pointerleave=${this._holdEnd}
+        @pointercancel=${this._holdEnd}
         title=${locked ? "Room selection is off while placing a pin/zone" : room.name} aria-label=${room.name}
         aria-pressed=${selected ? "true" : "false"}
       >
+        <div class="hold-ring"></div>
         ${!this._config.room_icon_hidden ? b `
           <ha-icon icon=${room.icon || "mdi:square"}
             style=${o({ color: selected ? "white" : "rgba(255,255,255,0.5)" })}>
@@ -4161,6 +4256,7 @@ let AnyVacCard = class AnyVacCard extends i$2 {
         ` : A}
         ${this._renderRoomAgeDots(room, vac)}
         ${this._renderRoomGauge(opts?.vacs ?? [vac], room)}
+        ${this._inspectKey === room.key ? this._renderRoomInspect(room, vac, selected, opts) : A}
       </button>
     `;
     }
@@ -4935,7 +5031,8 @@ AnyVacCard.styles = i$6 `
 
     .action-btn--holding .hold-ring,
     .badge--holding .hold-ring,
-    .vac-icon-btn--holding .hold-ring {
+    .vac-icon-btn--holding .hold-ring,
+    .room-overlay--holding .hold-ring {
       animation: hold-fill var(--hold-ms) linear forwards;
     }
 
@@ -5048,6 +5145,39 @@ AnyVacCard.styles = i$6 `
       pointer-events: none;
       z-index: 4;
     }
+
+    /* docs/25 §7b: hold-to-inspect popup — per-room detail moved out of the
+       (now hidden-by-default) portrait dock room list. Anchored below the
+       room by default; the --above modifier flips it for rooms in the
+       bottom half of the map. cursor:default plus its own click
+       stopPropagation (in the render fn) so tapping the popup itself
+       doesn't re-toggle the room underneath it. */
+    .room-inspect {
+      position: absolute;
+      top: 100%;
+      left: 50%;
+      transform: translateX(-50%);
+      margin-top: 6px;
+      min-width: 84px;
+      background: rgba(20, 20, 20, 0.94);
+      border: 1px solid rgba(255, 255, 255, 0.25);
+      border-radius: 8px;
+      padding: 6px 8px;
+      font-size: 11px;
+      white-space: nowrap;
+      box-shadow: 0 4px 14px rgba(0, 0, 0, 0.45);
+      z-index: 20;
+      cursor: default;
+    }
+    .room-inspect--above { top: auto; bottom: 100%; margin-top: 0; margin-bottom: 6px; }
+    .room-inspect-name { font-weight: 600; margin-bottom: 4px; color: #fff; }
+    .room-inspect-ages { display: flex; gap: 8px; margin-bottom: 4px; }
+    /* No counter-rotation in .avc-rot (rotated portrait map) — matches the
+       existing precedent for .room-overlay-assign/.room-gauges, which also
+       render sideways with the map today rather than fighting it (only the
+       room icon itself gets the avc-rot > ha-icon rotate(-90deg) treatment).
+       Revisit together if this turns out to actually bother anyone in the
+       field, rather than solving it speculatively here. */
 
     /* ── Debug per-room progress gauges (dry + wet) ──────────────────── */
     .room-gauges {
@@ -5283,6 +5413,9 @@ __decorate([
 __decorate([
     r()
 ], AnyVacCard.prototype, "_mapMode", void 0);
+__decorate([
+    r()
+], AnyVacCard.prototype, "_inspectKey", void 0);
 __decorate([
     r()
 ], AnyVacCard.prototype, "_modeEntity", void 0);
