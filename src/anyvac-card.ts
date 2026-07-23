@@ -2884,7 +2884,9 @@ export class AnyVacCard extends LitElement {
     return out;
   }
   private _renderMergedRooms(shown: VacuumConfig[]) {
-    return this._mergedRoomDefs(shown).map(({ r, v }) => this._renderRoomOverlay(r, v, { vacs: shown }));
+    const defs = this._mergedRoomDefs(shown);
+    const wholeHome = !defs.some(({ r }) => this._isRoomSelectedAny(r.key, shown));
+    return defs.map(({ r, v }) => this._renderRoomOverlay(r, v, { vacs: shown, wholeHome }));
   }
 
   /** Narrow (mobile) card → rotate the map to portrait (auto, unless disabled).
@@ -3108,7 +3110,11 @@ export class AnyVacCard extends LitElement {
         ` : nothing}
         ${showMap ? this._renderIntegrationOverlay(vac, seat) : nothing}
         ${this._config.layout ? nothing : this._renderLayerToggles([vac])}
-        ${(this._roomsFor(vac)).map((r) => this._renderRoomOverlay(r, vac))}
+        ${(() => {
+          const rooms = this._roomsFor(vac);
+          const wholeHome = !rooms.some((r) => this._isRoomSelected(r, vac));
+          return rooms.map((r) => this._renderRoomOverlay(r, vac, { wholeHome }));
+        })()}
         ${(this._mapMode !== "normal" && this._isModeCandidate(vac)) || (this._zoneRectShown && this._hasZoneEditTarget(vac))
           ? html`<div class="map-clickcatch" style="touch-action:none"
               @click=${(e: MouseEvent) => this._onMapClick(vac, e)}
@@ -3129,8 +3135,15 @@ export class AnyVacCard extends LitElement {
     `;
   }
 
-  private _renderRoomOverlay(room: RoomConfig, vac: VacuumConfig, opts?: { vacs?: VacuumConfig[] }) {
+  private _renderRoomOverlay(room: RoomConfig, vac: VacuumConfig, opts?: { vacs?: VacuumConfig[]; wholeHome?: boolean }) {
     const selected = opts?.vacs ? this._isRoomSelectedAny(room.key, opts.vacs) : this._isRoomSelected(room, vac);
+    // docs/25 §5: nothing explicitly selected = whole home is the implicit
+    // plan (START is already meaningful, see _renderDock/_renderStartBar).
+    // The map should say so too, but *gently* — this is a glanceable "this is
+    // what will run", one weight class below an actual selected room (no
+    // gradient border, no glow, no white icon — those stay reserved for
+    // explicit picks so "who's assigned" info isn't implied here).
+    const wholeHome = !selected && !!opts?.wholeHome;
     const ageColor = this._roomBorderColor(room, vac);
     const anchor = room.icon_anchor ?? "c";
     // Mutual exclusion (docs/19 A3): while Pin & Go / Zone is active, room
@@ -3162,8 +3175,8 @@ export class AnyVacCard extends LitElement {
       const borderW = (selected
         ? (this._config.room_border_selected ?? 4)
         : (this._config.room_border_normal ?? 2)) + "px";
-      const borderC = selected ? SEL + "E0" : ageColor;
-      const bg = selected ? SEL + "22" : "rgba(0,0,0,0.06)";
+      const borderC = selected ? SEL + "E0" : wholeHome ? "rgba(255,255,255,0.45)" : ageColor;
+      const bg = selected ? SEL + "22" : wholeHome ? "rgba(255,255,255,0.07)" : "rgba(0,0,0,0.06)";
       const shadow = selected ? "0 0 18px rgba(255,255,255,0.7)" : "none";
       // Who's assigned (dry/wet), from the backend plan preview — only known
       // once selected (the preview is computed for the current selection).
@@ -3205,7 +3218,7 @@ export class AnyVacCard extends LitElement {
     }
 
     // ── Point mód (legacy) ──────────────────────────────────────
-    const bg = selected ? SEL + "A8" : "rgba(0,0,0,0.55)";
+    const bg = selected ? SEL + "A8" : wholeHome ? "rgba(255,255,255,0.22)" : "rgba(0,0,0,0.55)";
     const shadow = selected ? "0 0 12px rgba(255,255,255,0.8)" : "none";
     return html`
       <button
@@ -3214,7 +3227,7 @@ export class AnyVacCard extends LitElement {
         style=${styleMap({
           left: (room.map_x ?? 0) + "%", top: (room.map_y ?? 0) + "%",
           background: bg,
-          border: "4px solid " + (selected ? SEL : ageColor),
+          border: "4px solid " + (selected ? SEL : wholeHome ? "rgba(255,255,255,0.5)" : ageColor),
           borderImage: selected ? SEL_GRADIENT : "none",
           boxShadow: shadow,
         })}

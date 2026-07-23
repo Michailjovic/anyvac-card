@@ -12,7 +12,23 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   release's layout hardening ship as **v1.0.0**.
 - Rest of docs/25 (Fáze 3, inserted before v1.0.0): portrait pages/menu
   (care & consumables as the pilot page), and the visual language pass —
-  neither shipped in 0.68.0 yet.
+  neither shipped yet.
+
+## [0.68.2] - 2026-07-23
+
+### Added
+
+- docs/25 §5 leftover: the map now visually reflects the whole-home
+  implicit plan when nothing is explicitly selected, not just the
+  START/dock/meta-bar text. Every room rectangle (and legacy point-mode
+  marker) gets a soft white border + faint tint — deliberately one weight
+  class below an actual explicit selection (no gradient border, no glow, no
+  white icon, no per-room vacuum-assignment chip), since whole-home stays a
+  glanceable "this is what will run" confirmation, not a stand-in for
+  picking rooms. Applies uniformly in merged mode (`_renderMergedRooms`)
+  and split/per-vacuum mode (`_renderMap`). Clicking a room while in this
+  state behaves exactly as before (starts an explicit single-room
+  selection).
 
 ## [0.68.1] - 2026-07-23
 
