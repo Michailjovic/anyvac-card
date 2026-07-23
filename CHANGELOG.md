@@ -14,7 +14,38 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   (care & consumables as the pilot page), and the visual language pass —
   neither shipped yet.
 
-## [0.68.3] - 2026-07-23
+## [0.69.0] - 2026-07-23
+
+First implementation slice of docs/25 §7 (field diskuze, portrait cockpit
+structure/interaction rework). Two self-contained pieces landed; the larger
+structural items (top tab-strip navigation, computed split/stack topology,
+map→vacuum→START block reorder) are follow-up work, see docs/25 §9.
+
+### Changed
+
+- Vacuum ring color (`.vac-icon-btn` in the portrait icon strip) switched
+  from per-vacuum identity color (`_color(v)`) to live status color
+  (`_statusInfo(v)` / `STATUS_MAP` — cleaning/error/docked etc., same
+  palette as the status cards). One visual language for "what it's doing"
+  instead of two competing ones for "what it's doing" + "which one is it" —
+  identity still carries via the avatar photo/icon inside the ring. Badges
+  (`_renderBadge`, landscape picker) intentionally NOT touched in this pass —
+  more entangled visual states (cleaning glow blended with identity color,
+  active-selection tinting), deserves its own pass.
+- Per-room age indicator reworked: the room border/icon on the map no
+  longer carries age color (`_colorForAgeDays`) — that channel is now
+  reserved purely for interaction state (normal/whole-home/selected, one
+  white-family scale). Age moved to two small corner dots (dry left, wet
+  right, same order as everywhere else in the card) via new
+  `_renderRoomAgeDots()`, gated on the vacuum's clean-type capability so a
+  dry-only setup doesn't grow a permanent "never wet cleaned" dot. A tried
+  double-ring alternative (inner = selection, outer = age) was rejected —
+  at real room size on a phone the two rings visually merge into one blurry
+  edge, doesn't read as two separate signals. Degraded mode (no companion
+  integration) keeps working via a single dot from the legacy
+  `last_clean_entity` helper. Dead code removed: `_roomBorderColor`.
+
+Sources: field diskuze 2026-07-23 (mockups at real room scale), docs/25 §7a/§7d.
 
 ### Changed
 

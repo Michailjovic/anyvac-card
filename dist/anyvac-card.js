@@ -94,7 +94,7 @@ const t={ATTRIBUTE:1},e=t=>(...e)=>({_$litDirective$:t,values:e});let i$1 = clas
 
 const CARD_NAME = "anyvac-card";
 const EDITOR_NAME = "anyvac-card-editor";
-const CARD_VERSION = "0.68.3";
+const CARD_VERSION = "0.69.0";
 /** Hold duration in ms required to trigger START / PAUSE actions */
 const HOLD_DURATION_MS = 600;
 /**
@@ -1625,9 +1625,6 @@ let AnyVacCard = class AnyVacCard extends i$2 {
         const dry = !wet || (ca?.suction_level != null && ca.suction_level !== "off");
         return { dry, wet };
     }
-    _roomBorderColor(room, vac) {
-        return this._colorForAgeDays(this._roomAgeDays(room, vac));
-    }
     /** Debug: per-room cleaning progress from the integration (rooms_progress). */
     _roomProgress(vac, room) {
         const rp = this._intAttrs(vac)?.rooms_progress;
@@ -2349,7 +2346,7 @@ let AnyVacCard = class AnyVacCard extends i$2 {
             return b `
             <div class="vac-icon-slot">
               <button class="vac-icon-btn ${holding ? "vac-icon-btn--holding" : ""} ${shown ? "" : "vac-icon-btn--hidden"}"
-                style=${o({ borderColor: this._color(v) + "80" })}
+                style=${o({ borderColor: this._statusInfo(v)[1] })}
                 @pointerdown=${(e) => {
                 e.preventDefault();
                 this._cancelHold();
@@ -3870,6 +3867,38 @@ let AnyVacCard = class AnyVacCard extends i$2 {
       </div>
     `;
     }
+    /** docs/25 §7d: per-room dry/wet age as two small corner dots, replacing
+     *  the old age-colored border/icon. Dry always left, wet always right —
+     *  same order as everywhere else in the card. Gated on the representative
+     *  vacuum's clean-type capability, not on whether a timestamp happens to
+     *  exist yet, so a dry-only vacuum's rooms don't grow a permanent "never
+     *  wet cleaned" red dot they can never clear. */
+    _renderRoomAgeDots(room, vac) {
+        const rec = this._intRoomRec(vac, room);
+        if (rec) {
+            const ct = this._vacCleanType(vac);
+            if (!ct.dry && !ct.wet)
+                return A;
+            const dry = this._ageDaysFromIso(rec.dry);
+            const wet = this._ageDaysFromIso(rec.wet);
+            return b `
+        <span class="room-age-dots">
+          ${ct.dry ? b `<span class="room-age-dot" style=${o({ background: this._colorForAgeDays(dry) })}></span>` : A}
+          ${ct.wet ? b `<span class="room-age-dot" style=${o({ background: this._colorForAgeDays(wet) })}></span>` : A}
+        </span>
+      `;
+        }
+        // Degraded mode (no integration rec, docs/14 §8 — card still works
+        // without the companion integration, just loses the dry/wet split):
+        // a single dot from the legacy `last_clean_entity` helper, if configured.
+        if (!room.last_clean_entity)
+            return A;
+        return b `
+      <span class="room-age-dots">
+        <span class="room-age-dot" style=${o({ background: this._colorForAgeDays(this._roomAgeDays(room)) })}></span>
+      </span>
+    `;
+    }
     _renderRoomOverlay(room, vac, opts) {
         const selected = opts?.vacs ? this._isRoomSelectedAny(room.key, opts.vacs) : this._isRoomSelected(room, vac);
         // docs/25 §5: nothing explicitly selected = whole home is the implicit
@@ -3879,7 +3908,15 @@ let AnyVacCard = class AnyVacCard extends i$2 {
         // gradient border, no glow, no white icon — those stay reserved for
         // explicit picks so "who's assigned" info isn't implied here).
         const wholeHome = !selected && !!opts?.wholeHome;
-        const ageColor = this._roomBorderColor(room, vac);
+        // docs/25 §7d: border/icon color is reserved for interaction state only
+        // (normal/whole-home/selected, one white-family channel) — age used to
+        // share this channel (`_colorForAgeDays` painting the border/icon) and
+        // fought both the selection highlight and the room icon's own stable
+        // identity (an icon painted a different color every day by how stale
+        // the room is isn't actually recognizable at a glance). Age moved to
+        // `_renderRoomAgeDots` below.
+        const NEUTRAL_BORDER = "rgba(255,255,255,0.22)";
+        const NEUTRAL_ICON = "rgba(255,255,255,0.55)";
         const anchor = room.icon_anchor ?? "c";
         // Mutual exclusion (docs/19 A3): while Pin & Go / Zone is active, room
         // selection is a different, contradictory intent (targeting a point/zone,
@@ -3916,7 +3953,7 @@ let AnyVacCard = class AnyVacCard extends i$2 {
             // added a soft glow so whole-home clearly reads as "highlighted",
             // while still staying a visible notch below `selected`'s crisp
             // gradient border + strong glow.
-            const borderC = selected ? SEL + "E0" : wholeHome ? "rgba(255,255,255,0.75)" : ageColor;
+            const borderC = selected ? SEL + "E0" : wholeHome ? "rgba(255,255,255,0.75)" : NEUTRAL_BORDER;
             const bg = selected ? SEL + "22" : wholeHome ? "rgba(255,255,255,0.16)" : "rgba(0,0,0,0.06)";
             const shadow = selected ? "0 0 18px rgba(255,255,255,0.7)" : wholeHome ? "0 0 10px rgba(255,255,255,0.4)" : "none";
             // Who's assigned (dry/wet), from the backend plan preview — only known
@@ -3942,9 +3979,10 @@ let AnyVacCard = class AnyVacCard extends i$2 {
         >
           ${!this._config.room_icon_hidden && anchor !== "none" && room.icon ? b `
             <ha-icon icon=${room.icon}
-              style=${o({ color: selected ? "white" : ageColor, "--mdc-icon-size": "16px" })}>
+              style=${o({ color: selected ? "white" : NEUTRAL_ICON, "--mdc-icon-size": "16px" })}>
             </ha-icon>
           ` : A}
+          ${this._renderRoomAgeDots(room, vac)}
           ${ /* Portrait's rotated map makes these tiny and sideways, and the
                  same assignment is already legible in the dock room list right
                  next to it — only show them where there's room to read them. */(dryEnt || wetEnt) && this._profile !== "portrait" ? b `
@@ -3967,7 +4005,7 @@ let AnyVacCard = class AnyVacCard extends i$2 {
         style=${o({
             left: (room.map_x ?? 0) + "%", top: (room.map_y ?? 0) + "%",
             background: bg,
-            border: "4px solid " + (selected ? SEL : wholeHome ? "rgba(255,255,255,0.7)" : ageColor),
+            border: "4px solid " + (selected ? SEL : wholeHome ? "rgba(255,255,255,0.7)" : NEUTRAL_BORDER),
             borderImage: selected ? SEL_GRADIENT : "none",
             boxShadow: shadow,
         })}
@@ -3981,6 +4019,7 @@ let AnyVacCard = class AnyVacCard extends i$2 {
             style=${o({ color: selected ? "white" : "rgba(255,255,255,0.5)" })}>
           </ha-icon>
         ` : A}
+        ${this._renderRoomAgeDots(room, vac)}
         ${this._renderRoomGauge(opts?.vacs ?? [vac], room)}
       </button>
     `;
@@ -4843,6 +4882,15 @@ AnyVacCard.styles = i$6 `
        (docs/19 A3) — dim + not-allowed cursor, no color-only distinction so it
        reads even on the age-gradient border colors. */
     .room-overlay--locked { opacity: 0.4; cursor: not-allowed; }
+    /* docs/25 §7d: room age lives here now, not in the border/icon color —
+       those are reserved for interaction state (normal/whole-home/selected)
+       so a stable, always-recognizable icon doesn't get repainted by how
+       long ago the room was cleaned. Two small dots (dry/wet, same order as
+       everywhere else in the card) in the corner instead — a double ring
+       around the whole room was tried and rejected (splits into one blurry
+       edge at real room size, field-tested). */
+    .room-age-dots { position: absolute; top: -3px; right: -3px; display: flex; gap: 1.5px; }
+    .room-age-dot { width: 7px; height: 7px; border-radius: 50%; border: 1px solid rgba(0,0,0,0.5); }
     /* Who's assigned to a selected room (docs/19 A1) — small chips, not area
        tinting, so assignment doesn't fight with the selection highlight or the
        age-gradient colors. */
