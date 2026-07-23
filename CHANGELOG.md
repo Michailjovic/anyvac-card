@@ -14,6 +14,19 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   (care & consumables as the pilot page), and the visual language pass —
   neither shipped yet.
 
+## [0.72.1] - 2026-07-24
+
+Field-caught fix, same day as 0.72.0: the inspect popup rendered sideways
+in the rotated portrait map.
+
+### Fixed
+
+- Popup content now counter-rotates in `.avc-rot` (rotated portrait map),
+  matching the room icon/gauges — a whole popup of text read sideways was
+  genuinely unreadable, unlike the small icon/gauges the "no counter-
+  rotation" call in 0.72.0 was modeled on. Applied to a nested inner div so
+  it doesn't fight the popup's own position/anchor transform.
+
 ## [0.72.0] - 2026-07-24
 
 Docs/25 §7b: hold-to-inspect on the map, replacing the per-room detail that

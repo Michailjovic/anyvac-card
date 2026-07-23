@@ -94,7 +94,7 @@ const t={ATTRIBUTE:1},e=t=>(...e)=>({_$litDirective$:t,values:e});let i$1 = clas
 
 const CARD_NAME = "anyvac-card";
 const EDITOR_NAME = "anyvac-card-editor";
-const CARD_VERSION = "0.72.0";
+const CARD_VERSION = "0.72.1";
 /** Hold duration in ms required to trigger START / PAUSE actions */
 const HOLD_DURATION_MS = 600;
 /**
@@ -4110,18 +4110,25 @@ let AnyVacCard = class AnyVacCard extends i$2 {
             ? (e) => { e.stopPropagation(); this._cycleRoomPin(room.key, shown); }
             : undefined;
         const flip = (room.map_y ?? 50) > 55;
+        // Content lives in a nested div that counter-rotates in `.avc-rot`
+        // (rotated portrait map) — same treatment as the room icon/gauges
+        // (`.avc-rot ... rotate(-90deg)`), kept separate from the outer
+        // positioning div so the anchor/centering transform (translateX,
+        // top/bottom) isn't fighting the same `transform` property.
         return b `
       <div class="room-inspect ${flip ? "room-inspect--above" : ""}" @click=${(e) => e.stopPropagation()}>
-        <div class="room-inspect-name">${room.name ?? room.key}</div>
-        <div class="room-inspect-ages">
-          <span class="dock-age"><ha-icon icon="mdi:broom"></ha-icon><b style=${o({ color: this._colorForAgeDays(dry) })}>${badge(dry)}</b></span>
-          <span class="dock-age"><ha-icon icon="mdi:water"></ha-icon><b style=${o({ color: this._colorForAgeDays(wet) })}>${badge(wet)}</b></span>
+        <div class="room-inspect-inner">
+          <div class="room-inspect-name">${room.name ?? room.key}</div>
+          <div class="room-inspect-ages">
+            <span class="dock-age"><ha-icon icon="mdi:broom"></ha-icon><b style=${o({ color: this._colorForAgeDays(dry) })}>${badge(dry)}</b></span>
+            <span class="dock-age"><ha-icon icon="mdi:water"></ha-icon><b style=${o({ color: this._colorForAgeDays(wet) })}>${badge(wet)}</b></span>
+          </div>
+          ${dryEnt || wetEnt ? b `
+            <div class="dock-avatars">
+              ${dryEnt ? this._vacChip(dryEnt, pinTap(dryEnt)) : A}
+              ${wetEnt ? this._vacChip(wetEnt, pinTap(wetEnt)) : A}
+            </div>` : A}
         </div>
-        ${dryEnt || wetEnt ? b `
-          <div class="dock-avatars">
-            ${dryEnt ? this._vacChip(dryEnt, pinTap(dryEnt)) : A}
-            ${wetEnt ? this._vacChip(wetEnt, pinTap(wetEnt)) : A}
-          </div>` : A}
       </div>
     `;
     }
@@ -5172,12 +5179,13 @@ AnyVacCard.styles = i$6 `
     .room-inspect--above { top: auto; bottom: 100%; margin-top: 0; margin-bottom: 6px; }
     .room-inspect-name { font-weight: 600; margin-bottom: 4px; color: #fff; }
     .room-inspect-ages { display: flex; gap: 8px; margin-bottom: 4px; }
-    /* No counter-rotation in .avc-rot (rotated portrait map) — matches the
-       existing precedent for .room-overlay-assign/.room-gauges, which also
-       render sideways with the map today rather than fighting it (only the
-       room icon itself gets the avc-rot > ha-icon rotate(-90deg) treatment).
-       Revisit together if this turns out to actually bother anyone in the
-       field, rather than solving it speculatively here. */
+    /* Field-caught (2026-07-24): unlike the small icon/gauges, a whole
+       popup of TEXT read sideways is genuinely unreadable, not just a minor
+       legibility ding — worth the counter-rotation the icon/gauges already
+       get elsewhere in .avc-rot (rotated portrait map). Applied to the
+       nested -inner div, not .room-inspect itself, so it doesn't fight the
+       outer div's own positioning transform (translateX + top/bottom). */
+    .avc-rot .room-inspect-inner { transform: rotate(-90deg); }
 
     /* ── Debug per-room progress gauges (dry + wet) ──────────────────── */
     .room-gauges {
