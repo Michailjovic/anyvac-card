@@ -94,7 +94,7 @@ const t={ATTRIBUTE:1},e=t=>(...e)=>({_$litDirective$:t,values:e});let i$1 = clas
 
 const CARD_NAME = "anyvac-card";
 const EDITOR_NAME = "anyvac-card-editor";
-const CARD_VERSION = "0.67.3";
+const CARD_VERSION = "0.68.0";
 /** Hold duration in ms required to trigger START / PAUSE actions */
 const HOLD_DURATION_MS = 600;
 /**
@@ -397,6 +397,29 @@ function roomBboxToRect(ir, at, seat, ar) {
  * of the available viewport; the UI is a set of named regions placed into the
  * grid per profile. A region not placed in a profile is not rendered there.
  */
+/** docs/25 §4 — compute whether rotating the floorplan 90° fits the portrait
+ *  map region better than leaving it upright. Pure geometry: for each
+ *  orientation, "how big could the floorplan render inside this box" is the
+ *  contain-fit scale (`min(boxW/contentW, boxH/contentH)`); pick whichever
+ *  orientation yields the larger rendered map (bigger = more legible rooms,
+ *  bigger tap targets). Ties (near-square floorplans, where it barely
+ *  matters either way) default to NOT rotating — it's the cheaper option
+ *  (no counter-rotating on-map labels via `.avc-rot`).
+ *
+ *  `floorplanAR` = floorplan width / height. `boxW`/`boxH` = the measured
+ *  portrait map region. Returns `undefined` when there isn't enough data to
+ *  decide yet (region not measured) — callers should keep their previous
+ *  answer rather than flicker on an unmeasured 0×0 box. */
+function shouldRotateMap(floorplanAR, boxW, boxH) {
+    if (boxW <= 4 || boxH <= 4 || floorplanAR <= 0)
+        return undefined;
+    // Normalize floorplan height to 1 → width is floorplanAR. Contain-fit scale
+    // is min(boxAxis / contentAxis) per axis; rotating swaps which axis is which.
+    const scaleUpright = Math.min(boxW / floorplanAR, boxH);
+    const scaleRotated = Math.min(boxW, boxH / floorplanAR);
+    // Equal scale (or upright wins/ties) → don't rotate.
+    return scaleRotated > scaleUpright;
+}
 /**
  * Canonical docs/18 §4 default profiles (Phase B). Landscape = cockpit: map left
  * (scrolls in split mode, §7b), dock (selection + plan + orchestrated run, §7d)
@@ -615,6 +638,12 @@ let AnyVacCard = class AnyVacCard extends i$2 {
          *  field (not @state) — read post-render in `updated()`, never drives a
          *  render itself. */
         this._lastPortraitFitW = 0;
+        /** docs/25 §4: last computed map-rotation decision, kept as the answer while
+         *  the map region hasn't been measured yet (`shouldRotateMap` returns
+         *  `undefined`) so the map doesn't flicker between orientations on first
+         *  paint. Defaults to `true` — matches the old fixed "portrait rotates"
+         *  behavior until real measurements correct it, one render later. */
+        this._lastRotate = true;
         this._ro = null;
         this._onWinResize = null;
         this._measureRaf = 0;
@@ -2268,17 +2297,20 @@ let AnyVacCard = class AnyVacCard extends i$2 {
         }
         return Math.round(sum);
     }
-    /** Glanceable stats trio (grid badges region): selected rooms · est time · min battery. */
+    /** Glanceable stats trio (grid badges region): selected rooms · est time · min battery.
+     *  docs/25 §5: no explicit selection still shows the whole-home estimate (what
+     *  START will actually do), not a bare "0 rooms". */
     _renderStatsTrio() {
         const vacs = this._config.vacuums;
         const selKeys = this._allRoomKeys().filter((k) => this._isRoomSelectedAny(k, vacs));
+        const runKeys = selKeys.length ? selKeys : this._allRoomKeys();
         const hasInt = vacs.some((v) => this._intAttrs(v));
-        const est = this._etaFor(selKeys, this._planMode, hasInt);
+        const est = this._etaFor(runKeys, this._planMode, hasInt);
         const batts = vacs.map((v) => this._batteryPct(v)).filter((x) => x !== null);
         const minB = batts.length ? Math.min(...batts) : null;
         return b `
       <div class="stats-trio">
-        <span class="stat"><ha-icon icon="mdi:floor-plan"></ha-icon><b>${selKeys.length}</b></span>
+        <span class="stat"><ha-icon icon="mdi:floor-plan"></ha-icon><b>${runKeys.length}</b></span>
         ${est > 0 ? b `<span class="stat"><ha-icon icon="mdi:clock-outline"></ha-icon><b>${est}</b><small>min</small></span>` : A}
         ${minB !== null ? b `<span class="stat"><ha-icon icon="mdi:battery"></ha-icon><b>${Math.round(minB)}</b><small>%</small></span>` : A}
       </div>
@@ -2360,14 +2392,18 @@ let AnyVacCard = class AnyVacCard extends i$2 {
         const hasInt = vacs.some((v) => this._intAttrs(v));
         const mode = this._planMode;
         const selKeys = this._allRoomKeys().filter((k) => this._isRoomSelectedAny(k, vacs));
-        if (hasInt && selKeys.length)
-            this._fetchPlan(selKeys, mode);
+        // docs/25 §5: no explicit selection = whole home, not an empty plan. Feeds
+        // the footer run button/ETA below; per-row "selected" styling stays tied
+        // to explicit selKeys, so this doesn't make every row look hand-picked.
+        const runKeys = selKeys.length ? selKeys : this._allRoomKeys();
+        if (hasInt && runKeys.length)
+            this._fetchPlan(runKeys, mode);
         const dryOf = this._planPreview?.dry ?? new Map();
         const wetOf = this._planPreview?.wet ?? new Map();
         // Sequence hint (docs/19 follow-up, TODO #2) — see _renderMetaBar for the
         // same idea in the landscape meta bar; here it's per-row instead of a count.
         const unsequenced = new Set(hasInt ? (this._planPreview?.unsequenced ?? []) : []);
-        const unassigned = new Set(this._unassignedRooms(selKeys, mode, hasInt));
+        const unassigned = new Set(this._unassignedRooms(runKeys, mode, hasInt));
         const showDry = mode !== "wet";
         const showWet = mode !== "dry";
         const badge = (d) => (d === null ? "—" : d < 1 ? "<1d" : Math.round(d) + "d");
@@ -2429,15 +2465,15 @@ let AnyVacCard = class AnyVacCard extends i$2 {
         </div>
         ${withRun && hasInt ? b `
           <div class="dock-foot">
-            <span class="dock-est">${selKeys.length ? selKeys.length + " rooms · ~" + this._etaFor(selKeys, mode, hasInt) + " min" : "Select rooms"}
+            <span class="dock-est">${selKeys.length ? selKeys.length + " rooms · ~" + this._etaFor(runKeys, mode, hasInt) + " min" : "Whole home · ~" + this._etaFor(runKeys, mode, hasInt) + " min"}
               ${unassigned.size ? b `<ha-icon class="dock-unassigned" icon="mdi:robot-off"
                 title="${unassigned.size} selected room${unassigned.size > 1 ? "s have" : " has"} no available robot for the ${mode} pass — it/they will be silently skipped. Check vacuum roles/config."></ha-icon>` : A}
               ${unsequenced.size ? b `<ha-icon class="dock-unseq" icon="mdi:sort-variant-off"
                 title="${unsequenced.size} selected room${unsequenced.size > 1 ? "s have" : " has"} no cleaning order set — the time above may be off. Set the order in the card editor's Maps tab."></ha-icon>` : A}</span>
             <button class="action-btn ${this._holdId === runHid ? "action-btn--holding" : ""}"
               style="flex:0 0 auto;padding:7px 14px;background:rgba(82,196,26,0.14);border:1px solid rgba(82,196,26,0.55);color:#fff"
-              ?disabled=${!selKeys.length}
-              @pointerdown=${selKeys.length ? this._holdStart(runHid, () => this._runOrchestrated(selKeys, this._planMode)) : A}
+              ?disabled=${!runKeys.length}
+              @pointerdown=${runKeys.length ? this._holdStart(runHid, () => this._runOrchestrated(runKeys, this._planMode)) : A}
               @pointerup=${this._holdEnd}
               @pointerleave=${this._holdEnd}
               @pointercancel=${this._holdEnd}>
@@ -2450,11 +2486,16 @@ let AnyVacCard = class AnyVacCard extends i$2 {
     `;
     }
     /** START region (portrait bottom bar, docs/18 §7d): ALWAYS the orchestrated
-     *  intent (anyvac.clean); while anything runs it flips to a cancel bar. */
+     *  intent (anyvac.clean); while anything runs it flips to a cancel bar.
+     *  docs/25 §5 (cockpit minimalism): no explicit room selection is NOT a dead
+     *  end — it means "whole home", and START stays immediately pressable from
+     *  the moment the card opens. Room selection / Dry-Wet-Both stay on screen
+     *  as refinement, not as a gate the user has to clear first. */
     _renderStartBar() {
         const vacs = this._config.vacuums;
         const hasInt = vacs.some((v) => this._intAttrs(v));
         const selKeys = this._allRoomKeys().filter((k) => this._isRoomSelectedAny(k, vacs));
+        const runKeys = selKeys.length ? selKeys : this._allRoomKeys();
         const anyCleaning = vacs.some((v) => this._isCleaning(v));
         const hid = "startbar";
         if (anyCleaning) {
@@ -2475,17 +2516,18 @@ let AnyVacCard = class AnyVacCard extends i$2 {
           <span>CANCEL · hold</span>
         </button>`;
         }
-        const canStart = hasInt && selKeys.length > 0;
-        const est = this._etaFor(selKeys, this._planMode, hasInt);
+        const canStart = hasInt && runKeys.length > 0;
+        const est = this._etaFor(runKeys, this._planMode, hasInt);
+        const scopeLabel = selKeys.length ? selKeys.length + (selKeys.length === 1 ? " room" : " rooms") : "whole home";
         return b `
       <button class="start-bar ${canStart && this._holdId === hid ? "action-btn--holding" : ""}"
         ?disabled=${!canStart}
         title=${hasInt ? "" : "Requires the AnyVac integration"}
-        @pointerdown=${canStart ? this._holdStart(hid, () => this._runOrchestrated(selKeys, this._planMode)) : A}
+        @pointerdown=${canStart ? this._holdStart(hid, () => this._runOrchestrated(runKeys, this._planMode)) : A}
         @pointerup=${this._holdEnd} @pointerleave=${this._holdEnd} @pointercancel=${this._holdEnd}>
         <div class="hold-ring"></div>
         <ha-icon icon="mdi:rocket-launch"></ha-icon>
-        <span>START${selKeys.length ? " · " + selKeys.length + (est ? " · ~" + est + " min" : "") : ""}</span>
+        <span>START · ${scopeLabel}${est ? " · ~" + est + " min" : ""}</span>
       </button>`;
     }
     /** Setting presets for a vacuum; falls back to a single default synthesized from clean_action. */
@@ -3146,8 +3188,10 @@ let AnyVacCard = class AnyVacCard extends i$2 {
             : !canCmd ? "Requires the AnyVac integration (≥ 0.18) + map entity" : "";
         const mode = this._modeEntity === "*" ? this._mapMode : "normal";
         const selKeys = this._allRoomKeys().filter((k) => this._isRoomSelectedAny(k, vacs));
+        // docs/25 §5: no explicit selection = whole home for the glanceable stats too.
+        const runKeys = selKeys.length ? selKeys : this._allRoomKeys();
         const hasInt = vacs.some((v) => this._intAttrs(v));
-        const est = this._etaFor(selKeys, this._planMode, hasInt);
+        const est = this._etaFor(runKeys, this._planMode, hasInt);
         // Sequence hint (docs/19 follow-up, TODO #2): the backend's ETA is only as
         // good as `room_sequence` (the Roborock app's own room order, which the
         // firmware follows regardless of what order HA sends). Rooms missing from
@@ -3157,7 +3201,7 @@ let AnyVacCard = class AnyVacCard extends i$2 {
         // Unassigned-rooms warning (found live 2026-07-18): see `_unassignedRooms`'s
         // doc comment — a "Both" run silently skipped wet cleaning with zero
         // feedback when the config-restricted wet vacuum couldn't take the rooms.
-        const unassigned = this._unassignedRooms(selKeys, this._planMode, hasInt);
+        const unassigned = this._unassignedRooms(runKeys, this._planMode, hasInt);
         const pinCount = this._pinPending ? Object.keys(this._pinPending).length : 0;
         const zoneCount = this._zonePending ? Object.keys(this._zonePending).length : 0;
         return b `
@@ -3171,8 +3215,8 @@ let AnyVacCard = class AnyVacCard extends i$2 {
           <ha-icon icon="mdi:select-drag"></ha-icon><span>Zone</span>
         </button>
         ${this._renderLayerToggleCompact(vacs)}
-        <span class="mtbtn mtbtn--stat" title="Selected rooms">
-          <ha-icon icon="mdi:floor-plan"></ha-icon><b>${selKeys.length}</b>
+        <span class="mtbtn mtbtn--stat" title=${selKeys.length ? "Selected rooms" : "Whole home (nothing selected)"}>
+          <ha-icon icon="mdi:floor-plan"></ha-icon><b>${runKeys.length}</b>
         </span>
         ${est > 0 ? b `<span class="mtbtn mtbtn--stat" title="Estimated time">
           <ha-icon icon="mdi:clock-outline"></ha-icon><b>${est}</b><small>min</small>
@@ -3575,16 +3619,34 @@ let AnyVacCard = class AnyVacCard extends i$2 {
         return this._mergedRoomDefs(shown).map(({ r, v }) => this._renderRoomOverlay(r, v, { vacs: shown }));
     }
     /** Narrow (mobile) card → rotate the map to portrait (auto, unless disabled).
-     *  With a layout: block the portrait PROFILE drives the rotation (docs/18);
-     *  without one the legacy card-width heuristic applies. */
+     *  With a layout: portrait rotation is a COMPUTED choice (docs/25 §4) —
+     *  whichever orientation fits the floorplan bigger inside the measured map
+     *  region, not the old fixed "portrait always rotates" rule (that only
+     *  worked by coincidence for one specific wide floorplan). Landscape never
+     *  rotates. `layout.portrait.crop.mapOrientation` overrides the computed
+     *  choice manually. Without a `layout:` block the legacy card-width
+     *  heuristic applies, completely unchanged. */
     get _narrow() {
         const mr = this._config.mobile_rotate;
         if (mr === "off")
             return false;
         if (mr === "always" || mr === "on")
             return true; // force (good for testing)
-        if (this._config.layout)
-            return this._profile === "portrait";
+        if (this._config.layout) {
+            if (this._profile !== "portrait")
+                return false;
+            const override = this._config.layout.portrait?.crop?.mapOrientation;
+            if (override === "normal")
+                return false;
+            if (override === "rotated")
+                return true;
+            const computed = shouldRotateMap(this._mapAR, this._mapRegW, this._mapRegH);
+            if (computed !== undefined) {
+                this._lastRotate = computed;
+                return computed;
+            }
+            return this._lastRotate; // region not measured yet — keep the previous answer
+        }
         return this._cardW > 0 && this._cardW < 500; // auto: by card width
     }
     /** Wrap a map render in a 90° portrait rotation when the card is narrow. The map

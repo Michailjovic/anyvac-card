@@ -39,6 +39,7 @@ import {
   resolveProfile,
   gridRootStyles,
   regionStyles,
+  shouldRotateMap,
   type LayoutProfile,
   type LayoutConfig,
   type ProfileGridConfig,
@@ -117,6 +118,12 @@ export class AnyVacCard extends LitElement {
    *  field (not @state) — read post-render in `updated()`, never drives a
    *  render itself. */
   private _lastPortraitFitW = 0;
+  /** docs/25 §4: last computed map-rotation decision, kept as the answer while
+   *  the map region hasn't been measured yet (`shouldRotateMap` returns
+   *  `undefined`) so the map doesn't flicker between orientations on first
+   *  paint. Defaults to `true` — matches the old fixed "portrait rotates"
+   *  behavior until real measurements correct it, one render later. */
+  private _lastRotate = true;
   private _ro: ResizeObserver | null = null;
   private _onWinResize: (() => void) | null = null;
   private _measureRaf = 0;
@@ -1633,17 +1640,20 @@ export class AnyVacCard extends LitElement {
     }
     return Math.round(sum);
   }
-  /** Glanceable stats trio (grid badges region): selected rooms · est time · min battery. */
+  /** Glanceable stats trio (grid badges region): selected rooms · est time · min battery.
+   *  docs/25 §5: no explicit selection still shows the whole-home estimate (what
+   *  START will actually do), not a bare "0 rooms". */
   private _renderStatsTrio() {
     const vacs = this._config.vacuums;
     const selKeys = this._allRoomKeys().filter((k) => this._isRoomSelectedAny(k, vacs));
+    const runKeys = selKeys.length ? selKeys : this._allRoomKeys();
     const hasInt = vacs.some((v) => this._intAttrs(v));
-    const est = this._etaFor(selKeys, this._planMode, hasInt);
+    const est = this._etaFor(runKeys, this._planMode, hasInt);
     const batts = vacs.map((v) => this._batteryPct(v)).filter((x): x is number => x !== null);
     const minB = batts.length ? Math.min(...batts) : null;
     return html`
       <div class="stats-trio">
-        <span class="stat"><ha-icon icon="mdi:floor-plan"></ha-icon><b>${selKeys.length}</b></span>
+        <span class="stat"><ha-icon icon="mdi:floor-plan"></ha-icon><b>${runKeys.length}</b></span>
         ${est > 0 ? html`<span class="stat"><ha-icon icon="mdi:clock-outline"></ha-icon><b>${est}</b><small>min</small></span>` : nothing}
         ${minB !== null ? html`<span class="stat"><ha-icon icon="mdi:battery"></ha-icon><b>${Math.round(minB)}</b><small>%</small></span>` : nothing}
       </div>
@@ -1723,13 +1733,17 @@ export class AnyVacCard extends LitElement {
     const hasInt = vacs.some((v) => this._intAttrs(v));
     const mode = this._planMode;
     const selKeys = this._allRoomKeys().filter((k) => this._isRoomSelectedAny(k, vacs));
-    if (hasInt && selKeys.length) this._fetchPlan(selKeys, mode);
+    // docs/25 §5: no explicit selection = whole home, not an empty plan. Feeds
+    // the footer run button/ETA below; per-row "selected" styling stays tied
+    // to explicit selKeys, so this doesn't make every row look hand-picked.
+    const runKeys = selKeys.length ? selKeys : this._allRoomKeys();
+    if (hasInt && runKeys.length) this._fetchPlan(runKeys, mode);
     const dryOf = this._planPreview?.dry ?? new Map<string, string>();
     const wetOf = this._planPreview?.wet ?? new Map<string, string>();
     // Sequence hint (docs/19 follow-up, TODO #2) — see _renderMetaBar for the
     // same idea in the landscape meta bar; here it's per-row instead of a count.
     const unsequenced = new Set(hasInt ? (this._planPreview?.unsequenced ?? []) : []);
-    const unassigned = new Set(this._unassignedRooms(selKeys, mode, hasInt));
+    const unassigned = new Set(this._unassignedRooms(runKeys, mode, hasInt));
     const showDry = mode !== "wet";
     const showWet = mode !== "dry";
     const badge = (d: number | null) => (d === null ? "—" : d < 1 ? "<1d" : Math.round(d) + "d");
@@ -1791,15 +1805,15 @@ export class AnyVacCard extends LitElement {
         </div>
         ${withRun && hasInt ? html`
           <div class="dock-foot">
-            <span class="dock-est">${selKeys.length ? selKeys.length + " rooms · ~" + this._etaFor(selKeys, mode, hasInt) + " min" : "Select rooms"}
+            <span class="dock-est">${selKeys.length ? selKeys.length + " rooms · ~" + this._etaFor(runKeys, mode, hasInt) + " min" : "Whole home · ~" + this._etaFor(runKeys, mode, hasInt) + " min"}
               ${unassigned.size ? html`<ha-icon class="dock-unassigned" icon="mdi:robot-off"
                 title="${unassigned.size} selected room${unassigned.size > 1 ? "s have" : " has"} no available robot for the ${mode} pass — it/they will be silently skipped. Check vacuum roles/config."></ha-icon>` : nothing}
               ${unsequenced.size ? html`<ha-icon class="dock-unseq" icon="mdi:sort-variant-off"
                 title="${unsequenced.size} selected room${unsequenced.size > 1 ? "s have" : " has"} no cleaning order set — the time above may be off. Set the order in the card editor's Maps tab."></ha-icon>` : nothing}</span>
             <button class="action-btn ${this._holdId === runHid ? "action-btn--holding" : ""}"
               style="flex:0 0 auto;padding:7px 14px;background:rgba(82,196,26,0.14);border:1px solid rgba(82,196,26,0.55);color:#fff"
-              ?disabled=${!selKeys.length}
-              @pointerdown=${selKeys.length ? this._holdStart(runHid, () => this._runOrchestrated(selKeys, this._planMode)) : nothing}
+              ?disabled=${!runKeys.length}
+              @pointerdown=${runKeys.length ? this._holdStart(runHid, () => this._runOrchestrated(runKeys, this._planMode)) : nothing}
               @pointerup=${this._holdEnd}
               @pointerleave=${this._holdEnd}
               @pointercancel=${this._holdEnd}>
@@ -1813,11 +1827,16 @@ export class AnyVacCard extends LitElement {
   }
 
   /** START region (portrait bottom bar, docs/18 §7d): ALWAYS the orchestrated
-   *  intent (anyvac.clean); while anything runs it flips to a cancel bar. */
+   *  intent (anyvac.clean); while anything runs it flips to a cancel bar.
+   *  docs/25 §5 (cockpit minimalism): no explicit room selection is NOT a dead
+   *  end — it means "whole home", and START stays immediately pressable from
+   *  the moment the card opens. Room selection / Dry-Wet-Both stay on screen
+   *  as refinement, not as a gate the user has to clear first. */
   private _renderStartBar() {
     const vacs = this._config.vacuums;
     const hasInt = vacs.some((v) => this._intAttrs(v));
     const selKeys = this._allRoomKeys().filter((k) => this._isRoomSelectedAny(k, vacs));
+    const runKeys = selKeys.length ? selKeys : this._allRoomKeys();
     const anyCleaning = vacs.some((v) => this._isCleaning(v));
     const hid = "startbar";
     if (anyCleaning) {
@@ -1833,17 +1852,18 @@ export class AnyVacCard extends LitElement {
           <span>CANCEL · hold</span>
         </button>`;
     }
-    const canStart = hasInt && selKeys.length > 0;
-    const est = this._etaFor(selKeys, this._planMode, hasInt);
+    const canStart = hasInt && runKeys.length > 0;
+    const est = this._etaFor(runKeys, this._planMode, hasInt);
+    const scopeLabel = selKeys.length ? selKeys.length + (selKeys.length === 1 ? " room" : " rooms") : "whole home";
     return html`
       <button class="start-bar ${canStart && this._holdId === hid ? "action-btn--holding" : ""}"
         ?disabled=${!canStart}
         title=${hasInt ? "" : "Requires the AnyVac integration"}
-        @pointerdown=${canStart ? this._holdStart(hid, () => this._runOrchestrated(selKeys, this._planMode)) : nothing}
+        @pointerdown=${canStart ? this._holdStart(hid, () => this._runOrchestrated(runKeys, this._planMode)) : nothing}
         @pointerup=${this._holdEnd} @pointerleave=${this._holdEnd} @pointercancel=${this._holdEnd}>
         <div class="hold-ring"></div>
         <ha-icon icon="mdi:rocket-launch"></ha-icon>
-        <span>START${selKeys.length ? " · " + selKeys.length + (est ? " · ~" + est + " min" : "") : ""}</span>
+        <span>START · ${scopeLabel}${est ? " · ~" + est + " min" : ""}</span>
       </button>`;
   }
 
@@ -2459,8 +2479,10 @@ export class AnyVacCard extends LitElement {
       : !canCmd ? "Requires the AnyVac integration (≥ 0.18) + map entity" : "";
     const mode = this._modeEntity === "*" ? this._mapMode : "normal";
     const selKeys = this._allRoomKeys().filter((k) => this._isRoomSelectedAny(k, vacs));
+    // docs/25 §5: no explicit selection = whole home for the glanceable stats too.
+    const runKeys = selKeys.length ? selKeys : this._allRoomKeys();
     const hasInt = vacs.some((v) => this._intAttrs(v));
-    const est = this._etaFor(selKeys, this._planMode, hasInt);
+    const est = this._etaFor(runKeys, this._planMode, hasInt);
     // Sequence hint (docs/19 follow-up, TODO #2): the backend's ETA is only as
     // good as `room_sequence` (the Roborock app's own room order, which the
     // firmware follows regardless of what order HA sends). Rooms missing from
@@ -2470,7 +2492,7 @@ export class AnyVacCard extends LitElement {
     // Unassigned-rooms warning (found live 2026-07-18): see `_unassignedRooms`'s
     // doc comment — a "Both" run silently skipped wet cleaning with zero
     // feedback when the config-restricted wet vacuum couldn't take the rooms.
-    const unassigned = this._unassignedRooms(selKeys, this._planMode, hasInt);
+    const unassigned = this._unassignedRooms(runKeys, this._planMode, hasInt);
     const pinCount = this._pinPending ? Object.keys(this._pinPending).length : 0;
     const zoneCount = this._zonePending ? Object.keys(this._zonePending).length : 0;
     return html`
@@ -2484,8 +2506,8 @@ export class AnyVacCard extends LitElement {
           <ha-icon icon="mdi:select-drag"></ha-icon><span>Zone</span>
         </button>
         ${this._renderLayerToggleCompact(vacs)}
-        <span class="mtbtn mtbtn--stat" title="Selected rooms">
-          <ha-icon icon="mdi:floor-plan"></ha-icon><b>${selKeys.length}</b>
+        <span class="mtbtn mtbtn--stat" title=${selKeys.length ? "Selected rooms" : "Whole home (nothing selected)"}>
+          <ha-icon icon="mdi:floor-plan"></ha-icon><b>${runKeys.length}</b>
         </span>
         ${est > 0 ? html`<span class="mtbtn mtbtn--stat" title="Estimated time">
           <ha-icon icon="mdi:clock-outline"></ha-icon><b>${est}</b><small>min</small>
@@ -2866,13 +2888,26 @@ export class AnyVacCard extends LitElement {
   }
 
   /** Narrow (mobile) card → rotate the map to portrait (auto, unless disabled).
-   *  With a layout: block the portrait PROFILE drives the rotation (docs/18);
-   *  without one the legacy card-width heuristic applies. */
+   *  With a layout: portrait rotation is a COMPUTED choice (docs/25 §4) —
+   *  whichever orientation fits the floorplan bigger inside the measured map
+   *  region, not the old fixed "portrait always rotates" rule (that only
+   *  worked by coincidence for one specific wide floorplan). Landscape never
+   *  rotates. `layout.portrait.crop.mapOrientation` overrides the computed
+   *  choice manually. Without a `layout:` block the legacy card-width
+   *  heuristic applies, completely unchanged. */
   private get _narrow(): boolean {
     const mr = this._config.mobile_rotate as string | undefined;
     if (mr === "off") return false;
     if (mr === "always" || mr === "on") return true;  // force (good for testing)
-    if (this._config.layout) return this._profile === "portrait";
+    if (this._config.layout) {
+      if (this._profile !== "portrait") return false;
+      const override = this._config.layout.portrait?.crop?.mapOrientation;
+      if (override === "normal") return false;
+      if (override === "rotated") return true;
+      const computed = shouldRotateMap(this._mapAR, this._mapRegW, this._mapRegH);
+      if (computed !== undefined) { this._lastRotate = computed; return computed; }
+      return this._lastRotate;   // region not measured yet — keep the previous answer
+    }
     return this._cardW > 0 && this._cardW < 500;       // auto: by card width
   }
   /** Learn the floorplan's aspect ratio once it loads, for the rotation maths. */

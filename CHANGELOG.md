@@ -10,6 +10,45 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 - Real-hardware polish pass on the landscape cockpit (docs/18/19). Plus this
   release's layout hardening ship as **v1.0.0**.
+- Rest of docs/25 (Fáze 3, inserted before v1.0.0): portrait pages/menu
+  (care & consumables as the pilot page), and the visual language pass —
+  neither shipped in 0.68.0 yet.
+
+## [0.68.0] - 2026-07-23
+
+First installment of docs/25 (Fáze 3, portrait stránkování a cockpit
+minimalismus — inserted before v1.0.0 per docs/22). Two of the three pieces
+land here; the pages/menu system and the visual language pass are still to
+come.
+
+### Changed
+
+- **Map orientation in portrait is now a computed choice, not a fixed rule**
+  (docs/25 §4). The old behavior always rotated the map 90° in portrait —
+  which only worked because it was tuned against one specific (wide)
+  floorplan. `shouldRotateMap()` (`layout.ts`) now compares the contain-fit
+  scale of the floorplan upright vs. rotated inside the measured portrait
+  map region and picks whichever renders the bigger map; near-square
+  floorplans default to not rotating (cheaper — no counter-rotating on-map
+  labels). New `layout.portrait.crop.mapOrientation: auto | normal |
+  rotated` escape hatch for the cases the computed rule doesn't call the way
+  you want. Legacy (no `layout:` block) rendering is untouched.
+- **Cockpit minimalism** (docs/25 §5): no explicit room selection is no
+  longer a dead end — it now means "whole home". The portrait START bar is
+  immediately pressable the moment the card opens (`Start · whole home · ~N
+  min`), the landscape dock's run button and the meta bar / stats trio
+  glanceable numbers all show the whole-home estimate instead of "0 rooms".
+  Explicit room selection still works exactly as before and takes over the
+  moment you pick anything; per-room "selected" styling is untouched (only
+  the primary-action affordances default to whole-home).
+
+### Known gaps
+
+- The map's "gently highlight the whole floorplan when nothing is picked"
+  visual (docs/25 §5) isn't done — the estimate/label reflect whole-home,
+  but the map itself doesn't yet show which rooms that implies.
+- Pages/menu (care & consumables, docs/25 §2-3) and the visual language pass
+  (docs/25 §6) are unstarted.
 
 ## [0.67.1] - 2026-07-23
 

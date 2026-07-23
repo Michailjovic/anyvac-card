@@ -29,6 +29,36 @@ export interface MapCropConfig {
   /** -100..100, 0 = centered. Only meaningful with fit: "cover". */
   offset_x?: number;
   offset_y?: number;
+  /** docs/25 §4. "auto" (default) computes whether rotating the floorplan 90°
+   *  gives a bigger fit inside the portrait map region than leaving it
+   *  upright, and picks whichever wins — replacing the old "portrait always
+   *  rotates" rule, which only happened to work because it was tuned against
+   *  one specific (wide) floorplan. "normal"/"rotated" force a side, for
+   *  edge cases the computed rule doesn't call the way the user wants. */
+  mapOrientation?: "auto" | "normal" | "rotated";
+}
+
+/** docs/25 §4 — compute whether rotating the floorplan 90° fits the portrait
+ *  map region better than leaving it upright. Pure geometry: for each
+ *  orientation, "how big could the floorplan render inside this box" is the
+ *  contain-fit scale (`min(boxW/contentW, boxH/contentH)`); pick whichever
+ *  orientation yields the larger rendered map (bigger = more legible rooms,
+ *  bigger tap targets). Ties (near-square floorplans, where it barely
+ *  matters either way) default to NOT rotating — it's the cheaper option
+ *  (no counter-rotating on-map labels via `.avc-rot`).
+ *
+ *  `floorplanAR` = floorplan width / height. `boxW`/`boxH` = the measured
+ *  portrait map region. Returns `undefined` when there isn't enough data to
+ *  decide yet (region not measured) — callers should keep their previous
+ *  answer rather than flicker on an unmeasured 0×0 box. */
+export function shouldRotateMap(floorplanAR: number, boxW: number, boxH: number): boolean | undefined {
+  if (boxW <= 4 || boxH <= 4 || floorplanAR <= 0) return undefined;
+  // Normalize floorplan height to 1 → width is floorplanAR. Contain-fit scale
+  // is min(boxAxis / contentAxis) per axis; rotating swaps which axis is which.
+  const scaleUpright = Math.min(boxW / floorplanAR, boxH);
+  const scaleRotated = Math.min(boxW, boxH / floorplanAR);
+  // Equal scale (or upright wins/ties) → don't rotate.
+  return scaleRotated > scaleUpright;
 }
 
 export interface ProfileGridConfig {
