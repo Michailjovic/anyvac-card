@@ -94,7 +94,7 @@ const t={ATTRIBUTE:1},e=t=>(...e)=>({_$litDirective$:t,values:e});let i$1 = clas
 
 const CARD_NAME = "anyvac-card";
 const EDITOR_NAME = "anyvac-card-editor";
-const CARD_VERSION = "0.68.2";
+const CARD_VERSION = "0.68.3";
 /** Hold duration in ms required to trigger START / PAUSE actions */
 const HOLD_DURATION_MS = 600;
 /**
@@ -3908,10 +3908,17 @@ let AnyVacCard = class AnyVacCard extends i$2 {
             const [jc, ai] = ANCHOR[anchor] ?? ["center", "center"];
             const borderW = (selected
                 ? (this._config.room_border_selected ?? 4)
-                : (this._config.room_border_normal ?? 2)) + "px";
-            const borderC = selected ? SEL + "E0" : wholeHome ? "rgba(255,255,255,0.45)" : ageColor;
-            const bg = selected ? SEL + "22" : wholeHome ? "rgba(255,255,255,0.07)" : "rgba(0,0,0,0.06)";
-            const shadow = selected ? "0 0 18px rgba(255,255,255,0.7)" : "none";
+                : wholeHome ? Math.max(3, this._config.room_border_normal ?? 2)
+                    : (this._config.room_border_normal ?? 2)) + "px";
+            // First pass at this (0.68.2) was too subtle to read at a glance on a
+            // real floorplan image (field feedback 2026-07-23: "if I didn't know
+            // about it, I wouldn't see it at all") — bumped border/bg opacity and
+            // added a soft glow so whole-home clearly reads as "highlighted",
+            // while still staying a visible notch below `selected`'s crisp
+            // gradient border + strong glow.
+            const borderC = selected ? SEL + "E0" : wholeHome ? "rgba(255,255,255,0.75)" : ageColor;
+            const bg = selected ? SEL + "22" : wholeHome ? "rgba(255,255,255,0.16)" : "rgba(0,0,0,0.06)";
+            const shadow = selected ? "0 0 18px rgba(255,255,255,0.7)" : wholeHome ? "0 0 10px rgba(255,255,255,0.4)" : "none";
             // Who's assigned (dry/wet), from the backend plan preview — only known
             // once selected (the preview is computed for the current selection).
             const dryEnt = selected ? this._planPreview?.dry.get(room.key) : undefined;
@@ -3951,8 +3958,8 @@ let AnyVacCard = class AnyVacCard extends i$2 {
       `;
         }
         // ── Point mód (legacy) ──────────────────────────────────────
-        const bg = selected ? SEL + "A8" : wholeHome ? "rgba(255,255,255,0.22)" : "rgba(0,0,0,0.55)";
-        const shadow = selected ? "0 0 12px rgba(255,255,255,0.8)" : "none";
+        const bg = selected ? SEL + "A8" : wholeHome ? "rgba(255,255,255,0.32)" : "rgba(0,0,0,0.55)";
+        const shadow = selected ? "0 0 12px rgba(255,255,255,0.8)" : wholeHome ? "0 0 8px rgba(255,255,255,0.45)" : "none";
         return b `
       <button
         class="room-btn ${locked ? "room-overlay--locked" : ""}"
@@ -3960,7 +3967,7 @@ let AnyVacCard = class AnyVacCard extends i$2 {
         style=${o({
             left: (room.map_x ?? 0) + "%", top: (room.map_y ?? 0) + "%",
             background: bg,
-            border: "4px solid " + (selected ? SEL : wholeHome ? "rgba(255,255,255,0.5)" : ageColor),
+            border: "4px solid " + (selected ? SEL : wholeHome ? "rgba(255,255,255,0.7)" : ageColor),
             borderImage: selected ? SEL_GRADIENT : "none",
             boxShadow: shadow,
         })}

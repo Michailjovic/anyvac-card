@@ -14,6 +14,19 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   (care & consumables as the pilot page), and the visual language pass —
   neither shipped yet.
 
+## [0.68.3] - 2026-07-23
+
+### Changed
+
+- Whole-home map highlight (0.68.2) was too subtle to notice on a real
+  floorplan — field feedback: "if I didn't know about it, I wouldn't see it
+  at all". Bumped border width (2px → 3px, still below selected's 4px),
+  border opacity (45% → 75% white), background tint (7% → 16% white), and
+  added a soft glow (absent → `0 0 10px rgba(255,255,255,0.4)`, softer than
+  selected's `0 0 18px rgba(255,255,255,0.7)`). Legacy point-mode markers
+  bumped similarly. Still a clear step below an explicit selection, just
+  actually visible now.
+
 ## [0.68.2] - 2026-07-23
 
 ### Added
