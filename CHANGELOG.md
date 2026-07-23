@@ -14,6 +14,26 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   (care & consumables as the pilot page), and the visual language pass —
   neither shipped in 0.68.0 yet.
 
+## [0.68.1] - 2026-07-23
+
+### Fixed
+
+- Portrait vacuum icon strip hold-to-hide (`.vac-icon-btn`, docs/19
+  follow-up) and the older badge-row hold-to-hide (`.badge`) silently did
+  nothing on mobile: the fill-ring animation played to completion, but the
+  vacuum's shown/hidden state never actually changed. Root cause: neither
+  class set `touch-action`/`-webkit-touch-callout`/`user-select`, so on
+  iOS/Android WebViews the OS's own long-press affordances (image-save
+  callout on the `<img>` avatar, text selection, Haptic Touch preview) race
+  our 600ms `pointerdown` timer — the native gesture wins right at the
+  deadline and fires `pointercancel` a moment before our `setTimeout`
+  callback runs, so `_toggleShownMulti()` never executes even though the
+  CSS ring visually finished. Added the same `touch-action: manipulation;
+  -webkit-touch-callout: none; user-select: none;` already used on
+  `.layer-btn` to both `.vac-icon-btn` and `.badge`, plus `pointer-events:
+  none` on their inner `<img>` avatars so the image itself is never
+  hit-tested for native gestures. Field verification pending.
+
 ## [0.68.0] - 2026-07-23
 
 First installment of docs/25 (Fáze 3, portrait stránkování a cockpit
@@ -49,6 +69,11 @@ come.
   but the map itself doesn't yet show which rooms that implies.
 - Pages/menu (care & consumables, docs/25 §2-3) and the visual language pass
   (docs/25 §6) are unstarted.
+- In whole-home mode the card shows room/time counts but not per-room
+  vacuum assignment (the dock's avatar chips stay tied to an explicit
+  selection). Confirmed with the user as an accepted boundary, not a gap to
+  close — see the "assignment stays tied to explicit selection" note in
+  docs/25 §5.
 
 ## [0.67.1] - 2026-07-23
 

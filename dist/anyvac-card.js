@@ -94,7 +94,7 @@ const t={ATTRIBUTE:1},e=t=>(...e)=>({_$litDirective$:t,values:e});let i$1 = clas
 
 const CARD_NAME = "anyvac-card";
 const EDITOR_NAME = "anyvac-card-editor";
-const CARD_VERSION = "0.68.0";
+const CARD_VERSION = "0.68.1";
 /** Hold duration in ms required to trigger START / PAUSE actions */
 const HOLD_DURATION_MS = 600;
 /**
@@ -4433,8 +4433,18 @@ AnyVacCard.styles = i$6 `
       display: flex; align-items: center; justify-content: center;
       background: rgba(255,255,255,0.05); border: 2px solid rgba(255,255,255,0.2); cursor: pointer;
       transition: opacity 0.15s ease;
+      /* Mobile hold-gesture fix: without these, iOS/Android WebViews race our
+       * 600ms pointerdown timer against their own long-press affordances
+       * (image-save callout, text selection, Haptic Touch preview) — the
+       * native gesture wins right at the deadline, firing pointercancel a
+       * moment before our setTimeout callback, so the ring animation still
+       * visually completes but _toggleShownMulti() never runs. Mirrors the
+       * fix already applied to .layer-btn. */
+      touch-action: manipulation;
+      -webkit-touch-callout: none;
+      user-select: none;
     }
-    .vac-icon-btn img { width: 100%; height: 100%; object-fit: cover; border-radius: 50%; }
+    .vac-icon-btn img { width: 100%; height: 100%; object-fit: cover; border-radius: 50%; -webkit-touch-callout: none; user-select: none; pointer-events: none; }
     .vac-icon-btn ha-icon { --mdc-icon-size: 20px; }
     .vac-icon-btn--hidden { opacity: 0.35; }
 
@@ -4667,6 +4677,12 @@ AnyVacCard.styles = i$6 `
       backdrop-filter: blur(10px);
       -webkit-backdrop-filter: blur(10px);
       transition: background 0.3s, border 0.3s, box-shadow 0.3s;
+      /* Same mobile hold-gesture fix as .vac-icon-btn — badges use the
+       * identical tap-vs-hold pointer pattern (short tap = focus, hold =
+       * show/hide toggle). */
+      touch-action: manipulation;
+      -webkit-touch-callout: none;
+      user-select: none;
     }
 
     .badge-img {
@@ -4677,6 +4693,9 @@ AnyVacCard.styles = i$6 `
       flex-shrink: 0;
       position: relative;
       z-index: 1;
+      -webkit-touch-callout: none;
+      user-select: none;
+      pointer-events: none;
     }
 
     .badge-icon {
