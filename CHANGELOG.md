@@ -14,6 +14,24 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   (care & consumables as the pilot page), and the visual language pass —
   neither shipped yet.
 
+## [0.70.0] - 2026-07-24
+
+Docs/25 §7c resolved (field diskuze: mode switcher + path-visibility are the
+two must-have-before-start controls; room list is not) and its first piece
+shipped.
+
+### Changed
+
+- Portrait dock's permanent room list (`dock-rows` — per-room age/pin/avatar
+  detail) is now gated behind `debug_room_progress`. Selection stays
+  map-tap-only; per-room detail is moving to a hold-to-inspect gesture on the
+  room (docs/25 §7b), not yet shipped — until then this detail is only
+  reachable via the debug toggle. Landscape's dock/picker sidebar (docs/18/19
+  A5) is unaffected, keeps the room list unconditionally.
+- `layout.ts`: new `shouldStackLayout()`, generalizing `shouldRotateMap()`
+  (§4) to the map/dock topology choice (split vs. stack, docs/25 §7c) — pure
+  geometry helper, not yet wired into the card's grid computation.
+
 ## [0.69.0] - 2026-07-23
 
 First implementation slice of docs/25 §7 (field diskuze, portrait cockpit

@@ -94,7 +94,7 @@ const t={ATTRIBUTE:1},e=t=>(...e)=>({_$litDirective$:t,values:e});let i$1 = clas
 
 const CARD_NAME = "anyvac-card";
 const EDITOR_NAME = "anyvac-card-editor";
-const CARD_VERSION = "0.69.0";
+const CARD_VERSION = "0.70.0";
 /** Hold duration in ms required to trigger START / PAUSE actions */
 const HOLD_DURATION_MS = 600;
 /**
@@ -2410,6 +2410,15 @@ let AnyVacCard = class AnyVacCard extends i$2 {
         <ha-icon icon=${icon}></ha-icon><span>${label}</span>
       </button>`;
         const runHid = "dock-run";
+        // docs/25 §7c (field diskuze 2026-07-24): portrait cockpit minimalism drops
+        // the permanent room list — selection stays map-tap-only, per-room detail
+        // (age/pin) moves to hold-to-inspect on the room (§7b, not yet shipped).
+        // `debug_room_progress` (§7e) is the escape hatch back to today's dense
+        // view for calibration debugging (docs/17 §1.3 / docs/26 use case) in the
+        // meantime. Landscape's dock/picker sidebar is a separate, established
+        // design (docs/18/19 A5) and keeps the room list unconditionally — this
+        // gate only ever hides it in portrait.
+        const showRoomList = this._profile !== "portrait" || !!this._config.debug_room_progress;
         return b `
       <div class="dock">
         ${this._renderVacuumIconStrip()}
@@ -2424,7 +2433,7 @@ let AnyVacCard = class AnyVacCard extends i$2 {
         <div class="dock-head">
           ${modeBtn("dry", "mdi:broom", "Dry")}${modeBtn("wet", "mdi:water", "Wet")}${modeBtn("both", "mdi:water-plus", "Both")}
         </div>
-        <div class="dock-rows">
+        ${!showRoomList ? A : b `<div class="dock-rows">
           ${rooms.map(({ r, v }) => {
             const rec = this._intRoomRec(v, r);
             const dry = this._ageDaysFromIso(rec?.dry);
@@ -2459,7 +2468,7 @@ let AnyVacCard = class AnyVacCard extends i$2 {
                   </span>` : A}
               </button>`;
         })}
-        </div>
+        </div>`}
         ${withRun && hasInt ? b `
           <div class="dock-foot">
             <span class="dock-est">${selKeys.length ? selKeys.length + " rooms · ~" + this._etaFor(runKeys, mode, hasInt) + " min" : "Whole home · ~" + this._etaFor(runKeys, mode, hasInt) + " min"}
@@ -3872,7 +3881,17 @@ let AnyVacCard = class AnyVacCard extends i$2 {
      *  same order as everywhere else in the card. Gated on the representative
      *  vacuum's clean-type capability, not on whether a timestamp happens to
      *  exist yet, so a dry-only vacuum's rooms don't grow a permanent "never
-     *  wet cleaned" red dot they can never clear. */
+     *  wet cleaned" red dot they can never clear.
+     *
+     *  KNOWN ISSUE (field-reported 2026-07-23, deferred — not root-caused
+     *  yet): in merged mode, `vac` here is `_mergedRoomDefs`'s representative
+     *  owner of the room definition, not necessarily every vacuum that can
+     *  actually clean it (same class of gap already noted elsewhere in this
+     *  file re: identity color). If the representative happens to be
+     *  dry-only, `_vacCleanType` gates off the wet dot even when another
+     *  configured vacuum does mop the room — user saw one dot where two were
+     *  expected. Likely fix: gate on capability across `opts.vacs`, not just
+     *  `vac` — needs its own pass, not bundled into this one. */
     _renderRoomAgeDots(room, vac) {
         const rec = this._intRoomRec(vac, room);
         if (rec) {

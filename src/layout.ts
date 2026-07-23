@@ -61,6 +61,51 @@ export function shouldRotateMap(floorplanAR: number, boxW: number, boxH: number)
   return scaleRotated > scaleUpright;
 }
 
+/** docs/25 §7c — portrait map/dock topology as a computed choice, generalizing
+ *  `shouldRotateMap()` (§4) from "which way is the floorplan rotated" up one
+ *  level to "which overall arrangement fits the floorplan better":
+ *
+ *  - "split": today's default (`DEFAULT_PROFILES.portrait`) — map and dock
+ *    side by side, map gets the full available height, its width follows its
+ *    own aspect ratio (post §4 rotation choice). Wins for a naturally
+ *    tall/narrow floorplan (multiple storeys stacked, a narrow rowhouse).
+ *  - "stack": map full-width on top, dock/vacuum row/START below it full-width.
+ *    Map gets the full available width, height follows its aspect ratio
+ *    (capped so the dock doesn't get squeezed to a sliver). Wins for a
+ *    naturally wide/short floorplan.
+ *
+ *  Same contain-fit-scale comparison as `shouldRotateMap()`: for each
+ *  candidate arrangement, compute how big the floorplan could render inside
+ *  the box that arrangement gives it, and pick whichever renders it bigger.
+ *  Fixes the field-observed problem (2026-07-23 screenshot, a 3-storey
+ *  narrow floorplan) where a fixed split left the dock column wide and mostly
+ *  empty because its width was whatever the map didn't need, not what the
+ *  dock's own content needed.
+ *
+ *  `floorplanAR` = floorplan width / height (post-rotation, i.e. whatever
+ *  `_narrow`/`shouldRotateMap` already decided to actually render).
+ *  `boxW`/`boxH` = the full portrait content box (map + dock combined, minus
+ *  START bar). `dockFrac` = today's dock column width fraction of that box
+ *  (0..1, e.g. 0.28 for the current `columns: [72, 28]` split) — stack's
+ *  candidate reserves the same fraction of height instead. Returns
+ *  `undefined` when there isn't enough data yet, same convention as
+ *  `shouldRotateMap()`. */
+export function shouldStackLayout(
+  floorplanAR: number,
+  boxW: number,
+  boxH: number,
+  dockFrac = 0.28,
+): boolean | undefined {
+  if (boxW <= 4 || boxH <= 4 || floorplanAR <= 0) return undefined;
+  const splitMapW = boxW * (1 - dockFrac);
+  const scaleSplit = Math.min(splitMapW / floorplanAR, boxH);
+  const stackMapH = boxH * (1 - dockFrac);
+  const scaleStack = Math.min(boxW / floorplanAR, stackMapH);
+  // Ties (near-identical fit either way) default to split — it's today's
+  // shipped behavior, cheaper to keep than to flip for a marginal gain.
+  return scaleStack > scaleSplit;
+}
+
 export interface ProfileGridConfig {
   /** Track sizes: numbers are % of available viewport, strings pass through
    *  ("1fr", "auto", "120px"). */
