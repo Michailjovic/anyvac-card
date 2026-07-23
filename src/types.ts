@@ -319,8 +319,16 @@ export interface AnyVacCardConfig {
   /** Default orchestrator policy (overridable per global preset). */
   orchestrator?: OrchestratorPolicy;
   /** Debug: draw a per-room cleaning-progress gauge on the map (reads the integration's
-   *  rooms_progress). Off by default — a testing aid, not for everyday cards. */
+   *  rooms_progress). Off by default — a testing aid, not for everyday cards.
+   *  Independent of `debug_dense_dock` below (docs/25 §7e, split 2026-07-24 —
+   *  a user relying on this for coverage debugging still gets the minimalist
+   *  portrait cockpit; the map gauges this flag draws are dock-independent). */
   debug_room_progress?: boolean;
+  /** Debug: portrait-only, brings back the pre-docs/25 dense room list (age/pin/
+   *  assigned-vacuum per row) below the map instead of the minimalist map-tap-only
+   *  cockpit (docs/25 §7c/§7e). Off by default. Landscape's dock/picker sidebar
+   *  (docs/18/19 A5) is unaffected either way — it always shows the room list. */
+  debug_dense_dock?: boolean;
   /** Two-profile percentage-grid layout (docs/18). Omitted = today's stacked
    *  render, unchanged. Present = the card becomes a viewport-sized grid with
    *  named regions placed per portrait/landscape profile. */

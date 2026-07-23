@@ -113,7 +113,35 @@ export interface ProfileGridConfig {
   rows?: Array<number | string>;
   place?: Record<string, RegionPlace>;
   crop?: MapCropConfig;
+  /** docs/25 §7c. "auto" (default, portrait only) computes split vs. stack
+   *  from `shouldStackLayout()`. "split"/"stack" force a side — same escape
+   *  hatch pattern as `crop.mapOrientation`. Any explicit `columns`/`rows`/
+   *  `place` on this profile already opts out of the computed choice
+   *  entirely (the card treats a manual layout as intentional) — this field
+   *  only matters when none of those are set. */
+  topology?: "auto" | "split" | "stack";
 }
+
+/** `columns`/`rows`/`place` filled in; `crop`/`topology` stay optional/absent
+ *  (no default data to fall back to — see `resolveProfile`'s doc comment). */
+export type ResolvedProfileGrid = Required<Omit<ProfileGridConfig, "crop" | "topology">>;
+
+/** docs/25 §7c — the "stack" portrait arrangement (map full-width on top,
+ *  dock/vacuum-row/START stacked full-width below it), used in place of
+ *  `DEFAULT_PROFILES.portrait` when `shouldStackLayout()` (or a manual
+ *  `topology: "stack"` override) picks it. `rows: ["1fr", "auto", "auto"]`
+ *  mirrors the landscape pattern (docs/19 A5 addendum) — the map takes
+ *  whatever's left after dock/start size to their own content, not the
+ *  other way around. */
+export const STACK_PORTRAIT_PROFILE: ResolvedProfileGrid = {
+  columns: [100],
+  rows: ["1fr", "auto", "auto"],
+  place: {
+    map: { row: 1, col: 1 },
+    dock: { row: 2, col: 1, overflow: "auto" },
+    start: { row: 3, col: 1 },
+  },
+};
 
 export interface LayoutConfig {
   /** availW/availH below this → portrait. Default 1.0. */
@@ -133,7 +161,7 @@ export interface LayoutConfig {
  * and per-robot status cards right. Portrait = docs/12: slim badges bar, tall
  * rotated map, right thumb dock, full-width START bar. Overridable per config.
  */
-export const DEFAULT_PROFILES: Record<LayoutProfile, Required<Omit<ProfileGridConfig, "crop">>> = {
+export const DEFAULT_PROFILES: Record<LayoutProfile, ResolvedProfileGrid> = {
   landscape: {
     // Phase C (docs/19 A5): map + meta bar go full-width — the map is the main
     // instrument, not a 70%-column tenant. Below that the cockpit splits in
@@ -212,7 +240,7 @@ export function headerPx(el: Element): number {
 /** Merge the profile's grid config with the built-in defaults. `crop` isn't
  *  merged here (it has no "default profile" data to fall back to — it's just
  *  present or absent) — callers read `cfg[profile]?.crop` directly. */
-export function resolveProfile(cfg: LayoutConfig, profile: LayoutProfile): Required<Omit<ProfileGridConfig, "crop">> {
+export function resolveProfile(cfg: LayoutConfig, profile: LayoutProfile): ResolvedProfileGrid {
   const p = cfg[profile] ?? {};
   const d = DEFAULT_PROFILES[profile];
   return {
@@ -265,7 +293,7 @@ export function resolveHeightCss(cfg: LayoutConfig): string {
  *  JS refinement in `updated()` fights (and mostly loses) against this
  *  declarative object again — a cosmetic imperfection, not a crash. Do NOT
  *  remove these from styleMap again without a mobile-tested alternative. */
-export function gridRootStyles(cfg: LayoutConfig, prof: Required<Omit<ProfileGridConfig, "crop">>): Record<string, string> {
+export function gridRootStyles(cfg: LayoutConfig, prof: ResolvedProfileGrid): Record<string, string> {
   return {
     display: "grid",
     width: "100%",

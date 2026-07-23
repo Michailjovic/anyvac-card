@@ -14,6 +14,50 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   (care & consumables as the pilot page), and the visual language pass —
   neither shipped yet.
 
+## [0.71.0] - 2026-07-24
+
+Docs/25 §7c: portrait map/dock topology as a computed choice.
+
+### Added
+
+- `shouldStackLayout()` (`layout.ts`) is now wired into the actual grid
+  render: portrait picks between **split** (today's default, map/dock side
+  by side) and **stack** (map full-width on top, dock/vacuum-row/START
+  stacked full-width below) by comparing achieved floorplan fit scale for
+  each, same contain-fit-scale technique as `shouldRotateMap()` (§4).
+  Targets the field-observed problem where a naturally tall/narrow
+  floorplan left the split's dock column wide and mostly empty.
+- New `layout.portrait.topology: auto|split|stack` config override — same
+  escape-hatch pattern as `crop.mapOrientation`. Any explicit
+  `columns`/`rows`/`place` on `layout.portrait` already opts out of the
+  computed choice on its own (unchanged rule), regardless of `topology`.
+- New measured box (`_mapAvailW`/`_mapAvailH` — the combined map+dock
+  content area, independent of which topology is currently applied) feeds
+  the decision; settles over 1-2 renders like the existing rotation logic
+  (`_lastRotate` → now `_lastStack`).
+
+### Notes
+
+- Touches the grid sizing mechanics that previously caused a mobile
+  companion-app crash (0.59.0–0.61.0, docs/21 §5b) — kept to the same
+  established layered pattern (declarative `styleMap` fallback + JS
+  refinement on top, never sole JS ownership) as a precaution. Field test
+  requested before relying on this away from a full-width dashboard card.
+
+## [0.70.1] - 2026-07-24
+
+Field-caught fix, same day as 0.70.0: gating the portrait room list on
+`debug_room_progress` meant a user who keeps that flag on for coverage-%
+debugging never saw the new minimalist cockpit at all.
+
+### Fixed
+
+- New independent `debug_dense_dock` config flag controls the portrait room
+  list; `debug_room_progress` goes back to its original narrow scope (map
+  gauges / inline % chips only). The two are unrelated — coverage debugging
+  works fine with the minimalist cockpit, since the map gauges don't live in
+  the room list.
+
 ## [0.70.0] - 2026-07-24
 
 Docs/25 §7c resolved (field diskuze: mode switcher + path-visibility are the

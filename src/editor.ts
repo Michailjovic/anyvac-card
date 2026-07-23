@@ -1235,6 +1235,16 @@ export class AnyVacCardEditor extends LitElement {
           </label>
         </div>
         <p class="hint">Draws a small % gauge on each room (spatial coverage). Spatial % is approximate — the room box includes furniture, so it plateaus below 100%.</p>
+        <div class="field field--row">
+          <label>Dense portrait room list</label>
+          <label class="toggle-wrap">
+            <input type="checkbox" class="toggle-input"
+              .checked=${this._config.debug_dense_dock ?? false}
+              @change=${(e: Event) => this._setConfig({ debug_dense_dock: (e.target as HTMLInputElement).checked || undefined })} />
+            <span class="toggle-track"></span>
+          </label>
+        </div>
+        <p class="hint">Brings back the old portrait room list (name, age, pin, assigned vacuum) below the map — the minimalist cockpit (docs/25 §7c) drops it in favor of map-tap selection. Independent of the gauges toggle above — you can debug coverage % (which shows on the map either way) without this.</p>
         ${this._config.vacuums.map((vac) => {
           const ie = this._intEntityFor(vac);
           const st = ie ? this.hass.states[ie] : undefined;

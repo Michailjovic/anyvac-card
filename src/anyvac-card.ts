@@ -40,9 +40,12 @@ import {
   gridRootStyles,
   regionStyles,
   shouldRotateMap,
+  shouldStackLayout,
+  STACK_PORTRAIT_PROFILE,
   type LayoutProfile,
   type LayoutConfig,
   type ProfileGridConfig,
+  type ResolvedProfileGrid,
 } from "./layout";
 
 console.info(
@@ -112,6 +115,18 @@ export class AnyVacCard extends LitElement {
   /** Measured inner box of the map region (grid mode) for the exact rotated fit. */
   @state() private _mapRegW = 0;
   @state() private _mapRegH = 0;
+  /** docs/25 §7c: measured combined map+dock content box (portrait grid root
+   *  minus the START row) — the box the split-vs-stack topology choice is
+   *  computed against, BEFORE that choice picks map's own (narrower/shorter)
+   *  region. Distinct from `_mapRegW`/`_mapRegH`, which measure the map
+   *  region AFTER a topology is already applied. */
+  @state() private _mapAvailW = 0;
+  @state() private _mapAvailH = 0;
+  /** docs/25 §7c: last computed split-vs-stack decision, same "keep the
+   *  previous answer while unmeasured" convention as `_lastRotate`. Defaults
+   *  to `false` (split) — matches today's shipped default until real
+   *  measurements correct it. */
+  private _lastStack = false;
   /** Portrait only: the map's last computed fitted width (`_renderResponsive`),
    *  fed into `_refineGridColumns` to override the map/dock column split so the
    *  sidebar gets whatever width the height-fitted map doesn't need. Plain
@@ -518,6 +533,18 @@ export class AnyVacCard extends LitElement {
       if (w && Math.abs(w - this._mapRegW) >= 2) this._mapRegW = w;
       if (h2 && Math.abs(h2 - this._mapRegH) >= 2) this._mapRegH = h2;
     }
+    // docs/25 §7c: measure the combined map+dock box (root minus the START
+    // row) for the split-vs-stack topology decision — independent of which
+    // topology is currently rendered, so it stays correct across the switch.
+    if (this._profile === "portrait") {
+      const startEl = this.renderRoot?.querySelector<HTMLElement>(".avc-region--start");
+      const gapPx = parseFloat(getComputedStyle(root).rowGap || getComputedStyle(root).gap || "0") || 0;
+      const startH = startEl ? Math.round(startEl.getBoundingClientRect().height) : 0;
+      const aw = Math.round(root.clientWidth);
+      const ah = Math.round(root.clientHeight - startH - (startH ? gapPx : 0));
+      if (aw && Math.abs(aw - this._mapAvailW) >= 2) this._mapAvailW = aw;
+      if (ah > 0 && Math.abs(ah - this._mapAvailH) >= 2) this._mapAvailH = ah;
+    }
   }
 
   disconnectedCallback(): void {
@@ -619,6 +646,8 @@ export class AnyVacCard extends LitElement {
   private _refineGridColumns(): void {
     if (this._profile !== "portrait" || !this._lastPortraitFitW) return;
     if (this._config.layout?.portrait?.columns?.length) return;
+    // Stack topology has a single 100%-width column — no split to refine.
+    if (this._stackTopology) return;
     const root = this.renderRoot?.querySelector<HTMLElement>(".avc-grid");
     if (!root) return;
     const total = root.clientWidth;
@@ -1753,12 +1782,15 @@ export class AnyVacCard extends LitElement {
     // docs/25 §7c (field diskuze 2026-07-24): portrait cockpit minimalism drops
     // the permanent room list — selection stays map-tap-only, per-room detail
     // (age/pin) moves to hold-to-inspect on the room (§7b, not yet shipped).
-    // `debug_room_progress` (§7e) is the escape hatch back to today's dense
-    // view for calibration debugging (docs/17 §1.3 / docs/26 use case) in the
-    // meantime. Landscape's dock/picker sidebar is a separate, established
-    // design (docs/18/19 A5) and keeps the room list unconditionally — this
-    // gate only ever hides it in portrait.
-    const showRoomList = this._profile !== "portrait" || !!this._config.debug_room_progress;
+    // `debug_dense_dock` (§7e) is the escape hatch back to today's dense view.
+    // Deliberately a SEPARATE flag from `debug_room_progress` (field-caught
+    // 2026-07-24: a user who keeps `debug_room_progress` on for coverage-%
+    // debugging — the map gauges it draws, `_renderRoomGauge`, are dock-
+    // independent — would otherwise never see the new minimalist cockpit at
+    // all, defeating the point of shipping it). Landscape's dock/picker
+    // sidebar is a separate, established design (docs/18/19 A5) and keeps the
+    // room list unconditionally — this gate only ever hides it in portrait.
+    const showRoomList = this._profile !== "portrait" || !!this._config.debug_dense_dock;
     return html`
       <div class="dock">
         ${this._renderVacuumIconStrip()}
@@ -2918,6 +2950,34 @@ export class AnyVacCard extends LitElement {
     }
     return this._cardW > 0 && this._cardW < 500;       // auto: by card width
   }
+
+  /** docs/25 §7c: split (today's default) vs. stack portrait topology, computed
+   *  from `shouldStackLayout()` — mirrors `_narrow`'s structure (manual override
+   *  → computed → settle-on-previous-answer while unmeasured). Only active with
+   *  a `layout:` config block; only meaningful in portrait. A manual `topology`
+   *  override, or any explicit `columns`/`rows`/`place` on `layout.portrait`
+   *  (the user has already hand-tuned the split), opts out of the computed
+   *  choice entirely — same "manual config wins" rule `resolveProfile` already
+   *  applies to columns/rows/place individually. */
+  private get _stackTopology(): boolean {
+    if (this._profile !== "portrait" || !this._config.layout) return false;
+    const p = this._config.layout.portrait;
+    if (p?.topology === "split") return false;
+    if (p?.topology === "stack") return true;
+    if (p?.columns?.length || p?.rows?.length || (p?.place && Object.keys(p.place).length)) return false;
+    const ar = this._mapAR > 0.1 ? this._mapAR : 3.636;
+    // Effective floorplan AR honoring the current rotation state (`_narrow`) —
+    // shouldStackLayout wants "whatever will actually get rendered", not the
+    // raw un-rotated floorplan. Same bootstrapping approximation as `_narrow`
+    // itself: on the very first render this reads last render's decision, not
+    // this one's, and converges within a render or two, same as elsewhere in
+    // this settle-based system.
+    const effAr = this._narrow ? 1 / ar : ar;
+    const computed = shouldStackLayout(effAr, this._mapAvailW, this._mapAvailH);
+    if (computed !== undefined) { this._lastStack = computed; return computed; }
+    return this._lastStack;
+  }
+
   /** Learn the floorplan's aspect ratio once it loads, for the rotation maths. */
   private _onFloorplanLoad = (e: Event): void => {
     const img = e.target as HTMLImageElement;
@@ -3622,7 +3682,7 @@ export class AnyVacCard extends LitElement {
 
   /** Named region template (docs/18 §3), built on demand — a region not placed
    *  in the active profile is never even computed. */
-  private _regionTemplate(name: string, prof: Required<Omit<ProfileGridConfig, "crop">>): unknown {
+  private _regionTemplate(name: string, prof: ResolvedProfileGrid): unknown {
     const shown = this._gridShown();
     const merged = this._config.map_mode === "merged";
     const vacsOf = (idxs: number[]) => idxs.map((i) => this._config.vacuums[i]);
@@ -3668,7 +3728,12 @@ export class AnyVacCard extends LitElement {
 
   /** Grid render path (docs/18): active only with a `layout:` config block. */
   private _renderGrid(lay: LayoutConfig) {
-    const prof = resolveProfile(lay, this._profile);
+    // docs/25 §7c: stack topology substitutes the whole resolved profile —
+    // `_stackTopology` already refuses to fire when the user has hand-set
+    // columns/rows/place, so this never overrides a manual layout.
+    const prof = (this._profile === "portrait" && this._stackTopology)
+      ? STACK_PORTRAIT_PROFILE
+      : resolveProfile(lay, this._profile);
     const schemaWarn = this._schemaWarning();
     return html`
       <ha-card style="padding:0;display:block">

@@ -94,7 +94,7 @@ const t={ATTRIBUTE:1},e=t=>(...e)=>({_$litDirective$:t,values:e});let i$1 = clas
 
 const CARD_NAME = "anyvac-card";
 const EDITOR_NAME = "anyvac-card-editor";
-const CARD_VERSION = "0.70.0";
+const CARD_VERSION = "0.71.0";
 /** Hold duration in ms required to trigger START / PAUSE actions */
 const HOLD_DURATION_MS = 600;
 /**
@@ -420,6 +420,62 @@ function shouldRotateMap(floorplanAR, boxW, boxH) {
     // Equal scale (or upright wins/ties) → don't rotate.
     return scaleRotated > scaleUpright;
 }
+/** docs/25 §7c — portrait map/dock topology as a computed choice, generalizing
+ *  `shouldRotateMap()` (§4) from "which way is the floorplan rotated" up one
+ *  level to "which overall arrangement fits the floorplan better":
+ *
+ *  - "split": today's default (`DEFAULT_PROFILES.portrait`) — map and dock
+ *    side by side, map gets the full available height, its width follows its
+ *    own aspect ratio (post §4 rotation choice). Wins for a naturally
+ *    tall/narrow floorplan (multiple storeys stacked, a narrow rowhouse).
+ *  - "stack": map full-width on top, dock/vacuum row/START below it full-width.
+ *    Map gets the full available width, height follows its aspect ratio
+ *    (capped so the dock doesn't get squeezed to a sliver). Wins for a
+ *    naturally wide/short floorplan.
+ *
+ *  Same contain-fit-scale comparison as `shouldRotateMap()`: for each
+ *  candidate arrangement, compute how big the floorplan could render inside
+ *  the box that arrangement gives it, and pick whichever renders it bigger.
+ *  Fixes the field-observed problem (2026-07-23 screenshot, a 3-storey
+ *  narrow floorplan) where a fixed split left the dock column wide and mostly
+ *  empty because its width was whatever the map didn't need, not what the
+ *  dock's own content needed.
+ *
+ *  `floorplanAR` = floorplan width / height (post-rotation, i.e. whatever
+ *  `_narrow`/`shouldRotateMap` already decided to actually render).
+ *  `boxW`/`boxH` = the full portrait content box (map + dock combined, minus
+ *  START bar). `dockFrac` = today's dock column width fraction of that box
+ *  (0..1, e.g. 0.28 for the current `columns: [72, 28]` split) — stack's
+ *  candidate reserves the same fraction of height instead. Returns
+ *  `undefined` when there isn't enough data yet, same convention as
+ *  `shouldRotateMap()`. */
+function shouldStackLayout(floorplanAR, boxW, boxH, dockFrac = 0.28) {
+    if (boxW <= 4 || boxH <= 4 || floorplanAR <= 0)
+        return undefined;
+    const splitMapW = boxW * (1 - dockFrac);
+    const scaleSplit = Math.min(splitMapW / floorplanAR, boxH);
+    const stackMapH = boxH * (1 - dockFrac);
+    const scaleStack = Math.min(boxW / floorplanAR, stackMapH);
+    // Ties (near-identical fit either way) default to split — it's today's
+    // shipped behavior, cheaper to keep than to flip for a marginal gain.
+    return scaleStack > scaleSplit;
+}
+/** docs/25 §7c — the "stack" portrait arrangement (map full-width on top,
+ *  dock/vacuum-row/START stacked full-width below it), used in place of
+ *  `DEFAULT_PROFILES.portrait` when `shouldStackLayout()` (or a manual
+ *  `topology: "stack"` override) picks it. `rows: ["1fr", "auto", "auto"]`
+ *  mirrors the landscape pattern (docs/19 A5 addendum) — the map takes
+ *  whatever's left after dock/start size to their own content, not the
+ *  other way around. */
+const STACK_PORTRAIT_PROFILE = {
+    columns: [100],
+    rows: ["1fr", "auto", "auto"],
+    place: {
+        map: { row: 1, col: 1 },
+        dock: { row: 2, col: 1, overflow: "auto" },
+        start: { row: 3, col: 1 },
+    },
+};
 /**
  * Canonical docs/18 §4 default profiles (Phase B). Landscape = cockpit: map left
  * (scrolls in split mode, §7b), dock (selection + plan + orchestrated run, §7d)
@@ -632,6 +688,18 @@ let AnyVacCard = class AnyVacCard extends i$2 {
         /** Measured inner box of the map region (grid mode) for the exact rotated fit. */
         this._mapRegW = 0;
         this._mapRegH = 0;
+        /** docs/25 §7c: measured combined map+dock content box (portrait grid root
+         *  minus the START row) — the box the split-vs-stack topology choice is
+         *  computed against, BEFORE that choice picks map's own (narrower/shorter)
+         *  region. Distinct from `_mapRegW`/`_mapRegH`, which measure the map
+         *  region AFTER a topology is already applied. */
+        this._mapAvailW = 0;
+        this._mapAvailH = 0;
+        /** docs/25 §7c: last computed split-vs-stack decision, same "keep the
+         *  previous answer while unmeasured" convention as `_lastRotate`. Defaults
+         *  to `false` (split) — matches today's shipped default until real
+         *  measurements correct it. */
+        this._lastStack = false;
         /** Portrait only: the map's last computed fitted width (`_renderResponsive`),
          *  fed into `_refineGridColumns` to override the map/dock column split so the
          *  sidebar gets whatever width the height-fitted map doesn't need. Plain
@@ -1096,6 +1164,20 @@ let AnyVacCard = class AnyVacCard extends i$2 {
             if (h2 && Math.abs(h2 - this._mapRegH) >= 2)
                 this._mapRegH = h2;
         }
+        // docs/25 §7c: measure the combined map+dock box (root minus the START
+        // row) for the split-vs-stack topology decision — independent of which
+        // topology is currently rendered, so it stays correct across the switch.
+        if (this._profile === "portrait") {
+            const startEl = this.renderRoot?.querySelector(".avc-region--start");
+            const gapPx = parseFloat(getComputedStyle(root).rowGap || getComputedStyle(root).gap || "0") || 0;
+            const startH = startEl ? Math.round(startEl.getBoundingClientRect().height) : 0;
+            const aw = Math.round(root.clientWidth);
+            const ah = Math.round(root.clientHeight - startH - (startH ? gapPx : 0));
+            if (aw && Math.abs(aw - this._mapAvailW) >= 2)
+                this._mapAvailW = aw;
+            if (ah > 0 && Math.abs(ah - this._mapAvailH) >= 2)
+                this._mapAvailH = ah;
+        }
     }
     disconnectedCallback() {
         super.disconnectedCallback();
@@ -1220,6 +1302,9 @@ let AnyVacCard = class AnyVacCard extends i$2 {
         if (this._profile !== "portrait" || !this._lastPortraitFitW)
             return;
         if (this._config.layout?.portrait?.columns?.length)
+            return;
+        // Stack topology has a single 100%-width column — no split to refine.
+        if (this._stackTopology)
             return;
         const root = this.renderRoot?.querySelector(".avc-grid");
         if (!root)
@@ -2413,12 +2498,15 @@ let AnyVacCard = class AnyVacCard extends i$2 {
         // docs/25 §7c (field diskuze 2026-07-24): portrait cockpit minimalism drops
         // the permanent room list — selection stays map-tap-only, per-room detail
         // (age/pin) moves to hold-to-inspect on the room (§7b, not yet shipped).
-        // `debug_room_progress` (§7e) is the escape hatch back to today's dense
-        // view for calibration debugging (docs/17 §1.3 / docs/26 use case) in the
-        // meantime. Landscape's dock/picker sidebar is a separate, established
-        // design (docs/18/19 A5) and keeps the room list unconditionally — this
-        // gate only ever hides it in portrait.
-        const showRoomList = this._profile !== "portrait" || !!this._config.debug_room_progress;
+        // `debug_dense_dock` (§7e) is the escape hatch back to today's dense view.
+        // Deliberately a SEPARATE flag from `debug_room_progress` (field-caught
+        // 2026-07-24: a user who keeps `debug_room_progress` on for coverage-%
+        // debugging — the map gauges it draws, `_renderRoomGauge`, are dock-
+        // independent — would otherwise never see the new minimalist cockpit at
+        // all, defeating the point of shipping it). Landscape's dock/picker
+        // sidebar is a separate, established design (docs/18/19 A5) and keeps the
+        // room list unconditionally — this gate only ever hides it in portrait.
+        const showRoomList = this._profile !== "portrait" || !!this._config.debug_dense_dock;
         return b `
       <div class="dock">
         ${this._renderVacuumIconStrip()}
@@ -3657,6 +3745,39 @@ let AnyVacCard = class AnyVacCard extends i$2 {
         }
         return this._cardW > 0 && this._cardW < 500; // auto: by card width
     }
+    /** docs/25 §7c: split (today's default) vs. stack portrait topology, computed
+     *  from `shouldStackLayout()` — mirrors `_narrow`'s structure (manual override
+     *  → computed → settle-on-previous-answer while unmeasured). Only active with
+     *  a `layout:` config block; only meaningful in portrait. A manual `topology`
+     *  override, or any explicit `columns`/`rows`/`place` on `layout.portrait`
+     *  (the user has already hand-tuned the split), opts out of the computed
+     *  choice entirely — same "manual config wins" rule `resolveProfile` already
+     *  applies to columns/rows/place individually. */
+    get _stackTopology() {
+        if (this._profile !== "portrait" || !this._config.layout)
+            return false;
+        const p = this._config.layout.portrait;
+        if (p?.topology === "split")
+            return false;
+        if (p?.topology === "stack")
+            return true;
+        if (p?.columns?.length || p?.rows?.length || (p?.place && Object.keys(p.place).length))
+            return false;
+        const ar = this._mapAR > 0.1 ? this._mapAR : 3.636;
+        // Effective floorplan AR honoring the current rotation state (`_narrow`) —
+        // shouldStackLayout wants "whatever will actually get rendered", not the
+        // raw un-rotated floorplan. Same bootstrapping approximation as `_narrow`
+        // itself: on the very first render this reads last render's decision, not
+        // this one's, and converges within a render or two, same as elsewhere in
+        // this settle-based system.
+        const effAr = this._narrow ? 1 / ar : ar;
+        const computed = shouldStackLayout(effAr, this._mapAvailW, this._mapAvailH);
+        if (computed !== undefined) {
+            this._lastStack = computed;
+            return computed;
+        }
+        return this._lastStack;
+    }
     /** Wrap a map render in a 90° portrait rotation when the card is narrow. The map
      *  fills the card width and goes tall (capped), so the floorplan is readable on a
      *  phone instead of a thin letterbox. Controls outside the map-wrap stay upright.
@@ -4385,7 +4506,12 @@ let AnyVacCard = class AnyVacCard extends i$2 {
     }
     /** Grid render path (docs/18): active only with a `layout:` config block. */
     _renderGrid(lay) {
-        const prof = resolveProfile(lay, this._profile);
+        // docs/25 §7c: stack topology substitutes the whole resolved profile —
+        // `_stackTopology` already refuses to fire when the user has hand-set
+        // columns/rows/place, so this never overrides a manual layout.
+        const prof = (this._profile === "portrait" && this._stackTopology)
+            ? STACK_PORTRAIT_PROFILE
+            : resolveProfile(lay, this._profile);
         const schemaWarn = this._schemaWarning();
         return b `
       <ha-card style="padding:0;display:block">
@@ -5211,6 +5337,12 @@ __decorate([
 __decorate([
     r()
 ], AnyVacCard.prototype, "_mapRegH", void 0);
+__decorate([
+    r()
+], AnyVacCard.prototype, "_mapAvailW", void 0);
+__decorate([
+    r()
+], AnyVacCard.prototype, "_mapAvailH", void 0);
 __decorate([
     r()
 ], AnyVacCard.prototype, "_now", void 0);
@@ -6353,6 +6485,16 @@ let AnyVacCardEditor = class AnyVacCardEditor extends i$2 {
           </label>
         </div>
         <p class="hint">Draws a small % gauge on each room (spatial coverage). Spatial % is approximate — the room box includes furniture, so it plateaus below 100%.</p>
+        <div class="field field--row">
+          <label>Dense portrait room list</label>
+          <label class="toggle-wrap">
+            <input type="checkbox" class="toggle-input"
+              .checked=${this._config.debug_dense_dock ?? false}
+              @change=${(e) => this._setConfig({ debug_dense_dock: e.target.checked || undefined })} />
+            <span class="toggle-track"></span>
+          </label>
+        </div>
+        <p class="hint">Brings back the old portrait room list (name, age, pin, assigned vacuum) below the map — the minimalist cockpit (docs/25 §7c) drops it in favor of map-tap selection. Independent of the gauges toggle above — you can debug coverage % (which shows on the map either way) without this.</p>
         ${this._config.vacuums.map((vac) => {
             const ie = this._intEntityFor(vac);
             const st = ie ? this.hass.states[ie] : undefined;
