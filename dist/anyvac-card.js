@@ -94,7 +94,7 @@ const t={ATTRIBUTE:1},e=t=>(...e)=>({_$litDirective$:t,values:e});let i$1 = clas
 
 const CARD_NAME = "anyvac-card";
 const EDITOR_NAME = "anyvac-card-editor";
-const CARD_VERSION = "0.72.2";
+const CARD_VERSION = "0.72.3";
 /** Hold duration in ms required to trigger START / PAUSE actions */
 const HOLD_DURATION_MS = 600;
 /**
@@ -4109,14 +4109,21 @@ let AnyVacCard = class AnyVacCard extends i$2 {
         const pinTap = (shown) => canCycle
             ? (e) => { e.stopPropagation(); this._cycleRoomPin(room.key, shown); }
             : undefined;
-        const flip = (room.map_y ?? 50) > 55;
-        // Content lives in a nested div that counter-rotates in `.avc-rot`
-        // (rotated portrait map) — same treatment as the room icon/gauges
-        // (`.avc-rot ... rotate(-90deg)`), kept separate from the outer
-        // positioning div so the anchor/centering transform (translateX,
-        // top/bottom) isn't fighting the same `transform` property.
+        // Field-caught (2026-07-24): the original below/above-the-room anchor
+        // (top:100% or bottom:100%, sized off the button's OWN width/height)
+        // broke badly for large rooms — after the parent `.avc-rot` 90° rotation,
+        // an offset proportional to a large room's local width/height turns into
+        // a large SCREEN-space offset, pushing the popup mostly off-screen (seen
+        // in the field: ~80% off the left edge on a near-full-map-width room).
+        // Centered-on-room instead: a rotation's center point never moves under
+        // that rotation, so `top:50%/left:50%/translate(-50%,-50%)` lands on the
+        // same screen spot regardless of room size OR rotation — no separate
+        // math needed for the rotated-map case, and no flip logic either (always
+        // centered, nothing to flip). Trade-off: the popup now sits ON the room
+        // (briefly covering its icon/dots) instead of floating past its edge —
+        // acceptable since the popup itself already names the room.
         return b `
-      <div class="room-inspect ${flip ? "room-inspect--above" : ""}" @click=${(e) => e.stopPropagation()}>
+      <div class="room-inspect" @click=${(e) => e.stopPropagation()}>
         <div class="room-inspect-inner">
           <div class="room-inspect-name">${room.name ?? room.key}</div>
           <div class="room-inspect-ages">
@@ -5184,17 +5191,17 @@ AnyVacCard.styles = i$6 `
        visually rotated within it, badly mismatched. Fix: the whole visual
        box (border/background/padding included) lives on -inner instead, so
        it rotates as one rigid unit — box and text always agree, upright or
-       rotated. */
+       rotated. Anchored dead-center on the room (see the render fn's doc
+       comment, 0.72.3) rather than below/above it — the only anchor that
+       stays correct at any room size under the map's rotation. */
     .room-inspect {
       position: absolute;
-      top: 100%;
+      top: 50%;
       left: 50%;
-      transform: translateX(-50%);
-      margin-top: 6px;
+      transform: translate(-50%, -50%);
       z-index: 20;
       cursor: default;
     }
-    .room-inspect--above { top: auto; bottom: 100%; margin-top: 0; margin-bottom: 6px; }
     .room-inspect-inner {
       min-width: 84px;
       background: rgba(20, 20, 20, 0.94);

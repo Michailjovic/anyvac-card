@@ -14,6 +14,26 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   (care & consumables as the pilot page), and the visual language pass —
   neither shipped yet.
 
+## [0.72.3] - 2026-07-24
+
+Third field-caught fix, same day: on a near-full-map-width room, the
+inspect popup rendered ~80% off the left edge of the screen.
+
+### Fixed
+
+- Root cause: the below/above-the-room anchor (`top: 100%` / `bottom: 100%`)
+  was sized off the room button's OWN width/height. For a large room, that
+  offset is large — and after the map's `.avc-rot` 90° rotation, a large
+  local-space offset becomes a large screen-space offset, pushing the
+  popup mostly off-screen. Re-anchored to the room's dead center instead
+  (`top: 50%; left: 50%; transform: translate(-50%, -50%)`) — a rotation's
+  center point never moves under that rotation, so this lands on the same
+  screen spot regardless of room size or map orientation, with no separate
+  math needed for the rotated case. The popup now briefly covers the room's
+  own icon/age-dots instead of floating past its edge; acceptable since the
+  popup already names the room. The `--above`/flip logic is gone — nothing
+  left to flip once centering doesn't depend on room size.
+
 ## [0.72.2] - 2026-07-24
 
 Two more field-caught fixes, same day.
