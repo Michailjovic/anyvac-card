@@ -14,6 +14,21 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   (care & consumables as the pilot page), and the visual language pass —
   neither shipped yet.
 
+## [0.73.5] - 2026-07-24
+
+Debug chip follow-up #2: after the 0.73.4 width fix, the second line (the
+actual `stack`/`split` decision data) was still effectively invisible —
+its translucent (35% opacity) text was overlapping the vacuum avatar photos
+below it with too little contrast to read on a compressed phone screenshot.
+Chip now has a solid dark background pill (`rgba(0,0,0,0.75)`, rounded,
+padded) and brighter text (85% opacity), so it's legible regardless of what
+renders underneath it. Also switched from `left+right` (forced full card
+width) to `right` + `max-width` so the chip shrinks to its own content
+width instead of stretching, and bumped `z-index` to 20 to sit above map/
+region content unambiguously. Still TEMP debug instrumentation (docs/25 §4
+split/stack diagnosis) — remove once the topology model is confirmed
+correct in the field.
+
 ## [0.73.4] - 2026-07-24
 
 Debug chip follow-up: it was overflowing past the card's left edge on a

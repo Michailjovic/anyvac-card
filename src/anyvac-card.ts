@@ -3925,16 +3925,19 @@ export class AnyVacCard extends LitElement {
 
     .version-chip {
       position: absolute;
-      top: 0;
-      left: 8px;
+      top: 4px;
       right: 8px;
+      max-width: calc(100% - 16px);
       text-align: right;
       font-size: 10px;
-      line-height: 1.4;
+      line-height: 1.5;
       font-weight: 600;
-      color: rgba(255, 255, 255, 0.35);
+      color: rgba(255, 255, 255, 0.85);
+      background: rgba(0, 0, 0, 0.75);
+      border-radius: 6px;
+      padding: 3px 6px;
       pointer-events: none;
-      z-index: 2;
+      z-index: 20;
     }
 
     /* ── Grid layout (docs/18) ───────────────────────────────────────── */
