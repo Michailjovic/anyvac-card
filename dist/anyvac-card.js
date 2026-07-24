@@ -94,7 +94,7 @@ const t={ATTRIBUTE:1},e=t=>(...e)=>({_$litDirective$:t,values:e});let i$1 = clas
 
 const CARD_NAME = "anyvac-card";
 const EDITOR_NAME = "anyvac-card-editor";
-const CARD_VERSION = "0.73.0";
+const CARD_VERSION = "0.73.1";
 /** Hold duration in ms required to trigger START / PAUSE actions */
 const HOLD_DURATION_MS = 600;
 /**
@@ -426,12 +426,10 @@ function shouldRotateMap(floorplanAR, boxW, boxH) {
  *
  *  - "split": today's default (`DEFAULT_PROFILES.portrait`) — map and dock
  *    side by side, map gets the full available height, its width follows its
- *    own aspect ratio (post §4 rotation choice). Wins for a naturally
- *    tall/narrow floorplan (multiple storeys stacked, a narrow rowhouse).
+ *    own aspect ratio (post §4 rotation choice).
  *  - "stack": map full-width on top, dock/vacuum row/START below it full-width.
  *    Map gets the full available width, height follows its aspect ratio
- *    (capped so the dock doesn't get squeezed to a sliver). Wins for a
- *    naturally wide/short floorplan.
+ *    (capped so the dock doesn't get squeezed to a sliver).
  *
  *  Same contain-fit-scale comparison as `shouldRotateMap()`: for each
  *  candidate arrangement, compute how big the floorplan could render inside
@@ -441,20 +439,42 @@ function shouldRotateMap(floorplanAR, boxW, boxH) {
  *  empty because its width was whatever the map didn't need, not what the
  *  dock's own content needed.
  *
+ *  **Model correction (2026-07-24 field feedback):** the first version
+ *  reserved the SAME FRACTION of the box for both candidates (dock keeps
+ *  `dockFrac` of width in split, `dockFrac` of height in stack) — wrong,
+ *  because it made stack's reservation scale up with box height, while a
+ *  real dock's content (icon strip + layer toggles + mode row, now that the
+ *  room list is hidden by default, docs/25 §7c/§7e) is a roughly FIXED pixel
+ *  height regardless of how tall the box is. That bias meant split won by
+ *  this formula for basically any tall/narrow floorplan even when it
+ *  visually left the dock mostly empty (confirmed live: a user's 4-storey
+ *  narrow floorplan scored split as "better fitting" while looking
+ *  obviously worse once forced into stack via the manual override).
+ *  `dockHeightPx` replaces the height-side fraction with that fixed
+ *  estimate — as the box gets taller, stack's map keeps almost all of the
+ *  extra height (dock cost stays flat) instead of losing a growing
+ *  fraction to it. `dockWidthFrac` stays a fraction for the split
+ *  candidate — a column's width genuinely does scale with the box, unlike
+ *  a stacked row's height, matching `columns: [72, 28]`.
+ *
  *  `floorplanAR` = floorplan width / height (post-rotation, i.e. whatever
  *  `_narrow`/`shouldRotateMap` already decided to actually render).
  *  `boxW`/`boxH` = the full portrait content box (map + dock combined, minus
- *  START bar). `dockFrac` = today's dock column width fraction of that box
- *  (0..1, e.g. 0.28 for the current `columns: [72, 28]` split) — stack's
- *  candidate reserves the same fraction of height instead. Returns
- *  `undefined` when there isn't enough data yet, same convention as
- *  `shouldRotateMap()`. */
-function shouldStackLayout(floorplanAR, boxW, boxH, dockFrac = 0.28) {
+ *  START bar). Returns `undefined` when there isn't enough data yet, same
+ *  convention as `shouldRotateMap()`. */
+function shouldStackLayout(floorplanAR, boxW, boxH, opts = {}) {
+    // ~150px estimate: vac-icon-strip (~50-64px) + dock-layers row (~30px) +
+    // dock-head mode row (~40px) + dock container padding/gaps (~24px), per
+    // today's minimalist portrait dock (docs/25 §7c/§7e — no permanent room
+    // list). Only needs to be roughly right: the actual STACK_PORTRAIT_PROFILE
+    // dock row is CSS "auto" (sized to real content, not this estimate) — this
+    // number only steers the split-vs-stack DECISION, not final layout.
+    const { dockWidthFrac = 0.28, dockHeightPx = 150 } = opts;
     if (boxW <= 4 || boxH <= 4 || floorplanAR <= 0)
         return undefined;
-    const splitMapW = boxW * (1 - dockFrac);
+    const splitMapW = boxW * (1 - dockWidthFrac);
     const scaleSplit = Math.min(splitMapW / floorplanAR, boxH);
-    const stackMapH = boxH * (1 - dockFrac);
+    const stackMapH = Math.max(boxH - dockHeightPx, 0);
     const scaleStack = Math.min(boxW / floorplanAR, stackMapH);
     // Ties (near-identical fit either way) default to split — it's today's
     // shipped behavior, cheaper to keep than to flip for a marginal gain.

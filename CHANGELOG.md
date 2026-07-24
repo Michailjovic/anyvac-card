@@ -14,6 +14,30 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   (care & consumables as the pilot page), and the visual language pass —
   neither shipped yet.
 
+## [0.73.1] - 2026-07-24
+
+Field-caught model correction for the split/stack topology decision
+(0.71.0): a user's 4-storey narrow floorplan scored `split` as the
+"better fit" and got it automatically, but visually it left the dock
+column mostly empty — manually forcing `topology: stack` looked clearly
+better once tried.
+
+### Fixed
+
+- `shouldStackLayout()`'s stack candidate reserved a FRACTION of box height
+  for the dock, same as split reserves a fraction of width — wrong model.
+  A real dock's content (icon strip + layer toggles + mode row, now that
+  the room list is hidden by default) is a roughly fixed pixel height
+  regardless of box size, so the fractional model made stack's reserved
+  space grow with box height, unfairly penalizing it for exactly the
+  tall/narrow floorplans where a fixed-height dock row matters most.
+  Replaced with a fixed `dockHeightPx` (~150px) estimate for the stack
+  candidate; the split candidate keeps its width fraction (a column's width
+  genuinely does scale with the box, unlike a stacked row's height).
+- New `layout.portrait.topology: stack` config override (added same day as
+  0.71.0, unchanged) remains the immediate escape hatch for anyone who
+  still disagrees with the computed choice.
+
 ## [0.73.0] - 2026-07-24
 
 Docs/25 §6 (visual language pass) — first slice. Direction agreed via a
