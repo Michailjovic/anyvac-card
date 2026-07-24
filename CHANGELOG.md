@@ -14,6 +14,26 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   (care & consumables as the pilot page), and the visual language pass —
   neither shipped yet.
 
+## [0.72.2] - 2026-07-24
+
+Two more field-caught fixes, same day.
+
+### Fixed
+
+- Inspect popup's border/background/padding were on the outer (unrotated)
+  positioning div while only the text content rotated in `.avc-rot` —
+  visible box and text disagreed on orientation. Moved the whole visual box
+  onto the counter-rotating inner div so it rotates as one rigid unit.
+- Hold-to-inspect silently did nothing on large (near full-map-width)
+  rooms — `.room-overlay`/`.room-btn` were missing the `touch-action:
+  manipulation` / `-webkit-touch-callout: none` / `user-select: none` combo
+  already applied to `.vac-icon-btn`/`.badge`/`.layer-btn` earlier this
+  session (0.68.1) for the identical class of bug: the browser's own
+  long-press handling can win the race against the JS hold timer and fire
+  `pointercancel` first. Bigger touch targets appear to make browsers more
+  likely to contest the gesture, which is why it only showed up on the
+  larger rooms.
+
 ## [0.72.1] - 2026-07-24
 
 Field-caught fix, same day as 0.72.0: the inspect popup rendered sideways

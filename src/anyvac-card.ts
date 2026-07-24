@@ -4330,10 +4330,22 @@ export class AnyVacCard extends LitElement {
       justify-content: center;
       transform: translate(-50%, -50%);
       transition: background 0.2s, box-shadow 0.2s;
+      /* Same mobile hold-gesture fix as .vac-icon-btn/.badge (field-caught
+       * 2026-07-24, docs/25 §7b): without this the browser's own long-press
+       * handling (context menu / scroll-intent detection) can win the race
+       * against our JS hold timer and fire pointercancel before it completes
+       * — the room's own hold-to-inspect gesture then silently does nothing,
+       * reported specifically on large (near full-map-width) rooms, where a
+       * bigger touch target makes that native-gesture race more likely to
+       * be won by the browser. */
+      touch-action: manipulation;
+      -webkit-touch-callout: none;
+      user-select: none;
     }
 
     .room-btn ha-icon {
       --mdc-icon-size: 22px;
+      pointer-events: none;
     }
 
     .room-overlay {
@@ -4344,7 +4356,12 @@ export class AnyVacCard extends LitElement {
       display: flex;
       padding: 3px;
       transition: background 0.2s, border 0.3s, box-shadow 0.3s;
+      /* Same mobile hold-gesture fix as .room-btn above. */
+      touch-action: manipulation;
+      -webkit-touch-callout: none;
+      user-select: none;
     }
+    .room-overlay > ha-icon { pointer-events: none; }
     /* Mutual exclusion: room selection disabled while Pin & Go / Zone is active
        (docs/19 A3) — dim + not-allowed cursor, no color-only distinction so it
        reads even on the age-gradient border colors. */
@@ -4377,12 +4394,26 @@ export class AnyVacCard extends LitElement {
        bottom half of the map. cursor:default plus its own click
        stopPropagation (in the render fn) so tapping the popup itself
        doesn't re-toggle the room underneath it. */
+    /* .room-inspect is a bare positioning wrapper (anchor + centering
+       transform only) — NO border/background/padding here. Field-caught
+       bug (0.72.1 first pass): those were on this outer div while only
+       -inner rotated in .avc-rot, so the visible box (border/background)
+       stayed in its pre-rotation wide/short shape while the text inside
+       visually rotated within it, badly mismatched. Fix: the whole visual
+       box (border/background/padding included) lives on -inner instead, so
+       it rotates as one rigid unit — box and text always agree, upright or
+       rotated. */
     .room-inspect {
       position: absolute;
       top: 100%;
       left: 50%;
       transform: translateX(-50%);
       margin-top: 6px;
+      z-index: 20;
+      cursor: default;
+    }
+    .room-inspect--above { top: auto; bottom: 100%; margin-top: 0; margin-bottom: 6px; }
+    .room-inspect-inner {
       min-width: 84px;
       background: rgba(20, 20, 20, 0.94);
       border: 1px solid rgba(255, 255, 255, 0.25);
@@ -4391,18 +4422,14 @@ export class AnyVacCard extends LitElement {
       font-size: 11px;
       white-space: nowrap;
       box-shadow: 0 4px 14px rgba(0, 0, 0, 0.45);
-      z-index: 20;
-      cursor: default;
     }
-    .room-inspect--above { top: auto; bottom: 100%; margin-top: 0; margin-bottom: 6px; }
     .room-inspect-name { font-weight: 600; margin-bottom: 4px; color: #fff; }
     .room-inspect-ages { display: flex; gap: 8px; margin-bottom: 4px; }
-    /* Field-caught (2026-07-24): unlike the small icon/gauges, a whole
-       popup of TEXT read sideways is genuinely unreadable, not just a minor
-       legibility ding — worth the counter-rotation the icon/gauges already
-       get elsewhere in .avc-rot (rotated portrait map). Applied to the
-       nested -inner div, not .room-inspect itself, so it doesn't fight the
-       outer div's own positioning transform (translateX + top/bottom). */
+    /* Unlike the small icon/gauges, a whole popup of TEXT read sideways is
+       genuinely unreadable, not just a minor legibility ding — worth the
+       counter-rotation the icon/gauges already get elsewhere in .avc-rot
+       (rotated portrait map). Whole box (see -inner above), not just text,
+       so border/background rotate together with the content they wrap. */
     .avc-rot .room-inspect-inner { transform: rotate(-90deg); }
 
     /* ── Debug per-room progress gauges (dry + wet) ──────────────────── */
