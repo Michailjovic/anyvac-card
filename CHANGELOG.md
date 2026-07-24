@@ -14,6 +14,36 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   (care & consumables as the pilot page), and the visual language pass —
   neither shipped yet.
 
+## [0.73.6] - 2026-07-24
+
+### Fixed
+
+Stack topology (0.71.0) rendered ~2 phone-screens tall instead of fitting
+the viewport, permanently — not a first-paint flash, a stuck state.
+Root cause: `STACK_PORTRAIT_PROFILE`'s map row was a bare `"1fr"`, whose
+CSS Grid implicit minimum is `auto` (its content's min-content size), not
+`0`. `_renderResponsive()` returns the map template unwrapped/unbounded
+until the map region has been measured once — on a brand-new stack render
+that unmeasured natural size became the row's forced minimum, blowing the
+whole grid out, and the following measurement pass read the ALREADY
+blown-out region back as "correct," locking it in for good (the settle
+loop only checks "changed by ≥2px," not "too big"). Fixed by changing the
+row to `"minmax(0, 1fr)"` — caps it to its fair share of the grid from
+frame one, letting the region's existing `overflow:hidden` clip the
+oversized first-paint content instead of stretching the grid; the next
+measurement then reads the correctly-sized region and the lock-in never
+happens. Confirmed live against the field-reporting user's real Home
+Assistant instance (Claude in Chrome), both in and out of dashboard edit
+mode, before shipping — not just typechecked/built clean.
+
+Also confirmed in the same live session that the split-vs-stack topology
+decision itself (0.73.1/0.73.2) is correct: it only looked "stuck on
+split" because the debug chip (0.73.3–0.73.5) is edit-mode-only, and
+entering dashboard edit mode costs ~120px of vertical space (edit
+toolbar + per-card actions bar) — enough on this floorplan to flip the
+decision back to split. Outside the editor, stack was already being
+chosen correctly.
+
 ## [0.73.5] - 2026-07-24
 
 Debug chip follow-up #2: after the 0.73.4 width fix, the second line (the

@@ -94,7 +94,7 @@ const t={ATTRIBUTE:1},e=t=>(...e)=>({_$litDirective$:t,values:e});let i$1 = clas
 
 const CARD_NAME = "anyvac-card";
 const EDITOR_NAME = "anyvac-card-editor";
-const CARD_VERSION = "0.73.5";
+const CARD_VERSION = "0.73.6";
 /** Hold duration in ms required to trigger START / PAUSE actions */
 const HOLD_DURATION_MS = 600;
 /**
@@ -487,13 +487,32 @@ function shouldStackLayout(floorplanAR, boxW, boxH, opts = {}) {
 /** docs/25 §7c — the "stack" portrait arrangement (map full-width on top,
  *  dock/vacuum-row/START stacked full-width below it), used in place of
  *  `DEFAULT_PROFILES.portrait` when `shouldStackLayout()` (or a manual
- *  `topology: "stack"` override) picks it. `rows: ["1fr", "auto", "auto"]`
- *  mirrors the landscape pattern (docs/19 A5 addendum) — the map takes
- *  whatever's left after dock/start size to their own content, not the
- *  other way around. */
+ *  `topology: "stack"` override) picks it. `rows: ["minmax(0, 1fr)", "auto",
+ *  "auto"]` mirrors the landscape pattern (docs/19 A5 addendum) — the map
+ *  takes whatever's left after dock/start size to their own content, not
+ *  the other way around.
+ *
+ *  `minmax(0, ...)`, not bare `"1fr"` (field bug, 2026-07-24): a bare `1fr`
+ *  track's implicit minimum is `auto` (its content's min-content size), not
+ *  `0`. `_renderResponsive()` returns the RAW, unwrapped map template
+ *  (unbounded natural/intrinsic size — no fit box yet) until the map region
+ *  has been measured once (`_mapRegW/_mapRegH`). On a brand-new stack
+ *  render, that first unmeasured paint's natural size became the row's
+ *  forced minimum, blowing the whole grid out to ~2 phone-screens tall —
+ *  and it never recovered, because the very next measurement pass read the
+ *  ALREADY-blown-out region size back as "correct" and locked it in (the
+ *  settle-loop has no notion of "too big", only "changed by ≥2px"). `auto`
+ *  rows (split's `[90, 10]`, or landscape's non-map rows) never had this
+ *  because they're either a definite percentage of a definite grid height,
+ *  or genuinely want their content's natural size. `minmax(0, 1fr)` caps
+ *  the row to its fair share of the (already height-constrained) grid from
+ *  frame one — the oversized raw content just gets clipped by the region's
+ *  existing `overflow:hidden` (`regionStyles()`) instead of stretching the
+ *  grid, and the following measurement pass reads the correctly-sized
+ *  region, breaking the lock-in for good. */
 const STACK_PORTRAIT_PROFILE = {
     columns: [100],
-    rows: ["1fr", "auto", "auto"],
+    rows: ["minmax(0, 1fr)", "auto", "auto"],
     place: {
         map: { row: 1, col: 1 },
         dock: { row: 2, col: 1, overflow: "auto" },
