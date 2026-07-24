@@ -94,7 +94,7 @@ const t={ATTRIBUTE:1},e=t=>(...e)=>({_$litDirective$:t,values:e});let i$1 = clas
 
 const CARD_NAME = "anyvac-card";
 const EDITOR_NAME = "anyvac-card-editor";
-const CARD_VERSION = "0.73.7";
+const CARD_VERSION = "0.74.0";
 /** Hold duration in ms required to trigger START / PAUSE actions */
 const HOLD_DURATION_MS = 600;
 /**
@@ -707,6 +707,13 @@ let AnyVacCard = class AnyVacCard extends i$2 {
          *  the room overlay; a tap while open dismisses it instead of toggling
          *  selection (see `_renderRoomOverlay`'s pointer handlers). */
         this._inspectKey = null;
+        /** docs/25 §7 field follow-up (2026-07-24): dock sheet (Empty/Wash/Dry +
+         *  per-vacuum status), opened from a new "Dock" button in the dock-head
+         *  row. `_dockSheetIdx` is which vacuum's tab is active — local UI state,
+         *  not backend-shared (same reasoning as `_inspectKey`: navigation, not
+         *  orchestration input). */
+        this._dockSheetOpen = false;
+        this._dockSheetIdx = 0;
         this._modeEntity = null;
         this._dbg = "";
         this._zoneDrag = null;
@@ -2587,7 +2594,14 @@ let AnyVacCard = class AnyVacCard extends i$2 {
           ` : A}
         <div class="dock-head">
           ${modeBtn("dry", "mdi:broom", "Dry")}${modeBtn("wet", "mdi:water", "Wet")}${modeBtn("both", "mdi:water-plus", "Both")}
+          ${hasInt ? b `
+            <button class="dock-mode dock-mode--dock ${this._dockSheetOpen ? "on" : ""}"
+              @click=${(e) => { e.stopPropagation(); this._dockSheetOpen = !this._dockSheetOpen; }}>
+              <ha-icon icon="mdi:home-outline"></ha-icon><span>Dock</span>
+              ${this._dockNeedsAttention() ? b `<span class="dock-mode-dot"></span>` : A}
+            </button>` : A}
         </div>
+        ${this._renderDockSheet()}
         ${!showRoomList ? A : b `<div class="dock-rows">
           ${rooms.map(({ r, v }) => {
             const rec = this._intRoomRec(v, r);
@@ -2643,6 +2657,72 @@ let AnyVacCard = class AnyVacCard extends i$2 {
               <span style="font-size:12px">Start · hold</span>
             </button>
           </div>` : A}
+      </div>
+    `;
+    }
+    /** docs/25 §7 field follow-up: true when ANY vacuum's dock reports a real
+     *  error (`dock_error_status`, docs/26 §1 vrstva A). Deliberately narrow —
+     *  `water_shortage_status`/`dust_collection_status`'s exact value meanings
+     *  aren't documented anywhere upstream (verified against python-roborock's
+     *  source and docs), so guessing thresholds for THOSE risks a false badge.
+     *  `dock_error_status` is the one field where "present, nonzero" is an
+     *  unambiguous problem regardless of the exact code. */
+    _dockNeedsAttention() {
+        return this._config.vacuums.some((v) => {
+            const dock = this._intAttrs(v)?.dock_status;
+            const err = dock?.dock_error_status;
+            return err !== null && err !== undefined && err !== 0 && err !== "0";
+        });
+    }
+    /** docs/25 §7 field follow-up (2026-07-24): dock sheet — per-vacuum tabs +
+     *  Empty/Wash/Dry actions (`anyvac.dock_*`, confirmed commands per docs/26
+     *  §3, live-verified against the field-reporting user's real HW). Renders
+     *  in-flow below `.dock-head` (the `dock` region already has its own
+     *  `overflow:auto`, docs/18 `regionStyles()`) rather than as a floating
+     *  overlay — deliberately avoids `position:fixed`/absolute layering in a
+     *  region that's had real mobile-crash history (docs/21 §5b) tied to grid
+     *  ownership; an in-flow panel can't touch that class of bug. Raw
+     *  `dock_status` fields shown only behind `debug` (§7c precedent) — their
+     *  value encodings aren't documented upstream, so surfacing them as
+     *  polished UI would overclaim confidence we don't have. */
+    _renderDockSheet() {
+        if (!this._dockSheetOpen)
+            return A;
+        const vacs = this._config.vacuums.filter((v) => this._intAttrs(v));
+        if (!vacs.length)
+            return A;
+        const idx = Math.min(this._dockSheetIdx, vacs.length - 1);
+        const vac = vacs[idx];
+        const dock = this._intAttrs(vac)?.dock_status;
+        const act = (service) => () => void this._call("anyvac", service, { entity_id: vac.entity });
+        return b `
+      <div class="dock-sheet">
+        ${vacs.length > 1 ? b `
+          <div class="dock-sheet-tabs">
+            ${vacs.map((v, i) => b `
+              <button class="dock-sheet-tab ${i === idx ? "on" : ""}"
+                style=${o({ borderColor: this._color(v) })}
+                title=${v.name ?? v.entity}
+                @click=${(e) => { e.stopPropagation(); this._dockSheetIdx = i; }}>
+                ${v.image ? b `<img src=${v.image} alt="" />` : b `<ha-icon icon="mdi:robot-vacuum" style=${o({ color: this._color(v) })}></ha-icon>`}
+              </button>`)}
+          </div>` : A}
+        ${this._config.debug && dock ? b `
+          <div class="dock-sheet-debug">
+            ${Object.entries(dock).filter(([, val]) => val !== null && val !== undefined)
+            .map(([k, val]) => b `<span>${k}: ${String(val)}</span>`)}
+          </div>` : A}
+        <div class="dock-sheet-actions">
+          <button class="dock-sheet-action" @click=${act("dock_empty")}>
+            <ha-icon icon="mdi:delete-empty"></ha-icon><span>Empty</span>
+          </button>
+          <button class="dock-sheet-action" @click=${act("dock_wash")}>
+            <ha-icon icon="mdi:water"></ha-icon><span>Wash</span>
+          </button>
+          <button class="dock-sheet-action" @click=${act("dock_dry")}>
+            <ha-icon icon="mdi:hair-dryer"></ha-icon><span>Dry</span>
+          </button>
+        </div>
       </div>
     `;
     }
@@ -4905,6 +4985,67 @@ AnyVacCard.styles = i$6 `
       background: rgba(255, 255, 255, 0.12);
       border-color: rgba(255, 255, 255, 0.5);
     }
+    /* docs/25 §7 field follow-up: Dock button — same base as the mode
+     * buttons (visually one row), but a flex-0 fixed width since it's an
+     * icon + short label, not a mode choice competing for equal space. */
+    .dock-mode--dock { flex: 0 0 auto; padding: 7px 10px; position: relative; }
+    .dock-mode-dot {
+      position: absolute;
+      top: 4px;
+      right: 4px;
+      width: 7px;
+      height: 7px;
+      border-radius: 50%;
+      background: #e0994a;
+    }
+    .dock-sheet {
+      display: flex;
+      flex-direction: column;
+      gap: 8px;
+      padding: 8px;
+      background: rgba(0, 0, 0, 0.25);
+      border: 1px solid rgba(255, 255, 255, 0.1);
+      border-radius: 10px;
+    }
+    .dock-sheet-tabs { display: flex; gap: 6px; }
+    .dock-sheet-tab {
+      width: 30px;
+      height: 30px;
+      border-radius: 50%;
+      overflow: hidden;
+      padding: 0;
+      cursor: pointer;
+      background: rgba(255, 255, 255, 0.05);
+      border: 1.5px solid rgba(255, 255, 255, 0.2);
+      opacity: 0.55;
+    }
+    .dock-sheet-tab.on { opacity: 1; }
+    .dock-sheet-tab img { width: 100%; height: 100%; object-fit: cover; display: block; }
+    .dock-sheet-tab ha-icon { --mdc-icon-size: 16px; }
+    .dock-sheet-debug {
+      display: flex;
+      flex-direction: column;
+      gap: 2px;
+      font-size: 10px;
+      color: rgba(255, 255, 255, 0.4);
+    }
+    .dock-sheet-actions { display: flex; gap: 8px; }
+    .dock-sheet-action {
+      flex: 1;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      gap: 4px;
+      padding: 10px 0;
+      border-radius: 9px;
+      cursor: pointer;
+      font-family: inherit;
+      font-size: 11px;
+      color: rgba(255, 255, 255, 0.8);
+      background: rgba(255, 255, 255, 0.05);
+      border: 1px solid rgba(255, 255, 255, 0.12);
+    }
+    .dock-sheet-action ha-icon { --mdc-icon-size: 18px; }
     .dock-rows {
       display: flex;
       flex-direction: column;
@@ -5568,6 +5709,12 @@ __decorate([
 __decorate([
     r()
 ], AnyVacCard.prototype, "_inspectKey", void 0);
+__decorate([
+    r()
+], AnyVacCard.prototype, "_dockSheetOpen", void 0);
+__decorate([
+    r()
+], AnyVacCard.prototype, "_dockSheetIdx", void 0);
 __decorate([
     r()
 ], AnyVacCard.prototype, "_modeEntity", void 0);

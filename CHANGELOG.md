@@ -14,6 +14,32 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   (care & consumables as the pilot page), and the visual language pass —
   neither shipped yet.
 
+## [0.74.0] - 2026-07-24
+
+### Added
+
+Dock sheet (docs/25 §7 field follow-up) — the manufacturer app's bottom-bar
+Dock button, adapted for multi-vacuum: a new "Dock" button in the portrait
+`dock-head` row (next to Dry/Wet/Both) opens an in-flow panel with a tab
+per configured vacuum (only shown when 2+) and three action buttons —
+Empty, Wash, Dry — calling the new `anyvac.dock_empty`/`dock_wash`/
+`dock_dry` services (integration 0.74.0, synced). A small dot on the Dock
+button flags a real dock error (`dock_error_status`) on any vacuum; other
+raw `dock_status` fields are shown only behind the existing `debug` config
+flag, since their value encodings aren't documented upstream (Roborock's
+API doesn't expose tank-fill percentages the way the app's UI implies —
+verified against python-roborock's source before building this).
+Deliberately in-flow (not a floating overlay) — the `dock` region already
+scrolls (`overflow:auto`), and this avoids adding `position:fixed`/
+absolute layering to a region with real mobile-crash history (docs/21
+§5b) tied to grid ownership.
+
+**Scope note:** this replaces the docs/25 §2/§3 plan (separate "Péče"
+page + top tab-strip navigation) for the dock-control slice specifically.
+Consumables status/resets (main/side brush, filter, sensors — the rest of
+§2) remain unimplemented, deferred to a later step by explicit user
+choice (2026-07-24).
+
 ## [0.73.7] - 2026-07-24
 
 ### Changed
