@@ -94,7 +94,7 @@ const t={ATTRIBUTE:1},e=t=>(...e)=>({_$litDirective$:t,values:e});let i$1 = clas
 
 const CARD_NAME = "anyvac-card";
 const EDITOR_NAME = "anyvac-card-editor";
-const CARD_VERSION = "0.73.6";
+const CARD_VERSION = "0.73.7";
 /** Hold duration in ms required to trigger START / PAUSE actions */
 const HOLD_DURATION_MS = 600;
 /**
@@ -459,6 +459,25 @@ function shouldRotateMap(floorplanAR, boxW, boxH) {
  *     score exceeds stack's by more than this margin — i.e. split has to
  *     be a clear, not marginal, win to justify a wide, likely-underused
  *     side column instead of a snug full-width row below the map.
+ *  3. `stackBias: 1.3` still wasn't quite enough (2026-07-24, same
+ *     floorplan, same day): live A/B on the user's actual reported box
+ *     (360×580 and 360×514, both under the earlier 650px rule-of-thumb)
+ *     showed split "winning" the raw metric by only ~4% — comfortably
+ *     inside the 1.3 margin — while a live screenshot comparison (forced
+ *     `topology: stack` vs the computed `split` on the SAME box, via
+ *     Claude in Chrome against the user's running instance) showed stack
+ *     was still clearly better: for this floorplan the map ends up a
+ *     similarly narrow sliver either way (extreme ~0.27 rotated aspect
+ *     ratio), so the two candidates' RAW map sizes are almost the same —
+ *     but split's leftover dock column only ever holds ~250px of actual
+ *     content (avatars/chips/mode row) no matter how much width it's
+ *     handed, so anything past that is dead space, while stack's full-
+ *     width dock row uses its allotment properly. That "wasted width"
+ *     cost isn't in the raw metric at all, so a small default bias never
+ *     fully compensated for it. Raised to `1.5`, verified by hand against
+ *     both real reported boxes (needs bias > 1.41 for the 514 case) —
+ *     comfortably flips both to stack while leaving split able to win
+ *     outright for boxes tall enough that it's a genuinely clear margin.
  *
  *  `floorplanAR` = floorplan width / height (post-rotation, i.e. whatever
  *  `_narrow`/`shouldRotateMap` already decided to actually render).
@@ -472,7 +491,7 @@ function shouldStackLayout(floorplanAR, boxW, boxH, opts = {}) {
     // list). Only needs to be roughly right: the actual STACK_PORTRAIT_PROFILE
     // dock row is CSS "auto" (sized to real content, not this estimate) — this
     // number only steers the split-vs-stack DECISION, not final layout.
-    const { dockWidthFrac = 0.28, dockHeightPx = 150, stackBias = 1.3 } = opts;
+    const { dockWidthFrac = 0.28, dockHeightPx = 150, stackBias = 1.5 } = opts;
     if (boxW <= 4 || boxH <= 4 || floorplanAR <= 0)
         return undefined;
     const splitMapW = boxW * (1 - dockWidthFrac);

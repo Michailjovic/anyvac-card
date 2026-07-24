@@ -14,6 +14,26 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   (care & consumables as the pilot page), and the visual language pass —
   neither shipped yet.
 
+## [0.73.7] - 2026-07-24
+
+### Changed
+
+`shouldStackLayout()`'s `stackBias` raised `1.3` → `1.5`. Live A/B on the
+field-reporting user's actual box (360×580 in the dashboard editor,
+360×514 on their real phone) — forced `topology: stack` vs the computed
+`split` on the identical box, screenshotted side by side via Claude in
+Chrome against their running instance — showed stack was still clearly
+better even though split "won" the raw metric by only ~4%. Root cause:
+for this floorplan's extreme (~0.27) rotated aspect ratio, both
+candidates end up giving the map a similarly narrow sliver, so their raw
+achieved-size scores are nearly tied — but split's leftover dock column
+only ever fills ~250px with real content (avatars/chips/mode row)
+regardless of how much width it's handed, so the rest sits empty, while
+stack's full-width dock row uses its space properly. That "wasted width"
+cost isn't captured by the raw metric at all, so `1.3` never fully
+compensated for it. `1.5` was verified by hand against both real reported
+boxes (needed > 1.41 for the tighter 514px case) before shipping.
+
 ## [0.73.6] - 2026-07-24
 
 ### Fixed
