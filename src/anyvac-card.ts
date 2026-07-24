@@ -3839,13 +3839,18 @@ export class AnyVacCard extends LitElement {
     // docs/25 §7c: stack topology substitutes the whole resolved profile —
     // `_stackTopology` already refuses to fire when the user has hand-set
     // columns/rows/place, so this never overrides a manual layout.
-    const prof = (this._profile === "portrait" && this._stackTopology)
-      ? STACK_PORTRAIT_PROFILE
-      : resolveProfile(lay, this._profile);
+    const stack = this._profile === "portrait" && this._stackTopology;
+    const prof = stack ? STACK_PORTRAIT_PROFILE : resolveProfile(lay, this._profile);
     const schemaWarn = this._schemaWarning();
+    // TEMP debug (2026-07-24, field diagnosis of the split/stack decision —
+    // remove once the topology model is confirmed correct in the field):
+    // exposes the exact numbers `_stackTopology`/`shouldStackLayout` are
+    // computing from, since screenshot-based pixel estimates weren't
+    // reliable enough to debug the 0.73.1/0.73.2 fixes further.
+    const dbgAr = (this._narrow ? 1 / (this._mapAR > 0.1 ? this._mapAR : 3.636) : (this._mapAR > 0.1 ? this._mapAR : 3.636)).toFixed(3);
     return html`
       <ha-card style="padding:0;display:block">
-        ${this.editMode ? html`<div class="version-chip">v${CARD_VERSION} · ${Math.round(this._cardW)}w · ${this._profile}</div>` : nothing}
+        ${this.editMode ? html`<div class="version-chip">v${CARD_VERSION} · ${Math.round(this._cardW)}w · ${this._profile} · ${stack ? "stack" : "split"} · box:${Math.round(this._mapAvailW)}x${Math.round(this._mapAvailH)} · ar:${dbgAr}</div>` : nothing}
         <div class="avc-grid avc-grid--${this._profile}" style=${styleMap(gridRootStyles(lay, prof))}>
           ${schemaWarn ? html`<div class="avc-schemawarn">
             <ha-icon icon="mdi:alert" style="--mdc-icon-size:18px"></ha-icon><span>${schemaWarn}</span>

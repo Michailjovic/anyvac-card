@@ -14,6 +14,20 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   (care & consumables as the pilot page), and the visual language pass —
   neither shipped yet.
 
+## [0.73.3] - 2026-07-24
+
+Temporary debug build — 0.73.2's fix didn't change anything for the field
+tester despite the math checking out against estimated screenshot pixels,
+so estimating from screenshots isn't reliable enough to keep debugging
+this blind.
+
+### Debug
+
+- Edit-mode version chip now also shows the exact numbers the split/stack
+  decision is computed from: chosen topology, measured box size
+  (`_mapAvailW`x`_mapAvailH`), and the effective floorplan aspect ratio
+  used. Remove once the topology model is confirmed correct in the field.
+
 ## [0.73.2] - 2026-07-24
 
 Second same-day correction to the split/stack topology decision (0.73.1) —
