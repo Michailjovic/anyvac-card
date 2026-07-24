@@ -14,6 +14,41 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   (care & consumables as the pilot page), and the visual language pass —
   neither shipped yet.
 
+## [0.73.0] - 2026-07-24
+
+Docs/25 §6 (visual language pass) — first slice. Direction agreed via a
+before/after mockup (not locked-down exact values, per §6's explicit
+"iterate on real hardware" note) — this ships the parts of that mockup that
+translate directly into the real card's CSS.
+
+### Changed
+
+- START bar: bigger (min-height 44px → 52px), rounder (14px → 18px radius),
+  bigger/bolder text, and its own calm sage green instead of the same
+  saturated green used for "cleaning" status elsewhere — it's the one
+  thing the whole screen is for, so it should unambiguously be the
+  heaviest element on it. Room-count/ETA text was already inline in the
+  button; unchanged.
+- Dock mode row (Dry/Wet/Both): resting weight stepped down (700 → 600),
+  active state keeps 700 — a secondary control next to START shouldn't
+  compete with it for attention, but active/inactive contrast is preserved.
+- Portrait vacuum icon strip ring: thinner (2px → 1.5px) — reads calmer
+  without losing the status-color signal.
+- Dock container: more internal spacing (gap 6px → 9px, padding 6px → 8px)
+  — "generous whitespace" was one of the agreed directions.
+
+### Deferred
+
+- Map path color/opacity — the mockup's path styling was illustrative, not
+  a faithful rendering of the real dry/wet path system; changing it has
+  real legibility stakes (does it still read clearly where the robot went)
+  that need judging against a real floorplan screenshot, not a schematic
+  mockup. Revisit with real HW screenshots.
+- `STATUS_MAP` colors themselves — unchanged; reserving their saturation
+  for actual status meaning (cleaning/error/etc.) rather than diluting it
+  card-wide was part of the reasoning for giving START its own color
+  instead of reusing green.
+
 ## [0.72.5] - 2026-07-24
 
 Fifth field-caught fix, same day: 0.72.4's near-opaque background +

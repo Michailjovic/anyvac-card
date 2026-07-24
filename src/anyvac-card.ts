@@ -3965,7 +3965,9 @@ export class AnyVacCard extends LitElement {
       width: 100%; min-width: 28px; max-width: 64px; aspect-ratio: 1 / 1; height: auto;
       border-radius: 50%; padding: 0; overflow: hidden;
       display: flex; align-items: center; justify-content: center;
-      background: rgba(255,255,255,0.05); border: 2px solid rgba(255,255,255,0.2); cursor: pointer;
+      /* docs/25 §6: thinner ring (was 2px) — reads calmer, still clearly a
+       * status indicator, without competing for visual weight with START. */
+      background: rgba(255,255,255,0.05); border: 1.5px solid rgba(255,255,255,0.2); cursor: pointer;
       transition: opacity 0.15s ease;
       /* Mobile hold-gesture fix: without these, iOS/Android WebViews race our
        * 600ms pointerdown timer against their own long-press affordances
@@ -4000,9 +4002,13 @@ export class AnyVacCard extends LitElement {
     .dock {
       display: flex;
       flex-direction: column;
-      gap: 6px;
+      /* docs/25 §6 (visual language pass, 2026-07-24): a bit more breathing
+       * room between the icon strip / layer toggle / mode row — "generous
+       * whitespace" was one of the agreed directions, mocked up and
+       * confirmed against the card's actual dark theme before landing here. */
+      gap: 9px;
       height: 100%;
-      padding: 6px;
+      padding: 8px;
       box-sizing: border-box;
       background: rgba(255, 255, 255, 0.03);
       border: 1px solid rgba(255, 255, 255, 0.08);
@@ -4019,12 +4025,17 @@ export class AnyVacCard extends LitElement {
       align-items: center;
       justify-content: center;
       gap: 4px;
-      padding: 6px 4px;
-      border-radius: 9px;
+      padding: 7px 4px;
+      border-radius: 10px;
       cursor: pointer;
       font-family: inherit;
       font-size: 11px;
-      font-weight: 700;
+      /* docs/25 §6: 700 read as one more hard-edged/technical accent among
+       * several — the mode row is a secondary control next to START, not a
+       * second primary action, so its resting weight steps down a notch.
+       * The .on state keeps its own distinct (bolder) weight below, so the
+       * active/inactive contrast doesn't shrink. */
+      font-weight: 600;
       color: rgba(255, 255, 255, 0.5);
       background: transparent;
       border: 1px solid rgba(255, 255, 255, 0.15);
@@ -4032,6 +4043,7 @@ export class AnyVacCard extends LitElement {
     .dock-mode ha-icon { --mdc-icon-size: 15px; }
     .dock-mode.on {
       color: #fff;
+      font-weight: 700;
       background: rgba(255, 255, 255, 0.12);
       border-color: rgba(255, 255, 255, 0.5);
     }
@@ -4103,25 +4115,35 @@ export class AnyVacCard extends LitElement {
     }
     .dock-est { font-size: 11px; color: rgba(255, 255, 255, 0.45); }
 
-    /* START bar (portrait bottom, docs/18 §7d) */
+    /* START bar (portrait bottom, docs/18 §7d). docs/25 §6 (visual language
+     * pass, 2026-07-24): the one thing this whole screen is FOR, so it
+     * should read as unambiguously the heaviest element on it — bigger,
+     * rounder, and a calmer sage green instead of the same saturated
+     * "technical" green used for status accents elsewhere (cleaning state,
+     * battery, etc.) — reserving that vivid green for status meaning and
+     * giving START its own, purely intentional color instead of borrowing
+     * one. Mocked up and confirmed against the actual dark card theme
+     * before landing here; the room-count/ETA text stays inline in the
+     * button (already was — the mockup's separate line under the button
+     * was an artifact of the mockup, not a real proposal to split it out). */
     .start-bar {
       position: relative;
       overflow: hidden;
       width: 100%;
       height: 100%;
-      min-height: 44px;
+      min-height: 52px;
       display: flex;
       align-items: center;
       justify-content: center;
       gap: 10px;
-      border-radius: 14px;
+      border-radius: 18px;
       cursor: pointer;
       font-family: inherit;
-      font-size: 15px;
-      font-weight: 800;
+      font-size: 16px;
+      font-weight: 700;
       color: #fff;
-      background: rgba(82, 196, 26, 0.16);
-      border: 1px solid rgba(82, 196, 26, 0.6);
+      background: rgba(111, 191, 115, 0.24);
+      border: 1px solid rgba(111, 191, 115, 0.65);
     }
     .start-bar:disabled {
       cursor: default;
