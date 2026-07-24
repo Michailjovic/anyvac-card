@@ -14,6 +14,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   (care & consumables as the pilot page), and the visual language pass —
   neither shipped yet.
 
+## [0.73.4] - 2026-07-24
+
+Debug chip follow-up: it was overflowing past the card's left edge on a
+narrow (360px) card, invisible. Chip now wraps onto two explicit lines
+within the card's own width instead of shrink-to-fit growing past it.
+
 ## [0.73.3] - 2026-07-24
 
 Temporary debug build — 0.73.2's fix didn't change anything for the field

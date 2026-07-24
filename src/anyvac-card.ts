@@ -3850,7 +3850,10 @@ export class AnyVacCard extends LitElement {
     const dbgAr = (this._narrow ? 1 / (this._mapAR > 0.1 ? this._mapAR : 3.636) : (this._mapAR > 0.1 ? this._mapAR : 3.636)).toFixed(3);
     return html`
       <ha-card style="padding:0;display:block">
-        ${this.editMode ? html`<div class="version-chip">v${CARD_VERSION} · ${Math.round(this._cardW)}w · ${this._profile} · ${stack ? "stack" : "split"} · box:${Math.round(this._mapAvailW)}x${Math.round(this._mapAvailH)} · ar:${dbgAr}</div>` : nothing}
+        ${this.editMode ? html`<div class="version-chip">
+          <div>v${CARD_VERSION} · ${Math.round(this._cardW)}w · ${this._profile}</div>
+          <div>${stack ? "stack" : "split"} · box:${Math.round(this._mapAvailW)}x${Math.round(this._mapAvailH)} · ar:${dbgAr}</div>
+        </div>` : nothing}
         <div class="avc-grid avc-grid--${this._profile}" style=${styleMap(gridRootStyles(lay, prof))}>
           ${schemaWarn ? html`<div class="avc-schemawarn">
             <ha-icon icon="mdi:alert" style="--mdc-icon-size:18px"></ha-icon><span>${schemaWarn}</span>
@@ -3923,8 +3926,11 @@ export class AnyVacCard extends LitElement {
     .version-chip {
       position: absolute;
       top: 0;
+      left: 8px;
       right: 8px;
+      text-align: right;
       font-size: 10px;
+      line-height: 1.4;
       font-weight: 600;
       color: rgba(255, 255, 255, 0.35);
       pointer-events: none;

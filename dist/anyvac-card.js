@@ -94,7 +94,7 @@ const t={ATTRIBUTE:1},e=t=>(...e)=>({_$litDirective$:t,values:e});let i$1 = clas
 
 const CARD_NAME = "anyvac-card";
 const EDITOR_NAME = "anyvac-card-editor";
-const CARD_VERSION = "0.73.3";
+const CARD_VERSION = "0.73.4";
 /** Hold duration in ms required to trigger START / PAUSE actions */
 const HOLD_DURATION_MS = 600;
 /**
@@ -4656,7 +4656,10 @@ let AnyVacCard = class AnyVacCard extends i$2 {
         const dbgAr = (this._narrow ? 1 / (this._mapAR > 0.1 ? this._mapAR : 3.636) : (this._mapAR > 0.1 ? this._mapAR : 3.636)).toFixed(3);
         return b `
       <ha-card style="padding:0;display:block">
-        ${this.editMode ? b `<div class="version-chip">v${CARD_VERSION} · ${Math.round(this._cardW)}w · ${this._profile} · ${stack ? "stack" : "split"} · box:${Math.round(this._mapAvailW)}x${Math.round(this._mapAvailH)} · ar:${dbgAr}</div>` : A}
+        ${this.editMode ? b `<div class="version-chip">
+          <div>v${CARD_VERSION} · ${Math.round(this._cardW)}w · ${this._profile}</div>
+          <div>${stack ? "stack" : "split"} · box:${Math.round(this._mapAvailW)}x${Math.round(this._mapAvailH)} · ar:${dbgAr}</div>
+        </div>` : A}
         <div class="avc-grid avc-grid--${this._profile}" style=${o(gridRootStyles(lay, prof))}>
           ${schemaWarn ? b `<div class="avc-schemawarn">
             <ha-icon icon="mdi:alert" style="--mdc-icon-size:18px"></ha-icon><span>${schemaWarn}</span>
@@ -4729,8 +4732,11 @@ AnyVacCard.styles = i$6 `
     .version-chip {
       position: absolute;
       top: 0;
+      left: 8px;
       right: 8px;
+      text-align: right;
       font-size: 10px;
+      line-height: 1.4;
       font-weight: 600;
       color: rgba(255, 255, 255, 0.35);
       pointer-events: none;
