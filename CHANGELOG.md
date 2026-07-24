@@ -14,6 +14,27 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   (care & consumables as the pilot page), and the visual language pass —
   neither shipped yet.
 
+## [0.73.2] - 2026-07-24
+
+Second same-day correction to the split/stack topology decision (0.73.1) —
+the pixel-based dock estimate alone still wasn't enough.
+
+### Fixed
+
+- Root cause (confirmed with real numbers from the field — 908×1726px
+  content box, ~0.185 floorplan aspect ratio): split reserves ZERO height
+  for the dock (it sits beside the map), so its "achieved map size" is
+  always the box's full height regardless of any dock cost estimate, while
+  stack's is always `boxH − dockHeightPx` — strictly less. For a narrow
+  enough floorplan, split therefore always wins on raw map size, no matter
+  how `dockHeightPx` is tuned — a structural limit of "biggest map wins",
+  not a parameter to adjust away. New `stackBias` (default 1.3): stack is
+  now the default choice, and split only wins when its raw score beats
+  stack's by a clear margin (30%+), not just "any amount more" — matches
+  the field observation that a ~9% smaller map with a properly-sized dock
+  row looked clearly better than a marginally bigger map next to a mostly
+  empty column.
+
 ## [0.73.1] - 2026-07-24
 
 Field-caught model correction for the split/stack topology decision

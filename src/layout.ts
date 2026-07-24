@@ -72,31 +72,34 @@ export function shouldRotateMap(floorplanAR: number, boxW: number, boxH: number)
  *    Map gets the full available width, height follows its aspect ratio
  *    (capped so the dock doesn't get squeezed to a sliver).
  *
- *  Same contain-fit-scale comparison as `shouldRotateMap()`: for each
- *  candidate arrangement, compute how big the floorplan could render inside
- *  the box that arrangement gives it, and pick whichever renders it bigger.
- *  Fixes the field-observed problem (2026-07-23 screenshot, a 3-storey
- *  narrow floorplan) where a fixed split left the dock column wide and mostly
- *  empty because its width was whatever the map didn't need, not what the
- *  dock's own content needed.
+ *  **Model history (2026-07-24, two corrections same day, both from live
+ *  field feedback on the SAME real floorplan — a 4-storey narrow building):**
  *
- *  **Model correction (2026-07-24 field feedback):** the first version
- *  reserved the SAME FRACTION of the box for both candidates (dock keeps
- *  `dockFrac` of width in split, `dockFrac` of height in stack) — wrong,
- *  because it made stack's reservation scale up with box height, while a
- *  real dock's content (icon strip + layer toggles + mode row, now that the
- *  room list is hidden by default, docs/25 §7c/§7e) is a roughly FIXED pixel
- *  height regardless of how tall the box is. That bias meant split won by
- *  this formula for basically any tall/narrow floorplan even when it
- *  visually left the dock mostly empty (confirmed live: a user's 4-storey
- *  narrow floorplan scored split as "better fitting" while looking
- *  obviously worse once forced into stack via the manual override).
- *  `dockHeightPx` replaces the height-side fraction with that fixed
- *  estimate — as the box gets taller, stack's map keeps almost all of the
- *  extra height (dock cost stays flat) instead of losing a growing
- *  fraction to it. `dockWidthFrac` stays a fraction for the split
- *  candidate — a column's width genuinely does scale with the box, unlike
- *  a stacked row's height, matching `columns: [72, 28]`.
+ *  1. First version reserved the SAME FRACTION of the box for both
+ *     candidates (dock keeps a fraction of width in split, the SAME
+ *     fraction of height in stack) — wrong, because a real dock's content
+ *     (icon strip + layer toggles + mode row, now that the room list is
+ *     hidden by default, §7c/§7e) is a roughly FIXED pixel height, not
+ *     proportional to the box. Replaced the height fraction with a fixed
+ *     `dockHeightPx` estimate (~150px).
+ *  2. That alone still wasn't enough — live numbers from the field
+ *     (908×1726px content box, ~0.185 floorplan aspect ratio) showed WHY:
+ *     split reserves ZERO height for the dock (it sits beside the map, not
+ *     below it), so split's "achieved map size" is the box's FULL height
+ *     no matter what `dockHeightPx` is set to, while stack's is always
+ *     `boxH − dockHeightPx` — strictly less. For a sufficiently narrow
+ *     floorplan (map's width need is trivial either way, so both
+ *     candidates end up height-bound), split therefore ALWAYS wins on raw
+ *     "biggest achievable map" — not a tuning problem, a structural one:
+ *     that metric literally cannot prefer stack for a narrow floorplan,
+ *     no matter the dock cost estimate. But "biggest map" isn't actually
+ *     what looked better — a ~9% smaller map (1576 vs 1726 in the field
+ *     numbers) with a properly-sized dock row read as clearly better than
+ *     a marginally bigger map next to a mostly-empty column. `STACK_BIAS`
+ *     directly encodes that: stack wins by default UNLESS split's raw
+ *     score exceeds stack's by more than this margin — i.e. split has to
+ *     be a clear, not marginal, win to justify a wide, likely-underused
+ *     side column instead of a snug full-width row below the map.
  *
  *  `floorplanAR` = floorplan width / height (post-rotation, i.e. whatever
  *  `_narrow`/`shouldRotateMap` already decided to actually render).
@@ -107,7 +110,7 @@ export function shouldStackLayout(
   floorplanAR: number,
   boxW: number,
   boxH: number,
-  opts: { dockWidthFrac?: number; dockHeightPx?: number } = {},
+  opts: { dockWidthFrac?: number; dockHeightPx?: number; stackBias?: number } = {},
 ): boolean | undefined {
   // ~150px estimate: vac-icon-strip (~50-64px) + dock-layers row (~30px) +
   // dock-head mode row (~40px) + dock container padding/gaps (~24px), per
@@ -115,15 +118,16 @@ export function shouldStackLayout(
   // list). Only needs to be roughly right: the actual STACK_PORTRAIT_PROFILE
   // dock row is CSS "auto" (sized to real content, not this estimate) — this
   // number only steers the split-vs-stack DECISION, not final layout.
-  const { dockWidthFrac = 0.28, dockHeightPx = 150 } = opts;
+  const { dockWidthFrac = 0.28, dockHeightPx = 150, stackBias = 1.3 } = opts;
   if (boxW <= 4 || boxH <= 4 || floorplanAR <= 0) return undefined;
   const splitMapW = boxW * (1 - dockWidthFrac);
   const scaleSplit = Math.min(splitMapW / floorplanAR, boxH);
   const stackMapH = Math.max(boxH - dockHeightPx, 0);
   const scaleStack = Math.min(boxW / floorplanAR, stackMapH);
-  // Ties (near-identical fit either way) default to split — it's today's
-  // shipped behavior, cheaper to keep than to flip for a marginal gain.
-  return scaleStack > scaleSplit;
+  // Stack is the default; split only wins by a clear (not marginal) margin
+  // — see model history above for why a raw size comparison alone always
+  // favors split for narrow floorplans regardless of the dock estimate.
+  return !(scaleSplit > scaleStack * stackBias);
 }
 
 export interface ProfileGridConfig {
