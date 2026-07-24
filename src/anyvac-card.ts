@@ -48,6 +48,18 @@ import {
   type ResolvedProfileGrid,
 } from "./layout";
 
+/** docs/25 §10 follow-up: one auto-discovered "care" row (consumable time-left +
+ *  reset button, or a dock tank binary status). See `_careItems()` for how these
+ *  are found — purely from the official `roborock` integration's own entities, no
+ *  new config keys. */
+type CareRow = {
+  key: string;
+  label: string;
+  entity?: string;
+  reset?: string;
+  binary?: string;
+};
+
 console.info(
   `%c ANYVAC-CARD %c v${CARD_VERSION} `,
   "background:#2196F3;color:#fff;font-weight:700;padding:2px 4px;border-radius:3px 0 0 3px",
@@ -792,6 +804,85 @@ export class AnyVacCard extends LitElement {
   private _statusInfo(vac: VacuumConfig): readonly [string, string] {
     const raw = this.hass.states[this._ent(vac, "status") ?? vac.entity]?.state ?? "unknown";
     return STATUS_MAP[raw] ?? [raw, "rgba(255,255,255,0.5)"];
+  }
+
+  /** docs/25 §10 follow-up (2026-07-24): consumable/"care" rows auto-discovered from
+   *  the official `roborock` integration's OWN entities — zero new config keys, zero
+   *  new backend code, same spirit as `_intEntity`/`_autoEntities` above. Two device
+   *  scopes are involved: the vacuum's own device carries brush/filter/sensor
+   *  consumables; dock-mounted consumables (cleaning brush, strainer) and the S7/S8
+   *  water-tank binary sensors live on a SEPARATE `"<name> Dock"` HA device. That
+   *  second device is found not by name-matching (fragile, user-renamable) but via
+   *  its `identifiers` — live-verified on the user's HA (2026-07-24): the dock
+   *  device's `roborock` identifier is always the vacuum's own duid with `_dock`
+   *  appended (e.g. vacuum id `7bUI4dOp7O1qnECi7UfFW3` → dock id
+   *  `7bUI4dOp7O1qnECi7UfFW3_dock`), which is a backend-assigned id, not a slug.
+   *  Rows are matched by `translation_key` (not entity_id substring) — the same
+   *  robust-to-renaming approach `_autoEntities` already uses, and confirmed stable
+   *  across S6/S7 MaxV/S8 MaxV Ultra live registries. A vacuum/dock lacking a given
+   *  entity (e.g. S6 has no dock device at all; S7's dock lacks reset buttons for its
+   *  own consumables) simply omits that row — no guessing, no placeholders. */
+  private _careCache = new Map<string, CareRow[]>();
+  private _careItems(vac: VacuumConfig): CareRow[] {
+    const reg = (this.hass as any)?.entities as Record<string, any> | undefined;
+    const devs = (this.hass as any)?.devices as Record<string, any> | undefined;
+    if (!reg || !devs || !vac.entity) return [];
+    if (this._careCache.has(vac.entity)) return this._careCache.get(vac.entity)!;
+
+    const devId = reg[vac.entity]?.device_id as string | undefined;
+    const vacDevice = devId ? devs[devId] : undefined;
+    const duid = (vacDevice?.identifiers as [string, string][] | undefined)?.find(
+      ([domain]) => domain === "roborock"
+    )?.[1];
+    const dockDevice = duid
+      ? Object.values(devs).find((d: any) =>
+          (d.identifiers as [string, string][] | undefined)?.some(
+            ([domain, id]) => domain === "roborock" && id === `${duid}_dock`
+          )
+        )
+      : undefined;
+    const dockDevId = (dockDevice as any)?.id as string | undefined;
+
+    const byTk = (deviceId: string | undefined, tk: string, domain: string) =>
+      deviceId
+        ? Object.keys(reg).find(
+            (id) => reg[id]?.device_id === deviceId && reg[id]?.translation_key === tk && id.startsWith(domain + ".")
+          )
+        : undefined;
+
+    const rows: CareRow[] = [];
+    const consumable = (label: string, tk: string, resetTk: string, deviceId: string | undefined) => {
+      const entity = byTk(deviceId, tk, "sensor");
+      const reset = byTk(deviceId, resetTk, "button");
+      if (entity || reset) rows.push({ key: tk, label, entity, reset });
+    };
+    consumable("Main brush", "main_brush_time_left", "reset_main_brush_consumable", devId);
+    consumable("Side brush", "side_brush_time_left", "reset_side_brush_consumable", devId);
+    consumable("Filter", "filter_time_left", "reset_air_filter_consumable", devId);
+    consumable("Sensors", "sensor_time_left", "reset_sensor_consumable", devId);
+    consumable("Dock brush", "cleaning_brush_time_left", "reset_dock_cleaning_brush_consumable", dockDevId);
+    consumable("Strainer", "strainer_time_left", "reset_dock_strainer_consumable", dockDevId);
+
+    const binary = (label: string, tk: string) => {
+      const entity = byTk(dockDevId, tk, "binary_sensor");
+      if (entity) rows.push({ key: tk, label, binary: entity });
+    };
+    binary("Dirty water tank", "dirty_box_full");
+    binary("Clean water tank", "clean_box_empty");
+    binary("Cleaning fluid", "clean_fluid_empty");
+
+    this._careCache.set(vac.entity, rows);
+    return rows;
+  }
+
+  /** Formats a consumable time-left sensor's state + unit (e.g. "142 h"); falls
+   *  back to a dash when the entity is unavailable/unknown. */
+  private _careValue(entity: string | undefined): string {
+    if (!entity) return "—";
+    const st = this.hass.states[entity];
+    if (!st || st.state === "unavailable" || st.state === "unknown") return "—";
+    const unit = st.attributes?.unit_of_measurement;
+    return unit ? `${st.state} ${unit}` : st.state;
   }
 
   private _isCleaning(vac: VacuumConfig): boolean {
@@ -1917,6 +2008,11 @@ export class AnyVacCard extends LitElement {
     const vac = vacs[idx];
     const dock = this._intAttrs(vac)?.dock_status as Record<string, unknown> | undefined;
     const act = (service: string) => () => void this._call("anyvac", service, { entity_id: vac.entity });
+    const care = this._careItems(vac);
+    const reset = (entity: string) => (e: Event) => {
+      e.stopPropagation();
+      void this._call("button", "press", { entity_id: entity });
+    };
     return html`
       <div class="dock-sheet">
         ${vacs.length > 1 ? html`
@@ -1945,6 +2041,22 @@ export class AnyVacCard extends LitElement {
             <ha-icon icon="mdi:hair-dryer"></ha-icon><span>Dry</span>
           </button>
         </div>
+        ${care.length ? html`
+          <div class="dock-sheet-care">
+            ${care.map((row) => html`
+              <div class="dock-sheet-care-row">
+                <span class="dock-sheet-care-label">${row.label}</span>
+                ${row.binary
+                  ? html`<span class="dock-sheet-care-badge ${this.hass.states[row.binary]?.state === "on" ? "warn" : ""}">
+                      ${this.hass.states[row.binary]?.state === "on" ? "⚠" : "OK"}
+                    </span>`
+                  : html`<span class="dock-sheet-care-value">${this._careValue(row.entity)}</span>`}
+                ${row.reset ? html`
+                  <button class="dock-sheet-care-reset" title="Reset" @click=${reset(row.reset)}>
+                    <ha-icon icon="mdi:refresh"></ha-icon>
+                  </button>` : nothing}
+              </div>`)}
+          </div>` : nothing}
       </div>
     `;
   }
@@ -4202,6 +4314,53 @@ export class AnyVacCard extends LitElement {
       border: 1px solid rgba(255, 255, 255, 0.12);
     }
     .dock-sheet-action ha-icon { --mdc-icon-size: 18px; }
+    .dock-sheet-care {
+      display: flex;
+      flex-direction: column;
+      gap: 6px;
+      margin-top: 10px;
+      padding-top: 10px;
+      border-top: 1px solid rgba(255, 255, 255, 0.08);
+    }
+    .dock-sheet-care-row {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      font-size: 12px;
+    }
+    .dock-sheet-care-label {
+      flex: 1;
+      color: rgba(255, 255, 255, 0.75);
+    }
+    .dock-sheet-care-value {
+      color: rgba(255, 255, 255, 0.5);
+      font-variant-numeric: tabular-nums;
+    }
+    .dock-sheet-care-badge {
+      font-size: 10px;
+      font-weight: 600;
+      padding: 2px 7px;
+      border-radius: 20px;
+      background: rgba(82, 196, 26, 0.18);
+      color: #52c41a;
+    }
+    .dock-sheet-care-badge.warn {
+      background: rgba(250, 173, 20, 0.2);
+      color: #faad14;
+    }
+    .dock-sheet-care-reset {
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      width: 26px;
+      height: 26px;
+      border-radius: 50%;
+      cursor: pointer;
+      color: rgba(255, 255, 255, 0.6);
+      background: rgba(255, 255, 255, 0.06);
+      border: 1px solid rgba(255, 255, 255, 0.1);
+    }
+    .dock-sheet-care-reset ha-icon { --mdc-icon-size: 14px; }
     .dock-rows {
       display: flex;
       flex-direction: column;

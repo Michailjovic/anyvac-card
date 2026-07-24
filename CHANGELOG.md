@@ -10,9 +10,38 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 - Real-hardware polish pass on the landscape cockpit (docs/18/19). Plus this
   release's layout hardening ship as **v1.0.0**.
-- Rest of docs/25 (Fáze 3, inserted before v1.0.0): portrait pages/menu
-  (care & consumables as the pilot page), and the visual language pass —
-  neither shipped yet.
+- Rest of docs/25 (Fáze 3, inserted before v1.0.0): top tab-strip navigation
+  (low priority — no second page needs it now that care lives in the Dock
+  sheet, see 0.75.0) and the visual language pass — neither shipped yet.
+
+## [0.75.0] - 2026-07-24
+
+### Added
+
+Consumable/"care" rows in the Dock sheet (docs/25 §10 follow-up) — extends
+0.74.0's Dock sheet instead of a separate "Péče" page, since both live
+under the same "dock maintenance" concept the user originally described.
+Auto-discovered from the official `roborock` integration's own entities —
+zero new config keys, zero new backend code, same pattern as the existing
+`integration_entity`/status-sensor auto-resolve. Per active tab: main
+brush, side brush, filter, and sensor consumables (time-left + reset
+button, matched via HA's `translation_key`, robust to user-renamed
+entities) from the vacuum's own device; dock-mounted cleaning-brush and
+strainer consumables (time-left + reset) plus S7/S8 water-tank binary
+status (dirty water tank, clean water tank, cleaning fluid) from the
+vacuum's separate `"<name> Dock"` HA device. That second device is found
+via its `identifiers` (always the vacuum's own duid + `_dock`, confirmed
+live against the field-reporting user's real HA registry — not a
+name-match, so it survives renames) rather than by string-matching. A
+vacuum/dock missing a given entity (e.g. S6 has no dock device at all; S7's
+dock doesn't expose reset buttons for its own consumables) simply omits
+that row.
+
+**Correction to 0.74.0:** the Empty/Wash/Dry dock actions were briefly
+believed non-functional in the field — turned out the user had only
+updated the card, not reloaded the paired `anyvac` integration (0.74.0),
+so the `anyvac.dock_*` services didn't exist yet and calls silently failed
+client-side. Confirmed working once the integration was actually deployed.
 
 ## [0.74.0] - 2026-07-24
 
