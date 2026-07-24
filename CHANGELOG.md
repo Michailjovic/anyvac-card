@@ -14,6 +14,21 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   (care & consumables as the pilot page), and the visual language pass —
   neither shipped yet.
 
+## [0.72.4] - 2026-07-24
+
+Fourth field-caught fix, same day: on a selected room, the room's own
+gradient border/glow visibly bled through the inspect popup.
+
+### Fixed
+
+- `.room-inspect-inner`'s background was 94% opaque, letting the selected
+  room's white gradient border/glow (`box-shadow: 0 0 18px`, painted on the
+  same button the popup sits centered on top of) show faintly through —
+  read as "the ring crosses the age display" even though the popup was
+  already the topmost paint layer. Background bumped near-opaque
+  (rgba(18,18,18,0.99)) plus `isolation: isolate` so no ancestor glow can
+  bleed through at all.
+
 ## [0.72.3] - 2026-07-24
 
 Third field-caught fix, same day: on a near-full-map-width room, the

@@ -94,7 +94,7 @@ const t={ATTRIBUTE:1},e=t=>(...e)=>({_$litDirective$:t,values:e});let i$1 = clas
 
 const CARD_NAME = "anyvac-card";
 const EDITOR_NAME = "anyvac-card-editor";
-const CARD_VERSION = "0.72.3";
+const CARD_VERSION = "0.72.4";
 /** Hold duration in ms required to trigger START / PAUSE actions */
 const HOLD_DURATION_MS = 600;
 /**
@@ -5178,11 +5178,9 @@ AnyVacCard.styles = i$6 `
     }
 
     /* docs/25 §7b: hold-to-inspect popup — per-room detail moved out of the
-       (now hidden-by-default) portrait dock room list. Anchored below the
-       room by default; the --above modifier flips it for rooms in the
-       bottom half of the map. cursor:default plus its own click
-       stopPropagation (in the render fn) so tapping the popup itself
-       doesn't re-toggle the room underneath it. */
+       (now hidden-by-default) portrait dock room list. cursor:default plus
+       its own click stopPropagation (in the render fn) so tapping the
+       popup itself doesn't re-toggle the room underneath it. */
     /* .room-inspect is a bare positioning wrapper (anchor + centering
        transform only) — NO border/background/padding here. Field-caught
        bug (0.72.1 first pass): those were on this outer div while only
@@ -5204,13 +5202,21 @@ AnyVacCard.styles = i$6 `
     }
     .room-inspect-inner {
       min-width: 84px;
-      background: rgba(20, 20, 20, 0.94);
+      /* Field-caught (2026-07-24): 0.94 opacity let the selected room's
+       * white gradient border/glow (box-shadow 0 0 18px, painted on the
+       * same button this popup sits centered on top of) bleed faintly
+       * through the background, reading as "the ring crosses the popup"
+       * even though the popup is already the topmost paint layer
+       * (z-index: 20). Bumped near-opaque + isolation:isolate so no
+       * ancestor glow/blend can show through at all. */
+      background: rgba(18, 18, 18, 0.99);
       border: 1px solid rgba(255, 255, 255, 0.25);
       border-radius: 8px;
       padding: 6px 8px;
       font-size: 11px;
       white-space: nowrap;
       box-shadow: 0 4px 14px rgba(0, 0, 0, 0.45);
+      isolation: isolate;
     }
     .room-inspect-name { font-weight: 600; margin-bottom: 4px; color: #fff; }
     .room-inspect-ages { display: flex; gap: 8px; margin-bottom: 4px; }
