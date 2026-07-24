@@ -14,6 +14,23 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   (care & consumables as the pilot page), and the visual language pass —
   neither shipped yet.
 
+## [0.72.5] - 2026-07-24
+
+Fifth field-caught fix, same day: 0.72.4's near-opaque background +
+isolation still didn't stop the selected room's ring from showing through
+the popup.
+
+### Fixed
+
+- Structural fix instead of another opacity/isolation tweak: the popup now
+  renders as a SIBLING of the room's `<button>`, not a child. Nested inside
+  the button, it was always going to be at the mercy of that button's own
+  border-image/box-shadow paint behavior no matter how opaque its own
+  background was. As an independent sibling positioned at the room's own
+  `map_x`/`map_y` (the same point its button anchors to), there's no
+  parent/child relationship left for the button's selected-state styling to
+  interact with.
+
 ## [0.72.4] - 2026-07-24
 
 Fourth field-caught fix, same day: on a selected room, the room's own

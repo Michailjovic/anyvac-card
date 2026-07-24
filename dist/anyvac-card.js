@@ -94,7 +94,7 @@ const t={ATTRIBUTE:1},e=t=>(...e)=>({_$litDirective$:t,values:e});let i$1 = clas
 
 const CARD_NAME = "anyvac-card";
 const EDITOR_NAME = "anyvac-card-editor";
-const CARD_VERSION = "0.72.4";
+const CARD_VERSION = "0.72.5";
 /** Hold duration in ms required to trigger START / PAUSE actions */
 const HOLD_DURATION_MS = 600;
 /**
@@ -4090,11 +4090,20 @@ let AnyVacCard = class AnyVacCard extends i$2 {
     }
     /** docs/25 §7b: the per-room detail (age, assigned vacuum) that used to
      *  live permanently in the portrait dock room list, which the minimalist
-     *  cockpit now hides by default (§7c/§7e). Anchored to the room's own box;
-     *  flips above/below depending on which half of the map the room sits in
-     *  so it's less likely to run off the visible area. `stopPropagation` on
-     *  the popup itself so a tap inside it (e.g. the pin-cycle chip) doesn't
-     *  also reach the room button underneath and re-toggle/dismiss.
+     *  cockpit now hides by default (§7c/§7e). `stopPropagation` on the popup
+     *  itself so a tap inside it (e.g. the pin-cycle chip) doesn't also reach
+     *  the room button underneath and re-toggle/dismiss.
+     *
+     *  Field-caught (2026-07-24, third round): rendered as a SIBLING of the
+     *  room's `<button>`, not a child — earlier attempts nested it inside the
+     *  button and fought the selected room's own border-image/box-shadow
+     *  (glow visibly bleeding through even at 99% opaque background +
+     *  `isolation: isolate`, see 0.72.4's doc comment for the failed
+     *  theory). Positioning it as an independent sibling at the room's own
+     *  `map_x`/`map_y` point (same coordinates the button itself uses)
+     *  sidesteps the whole question — there is no parent/child relationship
+     *  left for the button's paint to interact with, by construction, not by
+     *  fighting z-index/stacking-context edge cases.
      *  KNOWN LIMITATION (v1): not edge-aware on the horizontal axis, and the
      *  map region still clips overflow — a room very close to the left/right
      *  edge can get its popup partly cut off. Revisit after field feedback. */
@@ -4109,21 +4118,14 @@ let AnyVacCard = class AnyVacCard extends i$2 {
         const pinTap = (shown) => canCycle
             ? (e) => { e.stopPropagation(); this._cycleRoomPin(room.key, shown); }
             : undefined;
-        // Field-caught (2026-07-24): the original below/above-the-room anchor
-        // (top:100% or bottom:100%, sized off the button's OWN width/height)
-        // broke badly for large rooms — after the parent `.avc-rot` 90° rotation,
-        // an offset proportional to a large room's local width/height turns into
-        // a large SCREEN-space offset, pushing the popup mostly off-screen (seen
-        // in the field: ~80% off the left edge on a near-full-map-width room).
-        // Centered-on-room instead: a rotation's center point never moves under
-        // that rotation, so `top:50%/left:50%/translate(-50%,-50%)` lands on the
-        // same screen spot regardless of room size OR rotation — no separate
-        // math needed for the rotated-map case, and no flip logic either (always
-        // centered, nothing to flip). Trade-off: the popup now sits ON the room
-        // (briefly covering its icon/dots) instead of floating past its edge —
-        // acceptable since the popup itself already names the room.
+        // Same point the room's own <button> is anchored at (see the doc comment
+        // above) — centering here, rather than below/above the room, is ALSO
+        // still correct for size/rotation reasons (0.72.3): a rotation's center
+        // point never moves under that rotation, so this lands on the same
+        // screen spot regardless of room size or map orientation.
         return b `
-      <div class="room-inspect" @click=${(e) => e.stopPropagation()}>
+      <div class="room-inspect" style=${o({ left: (room.map_x ?? 0) + "%", top: (room.map_y ?? 0) + "%" })}
+        @click=${(e) => e.stopPropagation()}>
         <div class="room-inspect-inner">
           <div class="room-inspect-name">${room.name ?? room.key}</div>
           <div class="room-inspect-ages">
@@ -4236,8 +4238,8 @@ let AnyVacCard = class AnyVacCard extends i$2 {
             </span>
           ` : A}
           ${this._renderRoomGauge(opts?.vacs ?? [vac], room)}
-          ${this._inspectKey === room.key ? this._renderRoomInspect(room, vac, selected, opts) : A}
         </button>
+        ${this._inspectKey === room.key ? this._renderRoomInspect(room, vac, selected, opts) : A}
       `;
         }
         // ── Point mód (legacy) ──────────────────────────────────────
@@ -4270,8 +4272,8 @@ let AnyVacCard = class AnyVacCard extends i$2 {
         ` : A}
         ${this._renderRoomAgeDots(room, vac)}
         ${this._renderRoomGauge(opts?.vacs ?? [vac], room)}
-        ${this._inspectKey === room.key ? this._renderRoomInspect(room, vac, selected, opts) : A}
       </button>
+      ${this._inspectKey === room.key ? this._renderRoomInspect(room, vac, selected, opts) : A}
     `;
     }
     // ── Render: status card ─────────────────────────────────────────────────
@@ -5191,14 +5193,18 @@ AnyVacCard.styles = i$6 `
        it rotates as one rigid unit — box and text always agree, upright or
        rotated. Anchored dead-center on the room (see the render fn's doc
        comment, 0.72.3) rather than below/above it — the only anchor that
-       stays correct at any room size under the map's rotation. */
+       stays correct at any room size under the map's rotation.
+       left/top come from an inline style (the room's own map_x/map_y, same
+       coordinates its <button> uses) — this div is now a SIBLING of that
+       button, not a child (0.72.5 field fix, see the render fn's doc
+       comment), so it needs its own absolute position rather than
+       inheriting one relative to the button's box. */
     .room-inspect {
       position: absolute;
-      top: 50%;
-      left: 50%;
       transform: translate(-50%, -50%);
       z-index: 20;
       cursor: default;
+      pointer-events: auto;
     }
     .room-inspect-inner {
       min-width: 84px;
