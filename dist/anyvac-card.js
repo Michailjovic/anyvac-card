@@ -87,7 +87,7 @@ const t={ATTRIBUTE:1},e=t=>(...e)=>({_$litDirective$:t,values:e});let i$1 = clas
 
 const CARD_NAME = "anyvac-card";
 const EDITOR_NAME = "anyvac-card-editor";
-const CARD_VERSION = "0.75.0";
+const CARD_VERSION = "0.76.0";
 /** Hold duration in ms required to trigger START / PAUSE actions */
 const HOLD_DURATION_MS = 600;
 /**
@@ -2789,6 +2789,12 @@ let AnyVacCard = class AnyVacCard extends i$2 {
           <button class="dock-sheet-action" @click=${act("dock_dry")}>
             <ha-icon icon="mdi:hair-dryer"></ha-icon><span>Dry</span>
           </button>
+          <button class="dock-sheet-action" @click=${act("dock_pump")}>
+            <ha-icon icon="mdi:water-pump"></ha-icon><span>Pump</span>
+          </button>
+          <button class="dock-sheet-action" @click=${act("dock_self_clean")}>
+            <ha-icon icon="mdi:autorenew"></ha-icon><span>Self-clean</span>
+          </button>
         </div>
         ${care.length ? b `
           <div class="dock-sheet-care">
@@ -5112,9 +5118,9 @@ AnyVacCard.styles = i$5 `
       font-size: 10px;
       color: rgba(255, 255, 255, 0.4);
     }
-    .dock-sheet-actions { display: flex; gap: 8px; }
+    .dock-sheet-actions { display: flex; flex-wrap: wrap; gap: 8px; }
     .dock-sheet-action {
-      flex: 1;
+      flex: 1 1 27%;
       display: flex;
       flex-direction: column;
       align-items: center;

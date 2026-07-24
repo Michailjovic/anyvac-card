@@ -14,6 +14,44 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   (low priority — no second page needs it now that care lives in the Dock
   sheet, see 0.75.0) and the visual language pass — neither shipped yet.
 
+## [0.76.0] - 2026-07-24
+
+### Added
+
+Two more Dock sheet actions (docs/25 §10 second follow-up), next to
+Empty/Wash/Dry: **Pump** and **Self-clean**. Both came from a live back-
+and-forth with the field-reporting user comparing their manufacturer app's
+"Dock Maintenance" screen against `python-roborock`'s `RoborockCommand`
+enum:
+
+- **Pump** → `app_empty_rinse_tank_water` (undocumented, found in the
+  enum). Maps to the app's "Pump — drain the remaining water from the
+  cleaning sink" — the mop-rinse basin every dock has, not the optional
+  Fill&Drain plumbing accessory's own tank. User confirmed live (2026-07-24,
+  Developer Tools → `vacuum.send_command`): pump audibly ran, matched the
+  app's own "Pump" action.
+- **Self-clean** → `app_amethyst_self_check` (undocumented, found in the
+  enum — "amethyst" appears to be Roborock's internal codename for the
+  Fill&Drain accessory). Maps to the app's "Dock and Fill&Drain Element
+  Self-Cleaning" ("performs a self-check on the element") — the wording
+  match against "self_check" is what pointed here. User confirmed live:
+  exactly the action they wanted.
+
+Both call new `anyvac.dock_pump`/`anyvac.dock_self_clean` services
+(integration 0.76.0, synced), same `_dock_command` plumbing as the
+existing three. Shown unconditionally for every configured vacuum, same
+as Empty/Wash/Dry — there's no documented way to detect which dock
+accessories (auto-empty, wash+dry, Fill&Drain plumbing) are actually
+installed, so gating would mean guessing thresholds, which this project
+avoids (docs/26 precedent). `.dock-sheet-actions` now wraps to two rows
+on narrow screens (`flex-wrap` + `flex: 1 1 27%`) instead of squeezing
+five buttons into one.
+
+**No confirmed command found** for the app's third Dock Maintenance item
+("Fill&Drain Element Drain" — drains the accessory's own built-in sewage
+tank, distinct from Pump's cleaning-sink drain). Not implemented; revisit
+only if a real command turns up.
+
 ## [0.75.0] - 2026-07-24
 
 ### Added

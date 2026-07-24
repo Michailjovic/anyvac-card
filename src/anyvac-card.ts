@@ -2040,6 +2040,12 @@ export class AnyVacCard extends LitElement {
           <button class="dock-sheet-action" @click=${act("dock_dry")}>
             <ha-icon icon="mdi:hair-dryer"></ha-icon><span>Dry</span>
           </button>
+          <button class="dock-sheet-action" @click=${act("dock_pump")}>
+            <ha-icon icon="mdi:water-pump"></ha-icon><span>Pump</span>
+          </button>
+          <button class="dock-sheet-action" @click=${act("dock_self_clean")}>
+            <ha-icon icon="mdi:autorenew"></ha-icon><span>Self-clean</span>
+          </button>
         </div>
         ${care.length ? html`
           <div class="dock-sheet-care">
@@ -4297,9 +4303,9 @@ export class AnyVacCard extends LitElement {
       font-size: 10px;
       color: rgba(255, 255, 255, 0.4);
     }
-    .dock-sheet-actions { display: flex; gap: 8px; }
+    .dock-sheet-actions { display: flex; flex-wrap: wrap; gap: 8px; }
     .dock-sheet-action {
-      flex: 1;
+      flex: 1 1 27%;
       display: flex;
       flex-direction: column;
       align-items: center;
