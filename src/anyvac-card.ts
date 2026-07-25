@@ -1527,6 +1527,21 @@ export class AnyVacCard extends LitElement {
   }
   /** Merged mode: toggle a room across every shown vacuum that has it (one rectangle -> both controllers). */
   private _toggleRoomAcross(key: string, vacs: VacuumConfig[]): void {
+    // docs/18 §7e follow-up (field report 2026-07-25): a manual pin
+    // (`_cycleRoomPin` → `anyvac.pin_room`) only ever auto-clears once the
+    // room is actually cleaned — pick a vacuum once, and it "sticks" through
+    // every future selection until a clean happens, even across
+    // deselect/reselect. Clearing it here too — the moment the room is
+    // DEselected — gives the user an obvious, always-available way back to
+    // auto: untick the room, tick it again. `vacuum` omitted from the call
+    // data is the documented unpin (`coordinator.set_room_pin`: "vacuum
+    // None/empty = unpin"), same as a fresh room that was never pinned.
+    // Computed from `_isRoomSelectedAny` BEFORE either selection-storage
+    // path below mutates state, so it covers both the backend-tracked and
+    // local-selection branches with one check.
+    if (this._isRoomSelectedAny(key, vacs) && vacs.some((v) => this._intAttrs(v))) {
+      void this._call("anyvac", "pin_room", { room: key });
+    }
     if (this._backendSel()) { this._setBackendSel([key], "toggle"); return; }
     const target = !this._isRoomSelectedAny(key, vacs);
     const next = new Map(this._localRoomSel);

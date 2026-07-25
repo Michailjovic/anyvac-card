@@ -8,6 +8,19 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Planned
 
+## [0.79.3] - 2026-07-25
+
+### Fixed
+
+Field report: once a room's vacuum was manually pinned (`_cycleRoomPin` →
+`anyvac.pin_room`), it stayed pinned forever — the only automatic clear was
+after the room was actually cleaned (docs/18 §7e), so re-selecting the same
+room later silently kept the stale manual override instead of going back
+through the planner. `_toggleRoomAcross` now clears the room's pin
+(`anyvac.pin_room` with no `vacuum` — the integration's documented unpin)
+the moment the room is DEselected, giving an obvious way back to auto:
+untick the room, tick it again.
+
 ## [0.79.2] - 2026-07-25
 
 ### Fixed
