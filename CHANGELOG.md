@@ -8,6 +8,19 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Planned
 
+## [0.80.1] - 2026-07-25
+
+### Changed
+
+Meta bar panel contrast bumped (docs/28 §2 follow-up): the 0.03/0.08
+background/border it shipped with in 0.80.0 (same subtle values as
+`.vac-picker`/`.dock` elsewhere) read as flush with the map above and the
+gap below it instead of its own panel — field-verified live via three A/B
+candidates on the user's own dashboard. `.meta-bar` is now
+`rgba(255,255,255,0.06)` background / `rgba(255,255,255,0.16)` border,
+`.meta-bar-divider` is `rgba(255,255,255,0.22)`. Only this panel changed;
+`.vac-picker`/`.dock` weren't reported as a problem.
+
 ## [0.80.0] - 2026-07-25
 
 ### Changed

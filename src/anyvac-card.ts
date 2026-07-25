@@ -5352,10 +5352,18 @@ export class AnyVacCard extends LitElement {
     /* docs/28 §2: own panel (was transparent, flush with the map above and the
      * dock below) — background + radius visually lifts it off both neighbors
      * instead of reading as a loose row of same-weight buttons. */
-    .meta-bar { display: flex; align-items: center; gap: 4px; flex-wrap: wrap; padding: 6px 8px; background: rgba(255, 255, 255, 0.03); border: 1px solid rgba(255, 255, 255, 0.08); border-radius: 12px; }
+    /* docs/28 §2 follow-up (field-verified 2026-07-25, live A/B via Claude in
+     * Chrome on the user's own dashboard against a "modest"/"strong"/
+     * "hairline-only" candidate — see docs/28 for the comparison): the
+     * original 0.03/0.08 values (shared with .vac-picker/.dock elsewhere)
+     * were too subtle against a near-black card background to read as a
+     * distinct panel at all — the specific goal this section was built for.
+     * Bumped just for .meta-bar/.meta-bar-divider, not the other panels,
+     * which weren't reported as a problem. */
+    .meta-bar { display: flex; align-items: center; gap: 4px; flex-wrap: wrap; padding: 6px 8px; background: rgba(255, 255, 255, 0.06); border: 1px solid rgba(255, 255, 255, 0.16); border-radius: 12px; }
     .meta-bar-cluster { display: flex; align-items: center; gap: 4px; }
     .meta-bar-spacer { flex: 1 1 auto; }
-    .meta-bar-divider { width: 0.5px; align-self: stretch; background: rgba(255, 255, 255, 0.14); margin: 0 4px; }
+    .meta-bar-divider { width: 0.5px; align-self: stretch; background: rgba(255, 255, 255, 0.22); margin: 0 4px; }
     /* Refresh: a quiet icon, not a bordered button on par with Pin & Go/Zone —
      * it shouldn't compete with the actual map-interaction tools for attention. */
     .mtbtn--ghost { border: none; background: transparent; color: rgba(255, 255, 255, 0.45); padding: 5px; }
