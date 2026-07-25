@@ -58,6 +58,27 @@ type CareRow = {
   entity?: string;
   reset?: string;
   binary?: string;
+  /** Nominal total lifespan in hours, when known — enables a % readout
+   *  instead of raw remaining time. See `_careItems()` for sourcing. */
+  totalHours?: number;
+};
+
+/** docs/25 §10 third follow-up: nominal total consumable lifespans, used to
+ *  turn a "time left" sensor into a "% remaining" readout. NOT from any
+ *  Roborock API field (the protocol only ever reports remaining time) —
+ *  triangulated from THREE independent live data points (S6/S7 MaxV/S8
+ *  MaxV Ultra all converge on the same round totals once time-left is
+ *  divided out) and cross-checked against Roborock's own published HEPA
+ *  filter service interval ("every 150 hours of runtime"). Deliberately
+ *  covers only the 4 consumables with this convergent evidence — the two
+ *  dock-mounted ones (cleaning brush, strainer) had just one data point
+ *  each with no round-number pattern to anchor on, so those stay in hours
+ *  rather than showing a guessed percentage. */
+const CARE_TOTAL_HOURS: Record<string, number> = {
+  main_brush_time_left: 300,
+  side_brush_time_left: 200,
+  filter_time_left: 150,
+  sensor_time_left: 30,
 };
 
 console.info(
@@ -854,35 +875,55 @@ export class AnyVacCard extends LitElement {
     const consumable = (label: string, tk: string, resetTk: string, deviceId: string | undefined) => {
       const entity = byTk(deviceId, tk, "sensor");
       const reset = byTk(deviceId, resetTk, "button");
-      if (entity || reset) rows.push({ key: tk, label, entity, reset });
+      if (entity || reset) rows.push({ key: tk, label, entity, reset, totalHours: CARE_TOTAL_HOURS[tk] });
     };
     consumable("Main brush", "main_brush_time_left", "reset_main_brush_consumable", devId);
     consumable("Side brush", "side_brush_time_left", "reset_side_brush_consumable", devId);
     consumable("Filter", "filter_time_left", "reset_air_filter_consumable", devId);
     consumable("Sensors", "sensor_time_left", "reset_sensor_consumable", devId);
-    consumable("Dock brush", "cleaning_brush_time_left", "reset_dock_cleaning_brush_consumable", dockDevId);
-    consumable("Strainer", "strainer_time_left", "reset_dock_strainer_consumable", dockDevId);
+    // Dock-mounted consumables/tank status only apply to a wash-capable dock —
+    // an empty-only dock's entities can still exist in HA's registry (created
+    // per device model, not per physically-installed accessory) but always
+    // report "unavailable"; gate on the same dock_type tier as the actions
+    // above instead of just checking entity presence (docs/25 §10 3rd
+    // follow-up, live-confirmed on the field-reporting user's S7 MaxV).
+    if (this._dockTier(vac) === "full") {
+      consumable("Dock brush", "cleaning_brush_time_left", "reset_dock_cleaning_brush_consumable", dockDevId);
+      consumable("Strainer", "strainer_time_left", "reset_dock_strainer_consumable", dockDevId);
 
-    const binary = (label: string, tk: string) => {
-      const entity = byTk(dockDevId, tk, "binary_sensor");
-      if (entity) rows.push({ key: tk, label, binary: entity });
-    };
-    binary("Dirty water tank", "dirty_box_full");
-    binary("Clean water tank", "clean_box_empty");
-    binary("Cleaning fluid", "clean_fluid_empty");
+      const binary = (label: string, tk: string) => {
+        const entity = byTk(dockDevId, tk, "binary_sensor");
+        if (entity) rows.push({ key: tk, label, binary: entity });
+      };
+      binary("Dirty water tank", "dirty_box_full");
+      binary("Clean water tank", "clean_box_empty");
+      binary("Cleaning fluid", "clean_fluid_empty");
+    }
 
     this._careCache.set(vac.entity, rows);
     return rows;
   }
 
-  /** Formats a consumable time-left sensor's state + unit (e.g. "142 h"); falls
-   *  back to a dash when the entity is unavailable/unknown. */
-  private _careValue(entity: string | undefined): string {
-    if (!entity) return "—";
-    const st = this.hass.states[entity];
+  /** Formats a consumable row: a % of nominal lifespan when the total is known
+   *  (`CARE_TOTAL_HOURS`), else a plain hour figure — always normalized to
+   *  hours regardless of the sensor's own unit (HA's `roborock` integration
+   *  reports some consumables in seconds and others already in hours for no
+   *  documented reason; live-confirmed inconsistent across S6 (`s`) vs S7/S8
+   *  (`h`) on the field-reporting user's own entities). Falls back to a dash
+   *  when the entity is unavailable/unknown. */
+  private _careValue(row: CareRow): string {
+    if (!row.entity) return "—";
+    const st = this.hass.states[row.entity];
     if (!st || st.state === "unavailable" || st.state === "unknown") return "—";
+    const raw = Number(st.state);
+    if (Number.isNaN(raw)) return st.state;
     const unit = st.attributes?.unit_of_measurement;
-    return unit ? `${st.state} ${unit}` : st.state;
+    const hours = unit === "s" ? raw / 3600 : unit === "min" ? raw / 60 : raw;
+    if (row.totalHours) {
+      const pct = Math.max(0, Math.min(100, Math.round((hours / row.totalHours) * 100)));
+      return `${pct} %`;
+    }
+    return `${Math.round(hours)} h`;
   }
 
   private _isCleaning(vac: VacuumConfig): boolean {
@@ -1908,7 +1949,7 @@ export class AnyVacCard extends LitElement {
           ` : nothing}
         <div class="dock-head">
           ${modeBtn("dry", "mdi:broom", "Dry")}${modeBtn("wet", "mdi:water", "Wet")}${modeBtn("both", "mdi:water-plus", "Both")}
-          ${hasInt ? html`
+          ${vacs.some((v) => this._dockTier(v) !== "none") ? html`
             <button class="dock-mode dock-mode--dock ${this._dockSheetOpen ? "on" : ""}"
               @click=${(e: Event) => { e.stopPropagation(); this._dockSheetOpen = !this._dockSheetOpen; }}>
               <ha-icon icon="mdi:home-outline"></ha-icon><span>Dock</span>
@@ -1989,6 +2030,28 @@ export class AnyVacCard extends LitElement {
     });
   }
 
+  /** docs/25 §10 third follow-up (2026-07-24): dock hardware tier, read from
+   *  `dock_status.dock_type` (already flowing through the integration sensor,
+   *  zero new backend work). `dock_type` maps to `python-roborock`'s
+   *  `RoborockDockTypeCode` — live-verified against the user's real HA
+   *  (dock_type null/absent → S6, `1` → S7 MaxV, `10` → S8 MaxV Ultra):
+   *    null/undefined/0  → no dock at all (S6 — not even auto-empty)
+   *    1 (auto_empty_dock) / 5 (auto_empty_dock_pure) → empty-only dock
+   *    everything else (3 empty_wash_fill, 6 s7_max_ultra, 7 s8, 10
+   *      s8_maxv_ultra, ...) → full wash+dry(+plumbing) dock
+   *  "empty" tier gets ONLY the Empty action and none of the dock-mounted
+   *  consumables (dock brush/strainer) — those entities can technically
+   *  exist in HA's registry even on an empty-only unit (the integration
+   *  creates them per device *model*, not per physically-installed
+   *  accessory) but report "unavailable"; confirmed live on the user's S7
+   *  MaxV before this fix shipped. */
+  private _dockTier(vac: VacuumConfig): "none" | "empty" | "full" {
+    const dt = this._intAttrs(vac)?.dock_status?.dock_type as number | null | undefined;
+    if (dt === null || dt === undefined || dt === 0) return "none";
+    if (dt === 1 || dt === 5) return "empty";
+    return "full";
+  }
+
   /** docs/25 §7 field follow-up (2026-07-24): dock sheet — per-vacuum tabs +
    *  Empty/Wash/Dry actions (`anyvac.dock_*`, confirmed commands per docs/26
    *  §3, live-verified against the field-reporting user's real HW). Renders
@@ -2002,10 +2065,11 @@ export class AnyVacCard extends LitElement {
    *  polished UI would overclaim confidence we don't have. */
   private _renderDockSheet() {
     if (!this._dockSheetOpen) return nothing;
-    const vacs = this._config.vacuums.filter((v) => this._intAttrs(v));
+    const vacs = this._config.vacuums.filter((v) => this._dockTier(v) !== "none");
     if (!vacs.length) return nothing;
     const idx = Math.min(this._dockSheetIdx, vacs.length - 1);
     const vac = vacs[idx];
+    const tier = this._dockTier(vac);
     const dock = this._intAttrs(vac)?.dock_status as Record<string, unknown> | undefined;
     const act = (service: string) => () => void this._call("anyvac", service, { entity_id: vac.entity });
     const care = this._careItems(vac);
@@ -2034,18 +2098,19 @@ export class AnyVacCard extends LitElement {
           <button class="dock-sheet-action" @click=${act("dock_empty")}>
             <ha-icon icon="mdi:delete-empty"></ha-icon><span>Empty</span>
           </button>
-          <button class="dock-sheet-action" @click=${act("dock_wash")}>
-            <ha-icon icon="mdi:water"></ha-icon><span>Wash</span>
-          </button>
-          <button class="dock-sheet-action" @click=${act("dock_dry")}>
-            <ha-icon icon="mdi:hair-dryer"></ha-icon><span>Dry</span>
-          </button>
-          <button class="dock-sheet-action" @click=${act("dock_pump")}>
-            <ha-icon icon="mdi:water-pump"></ha-icon><span>Pump</span>
-          </button>
-          <button class="dock-sheet-action" @click=${act("dock_self_clean")}>
-            <ha-icon icon="mdi:autorenew"></ha-icon><span>Self-clean</span>
-          </button>
+          ${tier === "full" ? html`
+            <button class="dock-sheet-action" @click=${act("dock_wash")}>
+              <ha-icon icon="mdi:water"></ha-icon><span>Wash</span>
+            </button>
+            <button class="dock-sheet-action" @click=${act("dock_dry")}>
+              <ha-icon icon="mdi:hair-dryer"></ha-icon><span>Dry</span>
+            </button>
+            <button class="dock-sheet-action" @click=${act("dock_pump")}>
+              <ha-icon icon="mdi:water-pump"></ha-icon><span>Pump</span>
+            </button>
+            <button class="dock-sheet-action" @click=${act("dock_self_clean")}>
+              <ha-icon icon="mdi:autorenew"></ha-icon><span>Self-clean</span>
+            </button>` : nothing}
         </div>
         ${care.length ? html`
           <div class="dock-sheet-care">
@@ -2056,7 +2121,7 @@ export class AnyVacCard extends LitElement {
                   ? html`<span class="dock-sheet-care-badge ${this.hass.states[row.binary]?.state === "on" ? "warn" : ""}">
                       ${this.hass.states[row.binary]?.state === "on" ? "⚠" : "OK"}
                     </span>`
-                  : html`<span class="dock-sheet-care-value">${this._careValue(row.entity)}</span>`}
+                  : html`<span class="dock-sheet-care-value">${this._careValue(row)}</span>`}
                 ${row.reset ? html`
                   <button class="dock-sheet-care-reset" title="Reset" @click=${reset(row.reset)}>
                     <ha-icon icon="mdi:refresh"></ha-icon>

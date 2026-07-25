@@ -8,6 +8,43 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Planned
 
+## [0.77.0] - 2026-07-24
+
+### Fixed
+
+Field-test feedback on 0.76.0's Dock sheet + Care section (docs/25 §10
+third follow-up):
+
+- **Hardware-tier gating.** The Dock sheet/actions/dock-mounted care rows
+  used to render identically for every configured vacuum, regardless of
+  what dock it actually has. Fixed by reading `dock_status.dock_type`
+  (already flowing through the integration sensor — no new backend work)
+  and mapping it to `python-roborock`'s `RoborockDockTypeCode` tiers:
+  no dock at all (S6 — `dock_type` absent) hides the Dock button
+  entirely; an empty-only dock (S7 MaxV — `dock_type: 1`) shows just the
+  Empty action and hides Wash/Dry/Pump/Self-clean plus the dock-mounted
+  consumables (dock brush, strainer, tank status); a full wash+dry(+
+  plumbing) dock (S8 MaxV Ultra — `dock_type: 10`) is unchanged. All
+  three tier values were read live off the user's actual HA, not
+  inferred — the field report was investigated by walking their real
+  entity/device registry before writing any gating logic. Fixes a
+  related, subtler bug for free: S7's `dock_maintenance_brush_time_left`/
+  `dock_strainer_time_left` sensors exist in HA's registry (created per
+  device *model*, not per physically-installed accessory) but always
+  report "unavailable" — the card was showing these as dead rows before.
+- **Consumable units.** `main_brush_time_left` and friends come back in
+  seconds on some vacuums and hours on others (confirmed live: S6 reports
+  `s`, S7/S8 report `h`, same sensor type) — the Care section now
+  normalizes everything to hours before display. On top of that, the four
+  body consumables with a well-established nominal lifespan (main brush
+  300h, side brush 200h, filter 150h — matches Roborock's published HEPA
+  filter service interval — sensor 30h; triangulated from three
+  independent live units converging on the same round totals) now show
+  **% remaining** instead of a raw hour count, per the user's request. The
+  two dock-mounted consumables (cleaning brush, strainer) keep showing
+  hours — only one live data point for each, no round-number pattern to
+  anchor a total on, so a % there would be a guess dressed up as a fact.
+
 - Real-hardware polish pass on the landscape cockpit (docs/18/19). Plus this
   release's layout hardening ship as **v1.0.0**.
 - Rest of docs/25 (Fáze 3, inserted before v1.0.0): top tab-strip navigation
