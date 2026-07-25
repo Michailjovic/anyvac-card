@@ -94,7 +94,7 @@ const t={ATTRIBUTE:1},e=t=>(...e)=>({_$litDirective$:t,values:e});let i$1 = clas
 
 const CARD_NAME = "anyvac-card";
 const EDITOR_NAME = "anyvac-card-editor";
-const CARD_VERSION = "0.79.0";
+const CARD_VERSION = "0.79.1";
 /** Hold duration in ms required to trigger START / PAUSE actions */
 const HOLD_DURATION_MS = 600;
 /**
@@ -738,6 +738,21 @@ let AnyVacCard = class AnyVacCard extends i$2 {
          *  closes the other) purely to keep the narrow dock column from showing two
          *  panels stacked at once. */
         this._modeSheetOpen = false;
+        /** docs/25 §10 field-caught (2026-07-25): reset-button visual feedback.
+         *  Live diagnosis on the field-reporting user's real HA found the reset
+         *  DOES work — the official `roborock` integration's own consumable
+         *  sensor just takes up to one poll cycle (~30s, live-measured) to reflect
+         *  it, and (separately, now fixed above in `_watchedEntities`) the card
+         *  wasn't even re-rendering on that entity's change. A 30s silent wait
+         *  after tapping reads as broken even once the card DOES re-render
+         *  promptly — so the tapped button shows a spinner until the watched
+         *  sensor's `last_changed` moves past the press time, with a hard-timeout
+         *  fallback (`_careResetPending` cleanup in `updated()`) in case the
+         *  vacuum is offline and the poll never lands. Keyed by the row's sensor
+         *  entity id when there is one (globally unique, unlike `CareRow.key`
+         *  which is a translation_key shared across vacuums), else the reset
+         *  button's own entity id. */
+        this._careResetPending = new Map();
         this._modeEntity = null;
         this._dbg = "";
         this._zoneDrag = null;
@@ -1348,6 +1363,28 @@ let AnyVacCard = class AnyVacCard extends i$2 {
         this._scheduleMeasure();
     }
     updated() {
+        // docs/25 §10 field-caught (2026-07-25): clear a reset spinner as soon as
+        // the watched sensor/button it's keyed on actually moves past the press
+        // time — the 40s timeout in the reset click handler is only the hard
+        // fallback for an offline vacuum whose poll never lands. Cheap (a
+        // handful of entries at most) so it runs on every render unconditionally
+        // rather than gating on `changed.has("hass")` — this override doesn't
+        // currently take a `PropertyValues` param and adding one just for this
+        // check isn't worth it.
+        if (this._careResetPending.size) {
+            let next = null;
+            for (const [key, pressedAt] of this._careResetPending) {
+                const st = this.hass?.states[key];
+                const changedMs = st ? Date.parse(st.last_changed) : NaN;
+                if (Number.isFinite(changedMs) && changedMs > pressedAt) {
+                    if (!next)
+                        next = new Map(this._careResetPending);
+                    next.delete(key);
+                }
+            }
+            if (next)
+                this._careResetPending = next;
+        }
         // Grid mode: re-apply the measured height after every render (the declarative
         // svh calc stays as the pre-measure fallback).
         this._refineGridHeight();
@@ -1467,6 +1504,26 @@ let AnyVacCard = class AnyVacCard extends i$2 {
                     s.add(r.last_clean_entity);
                 if (r.clean_time_entity)
                     s.add(r.clean_time_entity);
+            }
+            // docs/25 §10 field-caught (2026-07-25): the dock sheet's care rows
+            // (`_careItems`) are auto-discovered from the official `roborock`
+            // integration's OWN entities and were never added here — pressing a
+            // reset button DID work (live-verified: the underlying sensor updates
+            // within one ~30s roborock poll cycle) but the card only re-renders on
+            // a watched-entity change (`shouldUpdate` above), so the refreshed %
+            // silently sat in `hass.states` until some UNRELATED watched entity
+            // (battery tick, status change, ...) happened to trigger a render —
+            // which read as "reset doesn't work". Care items aren't computed yet
+            // this early in some code paths (entity registry may still be
+            // loading), so this reads `_careItems` defensively — it already
+            // no-ops safely without a loaded registry.
+            for (const row of this._careItems(vac)) {
+                if (row.entity)
+                    s.add(row.entity);
+                if (row.reset)
+                    s.add(row.reset);
+                if (row.binary)
+                    s.add(row.binary);
             }
         }
         for (const ga of this._config?.global_actions ?? []) {
@@ -2871,9 +2928,25 @@ let AnyVacCard = class AnyVacCard extends i$2 {
         const dock = this._intAttrs(vac)?.dock_status;
         const act = (service) => () => void this._call("anyvac", service, { entity_id: vac.entity });
         const care = this._careItems(vac);
-        const reset = (entity) => (e) => {
+        // docs/25 §10 field-caught: `pendingKey` is the entity we actually WATCH
+        // for the reset to land (the sensor, when we have one — falls back to
+        // the button's own id for binary-only rows with no time-left sensor).
+        const reset = (row) => (e) => {
             e.stopPropagation();
-            void this._call("button", "press", { entity_id: entity });
+            const pendingKey = row.entity ?? row.reset;
+            const next = new Map(this._careResetPending);
+            next.set(pendingKey, Date.now());
+            this._careResetPending = next;
+            // Hard fallback: clear the spinner even if the poll never lands
+            // (offline vacuum, entity removed, ...) — see `_careResetPending` doc.
+            setTimeout(() => {
+                if (this._careResetPending.get(pendingKey) === next.get(pendingKey)) {
+                    const cleared = new Map(this._careResetPending);
+                    cleared.delete(pendingKey);
+                    this._careResetPending = cleared;
+                }
+            }, 40000);
+            void this._call("button", "press", { entity_id: row.reset });
         };
         return b `
       <div class="dock-sheet">
@@ -2921,10 +2994,14 @@ let AnyVacCard = class AnyVacCard extends i$2 {
                       ${this.hass.states[row.binary]?.state === "on" ? "⚠" : "OK"}
                     </span>`
             : b `<span class="dock-sheet-care-value">${this._careValue(row)}</span>`}
-                ${row.reset ? b `
-                  <button class="dock-sheet-care-reset" title="Reset" @click=${reset(row.reset)}>
-                    <ha-icon icon="mdi:refresh"></ha-icon>
-                  </button>` : A}
+                ${row.reset ? (() => {
+            const pending = this._careResetPending.has(row.entity ?? row.reset);
+            return b `
+                    <button class="dock-sheet-care-reset ${pending ? "pending" : ""}"
+                      title="Reset" ?disabled=${pending} @click=${reset(row)}>
+                      <ha-icon icon=${pending ? "mdi:loading" : "mdi:refresh"}></ha-icon>
+                    </button>`;
+        })() : A}
               </div>`)}
           </div>` : A}
       </div>
@@ -5366,6 +5443,12 @@ AnyVacCard.styles = i$6 `
       border: 1px solid rgba(255, 255, 255, 0.1);
     }
     .dock-sheet-care-reset ha-icon { --mdc-icon-size: 14px; }
+    /* docs/25 §10 field-caught (2026-07-25): spinner while waiting for the
+     * roborock integration's own poll to reflect the reset — see
+     * _careResetPending's doc comment for why this is needed. */
+    .dock-sheet-care-reset.pending { cursor: default; opacity: 0.55; }
+    .dock-sheet-care-reset.pending ha-icon { animation: avc-spin 0.9s linear infinite; }
+    @keyframes avc-spin { to { transform: rotate(360deg); } }
     .dock-rows {
       display: flex;
       flex-direction: column;
@@ -6078,6 +6161,9 @@ __decorate([
 __decorate([
     r()
 ], AnyVacCard.prototype, "_modeSheetOpen", void 0);
+__decorate([
+    r()
+], AnyVacCard.prototype, "_careResetPending", void 0);
 __decorate([
     r()
 ], AnyVacCard.prototype, "_modeEntity", void 0);

@@ -8,6 +8,32 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Planned
 
+## [0.79.1] - 2026-07-25
+
+### Fixed
+
+Field report: dock sheet consumable reset buttons "don't reset the consumable".
+Live-diagnosed against the field-reporting user's real HA (Claude in Chrome,
+`button.press` on `button.s7_maxv_reset_sensor_consumable`): the reset itself
+works fine — the official `roborock` integration's own consumable sensor
+takes up to one poll cycle (~30s, live-measured at 27s) to reflect it. The
+actual bug: `_watchedEntities()` never included the dock sheet's care-item
+sensor/reset-button/tank-binary entities (`_careItems`, added in 0.75.0), so
+`shouldUpdate`'s watched-entity gate silently skipped re-rendering when they
+changed — the refreshed value sat in `hass.states` until some unrelated
+watched entity (battery tick, status change, ...) happened to trigger a
+render, which read as "reset doesn't work" rather than "works with a delay".
+Care item entities are now added to the watched set alongside the existing
+per-vacuum ones.
+
+### Added
+
+Reset buttons now show a spinner (disabled) from tap until the watched
+sensor's `last_changed` moves past the press time, with a 40s hard-timeout
+fallback for an offline vacuum whose poll never lands (`_careResetPending`) —
+even with the render-gating fix above, a ~30s silent wait after tapping
+still reads as broken without some feedback.
+
 ## [0.79.0] - 2026-07-25
 
 ### Changed
