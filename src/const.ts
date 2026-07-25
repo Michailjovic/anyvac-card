@@ -1,9 +1,19 @@
 export const CARD_NAME = "anyvac-card";
 export const EDITOR_NAME = "anyvac-card-editor";
-export const CARD_VERSION = "0.79.1";
+export const CARD_VERSION = "0.79.2";
 
 /** Hold duration in ms required to trigger START / PAUSE actions */
 export const HOLD_DURATION_MS = 600;
+
+/** docs/25 §10 field report (2026-07-25): Android's swipe-up-from-bottom-edge
+ *  gesture (app switcher / gesture nav) starts its touch on whatever's under
+ *  the finger — often the START bar in portrait, since it sits flush against
+ *  the screen's bottom edge. Touch pointers get implicit capture to their
+ *  initial target, so `pointerleave`/`pointercancel` never fire as the finger
+ *  slides upward mid-swipe; only `pointermove` does. This is the movement
+ *  threshold (px) beyond which a hold-in-progress is treated as a drag/swipe
+ *  and cancelled instead of left to fire after HOLD_DURATION_MS. */
+export const HOLD_MOVE_CANCEL_PX = 12;
 
 /**
  * Maps Roborock status strings to [human-readable label, accent colour].

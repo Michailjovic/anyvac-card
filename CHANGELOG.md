@@ -8,6 +8,25 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Planned
 
+## [0.79.2] - 2026-07-25
+
+### Fixed
+
+Field report: on Android, swiping up from the screen's bottom edge (system
+gesture nav / app switcher, used e.g. to force-close for a hard refresh)
+would sometimes start or cancel cleaning, because the gesture's touch begins
+on the START bar which sits flush against that edge in portrait. Root cause:
+touch pointers get implicit capture to their initial target, so
+`pointerleave`/`pointercancel` never fire as the finger slides away during
+the swipe — only `pointermove` does, and nothing was listening for it, so
+the 600ms hold timer kept running and fired right as the OS took the
+gesture over. Fixed in the shared `_holdStart` hold-to-confirm helper (all
+9 call sites: START/CANCEL bar, dock run buttons, global-action badge,
+per-vacuum resume/pause/start) — a new `_holdMove` pointermove handler
+cancels the hold once the pointer has moved more than `HOLD_MOVE_CANCEL_PX`
+(12px) from its start position, distinguishing a swipe/drag starting on the
+button from a deliberate hold-in-place.
+
 ## [0.79.1] - 2026-07-25
 
 ### Fixed

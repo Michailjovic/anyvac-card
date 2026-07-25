@@ -22,6 +22,7 @@ import {
   EDITOR_NAME,
   CARD_VERSION,
   HOLD_DURATION_MS,
+  HOLD_MOVE_CANCEL_PX,
   STATUS_MAP,
   COLOR_HEX,
   COLOR_BG,
@@ -260,6 +261,10 @@ export class AnyVacCard extends LitElement {
   // sensor data and sends intents.
 
   private _holdTimer: ReturnType<typeof setTimeout> | null = null;
+  /** docs/25 §10 field report: pointerdown position for the in-progress hold,
+   *  used by `_holdMove` to detect a drag/swipe starting on a hold button
+   *  (see `HOLD_MOVE_CANCEL_PX` doc comment). Null when no hold is active. */
+  private _holdStartPos: { x: number; y: number } | null = null;
   private _initialized = false;
   /** Entities whose state changes should trigger a re-render */
   private _watched: Set<string> | null = null;
@@ -1360,21 +1365,28 @@ export class AnyVacCard extends LitElement {
       this._holdTimer = null;
     }
     this._holdId = null;
+    this._holdStartPos = null;
   }
 
   /**
    * Returns a pointerdown handler that:
    *  1. Sets _holdId to `id` (triggers fill animation)
    *  2. Fires `action` after HOLD_DURATION_MS
+   *  Pair with `@pointermove=${this._holdMove}` alongside the usual
+   *  pointerup/leave/cancel bindings — see `HOLD_MOVE_CANCEL_PX` doc comment
+   *  for why `pointermove` needs its own explicit cancel path (touch capture
+   *  means leave/cancel don't fire during a swipe starting on the button).
    */
   private _holdStart(id: string, action: () => void) {
     return (e: PointerEvent): void => {
       e.preventDefault();
       this._cancelHold();
       this._holdId = id;
+      this._holdStartPos = { x: e.clientX, y: e.clientY };
       this._holdTimer = setTimeout(() => {
         this._holdTimer = null;
         this._holdId = null;
+        this._holdStartPos = null;
         action();
       }, HOLD_DURATION_MS);
     };
@@ -1382,6 +1394,19 @@ export class AnyVacCard extends LitElement {
 
   private _holdEnd = (): void => {
     this._cancelHold();
+  };
+
+  /** docs/25 §10 field report (2026-07-25): see `HOLD_MOVE_CANCEL_PX` doc
+   *  comment — cancels an in-progress hold once the pointer has moved past
+   *  the threshold from its start position, catching the Android
+   *  swipe-up-from-bottom-edge case where leave/cancel never fire. */
+  private _holdMove = (e: PointerEvent): void => {
+    if (!this._holdStartPos || this._holdTimer === null) return;
+    const dx = e.clientX - this._holdStartPos.x;
+    const dy = e.clientY - this._holdStartPos.y;
+    if (dx * dx + dy * dy > HOLD_MOVE_CANCEL_PX * HOLD_MOVE_CANCEL_PX) {
+      this._cancelHold();
+    }
   };
 
   private _toggleShown(index: number): void {
@@ -1756,6 +1781,7 @@ export class AnyVacCard extends LitElement {
         <button class="action-btn ${this._holdId === runHid ? "action-btn--holding" : ""}"
           style="flex:0 0 auto;align-self:flex-end;flex-direction:row;gap:6px;padding:7px 16px;background:rgba(82,196,26,0.14);border:1px solid rgba(82,196,26,0.55);color:#fff"
           @pointerdown=${this._holdStart(runHid, () => this._runOrchestrated(selKeys, this._planMode))}
+          @pointermove=${this._holdMove}
           @pointerup=${this._holdEnd}
           @pointerleave=${this._holdEnd}
           @pointercancel=${this._holdEnd}>
@@ -2094,6 +2120,7 @@ export class AnyVacCard extends LitElement {
               style="flex:0 0 auto;padding:7px 14px;background:rgba(82,196,26,0.14);border:1px solid rgba(82,196,26,0.55);color:#fff"
               ?disabled=${!runKeys.length}
               @pointerdown=${runKeys.length ? this._holdStart(runHid, () => this._runOrchestrated(runKeys, this._planMode)) : nothing}
+              @pointermove=${this._holdMove}
               @pointerup=${this._holdEnd}
               @pointerleave=${this._holdEnd}
               @pointercancel=${this._holdEnd}>
@@ -2329,6 +2356,7 @@ export class AnyVacCard extends LitElement {
               if (hasInt) void this._call("anyvac", "cancel", {});
               else for (const v of vacs) { if (this._isCleaning(v)) void this._pause(v); }
             })}
+            @pointermove=${this._holdMove}
             @pointerup=${this._holdEnd} @pointerleave=${this._holdEnd} @pointercancel=${this._holdEnd}>
             <div class="hold-ring"></div>
             <ha-icon icon="mdi:stop"></ha-icon>
@@ -2347,6 +2375,7 @@ export class AnyVacCard extends LitElement {
           ?disabled=${!canStart}
           title=${hasInt ? "" : "Requires the AnyVac integration"}
           @pointerdown=${canStart ? this._holdStart(hid, () => this._runOrchestrated(runKeys, this._planMode)) : nothing}
+          @pointermove=${this._holdMove}
           @pointerup=${this._holdEnd} @pointerleave=${this._holdEnd} @pointercancel=${this._holdEnd}>
           <div class="hold-ring"></div>
           <ha-icon icon="mdi:rocket-launch"></ha-icon>
@@ -2594,6 +2623,7 @@ export class AnyVacCard extends LitElement {
         class="badge badge--global ${holding ? "badge--holding" : ""}"
         style=${styleMap({ background: bg, border, boxShadow: shadow })}
         @pointerdown=${this._holdStart(holdId, () => this._triggerGlobal(ga))}
+        @pointermove=${this._holdMove}
         @pointerup=${this._holdEnd}
         @pointerleave=${this._holdEnd}
         @pointercancel=${this._holdEnd}
@@ -4020,6 +4050,7 @@ export class AnyVacCard extends LitElement {
             class="action-btn ${this._holdId === hId ? "action-btn--holding" : ""}"
             style=${styleMap({ background: COLOR_BG[ck], border: "1px solid " + color + "80" })}
             @pointerdown=${this._holdStart(hId, action)}
+            @pointermove=${this._holdMove}
             @pointerup=${this._holdEnd}
             @pointerleave=${this._holdEnd}
             @pointercancel=${this._holdEnd}
@@ -4047,6 +4078,7 @@ export class AnyVacCard extends LitElement {
             class="action-btn ${this._holdId === hId ? "action-btn--holding" : ""}"
             style=${styleMap({ background: COLOR_BG[ck], border: "1px solid " + color + "80" })}
             @pointerdown=${this._holdStart(hId, () => this._resume(vac))}
+            @pointermove=${this._holdMove}
             @pointerup=${this._holdEnd}
             @pointerleave=${this._holdEnd}
             @pointercancel=${this._holdEnd}
@@ -4073,6 +4105,7 @@ export class AnyVacCard extends LitElement {
           <button
             class="action-btn action-btn--warn ${this._holdId === hId ? "action-btn--holding" : ""}"
             @pointerdown=${this._holdStart(hId, () => this._pause(vac))}
+            @pointermove=${this._holdMove}
             @pointerup=${this._holdEnd}
             @pointerleave=${this._holdEnd}
             @pointercancel=${this._holdEnd}
@@ -4099,6 +4132,7 @@ export class AnyVacCard extends LitElement {
           style=${styleMap({ background: startBg, border: startBorder })}
           ?disabled=${!hasRooms}
           @pointerdown=${hasRooms ? this._holdStart(hId, () => this._startClean(vac)) : nothing}
+          @pointermove=${this._holdMove}
           @pointerup=${this._holdEnd}
           @pointerleave=${this._holdEnd}
           @pointercancel=${this._holdEnd}

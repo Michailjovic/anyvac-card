@@ -94,9 +94,18 @@ const t={ATTRIBUTE:1},e=t=>(...e)=>({_$litDirective$:t,values:e});let i$1 = clas
 
 const CARD_NAME = "anyvac-card";
 const EDITOR_NAME = "anyvac-card-editor";
-const CARD_VERSION = "0.79.1";
+const CARD_VERSION = "0.79.2";
 /** Hold duration in ms required to trigger START / PAUSE actions */
 const HOLD_DURATION_MS = 600;
+/** docs/25 §10 field report (2026-07-25): Android's swipe-up-from-bottom-edge
+ *  gesture (app switcher / gesture nav) starts its touch on whatever's under
+ *  the finger — often the START bar in portrait, since it sits flush against
+ *  the screen's bottom edge. Touch pointers get implicit capture to their
+ *  initial target, so `pointerleave`/`pointercancel` never fire as the finger
+ *  slides upward mid-swipe; only `pointermove` does. This is the movement
+ *  threshold (px) beyond which a hold-in-progress is treated as a drag/swipe
+ *  and cancelled instead of left to fire after HOLD_DURATION_MS. */
+const HOLD_MOVE_CANCEL_PX = 12;
 /**
  * Maps Roborock status strings to [human-readable label, accent colour].
  * This unified map covers S6 / S7 / S8 MaxV Ultra.
@@ -878,6 +887,10 @@ let AnyVacCard = class AnyVacCard extends i$2 {
         // estimates and room detection live in the anyvac integration — the card only renders
         // sensor data and sends intents.
         this._holdTimer = null;
+        /** docs/25 §10 field report: pointerdown position for the in-progress hold,
+         *  used by `_holdMove` to detect a drag/swipe starting on a hold button
+         *  (see `HOLD_MOVE_CANCEL_PX` doc comment). Null when no hold is active. */
+        this._holdStartPos = null;
         this._initialized = false;
         /** Entities whose state changes should trigger a re-render */
         this._watched = null;
@@ -905,6 +918,19 @@ let AnyVacCard = class AnyVacCard extends i$2 {
         this._careCache = new Map();
         this._holdEnd = () => {
             this._cancelHold();
+        };
+        /** docs/25 §10 field report (2026-07-25): see `HOLD_MOVE_CANCEL_PX` doc
+         *  comment — cancels an in-progress hold once the pointer has moved past
+         *  the threshold from its start position, catching the Android
+         *  swipe-up-from-bottom-edge case where leave/cancel never fire. */
+        this._holdMove = (e) => {
+            if (!this._holdStartPos || this._holdTimer === null)
+                return;
+            const dx = e.clientX - this._holdStartPos.x;
+            const dy = e.clientY - this._holdStartPos.y;
+            if (dx * dx + dy * dy > HOLD_MOVE_CANCEL_PX * HOLD_MOVE_CANCEL_PX) {
+                this._cancelHold();
+            }
         };
         /** Backend plan preview (anyvac.plan, response-only): room key -> vacuum entity,
          *  plus the sequence-aware ETA (docs/19) computed server-side from the real
@@ -2083,20 +2109,27 @@ let AnyVacCard = class AnyVacCard extends i$2 {
             this._holdTimer = null;
         }
         this._holdId = null;
+        this._holdStartPos = null;
     }
     /**
      * Returns a pointerdown handler that:
      *  1. Sets _holdId to `id` (triggers fill animation)
      *  2. Fires `action` after HOLD_DURATION_MS
+     *  Pair with `@pointermove=${this._holdMove}` alongside the usual
+     *  pointerup/leave/cancel bindings — see `HOLD_MOVE_CANCEL_PX` doc comment
+     *  for why `pointermove` needs its own explicit cancel path (touch capture
+     *  means leave/cancel don't fire during a swipe starting on the button).
      */
     _holdStart(id, action) {
         return (e) => {
             e.preventDefault();
             this._cancelHold();
             this._holdId = id;
+            this._holdStartPos = { x: e.clientX, y: e.clientY };
             this._holdTimer = setTimeout(() => {
                 this._holdTimer = null;
                 this._holdId = null;
+                this._holdStartPos = null;
                 action();
             }, HOLD_DURATION_MS);
         };
@@ -2511,6 +2544,7 @@ let AnyVacCard = class AnyVacCard extends i$2 {
         <button class="action-btn ${this._holdId === runHid ? "action-btn--holding" : ""}"
           style="flex:0 0 auto;align-self:flex-end;flex-direction:row;gap:6px;padding:7px 16px;background:rgba(82,196,26,0.14);border:1px solid rgba(82,196,26,0.55);color:#fff"
           @pointerdown=${this._holdStart(runHid, () => this._runOrchestrated(selKeys, this._planMode))}
+          @pointermove=${this._holdMove}
           @pointerup=${this._holdEnd}
           @pointerleave=${this._holdEnd}
           @pointercancel=${this._holdEnd}>
@@ -2849,6 +2883,7 @@ let AnyVacCard = class AnyVacCard extends i$2 {
               style="flex:0 0 auto;padding:7px 14px;background:rgba(82,196,26,0.14);border:1px solid rgba(82,196,26,0.55);color:#fff"
               ?disabled=${!runKeys.length}
               @pointerdown=${runKeys.length ? this._holdStart(runHid, () => this._runOrchestrated(runKeys, this._planMode)) : A}
+              @pointermove=${this._holdMove}
               @pointerup=${this._holdEnd}
               @pointerleave=${this._holdEnd}
               @pointercancel=${this._holdEnd}>
@@ -3087,6 +3122,7 @@ let AnyVacCard = class AnyVacCard extends i$2 {
                             void this._pause(v);
                     }
             })}
+            @pointermove=${this._holdMove}
             @pointerup=${this._holdEnd} @pointerleave=${this._holdEnd} @pointercancel=${this._holdEnd}>
             <div class="hold-ring"></div>
             <ha-icon icon="mdi:stop"></ha-icon>
@@ -3105,6 +3141,7 @@ let AnyVacCard = class AnyVacCard extends i$2 {
           ?disabled=${!canStart}
           title=${hasInt ? "" : "Requires the AnyVac integration"}
           @pointerdown=${canStart ? this._holdStart(hid, () => this._runOrchestrated(runKeys, this._planMode)) : A}
+          @pointermove=${this._holdMove}
           @pointerup=${this._holdEnd} @pointerleave=${this._holdEnd} @pointercancel=${this._holdEnd}>
           <div class="hold-ring"></div>
           <ha-icon icon="mdi:rocket-launch"></ha-icon>
@@ -3344,6 +3381,7 @@ let AnyVacCard = class AnyVacCard extends i$2 {
         class="badge badge--global ${holding ? "badge--holding" : ""}"
         style=${o({ background: bg, border, boxShadow: shadow })}
         @pointerdown=${this._holdStart(holdId, () => this._triggerGlobal(ga))}
+        @pointermove=${this._holdMove}
         @pointerup=${this._holdEnd}
         @pointerleave=${this._holdEnd}
         @pointercancel=${this._holdEnd}
@@ -4853,6 +4891,7 @@ let AnyVacCard = class AnyVacCard extends i$2 {
             class="action-btn ${this._holdId === hId ? "action-btn--holding" : ""}"
             style=${o({ background: COLOR_BG[ck], border: "1px solid " + color + "80" })}
             @pointerdown=${this._holdStart(hId, action)}
+            @pointermove=${this._holdMove}
             @pointerup=${this._holdEnd}
             @pointerleave=${this._holdEnd}
             @pointercancel=${this._holdEnd}
@@ -4877,6 +4916,7 @@ let AnyVacCard = class AnyVacCard extends i$2 {
             class="action-btn ${this._holdId === hId ? "action-btn--holding" : ""}"
             style=${o({ background: COLOR_BG[ck], border: "1px solid " + color + "80" })}
             @pointerdown=${this._holdStart(hId, () => this._resume(vac))}
+            @pointermove=${this._holdMove}
             @pointerup=${this._holdEnd}
             @pointerleave=${this._holdEnd}
             @pointercancel=${this._holdEnd}
@@ -4902,6 +4942,7 @@ let AnyVacCard = class AnyVacCard extends i$2 {
           <button
             class="action-btn action-btn--warn ${this._holdId === hId ? "action-btn--holding" : ""}"
             @pointerdown=${this._holdStart(hId, () => this._pause(vac))}
+            @pointermove=${this._holdMove}
             @pointerup=${this._holdEnd}
             @pointerleave=${this._holdEnd}
             @pointercancel=${this._holdEnd}
@@ -4926,6 +4967,7 @@ let AnyVacCard = class AnyVacCard extends i$2 {
           style=${o({ background: startBg, border: startBorder })}
           ?disabled=${!hasRooms}
           @pointerdown=${hasRooms ? this._holdStart(hId, () => this._startClean(vac)) : A}
+          @pointermove=${this._holdMove}
           @pointerup=${this._holdEnd}
           @pointerleave=${this._holdEnd}
           @pointercancel=${this._holdEnd}
