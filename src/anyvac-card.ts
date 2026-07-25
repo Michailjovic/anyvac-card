@@ -2975,16 +2975,21 @@ export class AnyVacCard extends LitElement {
     const layersOn = this._layersEff();
     const showDry = layersOn.dry && ct.dry;
     const showWet = layersOn.wet && ct.wet;
-    // path_dry_px is a list of contiguous segments (docs/14 §3.9 — the backend never
-    // bridges an excluded transit/mop-wash gap with a straight line, so the card must
-    // not either). One <polyline> per segment; a single flat polyline across all
-    // segments used to draw a spurious diagonal line at every room transition, which
-    // is why a finished multi-room trace used to look like a scribble while the live
-    // in-progress trace (still one segment) looked clean (fixed 2026-07-15).
+    // path_dry_px / path_wet_px are both lists of contiguous segments (docs/14 §3.9
+    // for dry; docs/27 extends the same shape to wet) — the backend never bridges an
+    // excluded gap (transit/mop-wash for dry, a dock trip between two dispatches of
+    // the same orchestrated job for wet) with a straight line, so the card must not
+    // either. One <polyline> per segment; a single flat polyline across all segments
+    // used to draw a spurious diagonal line at every gap, which is why a finished
+    // multi-room dry trace used to look like a scribble while the live in-progress
+    // trace (still one segment) looked clean (fixed 2026-07-15) — same class of bug
+    // docs/27 avoids for a multi-sortie wet trace by segmenting it the same way.
     const drySegs: string[] = showDry && Array.isArray(at.path_dry_px)
       ? at.path_dry_px.map((seg: any) => toPts(seg)).filter((s: string) => s.length > 0)
       : [];
-    const wetStr = showWet ? toPts(at.path_wet_px) : "";
+    const wetSegs: string[] = showWet && Array.isArray(at.path_wet_px)
+      ? at.path_wet_px.map((seg: any) => toPts(seg)).filter((s: string) => s.length > 0)
+      : [];
     const vp = at.vacuum_position_px;
     const rob = vp ? { x: vp.x as number, y: vp.y as number } : null;
     let head: { x: number; y: number } | null = null;
@@ -3006,12 +3011,12 @@ export class AnyVacCard extends LitElement {
     const bw = (pw * 2.6 * ((vac.mop_band_width ?? 100) / 100)).toFixed(2);
     const bandOp = ((vac.mop_band_opacity ?? 28) / 100).toFixed(2);
     const wetColor = vac.mop_path_color || "#40a9ff";
-    const mopBand = wetStr
-      ? svg`<polyline points=${wetStr} fill="none" stroke=${wetColor} stroke-width=${bw} stroke-linejoin="round" stroke-linecap="round" opacity=${bandOp}></polyline>`
+    const mopBand = wetSegs.length
+      ? svg`${wetSegs.map((s) => svg`<polyline points=${s} fill="none" stroke=${wetColor} stroke-width=${bw} stroke-linejoin="round" stroke-linecap="round" opacity=${bandOp}></polyline>`)}`
       : nothing;
     // Thin centre line down the mop band, so the wet trace reads as a path inside the sheen.
-    const mopLine = wetStr
-      ? svg`<polyline points=${wetStr} fill="none" stroke=${wetColor} stroke-width=${sw} stroke-linejoin="round" stroke-linecap="round" opacity="0.9"></polyline>`
+    const mopLine = wetSegs.length
+      ? svg`${wetSegs.map((s) => svg`<polyline points=${s} fill="none" stroke=${wetColor} stroke-width=${sw} stroke-linejoin="round" stroke-linecap="round" opacity="0.9"></polyline>`)}`
       : nothing;
     const traceT = drySegs.length
       ? svg`${drySegs.map((s) => svg`<polyline points=${s} fill="none" stroke=${vac.path_color || color} stroke-width=${sw} stroke-linejoin="round" stroke-linecap="round" opacity="0.85"></polyline>`)}`

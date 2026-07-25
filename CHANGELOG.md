@@ -8,6 +8,21 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Planned
 
+## [0.78.0] - 2026-07-25
+
+### Changed
+
+Docs/27 — orchestrated multi-sortie clean now renders as one continuous
+dry+wet trace on the map instead of resetting at every dock trip between
+progressive-dispatch batches (docs/23). `path_wet_px` changes shape from a
+flat point array to a list of segments (matching `path_dry_px`, docs/14
+§3.9) — `_renderIntegrationOverlay` now draws the wet trace (mop band +
+centre line) as one `<polyline>` per segment instead of a single flat
+polyline, so a dock trip between two dispatches never draws as a straight
+line either. Purely a rendering-side consequence of the backend now
+persisting the trace across sorties within one job (see `anyvac`
+CHANGELOG) — no card-side accumulation, no new config.
+
 ## [0.77.1] - 2026-07-24
 
 ### Fixed
