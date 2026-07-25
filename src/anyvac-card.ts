@@ -1552,32 +1552,6 @@ export class AnyVacCard extends LitElement {
     for (const v of vacs) this._saveRoomSel(v.entity);
   }
 
-  private _selectAll(vac: VacuumConfig): void {
-    const be = this._backendSel();
-    if (be) {
-      for (const r of this._roomsFor(vac)) be.add(r.key);
-      this._setBackendSel([...be], "set");
-      return;
-    }
-    const next = new Map(this._localRoomSel);
-    for (const r of this._roomsFor(vac)) next.set(vac.entity + ":" + r.key, true);
-    this._localRoomSel = next;
-    this._saveRoomSel(vac.entity);
-  }
-
-  private _deselectAll(vac: VacuumConfig): void {
-    const be = this._backendSel();
-    if (be) {
-      for (const r of this._roomsFor(vac)) be.delete(r.key);
-      this._setBackendSel([...be], "set");
-      return;
-    }
-    const next = new Map(this._localRoomSel);
-    for (const r of this._roomsFor(vac)) next.delete(vac.entity + ":" + r.key);
-    this._localRoomSel = next;
-    this._saveRoomSel(vac.entity);
-  }
-
   // ── Auto mode: orchestrated cleans (naive fan-out v1) ─────────────────────
   /** All distinct room keys across vacuums. */
   private _allRoomKeys(): string[] {
@@ -4167,13 +4141,6 @@ export class AnyVacCard extends LitElement {
               </div>
             ` : nothing}
             ${timeStr ? html`<small style="color:rgba(255,255,255,0.4)">${timeStr}</small>` : nothing}
-            ${(this._roomsFor(vac)).length > 1 ? html`
-              <div class="sel-all-row">
-                <button class="sel-link" @click=${(e: Event) => { e.stopPropagation(); this._selectAll(vac); }}>all</button>
-                <span style="color:rgba(255,255,255,0.2)">·</span>
-                <button class="sel-link" @click=${(e: Event) => { e.stopPropagation(); this._deselectAll(vac); }}>none</button>
-              </div>
-            ` : nothing}
           </div>
         </button>
       </div>
@@ -5318,16 +5285,6 @@ export class AnyVacCard extends LitElement {
     }
 
     .start-body small { font-size: 10px; }
-
-    .sel-all-row {
-      display: flex; align-items: center; gap: 4px; margin-top: 1px;
-    }
-    .sel-link {
-      background: none; border: none; cursor: pointer; padding: 0;
-      font-size: 10px; font-family: inherit;
-      color: rgba(255,255,255,0.3); transition: color .15s;
-    }
-    .sel-link:hover { color: rgba(255,255,255,0.7); }
 
     .room-icons {
       display: flex;

@@ -8,6 +8,21 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Planned
 
+## [0.79.4] - 2026-07-25
+
+### Changed
+
+Removed the "all"/"none" quick-select links from each vacuum's status card
+START button. With the integration present they mutated the exact same
+shared room selection the dock's per-room list already manages — three
+identical controls (one per vacuum card) doing the same thing to the same
+state, buried as small text inside a button that also starts cleaning.
+Cockpit minimalism (docs/25 §5) already made an empty selection mean "whole
+home", so "select all" / "select none" add nothing the dock doesn't already
+cover more precisely. `_selectAll`/`_deselectAll` removed (dead code, no
+other callers). The room-icons glanceable indicator in the START button is
+unchanged.
+
 ## [0.79.3] - 2026-07-25
 
 ### Fixed
