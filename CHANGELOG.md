@@ -8,6 +8,21 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Planned
 
+## [0.80.2] - 2026-07-25
+
+### Fixed
+
+Room pins (`anyvac.pin_room`) are now per-pass (dry/wet independent) instead
+of one flat vacuum per room. Diagnosed from the HA log: a fleet with no
+dual-capable robot (dry-only S6/S7 + wet-only S8, this user's real setup)
+pinning a room's dry pass silently clobbered its wet pin and vice versa,
+because both were writing the same single `room_pins[room]` value — the
+planner then hit its automatic-fallback path (with a WARNING) for whichever
+pass no longer matched the stored vacuum, on every plan/clean call for that
+room. `_cycleRoomPin` now sends `kind` on `anyvac.pin_room`; deselecting a
+room still unpins both passes at once (unchanged UX). Requires integration
+0.80.2+ (per-kind `room_pins`/`set_room_pin`/`planner._pin_for_kind`).
+
 ## [0.80.1] - 2026-07-25
 
 ### Changed

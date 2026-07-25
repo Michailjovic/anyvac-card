@@ -94,7 +94,7 @@ const t={ATTRIBUTE:1},e=t=>(...e)=>({_$litDirective$:t,values:e});let i$1 = clas
 
 const CARD_NAME = "anyvac-card";
 const EDITOR_NAME = "anyvac-card-editor";
-const CARD_VERSION = "0.80.1";
+const CARD_VERSION = "0.80.2";
 /** Hold duration in ms required to trigger START / PAUSE actions */
 const HOLD_DURATION_MS = 600;
 /** docs/25 §10 field report (2026-07-25): Android's swipe-up-from-bottom-edge
@@ -2280,9 +2280,11 @@ let AnyVacCard = class AnyVacCard extends i$2 {
         // every future selection until a clean happens, even across
         // deselect/reselect. Clearing it here too — the moment the room is
         // DEselected — gives the user an obvious, always-available way back to
-        // auto: untick the room, tick it again. `vacuum` omitted from the call
-        // data is the documented unpin (`coordinator.set_room_pin`: "vacuum
-        // None/empty = unpin"), same as a fresh room that was never pinned.
+        // auto: untick the room, tick it again. Both `kind` and `vacuum` omitted
+        // from the call data is the documented unpin-both-passes shorthand
+        // (`coordinator.set_room_pin`: "kind None = unpin the room entirely"),
+        // same as a fresh room that was never pinned — deselecting clears
+        // whatever dry/wet pins it had, not just one pass.
         // Computed from `_isRoomSelectedAny` BEFORE either selection-storage
         // path below mutates state, so it covers both the backend-tracked and
         // local-selection branches with one check.
@@ -2584,7 +2586,11 @@ let AnyVacCard = class AnyVacCard extends i$2 {
     `;
     }
     // ── Dock & START regions (docs/18 Fáze B) ────────────────────────────────
-    /** Shared per-room vacuum pins from the integration sensor (anyvac.pin_room). */
+    /** Shared per-room, per-pass vacuum pins from the integration sensor
+     *  (anyvac.pin_room). Per-kind since 2026-07-25 — dry and wet are stored
+     *  independently, see `_cycleRoomPin`. Only consumed here as a plan-preview
+     *  cache-key input (any change must trigger a refetch), so its exact shape
+     *  doesn't otherwise matter to callers. */
     _pinsAttr() {
         const ent = this._selSensor();
         const rp = ent ? this.hass.states[ent]?.attributes?.room_pins : undefined;
@@ -2613,21 +2619,33 @@ let AnyVacCard = class AnyVacCard extends i$2 {
      *  `kind` (2026-07-25 fix): the dry chip and the wet chip must cycle
      *  independently, each only among vacuums capable of THAT type — before
      *  this fix both chips cycled through every vacuum that merely knows the
-     *  room, capability-blind. `room_pins` is a single per-room override (one
-     *  vacuum, not one per type), so cycling the dry chip through a fleet that
-     *  includes a wet-only vacuum could silently pin the room to that wet-only
-     *  vacuum: the dry display ignores it (can't dry-clean) and keeps showing
-     *  the old assignee — no visible change — while the wet chip's own display
-     *  jumps to it unannounced. Worse, if that wet-only vacuum was ALREADY the
-     *  stored pin, cycling the dry chip is a permanent fixed point: shown
-     *  (dry-capable, one slot before the wet-only one in candidate order) always
-     *  resolves to the same "next" = the wet-only vacuum = the pin's current
-     *  value already, so nothing ever changes no matter how many times you tap
-     *  (field report 2026-07-25, reproduced live: dry-only-fleet room stuck on
-     *  a wet-only pin for Living room while other rooms merely looked flaky/
-     *  needed a manual refresh — same root cause, different coincidence of
-     *  indices). Filtering candidates by `kind` up front removes the
-     *  cross-type write entirely, so this class of bug can't recur.
+     *  room, capability-blind. At the time, `room_pins` was also still a single
+     *  per-room override (one vacuum, not one per type), so cycling the dry
+     *  chip through a fleet that includes a wet-only vacuum could silently pin
+     *  the room to that wet-only vacuum: the dry display ignored it (can't
+     *  dry-clean) and kept showing the old assignee — no visible change —
+     *  while the wet chip's own display jumped to it unannounced. Worse, if
+     *  that wet-only vacuum was ALREADY the stored pin, cycling the dry chip
+     *  was a permanent fixed point: shown (dry-capable, one slot before the
+     *  wet-only one in candidate order) always resolved to the same "next" =
+     *  the wet-only vacuum = the pin's current value already, so nothing ever
+     *  changed no matter how many times you tapped (field report 2026-07-25,
+     *  reproduced live: dry-only-fleet room stuck on a wet-only pin for Living
+     *  room while other rooms merely looked flaky/needed a manual refresh —
+     *  same root cause, different coincidence of indices). Filtering
+     *  candidates by `kind` up front removed the cross-type write for THIS
+     *  chip's own tap.
+     *
+     *  Same-day follow-up: filtering candidates alone didn't stop the dry and
+     *  wet chip from clobbering EACH OTHER, since both still wrote the same
+     *  single `room_pins[room]` value — pinning dry then pinning wet (or vice
+     *  versa) silently discarded whichever was set first, and the planner's
+     *  automatic-fallback WARNING for the now-mismatched pass fired on every
+     *  plan/clean call for that room (visible in the HA log as "pin X -> Y not
+     *  applicable for Z pass"). `room_pins` and `anyvac.pin_room` are now
+     *  per-kind ({room: {dry, wet}}, backend `coordinator.set_room_pin`/
+     *  `planner._pin_for_kind`) — dry and wet are genuinely independent, no
+     *  fallback needed for a correctly-pinned fleet like this one.
      *
      *  `shown` is the vacuum the tapped chip is CURRENTLY displaying — i.e. the
      *  planner's live assignment (auto or already-pinned), not the raw
@@ -2644,7 +2662,7 @@ let AnyVacCard = class AnyVacCard extends i$2 {
             return; // nothing to switch to
         const idx = cands.findIndex((v) => v.entity === shown);
         const next = cands[(idx + 1) % cands.length];
-        void this._call("anyvac", "pin_room", { room: key, vacuum: next.entity });
+        void this._call("anyvac", "pin_room", { room: key, kind, vacuum: next.entity });
     }
     /** Small vacuum-abbrev chip showing who's assigned to clean this room/pass. */
     _vacChip(entity, onTap) {
