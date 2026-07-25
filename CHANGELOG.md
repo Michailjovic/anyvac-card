@@ -8,6 +8,33 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Planned
 
+## [0.78.1] - 2026-07-25
+
+### Fixed
+
+Field report: tapping a room's vacuum avatar to reassign it (docs/18 §7e
+pin cycling) sometimes did nothing at all no matter how many times it was
+tapped (Living room, reproduced live), and on other rooms seemed to need a
+manual page refresh to show the change. Root cause, confirmed live against
+the user's actual fleet (dry-only S6 + S7, wet-only S8 — no vacuum capable
+of both): `_pinCandidates`/`_cycleRoomPin` cycled the dry chip AND the wet
+chip through the SAME candidate list — every vacuum that merely knows the
+room, not filtered by whether it can actually perform that pass. Cycling
+the dry chip could silently pin the room to the wet-only vacuum (the dry
+display can't show it, so nothing visibly changes), and if that wet-only
+vacuum was already the stored pin, the dry chip's cycle became a permanent
+fixed point — tapping it forever recomputed the same "next" candidate,
+which was already the current value, so it truly never changed. `_pinCandidates`
+now takes a `kind: "dry" | "wet"` parameter and filters candidates by
+`_vacCleanType(v)[kind]` — each chip cycles only among vacuums actually
+capable of that pass, so a cross-type write (and the stuck fixed point it
+could produce) is no longer possible. A room with only one capable vacuum
+for a given type (e.g. this fleet's wet pass — only S8) correctly has no
+tap handler on that chip, same as before. Both call sites updated
+(portrait dock rows, hold-to-inspect popup). Typecheck + build clean;
+capability filtering verified live against the reporting user's actual
+fleet data via Claude in Chrome.
+
 ## [0.78.0] - 2026-07-25
 
 ### Changed

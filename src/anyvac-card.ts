@@ -1739,21 +1739,46 @@ export class AnyVacCard extends LitElement {
     const rp = ent ? (this.hass.states[ent]?.attributes?.room_pins as Record<string, string> | undefined) : undefined;
     return rp && typeof rp === "object" ? rp : {};
   }
-  /** Vacuums that could clean this room at all (know the room key). */
-  private _pinCandidates(key: string): VacuumConfig[] {
-    return this._config.vacuums.filter((v) => this._roomsFor(v).some((r) => r.key === key));
+  /** Vacuums that could clean this room for the given pass (know the room key
+   *  AND are actually capable of that clean type). Field-caught 2026-07-25:
+   *  a fleet where no single vacuum can do both (dry-only S6/S7 + a wet-only
+   *  S8, this user's real setup) broke pin-cycling if candidates weren't
+   *  type-filtered — see `_cycleRoomPin` for the full failure mode. */
+  private _pinCandidates(key: string, kind: "dry" | "wet"): VacuumConfig[] {
+    return this._config.vacuums.filter(
+      (v) => this._roomsFor(v).some((r) => r.key === key) && this._vacCleanType(v)[kind],
+    );
   }
-  /** Cycle the room's assigned vacuum: vac1 → vac2 → … → vac1 (docs/18 §7e,
-   *  simplified 2026-07-23 — field feedback: the old auto→vac1→vac2→auto cycle's
-   *  "pinned" indicator (a 1.5px ring + a 10px pin glyph inside a 17px chip) was
-   *  practically unreadable, and the auto/pinned distinction itself wasn't a
-   *  concept the user found useful — tap just reassigns to the next candidate,
-   *  full stop; a room with only one capable vacuum has nothing to cycle to, so
-   *  the tap handler isn't even attached (see `_pinCandidates`, used below).
+  /** Cycle the room's DRY or WET assignment: vac1 → vac2 → … → vac1 (docs/18
+   *  §7e, simplified 2026-07-23 — field feedback: the old auto→vac1→vac2→auto
+   *  cycle's "pinned" indicator (a 1.5px ring + a 10px pin glyph inside a 17px
+   *  chip) was practically unreadable, and the auto/pinned distinction itself
+   *  wasn't a concept the user found useful — tap just reassigns to the next
+   *  candidate, full stop; a room with only one capable vacuum has nothing to
+   *  cycle to, so the tap handler isn't even attached (see `_pinCandidates`).
    *  Still stored backend-side (anyvac.pin_room) so every browser sees the same
    *  override, and the planner still auto-clears it after the room is cleaned
    *  (docs/18 §7e) — only the manual "back to auto" UI step is gone, not the
    *  automatic one.
+   *
+   *  `kind` (2026-07-25 fix): the dry chip and the wet chip must cycle
+   *  independently, each only among vacuums capable of THAT type — before
+   *  this fix both chips cycled through every vacuum that merely knows the
+   *  room, capability-blind. `room_pins` is a single per-room override (one
+   *  vacuum, not one per type), so cycling the dry chip through a fleet that
+   *  includes a wet-only vacuum could silently pin the room to that wet-only
+   *  vacuum: the dry display ignores it (can't dry-clean) and keeps showing
+   *  the old assignee — no visible change — while the wet chip's own display
+   *  jumps to it unannounced. Worse, if that wet-only vacuum was ALREADY the
+   *  stored pin, cycling the dry chip is a permanent fixed point: shown
+   *  (dry-capable, one slot before the wet-only one in candidate order) always
+   *  resolves to the same "next" = the wet-only vacuum = the pin's current
+   *  value already, so nothing ever changes no matter how many times you tap
+   *  (field report 2026-07-25, reproduced live: dry-only-fleet room stuck on
+   *  a wet-only pin for Living room while other rooms merely looked flaky/
+   *  needed a manual refresh — same root cause, different coincidence of
+   *  indices). Filtering candidates by `kind` up front removes the
+   *  cross-type write entirely, so this class of bug can't recur.
    *
    *  `shown` is the vacuum the tapped chip is CURRENTLY displaying — i.e. the
    *  planner's live assignment (auto or already-pinned), not the raw
@@ -1764,8 +1789,8 @@ export class AnyVacCard extends LitElement {
    *  the auto-assigned (displayed) vacuum, making the cycle feel random
    *  (S6→S7→S6→S6→S7). Cycling from what's actually shown always advances by
    *  exactly one candidate on every tap. */
-  private _cycleRoomPin(key: string, shown: string | undefined): void {
-    const cands = this._pinCandidates(key);
+  private _cycleRoomPin(key: string, kind: "dry" | "wet", shown: string | undefined): void {
+    const cands = this._pinCandidates(key, kind);
     if (cands.length < 2) return; // nothing to switch to
     const idx = cands.findIndex((v) => v.entity === shown);
     const next = cands[(idx + 1) % cands.length];
@@ -1964,11 +1989,16 @@ export class AnyVacCard extends LitElement {
             const wet = this._ageDaysFromIso(rec?.wet);
             const sel = this._isRoomSelectedAny(r.key, vacs);
             // Cycle relative to what THIS chip currently shows (dry vs. wet
-            // can differ), not the raw pin store — see _cycleRoomPin.
-            const canCycle = this._pinCandidates(r.key).length > 1;
-            const pinTap = (shown: string | undefined) => canCycle
-              ? (e: Event) => { e.stopPropagation(); this._cycleRoomPin(r.key, shown); }
-              : undefined;
+            // can differ), not the raw pin store — see _cycleRoomPin. Each
+            // chip cycles only among vacuums capable of ITS OWN type
+            // (2026-07-25 fix) — a room with dry-only + wet-only vacuums
+            // must not let the dry chip's cycle land on the wet-only one.
+            const canCycleDry = this._pinCandidates(r.key, "dry").length > 1;
+            const canCycleWet = this._pinCandidates(r.key, "wet").length > 1;
+            const pinTap = (kind: "dry" | "wet", shown: string | undefined) =>
+              (kind === "dry" ? canCycleDry : canCycleWet)
+                ? (e: Event) => { e.stopPropagation(); this._cycleRoomPin(r.key, kind, shown); }
+                : undefined;
             const locked = this._mapMode !== "normal";
             return html`
               <button class="dock-row ${sel ? "on" : ""} ${locked ? "room-overlay--locked" : ""}" ?disabled=${locked}
@@ -1986,8 +2016,8 @@ export class AnyVacCard extends LitElement {
                 </span>
                 ${hasInt && sel ? html`
                   <span class="dock-avatars">
-                    ${showDry ? this._vacChip(dryOf.get(r.key), pinTap(dryOf.get(r.key))) : nothing}
-                    ${showWet ? this._vacChip(wetOf.get(r.key), pinTap(wetOf.get(r.key))) : nothing}
+                    ${showDry ? this._vacChip(dryOf.get(r.key), pinTap("dry", dryOf.get(r.key))) : nothing}
+                    ${showWet ? this._vacChip(wetOf.get(r.key), pinTap("wet", wetOf.get(r.key))) : nothing}
                   </span>` : nothing}
               </button>`;
           })}
@@ -3586,10 +3616,14 @@ export class AnyVacCard extends LitElement {
     const badge = (d: number | null) => (d === null ? "—" : d < 1 ? "<1d" : Math.round(d) + "d");
     const dryEnt = selected ? this._planPreview?.dry.get(room.key) : undefined;
     const wetEnt = selected ? this._planPreview?.wet.get(room.key) : undefined;
-    const canCycle = this._pinCandidates(room.key).length > 1;
-    const pinTap = (shown: string | undefined) => canCycle
-      ? (e: Event) => { e.stopPropagation(); this._cycleRoomPin(room.key, shown); }
-      : undefined;
+    // Each chip cycles only among vacuums capable of ITS OWN type — see the
+    // 2026-07-25 fix note on `_cycleRoomPin`.
+    const canCycleDry = this._pinCandidates(room.key, "dry").length > 1;
+    const canCycleWet = this._pinCandidates(room.key, "wet").length > 1;
+    const pinTap = (kind: "dry" | "wet", shown: string | undefined) =>
+      (kind === "dry" ? canCycleDry : canCycleWet)
+        ? (e: Event) => { e.stopPropagation(); this._cycleRoomPin(room.key, kind, shown); }
+        : undefined;
     // Same point the room's own <button> is anchored at (see the doc comment
     // above) — centering here, rather than below/above the room, is ALSO
     // still correct for size/rotation reasons (0.72.3): a rotation's center
@@ -3606,8 +3640,8 @@ export class AnyVacCard extends LitElement {
           </div>
           ${dryEnt || wetEnt ? html`
             <div class="dock-avatars">
-              ${dryEnt ? this._vacChip(dryEnt, pinTap(dryEnt)) : nothing}
-              ${wetEnt ? this._vacChip(wetEnt, pinTap(wetEnt)) : nothing}
+              ${dryEnt ? this._vacChip(dryEnt, pinTap("dry", dryEnt)) : nothing}
+              ${wetEnt ? this._vacChip(wetEnt, pinTap("wet", wetEnt)) : nothing}
             </div>` : nothing}
         </div>
       </div>
