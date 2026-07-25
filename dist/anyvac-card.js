@@ -87,7 +87,7 @@ const t={ATTRIBUTE:1},e=t=>(...e)=>({_$litDirective$:t,values:e});let i$1 = clas
 
 const CARD_NAME = "anyvac-card";
 const EDITOR_NAME = "anyvac-card-editor";
-const CARD_VERSION = "0.77.0";
+const CARD_VERSION = "0.77.1";
 /** Hold duration in ms required to trigger START / PAUSE actions */
 const HOLD_DURATION_MS = 600;
 /**
@@ -2694,7 +2694,7 @@ let AnyVacCard = class AnyVacCard extends i$2 {
           ` : A}
         <div class="dock-head">
           ${modeBtn("dry", "mdi:broom", "Dry")}${modeBtn("wet", "mdi:water", "Wet")}${modeBtn("both", "mdi:water-plus", "Both")}
-          ${vacs.some((v) => this._dockTier(v) !== "none") ? b `
+          ${vacs.some((v) => this._dockTier(v) !== "none" || this._careItems(v).length > 0) ? b `
             <button class="dock-mode dock-mode--dock ${this._dockSheetOpen ? "on" : ""}"
               @click=${(e) => { e.stopPropagation(); this._dockSheetOpen = !this._dockSheetOpen; }}>
               <ha-icon icon="mdi:home-outline"></ha-icon><span>Dock</span>
@@ -2811,7 +2811,12 @@ let AnyVacCard = class AnyVacCard extends i$2 {
     _renderDockSheet() {
         if (!this._dockSheetOpen)
             return A;
-        const vacs = this._config.vacuums.filter((v) => this._dockTier(v) !== "none");
+        // A vacuum with no dock at all (tier "none", e.g. S6) still belongs in
+        // this sheet's tab list if it has its own body consumables to show
+        // (main/side brush, filter, sensor — these live on the vacuum's OWN
+        // device and have nothing to do with dock hardware). Dropped from the
+        // list entirely only when it has neither dock actions nor care rows.
+        const vacs = this._config.vacuums.filter((v) => this._dockTier(v) !== "none" || this._careItems(v).length > 0);
         if (!vacs.length)
             return A;
         const idx = Math.min(this._dockSheetIdx, vacs.length - 1);
@@ -2841,24 +2846,25 @@ let AnyVacCard = class AnyVacCard extends i$2 {
             ${Object.entries(dock).filter(([, val]) => val !== null && val !== undefined)
             .map(([k, val]) => b `<span>${k}: ${String(val)}</span>`)}
           </div>` : A}
-        <div class="dock-sheet-actions">
-          <button class="dock-sheet-action" @click=${act("dock_empty")}>
-            <ha-icon icon="mdi:delete-empty"></ha-icon><span>Empty</span>
-          </button>
-          ${tier === "full" ? b `
-            <button class="dock-sheet-action" @click=${act("dock_wash")}>
-              <ha-icon icon="mdi:water"></ha-icon><span>Wash</span>
+        ${tier !== "none" ? b `
+          <div class="dock-sheet-actions">
+            <button class="dock-sheet-action" @click=${act("dock_empty")}>
+              <ha-icon icon="mdi:delete-empty"></ha-icon><span>Empty</span>
             </button>
-            <button class="dock-sheet-action" @click=${act("dock_dry")}>
-              <ha-icon icon="mdi:hair-dryer"></ha-icon><span>Dry</span>
-            </button>
-            <button class="dock-sheet-action" @click=${act("dock_pump")}>
-              <ha-icon icon="mdi:water-pump"></ha-icon><span>Pump</span>
-            </button>
-            <button class="dock-sheet-action" @click=${act("dock_self_clean")}>
-              <ha-icon icon="mdi:autorenew"></ha-icon><span>Self-clean</span>
-            </button>` : A}
-        </div>
+            ${tier === "full" ? b `
+              <button class="dock-sheet-action" @click=${act("dock_wash")}>
+                <ha-icon icon="mdi:water"></ha-icon><span>Wash</span>
+              </button>
+              <button class="dock-sheet-action" @click=${act("dock_dry")}>
+                <ha-icon icon="mdi:hair-dryer"></ha-icon><span>Dry</span>
+              </button>
+              <button class="dock-sheet-action" @click=${act("dock_pump")}>
+                <ha-icon icon="mdi:water-pump"></ha-icon><span>Pump</span>
+              </button>
+              <button class="dock-sheet-action" @click=${act("dock_self_clean")}>
+                <ha-icon icon="mdi:autorenew"></ha-icon><span>Self-clean</span>
+              </button>` : A}
+          </div>` : A}
         ${care.length ? b `
           <div class="dock-sheet-care">
             ${care.map((row) => b `

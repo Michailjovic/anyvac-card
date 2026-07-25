@@ -1949,7 +1949,7 @@ export class AnyVacCard extends LitElement {
           ` : nothing}
         <div class="dock-head">
           ${modeBtn("dry", "mdi:broom", "Dry")}${modeBtn("wet", "mdi:water", "Wet")}${modeBtn("both", "mdi:water-plus", "Both")}
-          ${vacs.some((v) => this._dockTier(v) !== "none") ? html`
+          ${vacs.some((v) => this._dockTier(v) !== "none" || this._careItems(v).length > 0) ? html`
             <button class="dock-mode dock-mode--dock ${this._dockSheetOpen ? "on" : ""}"
               @click=${(e: Event) => { e.stopPropagation(); this._dockSheetOpen = !this._dockSheetOpen; }}>
               <ha-icon icon="mdi:home-outline"></ha-icon><span>Dock</span>
@@ -2065,7 +2065,14 @@ export class AnyVacCard extends LitElement {
    *  polished UI would overclaim confidence we don't have. */
   private _renderDockSheet() {
     if (!this._dockSheetOpen) return nothing;
-    const vacs = this._config.vacuums.filter((v) => this._dockTier(v) !== "none");
+    // A vacuum with no dock at all (tier "none", e.g. S6) still belongs in
+    // this sheet's tab list if it has its own body consumables to show
+    // (main/side brush, filter, sensor — these live on the vacuum's OWN
+    // device and have nothing to do with dock hardware). Dropped from the
+    // list entirely only when it has neither dock actions nor care rows.
+    const vacs = this._config.vacuums.filter(
+      (v) => this._dockTier(v) !== "none" || this._careItems(v).length > 0
+    );
     if (!vacs.length) return nothing;
     const idx = Math.min(this._dockSheetIdx, vacs.length - 1);
     const vac = vacs[idx];
@@ -2094,24 +2101,25 @@ export class AnyVacCard extends LitElement {
             ${Object.entries(dock).filter(([, val]) => val !== null && val !== undefined)
               .map(([k, val]) => html`<span>${k}: ${String(val)}</span>`)}
           </div>` : nothing}
-        <div class="dock-sheet-actions">
-          <button class="dock-sheet-action" @click=${act("dock_empty")}>
-            <ha-icon icon="mdi:delete-empty"></ha-icon><span>Empty</span>
-          </button>
-          ${tier === "full" ? html`
-            <button class="dock-sheet-action" @click=${act("dock_wash")}>
-              <ha-icon icon="mdi:water"></ha-icon><span>Wash</span>
+        ${tier !== "none" ? html`
+          <div class="dock-sheet-actions">
+            <button class="dock-sheet-action" @click=${act("dock_empty")}>
+              <ha-icon icon="mdi:delete-empty"></ha-icon><span>Empty</span>
             </button>
-            <button class="dock-sheet-action" @click=${act("dock_dry")}>
-              <ha-icon icon="mdi:hair-dryer"></ha-icon><span>Dry</span>
-            </button>
-            <button class="dock-sheet-action" @click=${act("dock_pump")}>
-              <ha-icon icon="mdi:water-pump"></ha-icon><span>Pump</span>
-            </button>
-            <button class="dock-sheet-action" @click=${act("dock_self_clean")}>
-              <ha-icon icon="mdi:autorenew"></ha-icon><span>Self-clean</span>
-            </button>` : nothing}
-        </div>
+            ${tier === "full" ? html`
+              <button class="dock-sheet-action" @click=${act("dock_wash")}>
+                <ha-icon icon="mdi:water"></ha-icon><span>Wash</span>
+              </button>
+              <button class="dock-sheet-action" @click=${act("dock_dry")}>
+                <ha-icon icon="mdi:hair-dryer"></ha-icon><span>Dry</span>
+              </button>
+              <button class="dock-sheet-action" @click=${act("dock_pump")}>
+                <ha-icon icon="mdi:water-pump"></ha-icon><span>Pump</span>
+              </button>
+              <button class="dock-sheet-action" @click=${act("dock_self_clean")}>
+                <ha-icon icon="mdi:autorenew"></ha-icon><span>Self-clean</span>
+              </button>` : nothing}
+          </div>` : nothing}
         ${care.length ? html`
           <div class="dock-sheet-care">
             ${care.map((row) => html`

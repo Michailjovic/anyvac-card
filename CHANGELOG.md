@@ -8,6 +8,21 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Planned
 
+## [0.77.1] - 2026-07-24
+
+### Fixed
+
+0.77.0's dock-tier gating had an over-broad side effect: S6 (tier
+`"none"` — no dock at all) dropped out of the Dock sheet's tab list
+entirely, taking its own body consumables (main brush, side brush,
+filter, sensor — these live on the vacuum's own device and have nothing
+to do with dock hardware) down with it. The tab list and the Empty
+action are now gated separately: a vacuum stays in the tab list if it
+has dock actions OR care rows to show, and the Empty button itself only
+renders when the vacuum actually has some dock (tier `"empty"`/`"full"`)
+— S6 keeps its own consumables visible, just with no dock actions row at
+all (it has none).
+
 ## [0.77.0] - 2026-07-24
 
 ### Fixed
