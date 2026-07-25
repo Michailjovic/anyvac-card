@@ -8,6 +8,44 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Planned
 
+## [0.80.0] - 2026-07-25
+
+### Changed
+
+Landscape meta bar redesign and layout (docs/28). The `tools` region meta bar
+is now its own panel (background + radius, previously flush with the map
+above and the dock below) with two clusters: Pin & Go / Zone on the left, a
+flexible spacer, then the unassigned/unsequenced warnings, the dry/wet layer
+toggle, a divider, and a borderless "ghost" refresh icon on the right. Room
+count and ETA chips are dropped from the bar entirely — the dock footer right
+below already shows both, so they were a pure duplicate. Refresh now gives a
+brief spin animation as tap feedback (`.mtbtn--spin`), since it previously had
+none.
+
+Landscape's `dock`/`picker` column (`DEFAULT_PROFILES.landscape.columns` in
+`layout.ts`) changed from a fixed `[70, 30]` split to content-driven sizing —
+`minmax(0, 1fr)` for the status-card column (grows to fill whatever's left,
+unbounded) and `max-content` for the dock/picker column (only ever as wide as
+it needs, never wider). `.dock-row`'s room-name field now wraps to a second
+line instead of truncating with an ellipsis when unusually long, via a fixed
+`max-width` on just that element — this is what lets the column settle on the
+row's typical width instead of the single longest name's unwrapped width.
+
+The orchestrated Start button living in `.dock-foot` (landscape's equivalent
+of portrait's dedicated `.start-bar`, since landscape has no separate `start`
+region) now uses the same calm sage green from the docs/25 §6 visual-language
+pass instead of the old saturated green it never received.
+
+The landscape vacuum picker (`_renderBadge`) ring and glow now derive from
+the vacuum's live status color (`_statusInfo`) instead of its configured
+identity color, mirroring the portrait icon strip (0.69.0) — one visual
+language for "what it's doing", identity stays on the background wash and the
+icon/photo. Uses border width and glow radius (not an alpha-blended color) to
+distinguish "shown" from "actively cleaning", since several common statuses
+(docked/idle/charging) are `rgba(...)` literals in `STATUS_MAP`, not hex, and
+the old identity code's hex-alpha-suffix trick would have produced invalid
+CSS for those.
+
 ## [0.79.4] - 2026-07-25
 
 ### Changed

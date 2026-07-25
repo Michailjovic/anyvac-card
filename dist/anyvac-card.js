@@ -94,7 +94,7 @@ const t={ATTRIBUTE:1},e=t=>(...e)=>({_$litDirective$:t,values:e});let i$1 = clas
 
 const CARD_NAME = "anyvac-card";
 const EDITOR_NAME = "anyvac-card-editor";
-const CARD_VERSION = "0.79.4";
+const CARD_VERSION = "0.80.0";
 /** Hold duration in ms required to trigger START / PAUSE actions */
 const HOLD_DURATION_MS = 600;
 /** docs/25 §10 field report (2026-07-25): Android's swipe-up-from-bottom-edge
@@ -572,7 +572,25 @@ const DEFAULT_PROFILES = {
         // over — not the other way around, which is what put the flex on the
         // status/dock row before and left the map a fixed, often-too-small size
         // on tall viewports.
-        columns: [70, 30],
+        // docs/28 §4 (2026-07-25): columns changed from a fixed `[70, 30]` split
+        // to content-driven — the right column (`picker` + `dock`, same grid
+        // track) should never grow past what it actually needs, and the
+        // controller column (`status`) should absorb whatever's left, unbounded
+        // (wide status cards aren't a problem the way a wide, mostly-empty dock
+        // column is, docs/25 §7c's stack/split finding on the portrait side).
+        // `max-content` is safe here in a way the abandoned portrait attempt
+        // (docs/21 §5b) wasn't: THAT column's `.dock-row` used `flex-wrap: wrap`
+        // with no per-element width cap, so its max-content contribution was
+        // always the unwrapped single-line size — never smaller than what was
+        // already allocated. Landscape's `.dock-row` doesn't wrap the row; the
+        // one variable-length field (`.dock-name`, room name) instead gets its
+        // OWN fixed `max-width` (docs/28 §4) so an outlier long name wraps to a
+        // second line inside that cap instead of setting the column's width.
+        // `.vac-picker .badge` (the `picker` region sharing this column) is
+        // `width: 100%`, which intrinsic-sizing treats as auto/shrink-to-fit —
+        // its own natural width (vacuum name, always short) drives the column
+        // the same way, no separate handling needed.
+        columns: ["minmax(0, 1fr)", "max-content"],
         rows: ["auto", "1fr", "auto", "auto", "auto"],
         place: {
             badges: { row: 1, col: "1/3" },
@@ -2867,7 +2885,7 @@ let AnyVacCard = class AnyVacCard extends i$2 {
               ${unsequenced.size ? b `<ha-icon class="dock-unseq" icon="mdi:sort-variant-off"
                 title="${unsequenced.size} selected room${unsequenced.size > 1 ? "s have" : " has"} no cleaning order set — the time above may be off. Set the order in the card editor's Maps tab."></ha-icon>` : A}</span>
             <button class="action-btn ${this._holdId === runHid ? "action-btn--holding" : ""}"
-              style="flex:0 0 auto;padding:7px 14px;background:rgba(82,196,26,0.14);border:1px solid rgba(82,196,26,0.55);color:#fff"
+              style="flex:0 0 auto;padding:7px 14px;background:rgba(111,191,115,0.24);border:1px solid rgba(111,191,115,0.65);color:#fff"
               ?disabled=${!runKeys.length}
               @pointerdown=${runKeys.length ? this._holdStart(runHid, () => this._runOrchestrated(runKeys, this._planMode)) : A}
               @pointermove=${this._holdMove}
@@ -3294,16 +3312,30 @@ let AnyVacCard = class AnyVacCard extends i$2 {
         const ck = this._colorKey(vac);
         const name = vac.name ?? vac.entity.split(".")[1] ?? vac.entity;
         const holding = this._holdId === "badge-" + index;
+        // docs/25 §7a / docs/28 §5: ring + glow now read STATE ("what is it
+        // doing"), not identity — mirrors the portrait icon strip (0.69.0,
+        // `_renderVacuumIconStrip`'s `_statusInfo(v)[1]`). Only this landscape
+        // picker badge kept the identity ring until now (0.69.0's changelog
+        // explicitly left it alone). Background wash + the icon/photo still
+        // carry identity, unchanged — same split as the icon strip: one visual
+        // language for "what it's doing", a separate one for "which one is it".
+        // Not hex-alpha-suffixed like the old identity `color + "80"` trick was —
+        // several very common statuses (docked/idle/charging) are `rgba(...)`
+        // literals in STATUS_MAP (const.ts), not hex, so appending a hex alpha
+        // suffix to those would produce an invalid CSS value (silently dropped
+        // border). Border WIDTH and glow RADIUS carry the active/cleaning
+        // distinction instead — works identically for hex or rgba input.
+        const statusColor = this._statusInfo(vac)[1];
         const bg = cleaning ? COLOR_BG_ACTIVE[ck] : active ? COLOR_BG[ck] : "rgba(30,30,30,0.85)";
         const border = cleaning
-            ? "3px solid " + color
+            ? "3px solid " + statusColor
             : active
-                ? "2px solid " + color + "80"
+                ? "2px solid " + statusColor
                 : "2px solid rgba(255,255,255,0.18)";
         const shadow = cleaning
-            ? "0 0 18px " + color + "B0"
+            ? "0 0 18px " + statusColor
             : active
-                ? "0 0 8px " + color + "50"
+                ? "0 0 6px " + statusColor
                 : "none";
         return b `
       <button
@@ -3795,11 +3827,17 @@ let AnyVacCard = class AnyVacCard extends i$2 {
             ? "Not available in the rotated mobile view"
             : !canCmd ? "Requires the AnyVac integration (≥ 0.18) + map entity" : "";
         const mode = this._modeEntity === "*" ? this._mapMode : "normal";
+        // docs/28 §2: room count + ETA dropped from this bar — the dock footer right
+        // below already carries both (`_renderDock`'s `.dock-foot`), so this was a
+        // pure duplicate. `_fetchPlan` still runs here (cheap no-op once the dock's
+        // own call already populated `_planPreview` for the same key) purely so
+        // `unassigned`/`unsequenced` — genuine WARNINGS, not stats, kept here on
+        // purpose — don't flash empty on a render where dock hasn't fired yet.
         const selKeys = this._allRoomKeys().filter((k) => this._isRoomSelectedAny(k, vacs));
-        // docs/25 §5: no explicit selection = whole home for the glanceable stats too.
         const runKeys = selKeys.length ? selKeys : this._allRoomKeys();
         const hasInt = vacs.some((v) => this._intAttrs(v));
-        const est = this._etaFor(runKeys, this._planMode, hasInt);
+        if (hasInt && runKeys.length)
+            this._fetchPlan(runKeys, this._planMode);
         // Sequence hint (docs/19 follow-up, TODO #2): the backend's ETA is only as
         // good as `room_sequence` (the Roborock app's own room order, which the
         // firmware follows regardless of what order HA sends). Rooms missing from
@@ -3812,36 +3850,48 @@ let AnyVacCard = class AnyVacCard extends i$2 {
         const unassigned = this._unassignedRooms(runKeys, this._planMode, hasInt);
         const pinCount = this._pinPending ? Object.keys(this._pinPending).length : 0;
         const zoneCount = this._zonePending ? Object.keys(this._zonePending).length : 0;
+        // docs/28 §2: brief spin on tap as press feedback — refresh has no other
+        // observable completion signal (unlike the care-reset spinner, 0.79.1,
+        // which waits for a confirmed sensor change), so a pure "tap registered"
+        // acknowledgement is all it needs. Toggled imperatively on the actual DOM
+        // node rather than via `@state` — a one-shot cosmetic effect that doesn't
+        // need to survive/react to the next render.
+        const refreshTap = (e) => {
+            const btn = e.currentTarget;
+            btn.classList.remove("mtbtn--spin");
+            void btn.offsetWidth;
+            btn.classList.add("mtbtn--spin");
+            for (const v of withMap)
+                this._refreshMap(v);
+        };
         return b `
       <div class="meta-bar">
-        <button class="mtbtn ${mode === "pin" ? "on" : ""}" ?disabled=${!canCmd}
-          @click=${() => this._armMode("pin")} title=${cmdTitle || "Pin & Go"}>
-          <ha-icon icon="mdi:map-marker-radius"></ha-icon><span>Pin &amp; Go</span>
-        </button>
-        <button class="mtbtn ${mode === "zone" ? "on" : ""}" ?disabled=${!canCmd}
-          @click=${() => this._armMode("zone")} title=${cmdTitle || "Zone clean"}>
-          <ha-icon icon="mdi:select-drag"></ha-icon><span>Zone</span>
-        </button>
-        ${this._renderLayerToggleCompact(vacs)}
-        <span class="mtbtn mtbtn--stat" title=${selKeys.length ? "Selected rooms" : "Whole home (nothing selected)"}>
-          <ha-icon icon="mdi:floor-plan"></ha-icon><b>${runKeys.length}</b>
-        </span>
-        ${est > 0 ? b `<span class="mtbtn mtbtn--stat" title="Estimated time">
-          <ha-icon icon="mdi:clock-outline"></ha-icon><b>${est}</b><small>min</small>
-        </span>` : A}
-        ${unassigned.length ? b `<span class="mtbtn mtbtn--stat mtbtn--err"
-            title="${unassigned.length} selected room${unassigned.length > 1 ? "s have" : " has"} no available robot for the ${this._planMode} pass — it/they will be silently skipped. Check vacuum roles/config.">
-          <ha-icon icon="mdi:robot-off"></ha-icon><b>${unassigned.length}</b>
-        </span>` : A}
-        ${unsequenced.length ? b `<span class="mtbtn mtbtn--stat mtbtn--warn"
-            title="${unsequenced.length} selected room${unsequenced.length > 1 ? "s have" : " has"} no cleaning order set — the time above may be off. Set the order in the card editor's Maps tab.">
-          <ha-icon icon="mdi:sort-variant-off"></ha-icon><b>${unsequenced.length}</b>
-        </span>` : A}
-        <button class="mtbtn mtbtn--push" title="Refresh maps"
-          @click=${() => { for (const v of withMap)
-            this._refreshMap(v); }}>
-          <ha-icon icon="mdi:refresh"></ha-icon>
-        </button>
+        <div class="meta-bar-cluster">
+          <button class="mtbtn ${mode === "pin" ? "on" : ""}" ?disabled=${!canCmd}
+            @click=${() => this._armMode("pin")} title=${cmdTitle || "Pin & Go"}>
+            <ha-icon icon="mdi:map-marker-radius"></ha-icon><span>Pin &amp; Go</span>
+          </button>
+          <button class="mtbtn ${mode === "zone" ? "on" : ""}" ?disabled=${!canCmd}
+            @click=${() => this._armMode("zone")} title=${cmdTitle || "Zone clean"}>
+            <ha-icon icon="mdi:select-drag"></ha-icon><span>Zone</span>
+          </button>
+        </div>
+        <div class="meta-bar-spacer"></div>
+        <div class="meta-bar-cluster meta-bar-cluster--right">
+          ${unassigned.length ? b `<span class="mtbtn mtbtn--stat mtbtn--err"
+              title="${unassigned.length} selected room${unassigned.length > 1 ? "s have" : " has"} no available robot for the ${this._planMode} pass — it/they will be silently skipped. Check vacuum roles/config.">
+            <ha-icon icon="mdi:robot-off"></ha-icon><b>${unassigned.length}</b>
+          </span>` : A}
+          ${unsequenced.length ? b `<span class="mtbtn mtbtn--stat mtbtn--warn"
+              title="${unsequenced.length} selected room${unsequenced.length > 1 ? "s have" : " has"} no cleaning order set — the time may be off. Set the order in the card editor's Maps tab.">
+            <ha-icon icon="mdi:sort-variant-off"></ha-icon><b>${unsequenced.length}</b>
+          </span>` : A}
+          ${this._renderLayerToggleCompact(vacs)}
+          <div class="meta-bar-divider"></div>
+          <button class="mtbtn mtbtn--ghost" title="Refresh maps" @click=${refreshTap}>
+            <ha-icon icon="mdi:refresh"></ha-icon>
+          </button>
+        </div>
       </div>
       ${ /* Capture finishes (and resets _mapMode to normal) the instant a click/drag
              lands — so pending state, not the armed mode, drives this panel. Only the
@@ -5497,14 +5547,23 @@ AnyVacCard.styles = i$6 `
       border-color: rgba(82, 196, 26, 0.5);
     }
     .dock-ric { --mdc-icon-size: 16px; color: rgba(255, 255, 255, 0.55); flex-shrink: 0; }
+    /* docs/28 §4: wraps to a second line instead of truncating — an unusually
+     * long room name stays fully readable, it just costs that one row a bit
+     * more height. Deliberately NOT flex:1 (that would make this the
+     * growable part of the row, fighting the landscape column's own
+     * content-driven max-content sizing, docs/28 §4) — a fixed max-width
+     * bounds this element's own max-content contribution, which is what lets
+     * the grid column settle on the row's TYPICAL width instead of whatever
+     * the single longest name would need unwrapped. */
     .dock-name {
-      flex: 1;
+      flex: 0 1 auto;
+      max-width: 128px;
       min-width: 0;
-      overflow: hidden;
-      text-overflow: ellipsis;
-      white-space: nowrap;
+      overflow-wrap: break-word;
+      white-space: normal;
       font-size: 12px;
       font-weight: 600;
+      line-height: 1.25;
     }
     /* Sequence hint (docs/19 follow-up, TODO #2) — amber, not red: it's a
        heads-up about ETA accuracy, not an error blocking the clean. */
@@ -6134,8 +6193,19 @@ AnyVacCard.styles = i$6 `
     .mtbtn--warn ha-icon { color: #d4a017; }
     .mtbtn--err { color: #ff4d4f; }
     .mtbtn--err ha-icon { color: #ff4d4f; }
-    .mtbtn--push { margin-left: auto; }
-    .meta-bar { display: flex; align-items: center; gap: 6px; flex-wrap: wrap; padding: 4px 0; }
+    /* docs/28 §2: own panel (was transparent, flush with the map above and the
+     * dock below) — background + radius visually lifts it off both neighbors
+     * instead of reading as a loose row of same-weight buttons. */
+    .meta-bar { display: flex; align-items: center; gap: 4px; flex-wrap: wrap; padding: 6px 8px; background: rgba(255, 255, 255, 0.03); border: 1px solid rgba(255, 255, 255, 0.08); border-radius: 12px; }
+    .meta-bar-cluster { display: flex; align-items: center; gap: 4px; }
+    .meta-bar-spacer { flex: 1 1 auto; }
+    .meta-bar-divider { width: 0.5px; align-self: stretch; background: rgba(255, 255, 255, 0.14); margin: 0 4px; }
+    /* Refresh: a quiet icon, not a bordered button on par with Pin & Go/Zone —
+     * it shouldn't compete with the actual map-interaction tools for attention. */
+    .mtbtn--ghost { border: none; background: transparent; color: rgba(255, 255, 255, 0.45); padding: 5px; }
+    .mtbtn--ghost:hover { color: rgba(255, 255, 255, 0.75); }
+    .mtbtn--spin ha-icon { animation: avc-refresh-spin 0.6s ease; }
+    @keyframes avc-refresh-spin { from { transform: rotate(0deg); } to { transform: rotate(360deg); } }
     .mode-action { display: flex; flex-wrap: wrap; gap: 6px; margin-bottom: 6px; }
     .mode-action .mtbtn { width: 100%; justify-content: center; box-sizing: border-box; animation: avc-mode-action-pulse 1.6s ease-in-out infinite; }
     @keyframes avc-mode-action-pulse { 0%,100% { box-shadow: 0 0 0 rgba(59,130,246,0); } 50% { box-shadow: 0 0 12px rgba(59,130,246,0.55); } }

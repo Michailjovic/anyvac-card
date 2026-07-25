@@ -242,7 +242,25 @@ export const DEFAULT_PROFILES: Record<LayoutProfile, ResolvedProfileGrid> = {
     // over — not the other way around, which is what put the flex on the
     // status/dock row before and left the map a fixed, often-too-small size
     // on tall viewports.
-    columns: [70, 30],
+    // docs/28 §4 (2026-07-25): columns changed from a fixed `[70, 30]` split
+    // to content-driven — the right column (`picker` + `dock`, same grid
+    // track) should never grow past what it actually needs, and the
+    // controller column (`status`) should absorb whatever's left, unbounded
+    // (wide status cards aren't a problem the way a wide, mostly-empty dock
+    // column is, docs/25 §7c's stack/split finding on the portrait side).
+    // `max-content` is safe here in a way the abandoned portrait attempt
+    // (docs/21 §5b) wasn't: THAT column's `.dock-row` used `flex-wrap: wrap`
+    // with no per-element width cap, so its max-content contribution was
+    // always the unwrapped single-line size — never smaller than what was
+    // already allocated. Landscape's `.dock-row` doesn't wrap the row; the
+    // one variable-length field (`.dock-name`, room name) instead gets its
+    // OWN fixed `max-width` (docs/28 §4) so an outlier long name wraps to a
+    // second line inside that cap instead of setting the column's width.
+    // `.vac-picker .badge` (the `picker` region sharing this column) is
+    // `width: 100%`, which intrinsic-sizing treats as auto/shrink-to-fit —
+    // its own natural width (vacuum name, always short) drives the column
+    // the same way, no separate handling needed.
+    columns: ["minmax(0, 1fr)", "max-content"],
     rows: ["auto", "1fr", "auto", "auto", "auto"],
     place: {
       badges: { row: 1, col: "1/3" },
