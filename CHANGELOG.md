@@ -8,6 +8,24 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Planned
 
+## [0.79.0] - 2026-07-25
+
+### Changed
+
+Portrait START bar split into three segments (docs/25 §10 follow-up), mirroring
+the manufacturer app's bottom bar (mode / START / Dock). Left segment shows the
+current clean type (Dry/Wet/Both icon + label) and opens a small mode-picker
+sheet on tap; right segment opens the existing Dock control sheet (Empty/Wash/
+Dry/Pump/Self-clean + consumables, unchanged); center keeps the hold-to-start
+(and hold-to-cancel while running) button. Both side segments reuse the
+existing `.dock-mode` sheet pattern (new `_renderModeSheet`, mirrors
+`_renderDockSheet`) rendered in-flow in the `dock` region below the bar; the
+two sheets are mutually exclusive (opening one closes the other). The
+mode/Dock buttons that used to sit permanently in `.dock-head` above the bar
+are now only rendered there when there's no separate `start` region to host
+them (landscape, unchanged) — portrait's `.dock-head` row is gone, replaced by
+the new segments.
+
 ## [0.78.1] - 2026-07-25
 
 ### Fixed

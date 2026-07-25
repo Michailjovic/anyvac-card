@@ -109,6 +109,13 @@ export class AnyVacCard extends LitElement {
    *  orchestration input). */
   @state() private _dockSheetOpen = false;
   @state() private _dockSheetIdx = 0;
+  /** docs/25 §10 follow-up (2026-07-25): the START bar's left segment mirrors
+   *  the manufacturer app's 3-section bottom bar (mode / START / Dock, see
+   *  docs/25 §10) — mode picker sheet, same in-flow pattern as `_dockSheetOpen`
+   *  right next to it. Mutually exclusive with the dock sheet (toggling one
+   *  closes the other) purely to keep the narrow dock column from showing two
+   *  panels stacked at once. */
+  @state() private _modeSheetOpen = false;
   @state() private _modeEntity: string | null = null;
   @state() private _dbg = "";
   @state() private _zoneDrag: { x0: number; y0: number; x1: number; y1: number } | null = null;
@@ -1972,15 +1979,17 @@ export class AnyVacCard extends LitElement {
           this._profile === "portrait" ? html`
             <div class="dock-layers">${this._renderLayerToggleCompact(vacs)}</div>
           ` : nothing}
-        <div class="dock-head">
-          ${modeBtn("dry", "mdi:broom", "Dry")}${modeBtn("wet", "mdi:water", "Wet")}${modeBtn("both", "mdi:water-plus", "Both")}
-          ${vacs.some((v) => this._dockTier(v) !== "none" || this._careItems(v).length > 0) ? html`
-            <button class="dock-mode dock-mode--dock ${this._dockSheetOpen ? "on" : ""}"
-              @click=${(e: Event) => { e.stopPropagation(); this._dockSheetOpen = !this._dockSheetOpen; }}>
-              <ha-icon icon="mdi:home-outline"></ha-icon><span>Dock</span>
-              ${this._dockNeedsAttention() ? html`<span class="dock-mode-dot"></span>` : nothing}
-            </button>` : nothing}
-        </div>
+        ${withRun ? html`
+          <div class="dock-head">
+            ${modeBtn("dry", "mdi:broom", "Dry")}${modeBtn("wet", "mdi:water", "Wet")}${modeBtn("both", "mdi:water-plus", "Both")}
+            ${vacs.some((v) => this._dockTier(v) !== "none" || this._careItems(v).length > 0) ? html`
+              <button class="dock-mode dock-mode--dock ${this._dockSheetOpen ? "on" : ""}"
+                @click=${(e: Event) => { e.stopPropagation(); this._dockSheetOpen = !this._dockSheetOpen; }}>
+                <ha-icon icon="mdi:home-outline"></ha-icon><span>Dock</span>
+                ${this._dockNeedsAttention() ? html`<span class="dock-mode-dot"></span>` : nothing}
+              </button>` : nothing}
+          </div>` : nothing}
+        ${this._renderModeSheet()}
         ${this._renderDockSheet()}
         ${!showRoomList ? nothing : html`<div class="dock-rows">
           ${rooms.map(({ r, v }) => {
@@ -2084,8 +2093,11 @@ export class AnyVacCard extends LitElement {
 
   /** docs/25 §7 field follow-up (2026-07-24): dock sheet — per-vacuum tabs +
    *  Empty/Wash/Dry actions (`anyvac.dock_*`, confirmed commands per docs/26
-   *  §3, live-verified against the field-reporting user's real HW). Renders
-   *  in-flow below `.dock-head` (the `dock` region already has its own
+   *  §3, live-verified against the field-reporting user's real HW). Toggled
+   *  from `.dock-head`'s Dock button when it's rendered (landscape), or from
+   *  the START bar's right segment when it isn't (portrait, docs/25 §10
+   *  follow-up 2026-07-25) — either way `_dockSheetOpen` renders it here,
+   *  in-flow inside the `dock` region (which already has its own
    *  `overflow:auto`, docs/18 `regionStyles()`) rather than as a floating
    *  overlay — deliberately avoids `position:fixed`/absolute layering in a
    *  region that's had real mobile-crash history (docs/21 §5b) tied to grid
@@ -2170,12 +2182,48 @@ export class AnyVacCard extends LitElement {
     `;
   }
 
+  /** docs/25 §10 follow-up (2026-07-25): mode picker sheet — the START bar's
+   *  left segment opens this (see `_renderStartBar`), same in-flow panel
+   *  pattern as `_renderDockSheet` and reusing the identical `.dock-mode`
+   *  button look (dry/wet/both), just three buttons instead of the dock
+   *  sheet's actions. Picking a mode closes the sheet immediately — there's
+   *  nothing else to configure here, unlike the dock sheet which stays open
+   *  for repeated care/action taps. */
+  private _renderModeSheet() {
+    if (!this._modeSheetOpen) return nothing;
+    const mode = this._planMode;
+    const pick = (m: "dry" | "wet" | "both") => (e: Event) => {
+      e.stopPropagation();
+      this._planMode = m;
+      this._modeSheetOpen = false;
+    };
+    const modeBtn = (m: "dry" | "wet" | "both", icon: string, label: string) => html`
+      <button class="dock-mode ${mode === m ? "on" : ""}" @click=${pick(m)}>
+        <ha-icon icon=${icon}></ha-icon><span>${label}</span>
+      </button>`;
+    return html`
+      <div class="dock-sheet">
+        <div class="dock-head">
+          ${modeBtn("dry", "mdi:broom", "Dry")}${modeBtn("wet", "mdi:water", "Wet")}${modeBtn("both", "mdi:water-plus", "Both")}
+        </div>
+      </div>
+    `;
+  }
+
   /** START region (portrait bottom bar, docs/18 §7d): ALWAYS the orchestrated
    *  intent (anyvac.clean); while anything runs it flips to a cancel bar.
    *  docs/25 §5 (cockpit minimalism): no explicit room selection is NOT a dead
    *  end — it means "whole home", and START stays immediately pressable from
    *  the moment the card opens. Room selection / Dry-Wet-Both stay on screen
-   *  as refinement, not as a gate the user has to clear first. */
+   *  as refinement, not as a gate the user has to clear first.
+   *  docs/25 §10 follow-up (2026-07-25): three-segment bar, mirroring the
+   *  manufacturer app's bottom bar (mode / START / Dock, docs/25 §10) — the
+   *  mode buttons and Dock button that used to live in `.dock-head` above
+   *  the bar move down into the bar itself (`_renderDock` only still renders
+   *  `.dock-head` when there's no separate `start` region to host them,
+   *  i.e. landscape). Both side segments just toggle a sheet rendered back
+   *  in the `dock` region (`_renderModeSheet`/`_renderDockSheet`) — the
+   *  bar itself stays a fixed-height strip, not an expandable panel. */
   private _renderStartBar() {
     const vacs = this._config.vacuums;
     const hasInt = vacs.some((v) => this._intAttrs(v));
@@ -2183,32 +2231,57 @@ export class AnyVacCard extends LitElement {
     const runKeys = selKeys.length ? selKeys : this._allRoomKeys();
     const anyCleaning = vacs.some((v) => this._isCleaning(v));
     const hid = "startbar";
+    const modeIcon = { dry: "mdi:broom", wet: "mdi:water", both: "mdi:water-plus" }[this._planMode];
+    const modeLabel = { dry: "Dry", wet: "Wet", both: "Both" }[this._planMode];
+    const modeSeg = html`
+      <button class="start-seg start-seg--mode ${this._modeSheetOpen ? "on" : ""}"
+        title="Clean type — tap to change"
+        @click=${(e: Event) => { e.stopPropagation(); this._dockSheetOpen = false; this._modeSheetOpen = !this._modeSheetOpen; }}>
+        <ha-icon icon=${modeIcon}></ha-icon>
+        <span>${modeLabel}</span>
+      </button>`;
+    const showDock = vacs.some((v) => this._dockTier(v) !== "none" || this._careItems(v).length > 0);
+    const dockSeg = showDock ? html`
+      <button class="start-seg start-seg--dock ${this._dockSheetOpen ? "on" : ""}"
+        title="Dock control"
+        @click=${(e: Event) => { e.stopPropagation(); this._modeSheetOpen = false; this._dockSheetOpen = !this._dockSheetOpen; }}>
+        <ha-icon icon="mdi:home-outline"></ha-icon>
+        ${this._dockNeedsAttention() ? html`<span class="dock-mode-dot"></span>` : nothing}
+      </button>` : nothing;
     if (anyCleaning) {
       return html`
-        <button class="start-bar start-bar--cancel ${this._holdId === hid ? "action-btn--holding" : ""}"
-          @pointerdown=${this._holdStart(hid, () => {
-            if (hasInt) void this._call("anyvac", "cancel", {});
-            else for (const v of vacs) { if (this._isCleaning(v)) void this._pause(v); }
-          })}
-          @pointerup=${this._holdEnd} @pointerleave=${this._holdEnd} @pointercancel=${this._holdEnd}>
-          <div class="hold-ring"></div>
-          <ha-icon icon="mdi:stop"></ha-icon>
-          <span>CANCEL · hold</span>
-        </button>`;
+        <div class="start-row">
+          ${modeSeg}
+          <button class="start-bar start-bar--cancel ${this._holdId === hid ? "action-btn--holding" : ""}"
+            @pointerdown=${this._holdStart(hid, () => {
+              if (hasInt) void this._call("anyvac", "cancel", {});
+              else for (const v of vacs) { if (this._isCleaning(v)) void this._pause(v); }
+            })}
+            @pointerup=${this._holdEnd} @pointerleave=${this._holdEnd} @pointercancel=${this._holdEnd}>
+            <div class="hold-ring"></div>
+            <ha-icon icon="mdi:stop"></ha-icon>
+            <span>CANCEL · hold</span>
+          </button>
+          ${dockSeg}
+        </div>`;
     }
     const canStart = hasInt && runKeys.length > 0;
     const est = this._etaFor(runKeys, this._planMode, hasInt);
     const scopeLabel = selKeys.length ? selKeys.length + (selKeys.length === 1 ? " room" : " rooms") : "whole home";
     return html`
-      <button class="start-bar ${canStart && this._holdId === hid ? "action-btn--holding" : ""}"
-        ?disabled=${!canStart}
-        title=${hasInt ? "" : "Requires the AnyVac integration"}
-        @pointerdown=${canStart ? this._holdStart(hid, () => this._runOrchestrated(runKeys, this._planMode)) : nothing}
-        @pointerup=${this._holdEnd} @pointerleave=${this._holdEnd} @pointercancel=${this._holdEnd}>
-        <div class="hold-ring"></div>
-        <ha-icon icon="mdi:rocket-launch"></ha-icon>
-        <span>START · ${scopeLabel}${est ? " · ~" + est + " min" : ""}</span>
-      </button>`;
+      <div class="start-row">
+        ${modeSeg}
+        <button class="start-bar ${canStart && this._holdId === hid ? "action-btn--holding" : ""}"
+          ?disabled=${!canStart}
+          title=${hasInt ? "" : "Requires the AnyVac integration"}
+          @pointerdown=${canStart ? this._holdStart(hid, () => this._runOrchestrated(runKeys, this._planMode)) : nothing}
+          @pointerup=${this._holdEnd} @pointerleave=${this._holdEnd} @pointercancel=${this._holdEnd}>
+          <div class="hold-ring"></div>
+          <ha-icon icon="mdi:rocket-launch"></ha-icon>
+          <span>START · ${scopeLabel}${est ? " · ~" + est + " min" : ""}</span>
+        </button>
+        ${dockSeg}
+      </div>`;
   }
 
   /** Setting presets for a vacuum; falls back to a single default synthesized from clean_action. */
@@ -4558,6 +4631,19 @@ export class AnyVacCard extends LitElement {
      * before landing here; the room-count/ETA text stays inline in the
      * button (already was — the mockup's separate line under the button
      * was an artifact of the mockup, not a real proposal to split it out). */
+    /* docs/25 §10 follow-up (2026-07-25): the START bar is now a 3-segment
+     * row (mode / START / Dock, mirrors the manufacturer app's bottom bar) —
+     * .start-row is the flex container, .start-bar keeps its own look
+     * but stretches to fill the middle slot instead of the whole region. */
+    .start-row {
+      display: flex;
+      align-items: stretch;
+      width: 100%;
+      height: 100%;
+      min-height: 52px;
+      gap: 8px;
+    }
+    .start-row .start-bar { width: auto; flex: 1; min-width: 0; }
     .start-bar {
       position: relative;
       overflow: hidden;
@@ -4589,6 +4675,33 @@ export class AnyVacCard extends LitElement {
       background: rgba(250, 173, 20, 0.16);
       border-color: rgba(250, 173, 20, 0.6);
     }
+    /* Side segments (mode / dock) — same family as .start-bar but a fixed
+     * narrow width so the middle START segment keeps most of the bar. */
+    .start-seg {
+      flex: 0 0 auto;
+      width: 54px;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      gap: 2px;
+      border-radius: 16px;
+      cursor: pointer;
+      font-family: inherit;
+      font-size: 10px;
+      font-weight: 600;
+      color: rgba(255, 255, 255, 0.65);
+      background: rgba(255, 255, 255, 0.05);
+      border: 1px solid rgba(255, 255, 255, 0.15);
+    }
+    .start-seg ha-icon { --mdc-icon-size: 20px; }
+    .start-seg.on {
+      color: #fff;
+      font-weight: 700;
+      background: rgba(255, 255, 255, 0.14);
+      border-color: rgba(255, 255, 255, 0.5);
+    }
+    .start-seg--dock { position: relative; }
 
     /* Grid badges-row extras */
     .badges-refresh { margin-left: auto; flex-shrink: 0; padding: 8px; }
