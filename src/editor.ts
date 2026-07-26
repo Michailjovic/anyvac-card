@@ -64,6 +64,11 @@ const DEFAULT_THRESHOLDS: RoomThreshold[] = [
   { days: 10, color: "#ff9800" },
 ];
 
+/** Clamps a room-rectangle percentage coordinate to the preview's 0–100 bounds. */
+function clampPct(v: number): number {
+  return Math.min(100, Math.max(0, v));
+}
+
 // ── Editor ───────────────────────────────────────────────────────────────────
 
 @customElement(EDITOR_NAME)
@@ -94,6 +99,33 @@ export class AnyVacCardEditor extends LitElement {
   /** Floorplan natural aspect ratio (W/H) learned from the preview image — used by
    *  the auto-seat fit and to give the preview the correct proportions. */
   @state() private _pvAR = 0;
+  /** Snapshot of the selected vacuum's live map `entity_picture` (2026-07-26 field
+   *  report — flashing risk). Home Assistant rotates this URL on essentially every
+   *  entity update, and `hass` itself is a reactive property that re-renders this
+   *  editor on every dashboard-wide state change, not just this vacuum's — binding
+   *  an `<img src>` straight to the live value made the map preview / reference
+   *  overlay reload (visibly flash) constantly while editing, unrelated to what the
+   *  user was actually doing. Captured explicitly (tab/vacuum switch, or the
+   *  "Refresh reference map" button) instead of read fresh on every render —
+   *  see `_snapshotRefMap`. */
+  @state() private _refMapUrl = "";
+  private _refMapVac = -1;
+
+  /** Active drag on a room's position dot / rectangle (2026-07-26 — was
+   *  sliders-only, no way to see or drag the actual rectangle extent on the
+   *  floorplan preview). `orig` is the room's state at drag START (not updated
+   *  mid-drag) so a resize always computes from the anchor corner, not from an
+   *  already-moved intermediate value. */
+  private _rectDrag: {
+    ri: number;
+    mode: "move" | "resize-nw" | "resize-ne" | "resize-sw" | "resize-se";
+    container: DOMRect;
+    orig: { x: number; y: number; w: number; h: number };
+    startClientX: number;
+    startClientY: number;
+    moved: boolean;
+    wasSelected: boolean;
+  } | null = null;
 
   private _initialized = false;
 
@@ -114,6 +146,26 @@ export class AnyVacCardEditor extends LitElement {
           .join("");
       }
     }
+    // Deliberately keyed off _tab/_mapVac only, NEVER _config or hass — this is
+    // what stops the reference map from reloading/flashing on every edit (see
+    // `_refMapUrl` docstring). Also covers the very first time the Maps tab is
+    // opened (nothing to snapshot yet).
+    if (this._tab === "maps" && (changed.has("_tab") || changed.has("_mapVac"))) {
+      this._snapshotRefMap();
+    }
+  }
+
+  /** Explicitly (re-)captures the selected vacuum's live map preview URL — see
+   *  `_refMapUrl`. Called on Maps-tab/vacuum-selection changes and from the
+   *  "Refresh reference map" button; never from a plain re-render. */
+  private _snapshotRefMap(): void {
+    const vacuums = this._config.vacuums;
+    if (!vacuums.length) { this._refMapUrl = ""; this._refMapVac = -1; return; }
+    const mapVac = Math.min(this._mapVac, vacuums.length - 1);
+    const entity = vacuums[mapVac].map?.entity;
+    this._refMapUrl = entity
+      ? ((this.hass.states[entity]?.attributes["entity_picture"] as string) ?? "") : "";
+    this._refMapVac = mapVac;
   }
 
   // ── Config helpers ────────────────────────────────────────────────────────
@@ -161,6 +213,82 @@ export class AnyVacCardEditor extends LitElement {
       this._setRoom(Math.min(this._mapVac, this._config.vacuums.length - 1), roomIdx, updates);
     }
   }
+  /** Pointer down on a room's dot/rectangle on the map preview (2026-07-26 —
+   *  was slider-only, no way to see OR drag the actual rectangle extent).
+   *  Selects the room immediately (so a plain tap still works like the old
+   *  click-to-select) and arms a potential drag; `pointermove`/`pointerup`
+   *  (below) decide whether it turns into an actual move/resize or stays a
+   *  tap. Pointer capture on the element itself means drags that leave its
+   *  bounds keep being tracked, without needing a full-container overlay. */
+  private _onRoomPointerDown(
+    ri: number,
+    mode: "move" | "resize-nw" | "resize-ne" | "resize-sw" | "resize-se",
+    room: RoomConfig,
+    e: PointerEvent,
+  ): void {
+    e.stopPropagation();
+    const container = (e.currentTarget as HTMLElement).closest(".map-pos-container");
+    if (!container) return;
+    const wasSelected = this._mapRoom === ri;
+    this._mapRoom = ri;
+    this._rectDrag = {
+      ri, mode,
+      container: container.getBoundingClientRect(),
+      orig: { x: room.map_x ?? 50, y: room.map_y ?? 50, w: room.map_w ?? 0, h: room.map_h ?? 0 },
+      startClientX: e.clientX, startClientY: e.clientY,
+      moved: false, wasSelected,
+    };
+    (e.currentTarget as Element).setPointerCapture(e.pointerId);
+  }
+
+  private _onRoomPointerMove(e: PointerEvent): void {
+    const d = this._rectDrag;
+    if (!d) return;
+    if (!d.moved) {
+      // A few px of slop before committing to "this is a drag, not a tap" —
+      // avoids the pointerdown's small inevitable jitter re-writing config
+      // (and re-rendering) on every single click.
+      if (Math.hypot(e.clientX - d.startClientX, e.clientY - d.startClientY) < 3) return;
+      d.moved = true;
+    }
+    const rect = d.container;
+    const px = clampPct(((e.clientX - rect.left) / rect.width) * 100);
+    const py = clampPct(((e.clientY - rect.top) / rect.height) * 100);
+    if (d.mode === "move") {
+      this._setEditedRoom(d.ri, { map_x: Math.round(px), map_y: Math.round(py) });
+      return;
+    }
+    // Resize: the OPPOSITE corner from the one being dragged stays anchored
+    // (standard resize-handle behaviour), computed from the room's state at
+    // drag START — never from an already-moved intermediate value, or the
+    // anchor corner would itself drift as the drag progresses.
+    const halfW = d.orig.w / 2, halfH = d.orig.h / 2;
+    const anchor = {
+      "resize-nw": { ox: d.orig.x + halfW, oy: d.orig.y + halfH },
+      "resize-ne": { ox: d.orig.x - halfW, oy: d.orig.y + halfH },
+      "resize-sw": { ox: d.orig.x + halfW, oy: d.orig.y - halfH },
+      "resize-se": { ox: d.orig.x - halfW, oy: d.orig.y - halfH },
+    }[d.mode];
+    const newW = Math.max(2, Math.min(100, Math.abs(px - anchor.ox)));
+    const newH = Math.max(2, Math.min(100, Math.abs(py - anchor.oy)));
+    this._setEditedRoom(d.ri, {
+      map_x: Math.round(clampPct((px + anchor.ox) / 2)),
+      map_y: Math.round(clampPct((py + anchor.oy) / 2)),
+      map_w: Math.round(newW),
+      map_h: Math.round(newH),
+    });
+  }
+
+  private _onRoomPointerUp(): void {
+    const d = this._rectDrag;
+    if (d && !d.moved && d.wasSelected) {
+      // A genuine tap (no drag) on an already-selected room deselects it —
+      // matches the old dot's click-to-toggle behaviour.
+      this._mapRoom = null;
+    }
+    this._rectDrag = null;
+  }
+
   private _addEditedRoom(): void {
     if (this._mergedEdit) {
       const rooms = [...(this._config.rooms ?? []), { ...DEFAULT_ROOM }];
@@ -944,8 +1072,11 @@ export class AnyVacCardEditor extends LitElement {
     const mapVac = Math.min(this._mapVac, vacuums.length - 1);
     const vac = vacuums[mapVac];
     const map = vac.map ?? { ...DEFAULT_MAP };
-    const mapUrl = map.entity
-      ? ((this.hass.states[map.entity]?.attributes["entity_picture"] as string) ?? "") : "";
+    // Snapshotted, not live (see `_refMapUrl`) — this is what stops the flash.
+    // Populated by `updated()` right after the first render of this tab/vacuum
+    // (a one-time empty frame, not a reload loop — deliberately NOT captured
+    // here mid-render).
+    const mapUrl = this._refMapVac === mapVac ? this._refMapUrl : "";
     const base = vac.base ?? "map";
     const ib = this._config.map_mode === "merged" ? this._config.image_base : vac.image_base;
     const useImg = this._config.map_mode === "merged" ? !!ib?.src : ((base === "image" || base === "combined") && !!ib?.src);
@@ -1020,6 +1151,16 @@ export class AnyVacCardEditor extends LitElement {
 
         ${this._entityPicker("Map image entity", map.entity, ["image"],
           v => this._setMap(mapVac, { entity: v }))}
+        ${map.entity ? html`
+          <button class="btn btn--sm" style="align-self:flex-start"
+            @click=${() => this._snapshotRefMap()}>
+            <ha-icon icon="mdi:refresh"></ha-icon> Refresh reference map
+          </button>
+          <p class="hint">The preview below is a frozen snapshot, not live — it used to
+            reload (and visibly flash) on every edit, since Home Assistant refreshes this
+            image's URL on nearly every state update. Use this button after the robot
+            explores/remaps to update it.</p>
+        ` : nothing}
 
         ${previewUrl ? html`
           <div class="map-pos-container ${this._mapRoom !== null ? "map-pos-container--active" : ""}"
@@ -1054,12 +1195,42 @@ export class AnyVacCardEditor extends LitElement {
                   transform: "translate(-50%,-50%) rotate(" + es.rotation + "deg)",
                   opacity:   "0.5",
                 })} />` : nothing}
-              ${rooms.map((r, ri) => html`
-                <div class="pos-dot ${ri === this._mapRoom ? "pos-dot--active" : ""}"
-                  style=${styleMap({ left: (r.map_x ?? 0) + "%", top: (r.map_y ?? 0) + "%" })}
-                  @click=${(e: Event) => { e.stopPropagation(); this._mapRoom = ri === this._mapRoom ? null : ri; }}>
-                  <ha-icon icon=${r.icon || "mdi:square"} style="--mdc-icon-size:14px"></ha-icon>
-                </div>`)}
+              ${rooms.map((r, ri) => {
+                const active = ri === this._mapRoom;
+                const cx = r.map_x ?? 50, cy = r.map_y ?? 50;
+                // Rectangle overlay mode (map_w/map_h set, §"Enable rectangle overlay"
+                // below): draw the ACTUAL box instead of just a centre dot, so its
+                // extent is visible while dragging/resizing — the whole point of this
+                // fix (2026-07-26 field report: sliders moved a box nobody could see).
+                if (r.map_w != null) {
+                  const w = r.map_w, h = r.map_h ?? 15;
+                  return html`
+                    <div class="room-rect ${active ? "room-rect--active" : ""}"
+                      style=${styleMap({ left: cx + "%", top: cy + "%", width: w + "%", height: h + "%" })}
+                      @pointerdown=${(e: PointerEvent) => this._onRoomPointerDown(ri, "move", r, e)}
+                      @pointermove=${(e: PointerEvent) => this._onRoomPointerMove(e)}
+                      @pointerup=${() => this._onRoomPointerUp()}
+                      @click=${(e: Event) => e.stopPropagation()}>
+                      <ha-icon icon=${r.icon || "mdi:square"} style="--mdc-icon-size:14px"></ha-icon>
+                      ${active ? (["nw", "ne", "sw", "se"] as const).map(pos => html`
+                        <div class="room-rect-handle room-rect-handle--${pos}"
+                          @pointerdown=${(e: PointerEvent) => this._onRoomPointerDown(ri, ("resize-" + pos) as "resize-nw", r, e)}
+                          @pointermove=${(e: PointerEvent) => this._onRoomPointerMove(e)}
+                          @pointerup=${() => this._onRoomPointerUp()}
+                          @click=${(e: Event) => e.stopPropagation()}></div>
+                      `) : nothing}
+                    </div>`;
+                }
+                return html`
+                  <div class="pos-dot ${active ? "pos-dot--active" : ""}"
+                    style=${styleMap({ left: cx + "%", top: cy + "%" })}
+                    @pointerdown=${(e: PointerEvent) => this._onRoomPointerDown(ri, "move", r, e)}
+                    @pointermove=${(e: PointerEvent) => this._onRoomPointerMove(e)}
+                    @pointerup=${() => this._onRoomPointerUp()}
+                    @click=${(e: Event) => e.stopPropagation()}>
+                    <ha-icon icon=${r.icon || "mdi:square"} style="--mdc-icon-size:14px"></ha-icon>
+                  </div>`;
+              })}
             </div>
           </div>
 
@@ -1134,8 +1305,8 @@ export class AnyVacCardEditor extends LitElement {
           ${rooms.length ? html`
             <div class="section-title">Room positions</div>
             <p class="hint">${this._mapRoom !== null
-              ? "Click the map to move the selected room. Click the dot to deselect."
-              : "Select a room below, then click the map to set its position."}</p>
+              ? "Drag the dot/rectangle to move it (rectangle mode: drag a corner to resize). Tap it again to deselect, or click elsewhere on the map to jump the selected room there."
+              : "Select a room below, then drag it on the map — or click the map to jump the selected room there."}</p>
             <div class="pill-row">
               ${rooms.map((r, ri) => html`
                 <button class="room-pill ${ri === this._mapRoom ? "room-pill--active" : ""}"
@@ -1680,9 +1851,33 @@ export class AnyVacCardEditor extends LitElement {
       width:26px; height:26px; border-radius:6px;
       background:rgba(0,0,0,.55); border:2px solid rgba(255,255,255,.4);
       display:flex; align-items:center; justify-content:center;
-      color:rgba(255,255,255,.7); cursor:pointer;
+      color:rgba(255,255,255,.7); cursor:grab;
+      touch-action:none; -webkit-user-select:none; user-select:none;
     }
     .pos-dot--active { background:rgba(33,150,243,.75); border-color:#2196F3; color:white; }
+
+    /* Rectangle overlay mode (map_w/map_h set) — draws the actual box instead of
+       just a centre dot, with drag-to-move + corner handles to drag-to-resize
+       (2026-07-26: sliders used to move a box nobody could see). */
+    .room-rect {
+      position:absolute; box-sizing:border-box; transform:translate(-50%,-50%);
+      border:2px solid rgba(255,255,255,.55); border-radius:4px;
+      background:rgba(0,0,0,.25);
+      display:flex; align-items:center; justify-content:center;
+      color:rgba(255,255,255,.8); cursor:grab;
+      touch-action:none; -webkit-user-select:none; user-select:none;
+    }
+    .room-rect--active { border-color:#2196F3; background:rgba(33,150,243,.25); color:white; }
+    .room-rect-handle {
+      position:absolute; transform:translate(-50%,-50%);
+      width:14px; height:14px; border-radius:50%;
+      background:#2196F3; border:2px solid white;
+      touch-action:none;
+    }
+    .room-rect-handle--nw { left:0%;   top:0%;   cursor:nwse-resize; }
+    .room-rect-handle--se { left:100%; top:100%; cursor:nwse-resize; }
+    .room-rect-handle--ne { left:100%; top:0%;   cursor:nesw-resize; }
+    .room-rect-handle--sw { left:0%;   top:100%; cursor:nesw-resize; }
 
     .two-col { display:flex; gap:8px; }
     .two-col > * { flex:1; min-width:0; }

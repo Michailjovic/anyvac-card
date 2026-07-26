@@ -8,6 +8,39 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Planned
 
+## [0.81.0] - 2026-07-26
+
+### Added
+
+Room rectangles in the editor's Maps tab can now be dragged directly on the
+floorplan preview instead of only through numeric sliders — reported after a
+user tried to re-anchor rooms onto a brand new floorplan photo and found
+there was no way to see or drag the actual box. Pointer-down on a room's dot
+(point mode) or rectangle (`map_w`/`map_h` set) selects it and arms a
+move-drag; the selected rectangle also grows four corner handles for a
+drag-to-resize (opposite corner stays anchored, mirroring the card's own
+zone-clean resize). A plain tap (no real movement) still just
+selects/deselects, matching the old click-only behaviour.
+
+Rectangle overlay mode previously rendered only a small centre dot — width
+and height existed purely as numbers in two sliders, invisible on the
+preview. It now draws the actual box, so its extent is visible while
+dragging/resizing.
+
+### Fixed
+
+The Maps tab's map preview (and, in merged mode, its semi-transparent "native
+map" reference overlay) used to reload — visibly flashing — on nearly every
+edit, since it was bound straight to the live `entity_picture` URL Home
+Assistant rotates on nearly every state update, and the editor re-renders on
+every dashboard-wide `hass` change, not just edits to this vacuum. Reported
+as a real flashing-content concern, not just a cosmetic annoyance.
+
+The preview is now a frozen snapshot (`_refMapUrl`), captured only when the
+Maps tab opens or the selected vacuum changes — never on a plain re-render.
+A new "Refresh reference map" button lets the snapshot be updated explicitly
+(e.g. after the robot re-explores/remaps).
+
 ## [0.80.5] - 2026-07-26
 
 ### Fixed
