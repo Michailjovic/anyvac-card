@@ -8,6 +8,28 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Planned
 
+## [0.80.4] - 2026-07-26
+
+### Fixed
+
+Per-vacuum setting presets were silently collapsed into one shared object per
+pass when sending the orchestrated `anyvac.clean` intent. `_v2Settings()`
+looped dry/wet-capable vacuums but stopped after the FIRST capable one per
+kind, so e.g. S6's fan_speed preset won for every dry-capable vacuum
+including S7, no matter what S7's own preset said. Reported as: "S7 mám v
+presetu nastavené na suction max_plus, ale on se vždy přehodí na max když to
+pustím."
+
+`_v2Settings()` now builds a genuinely per-vacuum settings map
+(`{kind: {vacuum_entity: {...}}}`, matching the new backend shape — see the
+paired `anyvac` integration release) for every capable vacuum, using each
+vacuum's own active preset (`_activePreset`) — the same extraction the
+single-vacuum manual START (`_startClean`) already used, now applied
+consistently to the multi-vacuum orchestrated path too, so the preset chip
+the user actually selected is respected instead of a heuristic search over
+the vacuum's own preset list. `_startClean`'s own `anyvac.clean` call updated
+to the new per-vacuum-keyed settings shape (`{mode: {vac.entity: {...}}}`).
+
 ## [0.80.3] - 2026-07-25
 
 ### Fixed

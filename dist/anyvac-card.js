@@ -94,7 +94,7 @@ const t={ATTRIBUTE:1},e=t=>(...e)=>({_$litDirective$:t,values:e});let i$1 = clas
 
 const CARD_NAME = "anyvac-card";
 const EDITOR_NAME = "anyvac-card-editor";
-const CARD_VERSION = "0.80.3";
+const CARD_VERSION = "0.80.4";
 /** Hold duration in ms required to trigger START / PAUSE actions */
 const HOLD_DURATION_MS = 600;
 /** docs/25 §10 field report (2026-07-25): Android's swipe-up-from-bottom-edge
@@ -2361,33 +2361,36 @@ let AnyVacCard = class AnyVacCard extends i$2 {
         }
         return out;
     }
-    /** Per-kind settings for anyvac.clean, from the first capable vacuum's matching
-     *  preset (fan speed / mop mode / mop intensity / repeat). */
+    /** Per-vacuum, per-pass settings for anyvac.clean (2026-07-26) — every capable
+     *  vacuum contributes its OWN active preset's fan speed / mop mode / mop
+     *  intensity / repeat, keyed by entity id. Mirrors the extraction already used
+     *  for the single-vacuum manual START (`_startClean`): a pass only reads
+     *  mop_mode/mop_intensity when it's actually the wet pass (the backend forces
+     *  mop off for a dry pass regardless).
+     *  Previously this searched each vacuum's own preset LIST for one that
+     *  "looked" wet/dry and, worse, stopped after the FIRST capable vacuum per
+     *  kind — so one vacuum's fan_speed silently won for every other vacuum doing
+     *  that pass (e.g. S6's preset overriding S7's), and the active preset chip
+     *  the user actually picked was ignored in favor of that heuristic search. */
     _v2Settings() {
-        const isWet = (p) => (p.mop_intensity != null && p.mop_intensity !== "" && p.mop_intensity !== "off") || !!p.mop_mode;
         const out = {};
         for (const kind of ["dry", "wet"]) {
             for (const v of this._config.vacuums) {
                 const role = this._vacCleanType(v);
                 if (!(kind === "dry" ? role.dry : role.wet))
                     continue;
-                const presets = this._settingPresets(v);
-                const pick = presets.find((p) => (kind === "wet" ? isWet(p) : !isWet(p))) ?? presets[0];
-                if (!pick)
-                    continue;
+                const ap = this._activePreset(v);
                 const s = {};
-                if (pick.suction_level)
-                    s.fan_speed = pick.suction_level;
-                if (kind === "wet" && pick.mop_mode)
-                    s.mop_mode = pick.mop_mode;
-                if (kind === "wet" && pick.mop_intensity)
-                    s.mop_intensity = pick.mop_intensity;
-                if (pick.repeat && pick.repeat > 1)
-                    s.repeat = pick.repeat;
-                if (Object.keys(s).length) {
-                    out[kind] = s;
-                    break;
-                }
+                if (ap.suction_level)
+                    s.fan_speed = ap.suction_level;
+                if (kind === "wet" && ap.mop_mode)
+                    s.mop_mode = ap.mop_mode;
+                if (kind === "wet" && ap.mop_intensity)
+                    s.mop_intensity = ap.mop_intensity;
+                if (ap.repeat && ap.repeat > 1)
+                    s.repeat = ap.repeat;
+                if (Object.keys(s).length)
+                    (out[kind] ?? (out[kind] = {}))[v.entity] = s;
             }
         }
         return Object.keys(out).length ? out : undefined;
@@ -3258,7 +3261,9 @@ let AnyVacCard = class AnyVacCard extends i$2 {
                 rooms: selected.map((r) => r.key),
                 mode,
                 vacuums: [vac.entity],
-                ...(Object.keys(s).length ? { settings: { [mode]: s } } : {}),
+                // Settings are per-vacuum since 2026-07-26 (backend now expects
+                // {kind: {vacuum_ref: {...}}}, not a flat {kind: {...}} shared object).
+                ...(Object.keys(s).length ? { settings: { [mode]: { [vac.entity]: s } } } : {}),
             });
             return;
         }
