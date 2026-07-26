@@ -3206,7 +3206,18 @@ export class AnyVacCard extends LitElement {
   /** Integration mode: draw the robot + cleaning path as a vector overlay from the
    *  px-space attributes (kontrakt v2: vacuum_position_px, path_dry_px, path_wet_px
    *  — already in rendered-map pixels, no client-side mm math). */
-  private _renderIntegrationOverlay(vac: VacuumConfig, m: any) {
+  /** `part` lets merged mode (multiple vacuums stacked in one map, docs/19)
+   *  z-order paths and markers as two separate GROUPS across ALL vacuums,
+   *  instead of interleaved per vacuum. Each vacuum's own <svg> already put
+   *  its robot marker after its own paths (top within itself), but merged
+   *  mode stacks a whole such <svg> per vacuum one after another in DOM
+   *  order — so vacuum #2's translucent wet-mop band (~28% opacity, wide)
+   *  still visually sat OVER vacuum #1's robot marker, since #1's entire
+   *  <svg> (marker included) is earlier in the DOM than #2's paths (field
+   *  report 2026-07-26: S6's marker disappearing under S8's wet trace).
+   *  Split mode's `_renderMap` renders one fully independent box per vacuum
+   *  (no shared stacking context), so it keeps using the default "both". */
+  private _renderIntegrationOverlay(vac: VacuumConfig, m: any, part: "both" | "paths" | "marker" = "both") {
     const at = this._intAttrs(vac);
     if (!at) return nothing;
     const dims = at.image_dims;
@@ -3294,7 +3305,10 @@ export class AnyVacCard extends LitElement {
             <circle class="avc-err-halo" cx=${rob!.x.toFixed(1)} cy=${rob!.y.toFixed(1)} r=${(rr * 2.2).toFixed(1)}
               fill="#ff3b30" filter=${"url(#" + errFilterId + ")"}></circle>`
       : nothing;
-    return html`<svg class="map-vector" viewBox="0 0 ${NW} ${NH}" preserveAspectRatio="none" style=${styleMap(seat)}>${mopBand}${mopLine}${traceT}${errHalo}${robotT}</svg>`;
+    const pathsInner = svg`${mopBand}${mopLine}${traceT}`;
+    const markerInner = svg`${errHalo}${robotT}`;
+    const inner = part === "paths" ? pathsInner : part === "marker" ? markerInner : svg`${pathsInner}${markerInner}`;
+    return html`<svg class="map-vector" viewBox="0 0 ${NW} ${NH}" preserveAspectRatio="none" style=${styleMap(seat)}>${inner}</svg>`;
   }
 
   private _onLayerDown(type: "dry" | "wet"): void {
@@ -3643,7 +3657,12 @@ export class AnyVacCard extends LitElement {
               mixBlendMode: v.overlay_blend ?? "normal",
             })} />`;
         })}
-        ${shown.map((v) => (this._intAttrs(v) ? this._renderIntegrationOverlay(v, this._effectiveSeat(v)) : nothing))}
+        ${shown.map((v) => (this._intAttrs(v) ? this._renderIntegrationOverlay(v, this._effectiveSeat(v), "paths") : nothing))}
+        ${/* Markers in their OWN pass, after every vacuum's paths (not one
+           interleaved pass per vacuum) — a vacuum's wide translucent wet-mop
+           band can no longer sit on top of ANOTHER vacuum's robot marker
+           regardless of shown/DOM order (field report 2026-07-26). */
+          shown.map((v) => (this._intAttrs(v) ? this._renderIntegrationOverlay(v, this._effectiveSeat(v), "marker") : nothing))}
         ${this._config.layout ? nothing : this._renderLayerToggles(shown)}
         ${this._renderMergedRooms(shown)}
         ${/* Pin & Go / Zone interaction layer — merged mode used to render NONE of

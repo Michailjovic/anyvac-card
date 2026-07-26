@@ -8,6 +8,31 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Planned
 
+## [0.80.5] - 2026-07-26
+
+### Fixed
+
+In merged map mode (multiple vacuums on one floorplan), one vacuum's robot
+marker could disappear underneath ANOTHER vacuum's wide translucent wet-mop
+band. Reported: S6's marker invisible under S8's blue wet trace.
+
+Cause: `_renderMergedMap` stacked each shown vacuum's ENTIRE overlay (paths +
+marker) as one `<svg>` per vacuum, one after another in DOM order. Within a
+single vacuum's own `<svg>`, the marker already drew last (on top of its own
+paths) — but that only orders a vacuum against ITSELF. A later vacuum's whole
+`<svg>` — its wet band included — still sits on top of an earlier vacuum's
+marker, since the earlier vacuum's marker is inside an earlier `<svg>` in the
+DOM.
+
+`_renderIntegrationOverlay` now takes an optional `part: "paths" | "marker"`
+so merged mode can render it in two full passes across every shown vacuum —
+every vacuum's paths first, then every vacuum's markers — instead of one
+interleaved pass per vacuum. A marker (and its error halo) is now always on
+top of every vacuum's paths, regardless of shown/DOM order. Split mode's
+`_renderMap` (one fully independent box per vacuum, no shared stacking
+context) is unaffected — it keeps calling the function with its original
+default (`"both"`, one combined `<svg>`).
+
 ## [0.80.4] - 2026-07-26
 
 ### Fixed
