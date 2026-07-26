@@ -8,6 +8,25 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Planned
 
+## [0.80.3] - 2026-07-25
+
+### Fixed
+
+Landscape dock room rows (`.dock-row`) looked visually "scattered" —
+diagnosed from a field screenshot: the trailing warning icons (unassigned/
+unsequenced), age chips, and vacuum avatar chips were flat siblings of the
+room icon/name in the row's own flex flow, with no growing element and no
+`justify-content`, so they packed left along with the name instead of
+anchoring to the row's right edge. A room without the optional unassigned/
+unsequenced icon landed its avatars at a different x-position than one
+with it, and a short room name left a gap before the info block — avatars
+didn't line up row-to-row. Grouped the trailing content into one new
+`.dock-info` span with `margin-left: auto`, so icon+name is a fixed left
+column and everything else is one right-anchored block regardless of which
+optional icons are present or how long the name is. Portrait's centered/
+wrapped debug room list (`debug_dense_dock`) neutralises the auto margin
+(its own layout, unaffected).
+
 ## [0.80.2] - 2026-07-25
 
 ### Fixed

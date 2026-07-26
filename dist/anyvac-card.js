@@ -94,7 +94,7 @@ const t={ATTRIBUTE:1},e=t=>(...e)=>({_$litDirective$:t,values:e});let i$1 = clas
 
 const CARD_NAME = "anyvac-card";
 const EDITOR_NAME = "anyvac-card-editor";
-const CARD_VERSION = "0.80.2";
+const CARD_VERSION = "0.80.3";
 /** Hold duration in ms required to trigger START / PAUSE actions */
 const HOLD_DURATION_MS = 600;
 /** docs/25 §10 field report (2026-07-25): Android's swipe-up-from-bottom-edge
@@ -2879,19 +2879,21 @@ let AnyVacCard = class AnyVacCard extends i$2 {
                 this._toggleRoomAcross(r.key, vacs); }}>
                 <ha-icon class="dock-ric" icon=${r.icon ?? "mdi:square"}></ha-icon>
                 <span class="dock-name">${r.name ?? r.key}</span>
-                ${sel && unassigned.has(r.key) ? b `<ha-icon class="dock-unassigned" icon="mdi:robot-off"
-                  title="No available robot for this room's ${mode} pass — check that a vacuum is configured with the right role and knows this room."></ha-icon>` : A}
-                ${sel && unsequenced.has(r.key) ? b `<ha-icon class="dock-unseq" icon="mdi:sort-variant-off"
-                  title="No cleaning order set for this room — the time estimate may be off. Set the order in the card editor's Maps tab."></ha-icon>` : A}
-                <span class="dock-ages">
-                  <span class="dock-age">${this._renderProgChip(this._roomProgForType(r, vacs, "dry"))}<ha-icon icon="mdi:broom"></ha-icon><b style=${o({ color: this._colorForAgeDays(dry) })}>${badge(dry)}</b></span>
-                  <span class="dock-age">${this._renderProgChip(this._roomProgForType(r, vacs, "wet"))}<ha-icon icon="mdi:water"></ha-icon><b style=${o({ color: this._colorForAgeDays(wet) })}>${badge(wet)}</b></span>
+                <span class="dock-info">
+                  ${sel && unassigned.has(r.key) ? b `<ha-icon class="dock-unassigned" icon="mdi:robot-off"
+                    title="No available robot for this room's ${mode} pass — check that a vacuum is configured with the right role and knows this room."></ha-icon>` : A}
+                  ${sel && unsequenced.has(r.key) ? b `<ha-icon class="dock-unseq" icon="mdi:sort-variant-off"
+                    title="No cleaning order set for this room — the time estimate may be off. Set the order in the card editor's Maps tab."></ha-icon>` : A}
+                  <span class="dock-ages">
+                    <span class="dock-age">${this._renderProgChip(this._roomProgForType(r, vacs, "dry"))}<ha-icon icon="mdi:broom"></ha-icon><b style=${o({ color: this._colorForAgeDays(dry) })}>${badge(dry)}</b></span>
+                    <span class="dock-age">${this._renderProgChip(this._roomProgForType(r, vacs, "wet"))}<ha-icon icon="mdi:water"></ha-icon><b style=${o({ color: this._colorForAgeDays(wet) })}>${badge(wet)}</b></span>
+                  </span>
+                  ${hasInt && sel ? b `
+                    <span class="dock-avatars">
+                      ${showDry ? this._vacChip(dryOf.get(r.key), pinTap("dry", dryOf.get(r.key))) : A}
+                      ${showWet ? this._vacChip(wetOf.get(r.key), pinTap("wet", wetOf.get(r.key))) : A}
+                    </span>` : A}
                 </span>
-                ${hasInt && sel ? b `
-                  <span class="dock-avatars">
-                    ${showDry ? this._vacChip(dryOf.get(r.key), pinTap("dry", dryOf.get(r.key))) : A}
-                    ${showWet ? this._vacChip(wetOf.get(r.key), pinTap("wet", wetOf.get(r.key))) : A}
-                  </span>` : A}
               </button>`;
         })}
         </div>`}
@@ -5587,6 +5589,20 @@ AnyVacCard.styles = i$6 `
        heads-up about ETA accuracy, not an error blocking the clean. */
     .dock-unseq { --mdc-icon-size: 13px; color: #d4a017; flex-shrink: 0; margin: 0 2px; }
     .dock-unassigned { --mdc-icon-size: 13px; color: #ff4d4f; flex-shrink: 0; margin: 0 2px; }
+    /* 2026-07-25 field feedback: the trailing warning icons + ages + avatars
+     * used to be flat siblings of .dock-ric/.dock-name in the row's own
+     * flex flow — with no growing element and no justify-content, they
+     * packed left along with the name instead of anchoring to the row's
+     * right edge, so a room WITHOUT the optional unassigned/unsequenced
+     * icon (extra width before .dock-ages) landed its avatars at a
+     * different x-position than a room WITH one, and a short room name left
+     * a gap before the info block on rows narrower than the column's
+     * settled width (docs/28 §4) — looked "scattered" row-to-row instead of
+     * two clean columns. Grouping them into one .dock-info block with
+     * margin-left: auto makes icon+name the fixed left column and
+     * everything else one right-anchored block, regardless of which
+     * optional icons are present or how long the name is. */
+    .dock-info { display: inline-flex; align-items: center; gap: 6px; margin-left: auto; flex-shrink: 0; }
     .dock-ages { display: inline-flex; gap: 6px; flex-shrink: 0; }
     .dock-age { display: inline-flex; align-items: center; gap: 2px; font-size: 10px; }
     .dock-age ha-icon { --mdc-icon-size: 12px; color: rgba(255, 255, 255, 0.3); }
@@ -5733,6 +5749,12 @@ AnyVacCard.styles = i$6 `
     .avc-grid--portrait .dock-mode span { display: none; }
     .avc-grid--portrait .dock-name { display: none; }
     .avc-grid--portrait .dock-row { padding: 5px 5px; gap: 4px; flex-wrap: wrap; justify-content: center; }
+    /* .dock-name is hidden in portrait (below), so .dock-info's
+     * margin-left: auto has no left column to push away from — with
+     * justify-content: center on the row, an auto margin would eat the
+     * would-be-centered free space and shove the block hard right instead.
+     * Neutralised here; portrait's own centered-wrap look is unaffected. */
+    .avc-grid--portrait .dock-info { margin-left: 0; }
     .avc-grid--portrait .dock-ages { gap: 3px; }
     .avc-grid--portrait .dock-age { font-size: 9px; }
     .avc-grid--portrait .dock-age ha-icon { --mdc-icon-size: 10px; }
