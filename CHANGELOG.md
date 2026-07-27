@@ -8,6 +8,32 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Planned
 
+## [0.81.1] - 2026-07-27
+
+### Fixed
+
+Map auto-rotation (docs/25 §4) now applies in landscape too, not just portrait.
+`_narrow` (the rotation decision) was hard-gated to `this._profile === "portrait"`
+— a field report after deploying a new, very tall/narrow floorplan showed it
+rendering as a thin letterboxed strip with large black margins in landscape,
+because rotation (which would have fit it much better) was structurally
+disabled there. `shouldRotateMap()` was already pure geometry independent of
+profile, and `_renderResponsive()`/`_mapRegW`/`_mapRegH` were already
+profile-agnostic — the fix is purely widening `_narrow` to compute the same
+contain-fit comparison for whichever profile is active, reading
+`layout.landscape.crop.mapOrientation` as the manual override (mirrors the
+existing `layout.portrait.crop.mapOrientation`, same escape-hatch pattern,
+`ProfileGridConfig.crop` was already generic to both profiles in the type).
+Legacy (no `layout:` block) card-width heuristic is unchanged — it never
+rotated in landscape and still doesn't.
+
+**Known trade-off, not a new bug:** Pin & Go / Zone are disabled whenever
+`_narrow` is true (docs/13 A5 — the click-coordinate inversion doesn't yet
+account for the rotation wrapper). This limitation already existed in
+portrait; extending rotation to landscape extends the same limitation there,
+whenever a landscape floorplan actually needs rotating. Fixing the underlying
+click-inversion gap remains open, unscheduled work.
+
 ## [0.81.0] - 2026-07-26
 
 ### Added

@@ -3024,7 +3024,7 @@ export class AnyVacCard extends LitElement {
     const candidates = this._modeCandidates();
     const canCmd = candidates.length > 0 && !this._narrow;
     const cmdTitle = this._narrow
-      ? "Not available in the rotated mobile view"
+      ? "Not available while the map is rotated"
       : !canCmd ? "Requires the AnyVac integration (≥ 0.18) + map entity" : "";
     const mode = this._modeEntity === "*" ? this._mapMode : "normal";
     // docs/28 §2: room count + ETA dropped from this bar — the dock footer right
@@ -3108,11 +3108,11 @@ export class AnyVacCard extends LitElement {
   private _renderMapTools(vac: VacuumConfig) {
     if (!vac.map && !vac.image_base) return nothing;
     // Map commands need the integration's calibration AND this vacuum's map element
-    // for the click geometry. Disabled in the rotated (narrow) view — the click
-    // inversion does not account for the wrapper rotation yet (docs/13 A5).
+    // for the click geometry. Disabled whenever the map is rotated (any profile) —
+    // the click inversion does not account for the wrapper rotation yet (docs/13 A5).
     const canCmd = !!this._intAttrs(vac) && !!vac.map?.entity && !this._narrow;
     const cmdTitle = this._narrow
-      ? "Not available in the rotated mobile view"
+      ? "Not available while the map is rotated"
       : (!this._intAttrs(vac) || !vac.map?.entity)
         ? "Requires the AnyVac integration (≥ 0.18) + map entity"
         : "";
@@ -3474,21 +3474,29 @@ export class AnyVacCard extends LitElement {
     return defs.map(({ r, v }) => this._renderRoomOverlay(r, v, { vacs: shown, wholeHome }));
   }
 
-  /** Narrow (mobile) card → rotate the map to portrait (auto, unless disabled).
-   *  With a layout: portrait rotation is a COMPUTED choice (docs/25 §4) —
-   *  whichever orientation fits the floorplan bigger inside the measured map
-   *  region, not the old fixed "portrait always rotates" rule (that only
-   *  worked by coincidence for one specific wide floorplan). Landscape never
-   *  rotates. `layout.portrait.crop.mapOrientation` overrides the computed
-   *  choice manually. Without a `layout:` block the legacy card-width
-   *  heuristic applies, completely unchanged. */
+  /** Narrow → rotate the map 90° (auto, unless disabled). With a `layout:`
+   *  block this is a COMPUTED choice (docs/25 §4) in BOTH profiles —
+   *  whichever orientation (upright vs. rotated) fits the floorplan bigger
+   *  inside the measured map region — not just portrait. A very tall/narrow
+   *  floorplan on a wide landscape box benefits from this exactly the same
+   *  way a wide floorplan on a portrait phone does (field report 2026-07-27:
+   *  a new tall floorplan rendered as a thin letterboxed strip in landscape
+   *  because rotation was hard-gated to portrait only). `layout.portrait
+   *  .crop.mapOrientation` / `layout.landscape.crop.mapOrientation` override
+   *  the computed choice manually, per profile. Without a `layout:` block
+   *  the legacy card-width heuristic applies, completely unchanged (that
+   *  path never rotated in landscape either, and still doesn't). NOTE: Pin
+   *  & Go / Zone are disabled whenever this is true (`_renderMetaBar`,
+   *  `_renderMapTools`, docs/13 A5 — the click-coordinate inversion doesn't
+   *  account for the rotation wrapper yet) — extending rotation to
+   *  landscape extends that same limitation to landscape. */
   private get _narrow(): boolean {
     const mr = this._config.mobile_rotate as string | undefined;
     if (mr === "off") return false;
     if (mr === "always" || mr === "on") return true;  // force (good for testing)
     if (this._config.layout) {
-      if (this._profile !== "portrait") return false;
-      const override = this._config.layout.portrait?.crop?.mapOrientation;
+      const profileCfg = this._profile === "portrait" ? this._config.layout.portrait : this._config.layout.landscape;
+      const override = profileCfg?.crop?.mapOrientation;
       if (override === "normal") return false;
       if (override === "rotated") return true;
       const computed = shouldRotateMap(this._mapAR, this._mapRegW, this._mapRegH);
@@ -3561,7 +3569,9 @@ export class AnyVacCard extends LitElement {
     // Grid mode (docs/19 follow-up): fit the map into the measured region box —
     // exact, since the box is whatever the grid ACTUALLY allocated, not a guess
     // (this is what fixes landscape cropping content that didn't fit the "auto"
-    // row's real height). Portrait rotates 90° first; landscape doesn't.
+    // row's real height). Either profile rotates 90° first when `_narrow`
+    // computes it fits better that way (docs/25 §4, extended to landscape
+    // 2026-07-27) — `rotate` below already carries the right answer either way.
     if (this._mapRegW <= 4 || this._mapRegH <= 4) return mapHtml; // not measured yet
     const ar = this._mapAR > 0.1 ? this._mapAR : 3.636;
     const rotate = this._narrow;
