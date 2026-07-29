@@ -94,7 +94,7 @@ const t={ATTRIBUTE:1},e=t=>(...e)=>({_$litDirective$:t,values:e});let i$1 = clas
 
 const CARD_NAME = "anyvac-card";
 const EDITOR_NAME = "anyvac-card-editor";
-const CARD_VERSION = "0.83.0";
+const CARD_VERSION = "0.84.0";
 /** Hold duration in ms required to trigger START / PAUSE actions */
 const HOLD_DURATION_MS = 600;
 /** docs/25 §10 field report (2026-07-25): Android's swipe-up-from-bottom-edge
@@ -7242,8 +7242,7 @@ let AnyVacCardEditor = class AnyVacCardEditor extends i$2 {
     _renderCleanActionEditor(vacIdx, vac) {
         const action = vac.clean_action ?? { type: "native" };
         return b `
-      ${this._selectField("Strategy", action.type, [{ value: "native", label: "Native (vacuum.send_command + segment IDs)" },
-            { value: "native-auto", label: "Native auto (deprecated — same as Native without the integration)" },
+      ${this._selectField("Strategy", action.type === "native-auto" ? "native" : action.type, [{ value: "native", label: "Native (vacuum.send_command + segment IDs)" },
             { value: "native-area", label: "Native area (vacuum.clean_area)" },
             { value: "script", label: "Custom script" }], v => {
             if (v === "script") {
@@ -7272,8 +7271,8 @@ let AnyVacCardEditor = class AnyVacCardEditor extends i$2 {
         const hint = action.type === "native-area"
             ? b `<p class="hint">Calls <code>vacuum.clean_area</code> (degraded mode only — with the AnyVac integration the START button sends <code>anyvac.clean</code> instead). No repeat; repeat lives server-side in <code>anyvac.clean</code>.</p>`
             : action.type === "native-auto"
-                ? b `<p class="hint">Deprecated: the <code>roborock.get_maps</code> auto-resolve was removed (docs/14 §3.7). With the AnyVac integration the backend resolves segments; without it this behaves like Native and needs configured <code>segment_id</code>s.</p>`
-                : A;
+                ? b `<p class="hint">Legacy value, no longer offered above — behaves identically to <strong>Native</strong> (segment-based) both with and without the integration. Safe to leave as-is; re-selecting "Native" above rewrites it.</p>`
+                : b `<p class="hint">Degraded mode only — with the AnyVac integration the START button always sends <code>anyvac.clean</code> instead, which resolves segments server-side.</p>`;
         return b `
       <div class="sub-section">
         ${hint}
@@ -7361,12 +7360,11 @@ let AnyVacCardEditor = class AnyVacCardEditor extends i$2 {
         ${isOpen ? b `
           <div class="room-acc-body">
             ${this._textField("Key (unique ID)", room.key, v => this._setRoom(vacIdx, roomIdx, { key: v }), "e.g. bedroom")}
-            <p class="hint">Tip: keep this identical to the room's name in the Roborock app — the <code>native-auto</code> strategy pairs rooms by this name.</p>
+            <p class="hint">Tip: keep this identical to the room's name in the Roborock app — the AnyVac integration matches rooms by this name (auto-seating, live positions from the integration, room pinning).</p>
             ${this._textField("Display name", room.name, v => this._setRoom(vacIdx, roomIdx, { name: v }), "e.g. Bedroom")}
             <p class="hint">Cleaning sequence moved to a shared, backend-owned reorderable
               list — see the <strong>Maps tab</strong> (requires the AnyVac integration + merged mode).</p>
-            ${(this._config.vacuums[vacIdx]?.clean_action?.type === "native-area" ||
-            this._config.vacuums[vacIdx]?.clean_action?.type === "native-auto")
+            ${this._config.vacuums[vacIdx]?.clean_action?.type === "native-area"
             ? b `
                 <div class="field field--row">
                   <label>Effective area</label>
@@ -7876,22 +7874,27 @@ let AnyVacCardEditor = class AnyVacCardEditor extends i$2 {
         <div class="section-title" style="margin-top:4px">Notifications</div>
         <p class="hint">
           Notifications are built from the AnyVac integration's server-side events
-          (<code>anyvac_clean_started</code>, <code>anyvac_clean_finished</code>,
-          <code>anyvac_room_done</code>, <code>anyvac_vacuum_error</code>) — the
-          integration ships ready-made automation blueprints for them
-          (Settings → Automations → Create with blueprint). The card no longer sends
-          notifications itself.
+          three ready-made automation blueprints (Settings → Automations →
+          Create with blueprint) — the card no longer sends notifications itself:
         </p>
+        <ul style="margin:0;padding-left:18px;font-size:12px;color:var(--secondary-text-color);display:flex;flex-direction:column;gap:2px">
+          <li><strong>Clean finished</strong> — fires on the integration's <code>anyvac_clean_finished</code> event.</li>
+          <li><strong>Vacuum error</strong> — watches the official Roborock error sensor's state directly (not an AnyVac event).</li>
+          <li><strong>Room overdue</strong> — polls an AnyVac per-room "last cleaned" timestamp sensor hourly against a day threshold you set.</li>
+        </ul>
+        <p class="hint">The integration also fires <code>anyvac_clean_started</code> and
+          <code>anyvac_room_done</code> events, but neither has a shipped blueprint yet —
+          build a custom automation on the event if you need one.</p>
 
         ${(() => {
-            const usesAreaMappings = this._config.vacuums.some(v => v.clean_action?.type === "native-area" || v.clean_action?.type === "native-auto");
+            const usesAreaMappings = this._config.vacuums.some(v => v.clean_action?.type === "native-area");
             if (!usesAreaMappings)
                 return A;
             const allKeys = [...new Set(this._config.vacuums.flatMap(v => (v.rooms ?? []).map(r => r.key)).filter(Boolean))].sort();
             const mappings = this._config.area_mappings ?? {};
             return b `
             <div class="section-title" style="margin-top:4px">Area mappings</div>
-            <p class="hint">Maps room keys to HA areas for the <strong>native-area</strong> and <strong>native-auto</strong> strategies. Set once here — applies to all vacuums.</p>
+            <p class="hint">Maps room keys to HA areas for the <strong>native-area</strong> strategy (degraded mode only — irrelevant once the AnyVac integration is active for a vacuum). Set once here — applies to all vacuums.</p>
             ${allKeys.length === 0
                 ? b `<p class="hint">No rooms configured yet.</p>`
                 : allKeys.map(key => this._areaPicker(key, mappings[key], v => {

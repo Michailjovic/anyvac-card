@@ -8,6 +8,47 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Planned
 
+## [0.84.0] - 2026-07-30
+
+### Changed
+
+Follow-up to 0.83.0's editor cleanup — a closer look at Area mappings and
+Notifications (Global tab) surfaced stale/inaccurate copy and one genuinely
+dead config option:
+
+- Removed `native-auto` as a selectable Clean action strategy — verified it
+  behaves 100% identically to `native` today (segment_id + app_segment_clean),
+  both with and without the integration. Its original distinguishing
+  behaviour (`roborock.get_maps` dynamic resolve, matching rooms via
+  `area_mappings`) was deleted in the docs/14 §3.7 purge, so it had been a
+  pure, confusing duplicate. Existing configs with the literal value keep
+  working unchanged (runtime already treated it as an alias); the editor now
+  displays/writes them as "Native" once touched. `types.ts` docstrings for
+  `NativeAreaCleanAction`/`NativeAutoCleanAction` updated to match reality
+  (both were describing removed behaviour — a false "software repeat" claim
+  on the former, the deleted dynamic-resolve mechanism on the latter).
+- Area mappings section now gates on `native-area` only (was incorrectly
+  also shown/described for `native-auto`, which never used it). Hint text
+  now states plainly that this is degraded-mode-only — irrelevant once the
+  AnyVac integration is active for a vacuum (which it always is with the
+  START button; `anyvac.clean` ignores the configured strategy entirely).
+  The per-room "Effective area" preview is likewise now native-area-only —
+  it was misleadingly shown for native-auto rooms too, which are actually
+  segment-based like plain Native.
+- The room "Key" field hint no longer cites the (already-removed)
+  native-auto name-matching behaviour; it now correctly explains the real,
+  current reason to match the Roborock app's room name: the AnyVac
+  integration's own name-based matching (auto-seating, live room positions,
+  room pinning).
+- Notifications hint rewritten to accurately describe the three blueprints
+  the integration actually ships, since they don't work uniformly the way
+  the old text implied: **Clean finished** fires on the real
+  `anyvac_clean_finished` event; **Vacuum error** watches the official
+  Roborock error sensor's state directly (there is no `anyvac_vacuum_error`
+  event — the old text was simply wrong); **Room overdue** polls a per-room
+  timestamp sensor hourly. Also notes `anyvac_clean_started` and
+  `anyvac_room_done` are real fired events with no shipped blueprint yet.
+
 ## [0.83.0] - 2026-07-30
 
 ### Changed

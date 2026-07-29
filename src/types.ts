@@ -102,14 +102,17 @@ export interface NativeCleanAction {
 }
 
 /**
- * Uses the newer HA vacuum.clean_area action.
- * room.key is sent directly as cleaning_area_id -- no segment_id needed.
- * Repeat is implemented in software: the card restarts cleaning after each
- * pass (the integration does not accept a times/repeat parameter).
+ * Uses the HA vacuum.clean_area action. room.key (or an area_mappings override)
+ * is sent as cleaning_area_id -- no segment_id needed. Degraded mode only: once
+ * the AnyVac integration is active for a vacuum, START always calls
+ * anyvac.clean instead and this strategy is never exercised (docs/14 §8).
+ * No repeat -- an earlier software-repeat implementation (restarting
+ * clean_area after each pass) was removed for being unsafe with mop washing
+ * (docs/13 A1); repeat now only exists server-side, in anyvac.clean.
  */
 export interface NativeAreaCleanAction {
   type: "native-area";
-  repeat?: number;         // software repeat -- card restarts after each pass
+  repeat?: number;         // unused -- kept for shape compat with the other native variants
   suction_level?: string;
   mop_mode_entity?: string;
   mop_mode?: string;
@@ -118,9 +121,14 @@ export interface NativeAreaCleanAction {
 }
 
 /**
- * Uses roborock.get_maps to dynamically resolve segment IDs, then calls
- * vacuum.send_command with app_segment_clean + repeat (same as native).
- * No segment_id needed per room -- matching is done via area_mappings.
+ * Legacy alias, no longer offered in the editor (2026-07-30) -- behaves
+ * identically to NativeCleanAction (segment_id + app_segment_clean) both with
+ * and without the integration. Its original distinguishing behaviour (a
+ * roborock.get_maps dynamic resolve, matching rooms via area_mappings instead
+ * of a configured segment_id) was deleted in the docs/14 §3.7 frontend purge,
+ * making it a pure duplicate of "native". Kept only so existing configs with
+ * this literal value keep working; the editor now displays/writes such
+ * configs as "native" once touched.
  */
 export interface NativeAutoCleanAction {
   type: "native-auto";
