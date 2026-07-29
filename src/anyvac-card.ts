@@ -1181,6 +1181,16 @@ export class AnyVacCard extends LitElement {
     if (!rlc) return null;
     return (rlc[room.key] ?? rlc[room.name ?? ""] ?? null) as Record<string, string> | null;
   }
+  /** Persistent "last completed clean covered X%" per room (docs/29) — durable across
+   *  restarts/dock trips, unlike `_roomProgForType`'s live in-session gauge (which reads
+   *  `rooms_progress` and goes blank the moment the vacuum docks). Missing kind = no
+   *  completed clean with an established baseline yet; the caller renders "—", never a
+   *  misleading 0%/100%. */
+  private _roomCoverageRec(vac: VacuumConfig, room: RoomConfig): Record<string, number> | null {
+    const rc = this._intAttrs(vac)?.rooms_coverage as Record<string, any> | undefined;
+    if (!rc) return null;
+    return (rc[room.key] ?? rc[room.name ?? ""] ?? null) as Record<string, number> | null;
+  }
   private _ageDaysFromIso(iso?: string): number | null {
     if (!iso) return null;
     const t = new Date(iso).getTime();
@@ -1290,9 +1300,15 @@ export class AnyVacCard extends LitElement {
     </div>`;
   }
 
-  /** Inline % chip for the room menus (debug only). Coloured by the vacuum when provided. */
+  /** Inline % chip for the room menus/dock rows — live in-session coverage while a room
+   *  is actively (or was just) being cleaned. Promoted out of the debug gate (docs/29
+   *  §4.4): it's the same data as the persistent post-clean % (`_roomCoverageRec`), just
+   *  live during the session, so there's no reason to show one and hide the other.
+   *  `debug_room_progress` still gates the rest of the debug strip (map corner gauges,
+   *  the status card's mm:ss timer) — this chip alone is production UI now. Coloured by
+   *  the vacuum when provided. */
   private _renderProgChip(p: { pct: number; kind: "S" | "T"; title: string; color?: string; calibrating?: boolean } | null) {
-    if (!this._config.debug_room_progress || !p) return nothing;
+    if (!p) return nothing;
     return html`<span class="rl-prog" title=${p.title}
       style=${styleMap({ color: p.color ?? this._progColor(p.pct) })}>${p.pct}${p.calibrating ? "~" : ""}%<small>${p.kind}</small></span>`;
   }
@@ -2086,6 +2102,8 @@ export class AnyVacCard extends LitElement {
             const rec = this._intRoomRec(v, r);
             const dry = this._ageDaysFromIso(rec?.dry);
             const wet = this._ageDaysFromIso(rec?.wet);
+            const cov = this._roomCoverageRec(v, r);
+            const covBadge = (pct: number | null | undefined) => (pct == null ? "—" : pct + "%");
             const sel = this._isRoomSelectedAny(r.key, vacs);
             // Cycle relative to what THIS chip currently shows (dry vs. wet
             // can differ), not the raw pin store — see _cycleRoomPin. Each
@@ -2111,8 +2129,8 @@ export class AnyVacCard extends LitElement {
                   ${sel && unsequenced.has(r.key) ? html`<ha-icon class="dock-unseq" icon="mdi:sort-variant-off"
                     title="No cleaning order set for this room — the time estimate may be off. Set the order in the card editor's Maps tab."></ha-icon>` : nothing}
                   <span class="dock-ages">
-                    <span class="dock-age">${this._renderProgChip(this._roomProgForType(r, vacs, "dry"))}<ha-icon icon="mdi:broom"></ha-icon><b style=${styleMap({ color: this._colorForAgeDays(dry) })}>${badge(dry)}</b></span>
-                    <span class="dock-age">${this._renderProgChip(this._roomProgForType(r, vacs, "wet"))}<ha-icon icon="mdi:water"></ha-icon><b style=${styleMap({ color: this._colorForAgeDays(wet) })}>${badge(wet)}</b></span>
+                    <span class="dock-age">${this._renderProgChip(this._roomProgForType(r, vacs, "dry"))}<ha-icon icon="mdi:broom"></ha-icon><b style=${styleMap({ color: this._colorForAgeDays(dry) })}>${badge(dry)}</b><small class="dock-cov" title="Last completed dry clean's coverage">${covBadge(cov?.dry)}</small></span>
+                    <span class="dock-age">${this._renderProgChip(this._roomProgForType(r, vacs, "wet"))}<ha-icon icon="mdi:water"></ha-icon><b style=${styleMap({ color: this._colorForAgeDays(wet) })}>${badge(wet)}</b><small class="dock-cov" title="Last completed wet clean's coverage">${covBadge(cov?.wet)}</small></span>
                   </span>
                   ${hasInt && sel ? html`
                     <span class="dock-avatars">
@@ -4798,6 +4816,10 @@ export class AnyVacCard extends LitElement {
     .dock-ages { display: inline-flex; gap: 6px; flex-shrink: 0; }
     .dock-age { display: inline-flex; align-items: center; gap: 2px; font-size: 10px; }
     .dock-age ha-icon { --mdc-icon-size: 12px; color: rgba(255, 255, 255, 0.3); }
+    /* Persistent last-clean coverage % (docs/29) — deliberately dimmer/smaller than the
+       age badge next to it: age is the primary "should I clean this?" signal, coverage
+       is supporting detail. */
+    .dock-cov { font-size: 9px; opacity: 0.45; margin-left: 1px; }
     .dock-avatars { display: inline-flex; gap: 3px; flex-shrink: 0; }
     .dock-chip {
       display: inline-flex;
@@ -4950,6 +4972,7 @@ export class AnyVacCard extends LitElement {
     .avc-grid--portrait .dock-ages { gap: 3px; }
     .avc-grid--portrait .dock-age { font-size: 9px; }
     .avc-grid--portrait .dock-age ha-icon { --mdc-icon-size: 10px; }
+    .avc-grid--portrait .dock-cov { font-size: 8px; }
 
     .avc-schemawarn {
       position: absolute;

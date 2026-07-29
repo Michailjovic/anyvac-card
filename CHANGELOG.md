@@ -8,6 +8,26 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Planned
 
+## [0.82.0] - 2026-07-29
+
+### Added
+
+Room coverage % (docs/29, spec ratified 2026-07-29). Two related pieces, both
+reading data the integration already computed but never fully surfaced:
+
+- Persistent "last completed clean covered X%" chip next to the existing age
+  chip (✓1d/💧1d) in dock rows (`.dock-cov`, both the landscape sidebar dock
+  and the portrait dense dock) — reads the integration's new `rooms_coverage`
+  attribute via `_roomCoverageRec`. Shows "—" when no baseline exists yet
+  (first-ever clean of a room), never a misleading 0%/100%.
+- The live in-session coverage chip (`_renderProgChip`, shown next to the
+  room name while a room is being — or was just — cleaned) is promoted out
+  of the `debug_room_progress` gate into production. It's the same
+  data/math as the persistent chip above, just live during the session
+  instead of a durable snapshot; no reason to show one and hide the other.
+  `debug_room_progress` still gates the rest of the debug strip (map corner
+  gauges, the status card's mm:ss timer) — unchanged.
+
 ## [0.81.1] - 2026-07-27
 
 ### Fixed
