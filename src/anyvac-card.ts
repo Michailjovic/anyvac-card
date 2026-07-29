@@ -1713,7 +1713,7 @@ export class AnyVacCard extends LitElement {
     });
   }
   /** Select a global preset (does NOT run): set the plan mode + apply its room scope,
-   *  so the plan preview reflects it. The user runs it via the plan's "Spustit". */
+   *  so the plan preview reflects it. The user runs it via the plan's "Start · hold". */
   private _selectGlobalPreset(gp: GlobalPreset): void {
     this._activeGlobalPreset = gp.id;
     if (gp.mode) this._planMode = gp.mode;
@@ -1772,8 +1772,8 @@ export class AnyVacCard extends LitElement {
     return html`
       <div style="margin:0 4px 6px;padding:6px 8px;background:rgba(255,255,255,0.03);border:1px solid rgba(255,255,255,0.08);border-radius:12px;display:flex;flex-direction:column;gap:6px">
         <div style="display:flex;align-items:center;justify-content:space-between">
-          <span style="font-size:9px;font-weight:600;letter-spacing:.6px;color:rgba(255,255,255,.35)">PLÁN ÚKLIDU${apLabel ? " · " + apLabel.toUpperCase() : ""}</span>
-          <div style="display:flex;gap:4px">${modeBtn("dry", "Sucho")}${modeBtn("wet", "Mokro")}${modeBtn("both", "Obojí")}</div>
+          <span style="font-size:9px;font-weight:600;letter-spacing:.6px;color:rgba(255,255,255,.35)">CLEAN PLAN${apLabel ? " · " + apLabel.toUpperCase() : ""}</span>
+          <div style="display:flex;gap:4px">${modeBtn("dry", "Dry")}${modeBtn("wet", "Wet")}${modeBtn("both", "Both")}</div>
         </div>
         <div style="display:flex;gap:6px;overflow-x:auto;align-items:center">
           <div style="display:flex;flex-direction:column;gap:3px;align-items:center;flex-shrink:0;padding-right:2px">
@@ -1799,7 +1799,7 @@ export class AnyVacCard extends LitElement {
           @pointercancel=${this._holdEnd}>
           <div class="hold-ring"></div>
           <ha-icon icon="mdi:play" style="--mdc-icon-size:18px"></ha-icon>
-          <span style="font-size:12px">Spustit · podrž</span>
+          <span style="font-size:12px">Start · hold</span>
         </button>
       </div>
     `;
@@ -1819,8 +1819,8 @@ export class AnyVacCard extends LitElement {
             <div style="display:flex;flex-direction:column;align-items:flex-start;line-height:1.15">
               <span style="font-size:13px;font-weight:700">${gp.label}</span>
               <small style="font-size:9px;font-weight:600;letter-spacing:.4px;color:rgba(255,255,255,0.4)">${
-                gp.scope === "all" ? "CELÝ BYT" : gp.scope === "select" ? "VYBRANÉ" : "MÍSTNOSTI"
-              }${gp.mode ? " · " + (gp.mode === "dry" ? "SUCHO" : gp.mode === "wet" ? "MOKRO" : "OBOJÍ") : ""}</small>
+                gp.scope === "all" ? "WHOLE HOME" : gp.scope === "select" ? "SELECTED" : "ROOMS"
+              }${gp.mode ? " · " + (gp.mode === "dry" ? "DRY" : gp.mode === "wet" ? "WET" : "BOTH") : ""}</small>
             </div>
           </button>`;
         })}
@@ -2410,7 +2410,7 @@ export class AnyVacCard extends LitElement {
           @pointermove=${this._holdMove}
           @pointerup=${this._holdEnd} @pointerleave=${this._holdEnd} @pointercancel=${this._holdEnd}>
           <div class="hold-ring"></div>
-          <ha-icon icon="mdi:rocket-launch"></ha-icon>
+          <ha-icon icon="mdi:play"></ha-icon>
           <span>START · ${scopeLabel}${est ? " · ~" + est + " min" : ""}</span>
         </button>
         ${dockSeg}
@@ -4232,9 +4232,9 @@ export class AnyVacCard extends LitElement {
           @pointercancel=${this._holdEnd}
         >
           <div class="hold-ring"></div>
-          <ha-icon icon="mdi:rocket-launch" style=${styleMap({ color: startIconColor })}></ha-icon>
+          <ha-icon icon="mdi:play" style=${styleMap({ color: startIconColor })}></ha-icon>
           <div class="start-body">
-            <span style=${styleMap({ color: startTextColor })}>START</span>
+            <span style=${styleMap({ color: startTextColor })}>${hasRooms ? "START" : "Select rooms"}</span>
             ${(this._roomsFor(vac)).length > 0 ? html`
               <div class="room-icons">
                 ${(this._roomsFor(vac)).map(r => html`

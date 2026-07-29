@@ -94,7 +94,7 @@ const t={ATTRIBUTE:1},e=t=>(...e)=>({_$litDirective$:t,values:e});let i$1 = clas
 
 const CARD_NAME = "anyvac-card";
 const EDITOR_NAME = "anyvac-card-editor";
-const CARD_VERSION = "0.81.1";
+const CARD_VERSION = "0.83.0";
 /** Hold duration in ms required to trigger START / PAUSE actions */
 const HOLD_DURATION_MS = 600;
 /** docs/25 §10 field report (2026-07-25): Android's swipe-up-from-bottom-edge
@@ -2475,7 +2475,7 @@ let AnyVacCard = class AnyVacCard extends i$2 {
         });
     }
     /** Select a global preset (does NOT run): set the plan mode + apply its room scope,
-     *  so the plan preview reflects it. The user runs it via the plan's "Spustit". */
+     *  so the plan preview reflects it. The user runs it via the plan's "Start · hold". */
     _selectGlobalPreset(gp) {
         this._activeGlobalPreset = gp.id;
         if (gp.mode)
@@ -2550,8 +2550,8 @@ let AnyVacCard = class AnyVacCard extends i$2 {
         return b `
       <div style="margin:0 4px 6px;padding:6px 8px;background:rgba(255,255,255,0.03);border:1px solid rgba(255,255,255,0.08);border-radius:12px;display:flex;flex-direction:column;gap:6px">
         <div style="display:flex;align-items:center;justify-content:space-between">
-          <span style="font-size:9px;font-weight:600;letter-spacing:.6px;color:rgba(255,255,255,.35)">PLÁN ÚKLIDU${apLabel ? " · " + apLabel.toUpperCase() : ""}</span>
-          <div style="display:flex;gap:4px">${modeBtn("dry", "Sucho")}${modeBtn("wet", "Mokro")}${modeBtn("both", "Obojí")}</div>
+          <span style="font-size:9px;font-weight:600;letter-spacing:.6px;color:rgba(255,255,255,.35)">CLEAN PLAN${apLabel ? " · " + apLabel.toUpperCase() : ""}</span>
+          <div style="display:flex;gap:4px">${modeBtn("dry", "Dry")}${modeBtn("wet", "Wet")}${modeBtn("both", "Both")}</div>
         </div>
         <div style="display:flex;gap:6px;overflow-x:auto;align-items:center">
           <div style="display:flex;flex-direction:column;gap:3px;align-items:center;flex-shrink:0;padding-right:2px">
@@ -2577,7 +2577,7 @@ let AnyVacCard = class AnyVacCard extends i$2 {
           @pointercancel=${this._holdEnd}>
           <div class="hold-ring"></div>
           <ha-icon icon="mdi:play" style="--mdc-icon-size:18px"></ha-icon>
-          <span style="font-size:12px">Spustit · podrž</span>
+          <span style="font-size:12px">Start · hold</span>
         </button>
       </div>
     `;
@@ -2598,7 +2598,7 @@ let AnyVacCard = class AnyVacCard extends i$2 {
             <ha-icon icon=${gp.icon || "mdi:robot-vacuum-variant"} style="--mdc-icon-size:24px"></ha-icon>
             <div style="display:flex;flex-direction:column;align-items:flex-start;line-height:1.15">
               <span style="font-size:13px;font-weight:700">${gp.label}</span>
-              <small style="font-size:9px;font-weight:600;letter-spacing:.4px;color:rgba(255,255,255,0.4)">${gp.scope === "all" ? "CELÝ BYT" : gp.scope === "select" ? "VYBRANÉ" : "MÍSTNOSTI"}${gp.mode ? " · " + (gp.mode === "dry" ? "SUCHO" : gp.mode === "wet" ? "MOKRO" : "OBOJÍ") : ""}</small>
+              <small style="font-size:9px;font-weight:600;letter-spacing:.4px;color:rgba(255,255,255,0.4)">${gp.scope === "all" ? "WHOLE HOME" : gp.scope === "select" ? "SELECTED" : "ROOMS"}${gp.mode ? " · " + (gp.mode === "dry" ? "DRY" : gp.mode === "wet" ? "WET" : "BOTH") : ""}</small>
             </div>
           </button>`;
         })}
@@ -3191,7 +3191,7 @@ let AnyVacCard = class AnyVacCard extends i$2 {
           @pointermove=${this._holdMove}
           @pointerup=${this._holdEnd} @pointerleave=${this._holdEnd} @pointercancel=${this._holdEnd}>
           <div class="hold-ring"></div>
-          <ha-icon icon="mdi:rocket-launch"></ha-icon>
+          <ha-icon icon="mdi:play"></ha-icon>
           <span>START · ${scopeLabel}${est ? " · ~" + est + " min" : ""}</span>
         </button>
         ${dockSeg}
@@ -5081,9 +5081,9 @@ let AnyVacCard = class AnyVacCard extends i$2 {
           @pointercancel=${this._holdEnd}
         >
           <div class="hold-ring"></div>
-          <ha-icon icon="mdi:rocket-launch" style=${o({ color: startIconColor })}></ha-icon>
+          <ha-icon icon="mdi:play" style=${o({ color: startIconColor })}></ha-icon>
           <div class="start-body">
-            <span style=${o({ color: startTextColor })}>START</span>
+            <span style=${o({ color: startTextColor })}>${hasRooms ? "START" : "Select rooms"}</span>
             ${(this._roomsFor(vac)).length > 0 ? b `
               <div class="room-icons">
                 ${(this._roomsFor(vac)).map(r => b `
@@ -6999,6 +6999,23 @@ let AnyVacCardEditor = class AnyVacCardEditor extends i$2 {
           @change=${(e) => onChange(e.target.value)} />
       </div>`;
     }
+    /** Hex colour field with a native colour-picker swatch alongside the text input —
+     *  the swatch writes back as a hex string, so both stay interchangeable. Falls
+     *  back to the placeholder colour for the swatch when the current value isn't a
+     *  valid #rrggbb (empty, or a CSS variable/name some configs still use). */
+    _hexColorField(label, value, onChange, placeholder) {
+        const swatch = /^#[0-9a-fA-F]{6}$/.test(value ?? "") ? value : placeholder;
+        return b `
+      <div class="field">
+        <label>${label} (hex)</label>
+        <div class="hex-color-row">
+          <input type="color" class="threshold-color" .value=${swatch}
+            @input=${(e) => onChange(e.target.value)} />
+          <input class="text-input" type="text" .value=${value ?? ""} placeholder=${placeholder}
+            @change=${(e) => onChange(e.target.value)} />
+        </div>
+      </div>`;
+    }
     _numberSlider(label, value, min, max, step, onChange, suffix = "") {
         const cur = value ?? 0;
         return b `
@@ -7118,11 +7135,11 @@ let AnyVacCardEditor = class AnyVacCardEditor extends i$2 {
             ${this._textField("Display name", vac.name, v => this._setVacuum(idx, { name: v }), "e.g. S8")}
             ${this._textField("Image path", vac.image, v => this._setVacuum(idx, { image: v }), "/local/...")}
             ${this._selectField("Accent colour", vac.color ?? "green", [{ value: "green", label: "Green" }, { value: "blue", label: "Blue" }, { value: "orange", label: "Orange" }], v => this._setVacuum(idx, { color: v }))}
-            ${this._selectField("Clean type (time estimate & layers)", vac.clean_type ?? "auto", [{ value: "auto", label: "Auto-detect from clean action" },
+            ${this._selectField("Role", vac.clean_type ?? "auto", [{ value: "auto", label: "Auto-detect from clean action" },
             { value: "dry", label: "Dry only" },
             { value: "wet", label: "Wet only" },
             { value: "both", label: "Both — follow live mode" }], v => this._setVacuum(idx, { clean_type: v === "auto" ? undefined : v }))}
-            <p class="hint">Controls which time estimate and which dry/wet layer the vacuum uses. "Both" follows the live water mode (needs the integration sensor).</p>
+            <p class="hint">This vacuum's capability — controls which time estimate and which dry/wet layer it uses. Not the run-time Dry/Wet/Both choice (that's made on the controller). "Both" follows the live water mode (needs the integration sensor).</p>
 
             ${this._renderSensorsSection(idx, vac)}
             ${this._renderCleanActionSection(idx, vac)}
@@ -7188,7 +7205,7 @@ let AnyVacCardEditor = class AnyVacCardEditor extends i$2 {
                     <ha-icon icon="mdi:delete"></ha-icon>
                   </button>
                 </div>
-                ${this._textField("Label", p.label, v => this._setPreset(vacIdx, pi, { label: v }), "e.g. Suchý")}
+                ${this._textField("Label", p.label, v => this._setPreset(vacIdx, pi, { label: v }), "e.g. Dry")}
                 ${this._textField("Icon", p.icon, v => this._setPreset(vacIdx, pi, { icon: v || undefined }), "mdi:broom")}
                 ${speeds.length
             ? this._optionSelectFromList("Suction", speeds, p.suction_level, v => this._setPreset(vacIdx, pi, { suction_level: v || undefined }))
@@ -7429,19 +7446,6 @@ let AnyVacCardEditor = class AnyVacCardEditor extends i$2 {
 
         ${(this._intEntityFor(vac) || this._config.map_mode === "merged") ? this._selectField("Hide vacuum map (show only floorplan + robot/path)", vac.hide_map ? "yes" : "no", [{ value: "no", label: "no" }, { value: "yes", label: "yes" }], v => this._setVacuum(mapVac, { hide_map: v === "yes" })) : A}
 
-        ${this._intEntityFor(vac) ? b `
-          ${this._textField("Path colour (hex)", vac.path_color, v => this._setVacuum(mapVac, { path_color: v || undefined }), "#69d2ff")}
-          ${this._numberSlider("Path width", vac.path_width ?? 100, 20, 300, 10, v => this._setVacuum(mapVac, { path_width: v }), "%")}
-          ${this._textField("Mop band colour (hex)", vac.mop_path_color, v => this._setVacuum(mapVac, { mop_path_color: v || undefined }), "#40a9ff")}
-          ${this._numberSlider("Mop band opacity", vac.mop_band_opacity ?? 28, 0, 100, 5, v => this._setVacuum(mapVac, { mop_band_opacity: v }), "%")}
-          ${this._numberSlider("Mop band width", vac.mop_band_width ?? 100, 20, 400, 10, v => this._setVacuum(mapVac, { mop_band_width: v }), "%")}
-          ${vac.image ? this._selectField("Robot image on map (uses status image)", vac.robot_image_on_map ? "yes" : "no", [{ value: "no", label: "no" }, { value: "yes", label: "yes" }], v => this._setVacuum(mapVac, { robot_image_on_map: v === "yes" })) : A}
-          ${vac.robot_image_on_map ? this._numberSlider("Robot image size", vac.robot_size ?? 100, 40, 220, 10, v => this._setVacuum(mapVac, { robot_size: v }), "%") : A}
-          ${vac.robot_image_on_map ? this._numberSlider("Robot image rotation", vac.robot_image_rotation ?? 0, -180, 180, 15, v => this._setVacuum(mapVac, { robot_image_rotation: v }), "°") : A}
-        ` : A}
-
-        ${this._numberSlider("Card height (0=auto)", (this._config.map_mode === "merged" ? this._config.base_height : vac.base_height) ?? 0, 0, 700, 10, v => this._config.map_mode === "merged" ? this._setConfig({ base_height: v > 0 ? v : undefined }) : this._setVacuum(mapVac, { base_height: v > 0 ? v : undefined }), "px")}
-
         ${(vac.base === "combined" || this._config.map_mode === "merged") ? b `
           ${this._numberSlider("Overlay opacity", vac.overlay_opacity ?? 55, 0, 100, 5, v => this._setVacuum(mapVac, { overlay_opacity: v }), "%")}
           ${this._selectField("Overlay blend", (vac.overlay_blend ?? "normal"), [{ value: "normal", label: "normal" }, { value: "lighten", label: "lighten (isolate path)" }, { value: "screen", label: "screen" }, { value: "plus-lighter", label: "plus-lighter" }], v => this._setVacuum(mapVac, { overlay_blend: v }))}
@@ -7680,6 +7684,20 @@ let AnyVacCardEditor = class AnyVacCardEditor extends i$2 {
           ` : b `${this._config.map_mode === "merged" ? b `<p class="hint">No rooms yet — use "Add room" above.</p>` : b `<p class="hint">Add rooms in the Vacuums tab to position them here.</p>`}`}
         ` : b `<p class="hint">Select a map or image above to enable the placement preview.</p>`}
 
+        ${this._intEntityFor(vac) ? b `
+          <div class="section-title" style="margin-top:4px">Appearance</div>
+          ${this._hexColorField("Path colour", vac.path_color, v => this._setVacuum(mapVac, { path_color: v || undefined }), "#69d2ff")}
+          ${this._numberSlider("Path width", vac.path_width ?? 100, 20, 300, 10, v => this._setVacuum(mapVac, { path_width: v }), "%")}
+          ${this._hexColorField("Mop band colour", vac.mop_path_color, v => this._setVacuum(mapVac, { mop_path_color: v || undefined }), "#40a9ff")}
+          ${this._numberSlider("Mop band opacity", vac.mop_band_opacity ?? 28, 0, 100, 5, v => this._setVacuum(mapVac, { mop_band_opacity: v }), "%")}
+          ${this._numberSlider("Mop band width", vac.mop_band_width ?? 100, 20, 400, 10, v => this._setVacuum(mapVac, { mop_band_width: v }), "%")}
+          ${vac.image ? this._selectField("Robot image on map (uses status image)", vac.robot_image_on_map ? "yes" : "no", [{ value: "no", label: "no" }, { value: "yes", label: "yes" }], v => this._setVacuum(mapVac, { robot_image_on_map: v === "yes" })) : A}
+          ${vac.robot_image_on_map ? this._numberSlider("Robot image size", vac.robot_size ?? 100, 40, 220, 10, v => this._setVacuum(mapVac, { robot_size: v }), "%") : A}
+          ${vac.robot_image_on_map ? this._numberSlider("Robot image rotation", vac.robot_image_rotation ?? 0, -180, 180, 15, v => this._setVacuum(mapVac, { robot_image_rotation: v }), "°") : A}
+        ` : A}
+
+        ${this._numberSlider("Card height (0=auto)", (this._config.map_mode === "merged" ? this._config.base_height : vac.base_height) ?? 0, 0, 700, 10, v => this._config.map_mode === "merged" ? this._setConfig({ base_height: v > 0 ? v : undefined }) : this._setVacuum(mapVac, { base_height: v > 0 ? v : undefined }), "px")}
+
       </div>`;
     }
     // ── Tab: Global ───────────────────────────────────────────────────────────
@@ -7772,7 +7790,7 @@ let AnyVacCardEditor = class AnyVacCardEditor extends i$2 {
             { value: "manual", label: "Manual — per-robot controllers" }], v => this._setConfig({ ui_mode: v }))}
 
         <div class="section-title" style="margin-top:4px">Global presets (Auto mode)</div>
-        <p class="hint">Targeted whole-home cleans for Auto mode (e.g. "Po večeři", "Celý byt"). The integration decides which robots and the order; you pick the scope.</p>
+        <p class="hint">Targeted whole-home cleans for Auto mode (e.g. "After dinner", "Whole home"). The integration decides which robots and the order; you pick the scope.</p>
         ${(this._config.global_presets ?? []).map((gp, i) => b `
           <div class="sub-section">
             <div class="sub-title" style="display:flex;align-items:center;justify-content:space-between">
@@ -7782,7 +7800,7 @@ let AnyVacCardEditor = class AnyVacCardEditor extends i$2 {
                 <ha-icon icon="mdi:delete"></ha-icon>
               </button>
             </div>
-            ${this._textField("Label", gp.label, v => this._setGlobalPreset(i, { label: v }), "e.g. Po večeři")}
+            ${this._textField("Label", gp.label, v => this._setGlobalPreset(i, { label: v }), "e.g. After dinner")}
             ${this._textField("Icon", gp.icon, v => this._setGlobalPreset(i, { icon: v || undefined }), "mdi:silverware-fork-knife")}
             ${this._selectField("Scope", (gp.scope === "all" ? "all" : "select"), [{ value: "all", label: "Whole flat" }, { value: "select", label: "Pick rooms on map" }], v => this._setGlobalPreset(i, { scope: v }))}
             ${this._selectField("Mode", gp.mode ?? "dry", [{ value: "dry", label: "Dry only" },
@@ -7955,17 +7973,22 @@ let AnyVacCardEditor = class AnyVacCardEditor extends i$2 {
       <datalist id="ha-entities"></datalist>
       <div class="editor-root">
         <div class="tabs-bar">
-          ${["vacuums", "maps", "global", "debug"].map(t => b `
+          ${["vacuums", "maps", "global"].map(t => b `
             <button class="tab-btn ${this._tab === t ? "tab-btn--active" : ""}"
               @click=${() => { this._tab = t; }}>
-              ${{ vacuums: "🤖 Vacuums", maps: "🗺 Maps", global: "⚙ Global", debug: "🐞 Debug" }[t]}
+              ${{ vacuums: "🤖 Vacuums", maps: "🗺 Maps", global: "⚙ Global" }[t]}
             </button>`)}
         </div>
         ${this._tab === "vacuums" ? this._renderVacuumsTab()
             : this._tab === "maps" ? this._renderMapsTab()
                 : this._tab === "debug" ? this._renderDebugTab()
                     : this._renderGlobalTab()}
-        <div class="editor-footer">anyvac-card v${CARD_VERSION}</div>
+        <div class="editor-footer">
+          <span class="footer-link" @click=${() => { this._tab = this._tab === "debug" ? "vacuums" : "debug"; }}>
+            ${this._tab === "debug" ? "← Back" : "🐞 Show debug info"}
+          </span>
+          <span>anyvac-card v${CARD_VERSION}</span>
+        </div>
       </div>`;
     }
 };
@@ -8235,9 +8258,12 @@ AnyVacCardEditor.styles = i$6 `
     .editor-footer {
       margin-top:8px; padding-top:6px;
       border-top:1px solid var(--divider-color,rgba(0,0,0,.12));
-      font-size:11px; text-align:right;
+      font-size:11px;
       color:var(--secondary-text-color); opacity:.7;
+      display:flex; align-items:center; justify-content:space-between; gap:8px;
     }
+    .footer-link { cursor:pointer; text-decoration:underline; text-underline-offset:2px; }
+    .footer-link:hover { opacity:.8; }
 
     .var-row { display:flex; align-items:center; gap:6px; }
     .var-sep { color:var(--secondary-text-color); flex-shrink:0; }
@@ -8259,6 +8285,9 @@ AnyVacCardEditor.styles = i$6 `
       border:1px solid var(--divider-color,rgba(0,0,0,.2));
       background:var(--card-background-color); cursor:pointer;
     }
+
+    .hex-color-row { display:flex; align-items:center; gap:6px; }
+    .hex-color-row .text-input { flex:1; }
   `;
 __decorate([
     n$1({ attribute: false })

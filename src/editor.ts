@@ -622,6 +622,24 @@ export class AnyVacCardEditor extends LitElement {
       </div>`;
   }
 
+  /** Hex colour field with a native colour-picker swatch alongside the text input —
+   *  the swatch writes back as a hex string, so both stay interchangeable. Falls
+   *  back to the placeholder colour for the swatch when the current value isn't a
+   *  valid #rrggbb (empty, or a CSS variable/name some configs still use). */
+  private _hexColorField(label: string, value: string | undefined, onChange: (v: string) => void, placeholder: string) {
+    const swatch = /^#[0-9a-fA-F]{6}$/.test(value ?? "") ? (value as string) : placeholder;
+    return html`
+      <div class="field">
+        <label>${label} (hex)</label>
+        <div class="hex-color-row">
+          <input type="color" class="threshold-color" .value=${swatch}
+            @input=${(e: Event) => onChange((e.target as HTMLInputElement).value)} />
+          <input class="text-input" type="text" .value=${value ?? ""} placeholder=${placeholder}
+            @change=${(e: Event) => onChange((e.target as HTMLInputElement).value)} />
+        </div>
+      </div>`;
+  }
+
   private _numberSlider(label: string, value: number | undefined, min: number, max: number, step: number,
     onChange: (v: number) => void, suffix = "") {
     const cur = value ?? 0;
@@ -758,13 +776,13 @@ export class AnyVacCardEditor extends LitElement {
             ${this._selectField<VacuumColor>("Accent colour", vac.color ?? "green",
               [{ value: "green", label: "Green" }, { value: "blue", label: "Blue" }, { value: "orange", label: "Orange" }],
               v => this._setVacuum(idx, { color: v }))}
-            ${this._selectField<"auto" | "dry" | "wet" | "both">("Clean type (time estimate & layers)", vac.clean_type ?? "auto",
+            ${this._selectField<"auto" | "dry" | "wet" | "both">("Role", vac.clean_type ?? "auto",
               [{ value: "auto", label: "Auto-detect from clean action" },
                { value: "dry", label: "Dry only" },
                { value: "wet", label: "Wet only" },
                { value: "both", label: "Both — follow live mode" }],
               v => this._setVacuum(idx, { clean_type: v === "auto" ? undefined : v }))}
-            <p class="hint">Controls which time estimate and which dry/wet layer the vacuum uses. "Both" follows the live water mode (needs the integration sensor).</p>
+            <p class="hint">This vacuum's capability — controls which time estimate and which dry/wet layer it uses. Not the run-time Dry/Wet/Both choice (that's made on the controller). "Both" follows the live water mode (needs the integration sensor).</p>
 
             ${this._renderSensorsSection(idx, vac)}
             ${this._renderCleanActionSection(idx, vac)}
@@ -838,7 +856,7 @@ export class AnyVacCardEditor extends LitElement {
                     <ha-icon icon="mdi:delete"></ha-icon>
                   </button>
                 </div>
-                ${this._textField("Label", p.label, v => this._setPreset(vacIdx, pi, { label: v }), "e.g. Suchý")}
+                ${this._textField("Label", p.label, v => this._setPreset(vacIdx, pi, { label: v }), "e.g. Dry")}
                 ${this._textField("Icon", p.icon, v => this._setPreset(vacIdx, pi, { icon: v || undefined }), "mdi:broom")}
                 ${speeds.length
                   ? this._optionSelectFromList("Suction", speeds, p.suction_level,
@@ -1116,22 +1134,6 @@ export class AnyVacCardEditor extends LitElement {
           [{ value: "no", label: "no" }, { value: "yes", label: "yes" }],
           v => this._setVacuum(mapVac, { hide_map: v === "yes" })) : nothing}
 
-        ${this._intEntityFor(vac) ? html`
-          ${this._textField("Path colour (hex)", vac.path_color, v => this._setVacuum(mapVac, { path_color: v || undefined }), "#69d2ff")}
-          ${this._numberSlider("Path width", vac.path_width ?? 100, 20, 300, 10, v => this._setVacuum(mapVac, { path_width: v }), "%")}
-          ${this._textField("Mop band colour (hex)", vac.mop_path_color, v => this._setVacuum(mapVac, { mop_path_color: v || undefined }), "#40a9ff")}
-          ${this._numberSlider("Mop band opacity", vac.mop_band_opacity ?? 28, 0, 100, 5, v => this._setVacuum(mapVac, { mop_band_opacity: v }), "%")}
-          ${this._numberSlider("Mop band width", vac.mop_band_width ?? 100, 20, 400, 10, v => this._setVacuum(mapVac, { mop_band_width: v }), "%")}
-          ${vac.image ? this._selectField("Robot image on map (uses status image)", vac.robot_image_on_map ? "yes" : "no",
-            [{ value: "no", label: "no" }, { value: "yes", label: "yes" }],
-            v => this._setVacuum(mapVac, { robot_image_on_map: v === "yes" })) : nothing}
-          ${vac.robot_image_on_map ? this._numberSlider("Robot image size", vac.robot_size ?? 100, 40, 220, 10, v => this._setVacuum(mapVac, { robot_size: v }), "%") : nothing}
-          ${vac.robot_image_on_map ? this._numberSlider("Robot image rotation", vac.robot_image_rotation ?? 0, -180, 180, 15, v => this._setVacuum(mapVac, { robot_image_rotation: v }), "°") : nothing}
-        ` : nothing}
-
-        ${this._numberSlider("Card height (0=auto)", (this._config.map_mode === "merged" ? this._config.base_height : vac.base_height) ?? 0, 0, 700, 10,
-          v => this._config.map_mode === "merged" ? this._setConfig({ base_height: v > 0 ? v : undefined }) : this._setVacuum(mapVac, { base_height: v > 0 ? v : undefined }), "px")}
-
         ${(vac.base === "combined" || this._config.map_mode === "merged") ? html`
           ${this._numberSlider("Overlay opacity", vac.overlay_opacity ?? 55, 0, 100, 5,
             v => this._setVacuum(mapVac, { overlay_opacity: v }), "%")}
@@ -1376,6 +1378,23 @@ export class AnyVacCardEditor extends LitElement {
           ` : html`${this._config.map_mode === "merged" ? html`<p class="hint">No rooms yet — use "Add room" above.</p>` : html`<p class="hint">Add rooms in the Vacuums tab to position them here.</p>`}`}
         ` : html`<p class="hint">Select a map or image above to enable the placement preview.</p>`}
 
+        ${this._intEntityFor(vac) ? html`
+          <div class="section-title" style="margin-top:4px">Appearance</div>
+          ${this._hexColorField("Path colour", vac.path_color, v => this._setVacuum(mapVac, { path_color: v || undefined }), "#69d2ff")}
+          ${this._numberSlider("Path width", vac.path_width ?? 100, 20, 300, 10, v => this._setVacuum(mapVac, { path_width: v }), "%")}
+          ${this._hexColorField("Mop band colour", vac.mop_path_color, v => this._setVacuum(mapVac, { mop_path_color: v || undefined }), "#40a9ff")}
+          ${this._numberSlider("Mop band opacity", vac.mop_band_opacity ?? 28, 0, 100, 5, v => this._setVacuum(mapVac, { mop_band_opacity: v }), "%")}
+          ${this._numberSlider("Mop band width", vac.mop_band_width ?? 100, 20, 400, 10, v => this._setVacuum(mapVac, { mop_band_width: v }), "%")}
+          ${vac.image ? this._selectField("Robot image on map (uses status image)", vac.robot_image_on_map ? "yes" : "no",
+            [{ value: "no", label: "no" }, { value: "yes", label: "yes" }],
+            v => this._setVacuum(mapVac, { robot_image_on_map: v === "yes" })) : nothing}
+          ${vac.robot_image_on_map ? this._numberSlider("Robot image size", vac.robot_size ?? 100, 40, 220, 10, v => this._setVacuum(mapVac, { robot_size: v }), "%") : nothing}
+          ${vac.robot_image_on_map ? this._numberSlider("Robot image rotation", vac.robot_image_rotation ?? 0, -180, 180, 15, v => this._setVacuum(mapVac, { robot_image_rotation: v }), "°") : nothing}
+        ` : nothing}
+
+        ${this._numberSlider("Card height (0=auto)", (this._config.map_mode === "merged" ? this._config.base_height : vac.base_height) ?? 0, 0, 700, 10,
+          v => this._config.map_mode === "merged" ? this._setConfig({ base_height: v > 0 ? v : undefined }) : this._setVacuum(mapVac, { base_height: v > 0 ? v : undefined }), "px")}
+
       </div>`;
   }
 
@@ -1471,7 +1490,7 @@ export class AnyVacCardEditor extends LitElement {
           v => this._setConfig({ ui_mode: v }))}
 
         <div class="section-title" style="margin-top:4px">Global presets (Auto mode)</div>
-        <p class="hint">Targeted whole-home cleans for Auto mode (e.g. "Po večeři", "Celý byt"). The integration decides which robots and the order; you pick the scope.</p>
+        <p class="hint">Targeted whole-home cleans for Auto mode (e.g. "After dinner", "Whole home"). The integration decides which robots and the order; you pick the scope.</p>
         ${(this._config.global_presets ?? []).map((gp, i) => html`
           <div class="sub-section">
             <div class="sub-title" style="display:flex;align-items:center;justify-content:space-between">
@@ -1481,7 +1500,7 @@ export class AnyVacCardEditor extends LitElement {
                 <ha-icon icon="mdi:delete"></ha-icon>
               </button>
             </div>
-            ${this._textField("Label", gp.label, v => this._setGlobalPreset(i, { label: v }), "e.g. Po večeři")}
+            ${this._textField("Label", gp.label, v => this._setGlobalPreset(i, { label: v }), "e.g. After dinner")}
             ${this._textField("Icon", gp.icon, v => this._setGlobalPreset(i, { icon: v || undefined }), "mdi:silverware-fork-knife")}
             ${this._selectField<"all" | "select">("Scope", (gp.scope === "all" ? "all" : "select"),
               [{ value: "all", label: "Whole flat" }, { value: "select", label: "Pick rooms on map" }],
@@ -1670,17 +1689,22 @@ export class AnyVacCardEditor extends LitElement {
       <datalist id="ha-entities"></datalist>
       <div class="editor-root">
         <div class="tabs-bar">
-          ${(["vacuums", "maps", "global", "debug"] as const).map(t => html`
+          ${(["vacuums", "maps", "global"] as const).map(t => html`
             <button class="tab-btn ${this._tab === t ? "tab-btn--active" : ""}"
               @click=${() => { this._tab = t; }}>
-              ${{ vacuums: "🤖 Vacuums", maps: "🗺 Maps", global: "⚙ Global", debug: "🐞 Debug" }[t]}
+              ${{ vacuums: "🤖 Vacuums", maps: "🗺 Maps", global: "⚙ Global" }[t]}
             </button>`)}
         </div>
         ${this._tab === "vacuums" ? this._renderVacuumsTab()
           : this._tab === "maps"    ? this._renderMapsTab()
           : this._tab === "debug"   ? this._renderDebugTab()
           : this._renderGlobalTab()}
-        <div class="editor-footer">anyvac-card v${CARD_VERSION}</div>
+        <div class="editor-footer">
+          <span class="footer-link" @click=${() => { this._tab = this._tab === "debug" ? "vacuums" : "debug"; }}>
+            ${this._tab === "debug" ? "← Back" : "🐞 Show debug info"}
+          </span>
+          <span>anyvac-card v${CARD_VERSION}</span>
+        </div>
       </div>`;
   }
 
@@ -1951,9 +1975,12 @@ export class AnyVacCardEditor extends LitElement {
     .editor-footer {
       margin-top:8px; padding-top:6px;
       border-top:1px solid var(--divider-color,rgba(0,0,0,.12));
-      font-size:11px; text-align:right;
+      font-size:11px;
       color:var(--secondary-text-color); opacity:.7;
+      display:flex; align-items:center; justify-content:space-between; gap:8px;
     }
+    .footer-link { cursor:pointer; text-decoration:underline; text-underline-offset:2px; }
+    .footer-link:hover { opacity:.8; }
 
     .var-row { display:flex; align-items:center; gap:6px; }
     .var-sep { color:var(--secondary-text-color); flex-shrink:0; }
@@ -1975,5 +2002,8 @@ export class AnyVacCardEditor extends LitElement {
       border:1px solid var(--divider-color,rgba(0,0,0,.2));
       background:var(--card-background-color); cursor:pointer;
     }
+
+    .hex-color-row { display:flex; align-items:center; gap:6px; }
+    .hex-color-row .text-input { flex:1; }
   `;
 }

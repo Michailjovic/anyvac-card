@@ -8,6 +8,44 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Planned
 
+## [0.83.0] - 2026-07-30
+
+### Changed
+
+UX/GUI editor polish pass, following a full runtime (portrait+landscape) and
+GUI editor critique. All English-language now (card + editor):
+
+- Editor: "Clean type (time estimate & layers)" field renamed to "Role" —
+  avoids confusion with the run-time Dry/Wet/Both mode picker on the
+  controller, which is a separate concept. Hint text clarified.
+- Manual per-vacuum START button (`_renderActions`): label now reads
+  "Select rooms" when no rooms are selected for that vacuum, reverting to
+  "START" once at least one is picked — was static "START" in both states,
+  indistinguishable from the (also visually dimmed) disabled look.
+- Replaced `mdi:rocket-launch` with `mdi:play` on both START buttons
+  (orchestrated START bar and manual per-vacuum START) — unifies the app's
+  "start/resume" icon language with the dock's orchestrated run button and
+  the per-vacuum Resume button, both of which already used `mdi:play`.
+- Editor Maps tab reordered: the room editor (floorplan preview, draggable
+  room rectangles, seating status, import, cleaning sequence, add room,
+  room positions) now comes before the purely cosmetic rendering fields
+  (path colour/width, mop band colour/opacity/width, robot image
+  size/rotation, card height), which moved into a new "Appearance" section
+  at the end of the tab.
+- Editor: hex colour fields (path colour, mop band colour) now show a
+  native colour-picker swatch (`<input type="color">`) alongside the
+  existing hex text field — either one updates the other.
+- Editor: "Debug" removed from the top-level Config tab strip; a
+  "🐞 Show debug info" text link at the bottom of the dialog reveals the
+  same content instead, keeping the main tab row to Vacuums/Maps/Global.
+- Translated the last remaining Czech user-facing strings to English: the
+  auto-mode clean-plan preview panel ("PLÁN ÚKLIDU" → "CLEAN PLAN",
+  "Sucho"/"Mokro"/"Obojí" → "Dry"/"Wet"/"Both", "Spustit · podrž" →
+  "Start · hold") and the global-preset auto bar
+  ("CELÝ BYT"/"VYBRANÉ"/"MÍSTNOSTI" → "WHOLE HOME"/"SELECTED"/"ROOMS",
+  "SUCHO"/"MOKRO"/"OBOJÍ" → "DRY"/"WET"/"BOTH"), plus example placeholder
+  text in the editor (preset/global-preset labels).
+
 ## [0.82.0] - 2026-07-29
 
 ### Added
