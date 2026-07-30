@@ -198,6 +198,37 @@ export function computeSeatFit(anchors: SeatAnchor[], ar: number): SeatFitResult
  * rectangle percentages, given a seat (auto-fitted or manual) — used by the
  * editor's room import.
  */
+/**
+ * Place a room bbox onto a KNOWN crop of the same image (docs/30 §8) — used
+ * right after `anyvac.snapshot_map_as_floorplan`, whose response includes
+ * the exact (px) crop box it applied. Unlike `roomBboxToRect` this needs no
+ * seat/rotation/AR at all: the saved floorplan file IS that crop, displayed
+ * un-rotated, so a room's position within it is a plain re-normalisation of
+ * `bbox_px` by the crop's own origin and size — no fit, no anchors, no
+ * ambiguity. Only valid for the SAME vacuum the floorplan was snapshotted
+ * from; other vacuums have unrelated coordinate systems and still need the
+ * existing anchor-based auto-fit (`assembleAnchors`/`computeSeatFit`).
+ */
+export function placeRoomInCrop(
+  bp: { x0: number; y0: number; x1: number; y1: number },
+  crop: { x0: number; y0: number; x1: number; y1: number },
+): { map_x: number; map_y: number; map_w: number; map_h: number } | null {
+  const cropW = crop.x1 - crop.x0;
+  const cropH = crop.y1 - crop.y0;
+  if (!(cropW > 0) || !(cropH > 0)) return null;
+  const cx = (bp.x0 + bp.x1) / 2 - crop.x0;
+  const cy = (bp.y0 + bp.y1) / 2 - crop.y0;
+  const w = bp.x1 - bp.x0;
+  const h = bp.y1 - bp.y0;
+  const clamp = (v: number, lo: number, hi: number) => Math.min(hi, Math.max(lo, v));
+  return {
+    map_x: clamp(Math.round((cx / cropW) * 1000) / 10, 0, 100),
+    map_y: clamp(Math.round((cy / cropH) * 1000) / 10, 0, 100),
+    map_w: clamp(Math.round((w / cropW) * 1000) / 10, 2, 100),
+    map_h: clamp(Math.round((h / cropH) * 1000) / 10, 2, 100),
+  };
+}
+
 export function roomBboxToRect(
   ir: Record<string, any>,
   at: Record<string, any>,

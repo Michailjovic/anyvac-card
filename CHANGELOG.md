@@ -8,6 +8,30 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Planned
 
+## [0.92.0] - 2026-07-30
+
+### Added
+
+Big seating-workflow simplification (docs/30 §8), paired with `anyvac`
+0.92.0. `anyvac.snapshot_map_as_floorplan` now returns the exact crop box
+it applied; the editor uses it to place the snapshotted vacuum's own rooms
+onto the new floorplan immediately, with no dragging — a new
+`placeRoomInCrop` (seatfit.ts) re-normalises `bbox_px` directly against the
+known crop, bypassing the old identity-seat assumption that broke once
+snapshots started being cropped (0.88.1). Since these rooms now carry real
+`map_x`/`map_y`, they act as anchors for every other vacuum sharing the
+floorplan whose own room names match — the existing anchor auto-fit
+(`assembleAnchors`/`computeSeatFit`) then places THEM automatically too,
+with no Import click and no dragging, as long as room names agree across
+vacuums' native apps. New room-name-mismatch hint (Maps tab) lists a
+vacuum's own room names that don't match anything on the shared floorplan
+yet, since a silent name mismatch across robots was previously undetectable
+in the UI. Map mode select now warns when merged mode has no shared
+floorplan set. Net effect for a fresh multi-vacuum setup: click "Use this
+vacuum's current map as floorplan" once on the fullest-coverage vacuum,
+then just switch the vacuum picker to each other one — no manual anchoring
+step left for the common case.
+
 ## [0.91.0] - 2026-07-30
 
 ### Changed

@@ -87,7 +87,7 @@ const t={ATTRIBUTE:1},e=t=>(...e)=>({_$litDirective$:t,values:e});let i$1 = clas
 
 const CARD_NAME = "anyvac-card";
 const EDITOR_NAME = "anyvac-card-editor";
-const CARD_VERSION = "0.91.0";
+const CARD_VERSION = "0.92.0";
 /** Hold duration in ms required to trigger START / PAUSE actions */
 const HOLD_DURATION_MS = 600;
 /** docs/25 §10 field report (2026-07-25): Android's swipe-up-from-bottom-edge
@@ -380,6 +380,34 @@ function computeSeatFit(anchors, ar) {
  * rectangle percentages, given a seat (auto-fitted or manual) — used by the
  * editor's room import.
  */
+/**
+ * Place a room bbox onto a KNOWN crop of the same image (docs/30 §8) — used
+ * right after `anyvac.snapshot_map_as_floorplan`, whose response includes
+ * the exact (px) crop box it applied. Unlike `roomBboxToRect` this needs no
+ * seat/rotation/AR at all: the saved floorplan file IS that crop, displayed
+ * un-rotated, so a room's position within it is a plain re-normalisation of
+ * `bbox_px` by the crop's own origin and size — no fit, no anchors, no
+ * ambiguity. Only valid for the SAME vacuum the floorplan was snapshotted
+ * from; other vacuums have unrelated coordinate systems and still need the
+ * existing anchor-based auto-fit (`assembleAnchors`/`computeSeatFit`).
+ */
+function placeRoomInCrop(bp, crop) {
+    const cropW = crop.x1 - crop.x0;
+    const cropH = crop.y1 - crop.y0;
+    if (!(cropW > 0) || !(cropH > 0))
+        return null;
+    const cx = (bp.x0 + bp.x1) / 2 - crop.x0;
+    const cy = (bp.y0 + bp.y1) / 2 - crop.y0;
+    const w = bp.x1 - bp.x0;
+    const h = bp.y1 - bp.y0;
+    const clamp = (v, lo, hi) => Math.min(hi, Math.max(lo, v));
+    return {
+        map_x: clamp(Math.round((cx / cropW) * 1000) / 10, 0, 100),
+        map_y: clamp(Math.round((cy / cropH) * 1000) / 10, 0, 100),
+        map_w: clamp(Math.round((w / cropW) * 1000) / 10, 2, 100),
+        map_h: clamp(Math.round((h / cropH) * 1000) / 10, 2, 100),
+    };
+}
 function roomBboxToRect(ir, at, seat, ar) {
     const dims = mapPxDims(at?.image_dims);
     const bp = ir?.bbox_px;
@@ -6691,6 +6719,15 @@ let AnyVacCardEditor = class AnyVacCardEditor extends i$2 {
                 if (idx >= 0)
                     this._setVacuum(idx, { hide_map: true });
             }
+            // docs/30 §8: place this vacuum's OWN rooms exactly onto the crop we
+            // just got back — no dragging needed, and it hands every other vacuum
+            // sharing this floorplan real anchors to auto-fit against (by name).
+            const crop = res?.response?.crop;
+            if (crop) {
+                const idx = this._config.vacuums.findIndex((v) => v.entity === vac.entity);
+                if (idx >= 0)
+                    this._autoPlaceOwnRooms(idx, crop);
+            }
         }
         catch (err) {
             this._floorplanSnapshotError =
@@ -7012,6 +7049,69 @@ let AnyVacCardEditor = class AnyVacCardEditor extends i$2 {
             this._setConfig({ rooms: target });
         else
             this._setVacuum(vacIdx, { rooms: target });
+    }
+    /** docs/30 §8 "big seating rework": places THIS vacuum's own rooms exactly
+     *  onto a floorplan crop just produced by `anyvac.snapshot_map_as_floorplan`
+     *  — no seat, no dragging, no ambiguity, since the crop box is in the same
+     *  bbox_px pixel space this vacuum's own rooms already report and the
+     *  saved file IS that crop (`placeRoomInCrop`). Once these carry real
+     *  map_x/map_y they act as anchors for every OTHER vacuum sharing this
+     *  floorplan whose own room names match (existing `assembleAnchors`/
+     *  `computeSeatFit` auto-fit, unaffected by this) — so this one call is
+     *  usually the entire multi-vacuum seating step, not just this vacuum's. */
+    _autoPlaceOwnRooms(vacIdx, crop) {
+        const vac = this._config.vacuums[vacIdx];
+        const ie = this._intEntityFor(vac);
+        const at = ie ? this.hass.states[ie]?.attributes : undefined;
+        const intRooms = Array.isArray(at?.rooms) ? at.rooms : [];
+        if (!intRooms.length)
+            return;
+        const target = this._mergedEdit ? [...(this._config.rooms ?? [])] : [...(vac.rooms ?? [])];
+        const have = new Set(target.map((r) => r.key));
+        let added = 0;
+        for (const ir of intRooms) {
+            const nm = ir?.name;
+            const bp = ir?.bbox_px;
+            if (!nm || have.has(nm) || !bp)
+                continue;
+            const rect = placeRoomInCrop(bp, crop);
+            if (!rect)
+                continue;
+            target.push({ key: nm, name: nm, icon: _roomIconFor(target.length), ...rect });
+            have.add(nm);
+            added++;
+        }
+        if (!added)
+            return;
+        if (this._mergedEdit)
+            this._setConfig({ rooms: target });
+        else
+            this._setVacuum(vacIdx, { rooms: target });
+    }
+    /** docs/30 §4b: room pairing across vacuums is by NAME, and a mismatch
+     *  (e.g. "Living room" on one robot's app vs. "Living Room" on another's)
+     *  fails silently — the room just never gets an anchor/auto-fit and there's
+     *  no error anywhere. Lists this vacuum's own room names that don't match
+     *  any room already on the shared floorplan, so the editor can surface it
+     *  instead of the user having to notice a missing/misplaced room. A name
+     *  showing up here isn't necessarily wrong — it may just be a room only
+     *  this vacuum covers (the normal case Import is for) — so this is a
+     *  pointer to go check the Roborock app, not an error state. */
+    _unmatchedOwnRoomNames(vacIdx) {
+        const vac = this._config.vacuums[vacIdx];
+        const ie = this._intEntityFor(vac);
+        const at = ie ? this.hass.states[ie]?.attributes : undefined;
+        const intRooms = Array.isArray(at?.rooms) ? at.rooms : [];
+        if (!intRooms.length)
+            return [];
+        const known = new Set(this._editRooms().map((r) => r.key));
+        const out = [];
+        for (const ir of intRooms) {
+            const nm = ir?.name;
+            if (nm && !known.has(nm))
+                out.push(nm);
+        }
+        return out;
     }
     _setRoom(vacIdx, roomIdx, updates) {
         const rooms = [...(this._config.vacuums[vacIdx].rooms ?? [])];
@@ -7668,6 +7768,13 @@ let AnyVacCardEditor = class AnyVacCardEditor extends i$2 {
 
         ${this._selectField("Map mode (all vacuums)", this._config.map_mode ?? "split", [{ value: "split", label: "Split — one map per vacuum" }, { value: "merged", label: "Merged — all in one map" }], v => this._setConfig({ map_mode: v === "merged" ? "merged" : undefined }))}
 
+        ${this._mergedEdit && !this._config.image_base?.src ? b `
+          <p class="hint">Merged needs a shared floorplan below or vacuums' raw maps just get laid on top of
+            each other unaligned. No photo of your own? Pick a vacuum, scroll to "Shared floorplan" and use
+            "Use this vacuum's current map as floorplan" — its own rooms place themselves automatically; every
+            other vacuum whose room names match then auto-fits too, with nothing else to set.</p>
+        ` : A}
+
         ${this._mergedEdit ? A : this._selectField("Base layer", (vac.base ?? "map"), [{ value: "map", label: "Vacuum map" }, { value: "combined", label: "Image + map" }], v => this._setVacuum(mapVac, { base: v }))}
 
         ${this._entityPicker("AnyVac integration sensor", vac.integration_entity, ["sensor"], v => this._setVacuum(mapVac, { integration_entity: v }))}
@@ -7689,13 +7796,13 @@ let AnyVacCardEditor = class AnyVacCardEditor extends i$2 {
               ${this._floorplanSnapshotBusy ? "Snapshotting…" : "Use this vacuum's current map as floorplan"}
             </button>
             <p class="hint">No floor plan photo of your own? This saves ${vac.name || vac.entity}'s
-              current map as a static image (via the AnyVac integration) and sets it as the
-              floorplan below — the easiest way to get auto-fit working across multiple vacuums
-              (docs: import rooms from this same vacuum next, then switch to another vacuum to
-              let it auto-fit against the shared rooms). Also turns "Hide vacuum map" on for
-              ${this._config.map_mode === "merged" ? "every vacuum sharing this floorplan" : "this vacuum"},
-              since the raw map would otherwise blend on top and look muddy. Requires anyvac
-              integration ≥ 0.88.0.</p>
+              current map as a static image and sets it as the floorplan below — the easiest way to
+              get auto-fit working across multiple vacuums. Also places ${vac.name || vac.entity}'s own
+              rooms on it automatically (no dragging needed) and turns "Hide vacuum map" on for
+              ${this._config.map_mode === "merged" ? "every vacuum sharing this floorplan" : "this vacuum"}.
+              Pick your fullest-coverage vacuum for this step, then switch to each other vacuum below —
+              any of its rooms whose name matches one already placed auto-fits with nothing else to do;
+              use "Import" only for rooms exclusive to that vacuum. Requires anyvac integration ≥ 0.88.0.</p>
             ${this._floorplanSnapshotError ? b `<p class="hint" style="color:#ff6b6b">${this._floorplanSnapshotError}</p>` : A}
           ` : A}
           ${this._textField("Image src (URL)", ib?.src, v => this._setEditedImageBase({ src: v }), "/local/anyvac/flat.svg")}
@@ -7808,6 +7915,15 @@ let AnyVacCardEditor = class AnyVacCardEditor extends i$2 {
             <p class="hint">Auto-fit inactive — it needs the integration sensor, a floorplan and at least one
               room rectangle whose key matches a room name on this robot's map. Using the manual values below.</p>
           `) : A}
+          ${vacuums.length > 1 && rooms.length > 0 ? (() => {
+            const unmatched = this._unmatchedOwnRoomNames(mapVac);
+            return unmatched.length ? b `
+              <p class="hint" style="color:#faad14">⚠️ This vacuum reports room${unmatched.length > 1 ? "s" : ""}
+                not on the shared floorplan yet: <strong>${unmatched.join(", ")}</strong>. If any of these are the
+                same physical room as one already listed above under a different name, rename it to match in the
+                Roborock app (room pairing is by exact name across vacuums) — otherwise use Import below to add it.</p>
+            ` : A;
+        })() : A}
           ${(map.seat === "manual" || !es.auto) ? b `
             ${this._numberSlider("Rotation", map.rotation ?? 0, 0, 360, 90, v => this._setMap(mapVac, { rotation: v }), "°")}
             ${this._numberSlider("Scale", map.scale ?? 100, 50, 200, 5, v => this._setMap(mapVac, { scale: v }), "%")}
