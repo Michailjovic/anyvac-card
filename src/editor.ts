@@ -46,6 +46,25 @@ const DEFAULT_ROOM: RoomConfig = {
   key: "", name: "", icon: "mdi:square", map_x: 50, map_y: 50,
 };
 
+/** Distinct default icons cycled across newly added/imported rooms (field
+ *  report 2026-07-30: every room defaulted to the SAME icon — `mdi:square`
+ *  manually, `mdi:floor-plan` on import — making adjacent/overlapping room
+ *  rectangles impossible to tell apart while anchoring them on the
+ *  floorplan). Numbered rather than thematic (sofa/bed/etc.): there's no
+ *  reliable way to guess a room's real type from its name alone, and a
+ *  wrong guess (e.g. "bed" on what's actually the kitchen) would confuse
+ *  more than a neutral number does. Purely a starting point — `_hexColorField`-
+ *  style, the user can still pick any icon per room afterwards. */
+const ROOM_ICON_PALETTE = [
+  "mdi:numeric-1-circle", "mdi:numeric-2-circle", "mdi:numeric-3-circle",
+  "mdi:numeric-4-circle", "mdi:numeric-5-circle", "mdi:numeric-6-circle",
+  "mdi:numeric-7-circle", "mdi:numeric-8-circle", "mdi:numeric-9-circle",
+  "mdi:numeric-9-plus-circle",
+];
+function _roomIconFor(index: number): string {
+  return ROOM_ICON_PALETTE[Math.min(index, ROOM_ICON_PALETTE.length - 1)];
+}
+
 const DEFAULT_MAP: MapConfig = {
   entity: "", rotation: 0, scale: 100, offset_x: 0, offset_y: 0,
 };
@@ -357,7 +376,8 @@ export class AnyVacCardEditor extends LitElement {
 
   private _addEditedRoom(): void {
     if (this._mergedEdit) {
-      const rooms = [...(this._config.rooms ?? []), { ...DEFAULT_ROOM }];
+      const existing = this._config.rooms ?? [];
+      const rooms = [...existing, { ...DEFAULT_ROOM, icon: _roomIconFor(existing.length) }];
       this._setConfig({ rooms });
       this._mapRoom = rooms.length - 1;
     } else {
@@ -504,7 +524,7 @@ export class AnyVacCardEditor extends LitElement {
       if (!nm || have.has(nm)) continue;
       const rect = roomBboxToRect(ir, at, seat, ar);
       if (!rect) continue;
-      target.push({ key: nm, name: nm, icon: "mdi:floor-plan", ...rect });
+      target.push({ key: nm, name: nm, icon: _roomIconFor(target.length), ...rect });
       have.add(nm);
       added++;
     }
@@ -585,7 +605,8 @@ export class AnyVacCardEditor extends LitElement {
   }
 
   private _addRoom(vacIdx: number): void {
-    const rooms = [...(this._config.vacuums[vacIdx].rooms ?? []), { ...DEFAULT_ROOM }];
+    const existing = this._config.vacuums[vacIdx].rooms ?? [];
+    const rooms = [...existing, { ...DEFAULT_ROOM, icon: _roomIconFor(existing.length) }];
     this._setVacuum(vacIdx, { rooms });
     const m = new Map(this._openRoom);
     m.set(vacIdx, rooms.length - 1);

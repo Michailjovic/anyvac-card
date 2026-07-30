@@ -8,6 +8,21 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Planned
 
+## [0.89.0] - 2026-07-30
+
+### Added
+
+Distinct default room icons — field report during a live onboarding walk:
+every newly added room defaulted to `mdi:square`, and every room pulled in
+by "Import missing rooms from this vacuum" defaulted to `mdi:floor-plan` —
+identical for every room, making adjacent/overlapping room rectangles
+impossible to tell apart while anchoring them on the floorplan preview.
+New rooms (manual add, per-vacuum or merged, and import) now cycle through
+a palette of numbered icons (`mdi:numeric-1-circle` … `9-plus`) instead —
+neutral rather than thematic (sofa/bed/etc.), since there's no reliable way
+to guess a room's real type from its name alone. Purely a starting point;
+any room's icon can still be changed afterwards.
+
 ## [0.88.0] - 2026-07-30
 
 ### Added

@@ -87,7 +87,7 @@ const t={ATTRIBUTE:1},e=t=>(...e)=>({_$litDirective$:t,values:e});let i$1 = clas
 
 const CARD_NAME = "anyvac-card";
 const EDITOR_NAME = "anyvac-card-editor";
-const CARD_VERSION = "0.88.0";
+const CARD_VERSION = "0.89.0";
 /** Hold duration in ms required to trigger START / PAUSE actions */
 const HOLD_DURATION_MS = 600;
 /** docs/25 §10 field report (2026-07-25): Android's swipe-up-from-bottom-edge
@@ -6532,6 +6532,24 @@ const DEFAULT_VACUUM = {
 const DEFAULT_ROOM = {
     key: "", name: "", icon: "mdi:square", map_x: 50, map_y: 50,
 };
+/** Distinct default icons cycled across newly added/imported rooms (field
+ *  report 2026-07-30: every room defaulted to the SAME icon — `mdi:square`
+ *  manually, `mdi:floor-plan` on import — making adjacent/overlapping room
+ *  rectangles impossible to tell apart while anchoring them on the
+ *  floorplan). Numbered rather than thematic (sofa/bed/etc.): there's no
+ *  reliable way to guess a room's real type from its name alone, and a
+ *  wrong guess (e.g. "bed" on what's actually the kitchen) would confuse
+ *  more than a neutral number does. Purely a starting point — `_hexColorField`-
+ *  style, the user can still pick any icon per room afterwards. */
+const ROOM_ICON_PALETTE = [
+    "mdi:numeric-1-circle", "mdi:numeric-2-circle", "mdi:numeric-3-circle",
+    "mdi:numeric-4-circle", "mdi:numeric-5-circle", "mdi:numeric-6-circle",
+    "mdi:numeric-7-circle", "mdi:numeric-8-circle", "mdi:numeric-9-circle",
+    "mdi:numeric-9-plus-circle",
+];
+function _roomIconFor(index) {
+    return ROOM_ICON_PALETTE[Math.min(index, ROOM_ICON_PALETTE.length - 1)];
+}
 const DEFAULT_MAP = {
     entity: "", rotation: 0, scale: 100, offset_x: 0, offset_y: 0,
 };
@@ -6817,7 +6835,8 @@ let AnyVacCardEditor = class AnyVacCardEditor extends i$2 {
     }
     _addEditedRoom() {
         if (this._mergedEdit) {
-            const rooms = [...(this._config.rooms ?? []), { ...DEFAULT_ROOM }];
+            const existing = this._config.rooms ?? [];
+            const rooms = [...existing, { ...DEFAULT_ROOM, icon: _roomIconFor(existing.length) }];
             this._setConfig({ rooms });
             this._mapRoom = rooms.length - 1;
         }
@@ -6968,7 +6987,7 @@ let AnyVacCardEditor = class AnyVacCardEditor extends i$2 {
             const rect = roomBboxToRect(ir, at, seat, ar);
             if (!rect)
                 continue;
-            target.push({ key: nm, name: nm, icon: "mdi:floor-plan", ...rect });
+            target.push({ key: nm, name: nm, icon: _roomIconFor(target.length), ...rect });
             have.add(nm);
             added++;
         }
@@ -7051,7 +7070,8 @@ let AnyVacCardEditor = class AnyVacCardEditor extends i$2 {
         this._openVac = s;
     }
     _addRoom(vacIdx) {
-        const rooms = [...(this._config.vacuums[vacIdx].rooms ?? []), { ...DEFAULT_ROOM }];
+        const existing = this._config.vacuums[vacIdx].rooms ?? [];
+        const rooms = [...existing, { ...DEFAULT_ROOM, icon: _roomIconFor(existing.length) }];
         this._setVacuum(vacIdx, { rooms });
         const m = new Map(this._openRoom);
         m.set(vacIdx, rooms.length - 1);
