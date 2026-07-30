@@ -8,6 +8,28 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Planned
 
+## [0.90.0] - 2026-07-30
+
+### Added
+
+GUI toggle for the responsive layout system (docs/18). Live diagnosis of a
+field report ("page renders ~8 screens tall, doesn't use the available
+screen space") traced back to the card having no `layout:` config block at
+all — the entire portrait/landscape fit-to-available-height system has
+been YAML-only since docs/18, completely invisible in the visual editor. A
+brand-new card built purely through the GUI (as most users do) had no way
+to discover or turn it on.
+
+New "Layout" section at the top of the Global tab: "Fit card to available
+screen space" toggle. On sets `layout: {}` (the whole system activates
+with its built-in default profiles — no YAML needed for the common case);
+off removes the `layout` key entirely, back to the older unbounded
+rendering some existing dashboards may still be tuned around. Advanced
+per-profile tuning (column/row overrides, map crop, orientation) remains
+YAML-only, mentioned in the hint text — this toggle is specifically the
+"turn it on with sensible defaults" path, not a full settings UI for every
+knob.
+
 ## [0.89.0] - 2026-07-30
 
 ### Added

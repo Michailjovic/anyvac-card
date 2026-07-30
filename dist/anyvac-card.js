@@ -87,7 +87,7 @@ const t={ATTRIBUTE:1},e=t=>(...e)=>({_$litDirective$:t,values:e});let i$1 = clas
 
 const CARD_NAME = "anyvac-card";
 const EDITOR_NAME = "anyvac-card-editor";
-const CARD_VERSION = "0.89.0";
+const CARD_VERSION = "0.90.0";
 /** Hold duration in ms required to trigger START / PAUSE actions */
 const HOLD_DURATION_MS = 600;
 /** docs/25 §10 field report (2026-07-25): Android's swipe-up-from-bottom-edge
@@ -8017,7 +8017,26 @@ let AnyVacCardEditor = class AnyVacCardEditor extends i$2 {
         return b `
       <div class="tab-body">
 
-        <div class="section-title">Controller</div>
+        <div class="section-title">Layout</div>
+        <div class="field field--row">
+          <label>Fit card to available screen space</label>
+          <label class="toggle-wrap">
+            <input type="checkbox" class="toggle-input"
+              .checked=${!!this._config.layout}
+              @change=${(e) => this._setConfig({
+            layout: e.target.checked ? (this._config.layout ?? {}) : undefined,
+        })} />
+            <span class="toggle-track"></span>
+          </label>
+        </div>
+        <p class="hint">Recommended for most dashboards — the card sizes itself to fit the space
+          it's given (portrait/landscape profiles, tuned spacing, responsive map rotation)
+          instead of growing as tall as its content needs. Off keeps the older, simpler
+          rendering for dashboards already tuned around it. Advanced per-profile tuning
+          (column/row overrides, map crop, orientation) is still YAML-only — this toggle
+          turns the system on with its built-in defaults; switch to YAML mode to fine-tune.</p>
+
+        <div class="section-title" style="margin-top:4px">Controller</div>
         ${this._selectField("Mode", this._config.ui_mode ?? "auto", [{ value: "auto", label: "Auto — one orchestrated controller" },
             { value: "manual", label: "Manual — per-robot controllers" }], v => this._setConfig({ ui_mode: v }))}
 
