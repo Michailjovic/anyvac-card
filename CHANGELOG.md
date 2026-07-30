@@ -8,6 +8,47 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Planned
 
+## [0.86.0] - 2026-07-30
+
+### Added
+
+Fixes the #1 finding from the onboarding audit (docs/30 §2.1/§6): the map
+image entity now auto-resolves, closing the last gap in "just add the
+vacuum entity and it works."
+
+- New `_mapEntityFor(vac)` (mirrored in the editor) resolves `map.entity`
+  automatically from the entity registry when not explicitly configured —
+  previously the only card field with no auto-resolve at all (unlike
+  `integration_entity`/status/battery/etc.), meaning a fresh install with
+  just `vacuums: [{entity: vacuum.s8}]` showed no map whatsoever until the
+  user found and typed in the right `image.*` entity by hand.
+- Live-verified against a real multi-vacuum registry (no dedicated
+  `translation_key` exists on this entity domain, ruling out the pattern
+  `_autoEntities`/`_careItems` use elsewhere): a vacuum can have **one
+  `image.*` entity per saved floor** (a 2-map vacuum had
+  `image.x_map_0`/`image.x_map_2`), so "the only image entity on this
+  device" isn't a safe heuristic on its own. Resolution instead prefers
+  whichever candidate is actually **live** — state not
+  unavailable/unknown and carrying an `entity_picture` attribute, the same
+  liveness signal `_mapUrl` already reads — since only the currently
+  selected map's image entity is backed by real state; falls back to "the
+  only candidate" when there's just one (covers a freshly added vacuum
+  whose first poll hasn't landed yet). Confirmed correct against all 4 of
+  the user's live vacuums, including the 2-map disambiguation case.
+- Every runtime call site that read `vac.map?.entity` directly (map
+  rendering in both split and merged mode, Pin & Go/Zone availability,
+  refresh buttons/badges, click-geometry lookups, watched-entities) now
+  goes through the resolved value. One deliberate exception: the `base`
+  layer default-inference (`image` vs `map` when `base` itself is unset)
+  still reads the raw config — it's inferring the user's intent from what
+  they explicitly typed, not availability, so auto-resolve shouldn't
+  silently flip a floorplan-only setup to also show the raw vacuum map.
+- Editor: the "Map image entity" picker now shows a hint naming the
+  auto-resolved entity when the field is left blank, and the "Refresh
+  reference map" button/preview activate from the resolved entity too
+  (previously required the field to be filled in explicitly even though
+  the card itself would already auto-resolve at runtime once this ships).
+
 ## [0.85.0] - 2026-07-30
 
 ### Changed

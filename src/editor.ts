@@ -162,7 +162,7 @@ export class AnyVacCardEditor extends LitElement {
     const vacuums = this._config.vacuums;
     if (!vacuums.length) { this._refMapUrl = ""; this._refMapVac = -1; return; }
     const mapVac = Math.min(this._mapVac, vacuums.length - 1);
-    const entity = vacuums[mapVac].map?.entity;
+    const entity = this._mapEntityFor(vacuums[mapVac]);
     this._refMapUrl = entity
       ? ((this.hass.states[entity]?.attributes["entity_picture"] as string) ?? "") : "";
     this._refMapVac = mapVac;
@@ -337,6 +337,25 @@ export class AnyVacCardEditor extends LitElement {
           (id) => reg![id]?.device_id === dev && reg![id]?.platform === "anyvac" && id.startsWith("sensor.")
         )
       : undefined;
+  }
+
+  /** Mirrors the card's `_mapEntityFor` (2026-07-30 onboarding audit, docs/30 §2.1)
+   *  so the Maps tab preview/hints reflect the same auto-resolved entity the card
+   *  will actually use, not just what's explicitly typed into the picker below. */
+  private _mapEntityFor(vac: { entity: string; map?: { entity: string } } | undefined): string | undefined {
+    if (!vac) return undefined;
+    if (vac.map?.entity) return vac.map.entity;
+    const reg = (this.hass as any)?.entities as Record<string, any> | undefined;
+    const dev = reg?.[vac.entity]?.device_id;
+    if (!dev) return undefined;
+    const candidates = Object.keys(reg!).filter(
+      (id) => reg![id]?.device_id === dev && id.startsWith("image.")
+    );
+    const live = candidates.filter((id) => {
+      const st = this.hass.states[id];
+      return !!st && st.state !== "unavailable" && st.state !== "unknown" && !!st.attributes["entity_picture"];
+    });
+    return live.length === 1 ? live[0] : (candidates.length === 1 ? candidates[0] : undefined);
   }
 
   /** Backend-owned room cleaning sequence (docs/19): {room_key: 1-based position},
@@ -1159,7 +1178,12 @@ export class AnyVacCardEditor extends LitElement {
 
         ${this._entityPicker("Map image entity", map.entity, ["image"],
           v => this._setMap(mapVac, { entity: v }))}
-        ${map.entity ? html`
+        ${!map.entity && this._mapEntityFor(vac) ? html`
+          <p class="hint">Leave blank to auto-use <code>${this._mapEntityFor(vac)}</code> —
+            found automatically on this vacuum's device. Set it explicitly only to
+            override (e.g. a multi-map vacuum where the wrong floor's image was picked).</p>
+        ` : nothing}
+        ${this._mapEntityFor(vac) ? html`
           <button class="btn btn--sm" style="align-self:flex-start"
             @click=${() => this._snapshotRefMap()}>
             <ha-icon icon="mdi:refresh"></ha-icon> Refresh reference map

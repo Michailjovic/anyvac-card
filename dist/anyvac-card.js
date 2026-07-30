@@ -94,7 +94,7 @@ const t={ATTRIBUTE:1},e=t=>(...e)=>({_$litDirective$:t,values:e});let i$1 = clas
 
 const CARD_NAME = "anyvac-card";
 const EDITOR_NAME = "anyvac-card-editor";
-const CARD_VERSION = "0.85.0";
+const CARD_VERSION = "0.86.0";
 /** Hold duration in ms required to trigger START / PAUSE actions */
 const HOLD_DURATION_MS = 600;
 /** docs/25 §10 field report (2026-07-25): Android's swipe-up-from-bottom-edge
@@ -916,6 +916,26 @@ let AnyVacCard = class AnyVacCard extends i$2 {
          *  entity registry — the AnyVac map sensor sits on the SAME device as the vacuum
          *  entity (platform "anyvac"), so no manual plumbing is needed (docs/14 Fáze 3). */
         this._intCache = new Map();
+        /** The vacuum's rendered-map `image.*` entity: explicit config, else auto-resolved
+         *  from the entity registry (2026-07-30 onboarding audit, docs/30 §2.1) — this was
+         *  previously the one config field with no auto-resolve at all, unlike
+         *  `integration_entity`/`_autoEntities` above, so a fresh install showed no map
+         *  whatsoever until the user hunted down the right entity by hand.
+         *  No `translation_key` to match on here (live-verified: the official `roborock`
+         *  integration's map image entities carry none — confirmed empty on a real
+         *  registry, 2026-07-30) and a multi-map vacuum can have ONE image entity PER
+         *  SAVED FLOOR (e.g. `image.kitchen_map_0` / `image.kitchen_map_2`), so picking
+         *  "the only image.* on this device" isn't safe in general. Instead: prefer
+         *  whichever candidate is actually live (state isn't unavailable/unknown AND has
+         *  `entity_picture` — the same liveness signal `_mapUrl` already reads) since the
+         *  Roborock integration only backs the CURRENTLY selected map's image entity with
+         *  a live state; the rest sit at "unavailable" (live-verified: a 2-map vacuum's
+         *  inactive map entity has no `entity_picture` attribute at all). Falls back to
+         *  "the only candidate, whatever its state" when there's exactly one — covers a
+         *  freshly added vacuum whose first poll hasn't landed yet. Ambiguous cases (0 or
+         *  2+ simultaneously-live candidates) fall through to undefined — same as today,
+         *  the user picks manually. */
+        this._mapCache = new Map();
         this._autoCache = new Map();
         /** docs/25 §10 follow-up (2026-07-24): consumable/"care" rows auto-discovered from
          *  the official `roborock` integration's OWN entities — zero new config keys, zero
@@ -1550,7 +1570,7 @@ let AnyVacCard = class AnyVacCard extends i$2 {
         for (const vac of this._config?.vacuums ?? []) {
             for (const id of [vac.entity, vac.status_entity, vac.battery_entity,
                 vac.last_clean_entity, vac.progress_entity, vac.current_room_entity,
-                vac.error_entity, vac.map?.entity, this._intEntity(vac),
+                vac.error_entity, this._mapEntityFor(vac), this._intEntity(vac),
                 ...Object.values(this._autoEntities(vac))]) {
                 if (id)
                     s.add(id);
@@ -1613,6 +1633,27 @@ let AnyVacCard = class AnyVacCard extends i$2 {
             ? Object.keys(reg).find((id) => reg[id]?.device_id === dev && reg[id]?.platform === "anyvac" && id.startsWith("sensor."))
             : undefined;
         this._intCache.set(vac.entity, found);
+        return found;
+    }
+    _mapEntityFor(vac) {
+        if (vac.map?.entity)
+            return vac.map.entity;
+        const reg = this.hass?.entities;
+        if (!reg || !vac.entity)
+            return undefined;
+        if (this._mapCache.has(vac.entity))
+            return this._mapCache.get(vac.entity);
+        const dev = reg[vac.entity]?.device_id;
+        let found;
+        if (dev) {
+            const candidates = Object.keys(reg).filter((id) => reg[id]?.device_id === dev && id.startsWith("image."));
+            const live = candidates.filter((id) => {
+                const st = this.hass.states[id];
+                return !!st && st.state !== "unavailable" && st.state !== "unknown" && !!st.attributes["entity_picture"];
+            });
+            found = live.length === 1 ? live[0] : (candidates.length === 1 ? candidates[0] : undefined);
+        }
+        this._mapCache.set(vac.entity, found);
         return found;
     }
     /** Kontrakt v2 gate: attributes of the vacuum's integration sensor, only when the
@@ -3516,13 +3557,13 @@ let AnyVacCard = class AnyVacCard extends i$2 {
      *  auto-seated transform, so one screen point/rectangle translates independently
      *  per vacuum via `_clickToContent`). */
     _modeCandidates() {
-        return this._config.vacuums.filter((v) => this._intAttrs(v) && v.map?.entity);
+        return this._config.vacuums.filter((v) => this._intAttrs(v) && this._mapEntityFor(v));
     }
     /** Whether this vacuum's map should render the click-catch / zone-rect layer:
      *  either it's the legacy hard-coded single target, or mode is armed "*" (meta
      *  bar) and this vacuum is a valid candidate. */
     _isModeCandidate(v) {
-        return this._modeEntity === v.entity || (this._modeEntity === "*" && !!this._intAttrs(v) && !!v.map?.entity);
+        return this._modeEntity === v.entity || (this._modeEntity === "*" && !!this._intAttrs(v) && !!this._mapEntityFor(v));
     }
     /** Whether `v` still has a stake in the current zone capture once arming has
      *  already ended — i.e. it's awaiting confirm (`_zonePending`) or it's still
@@ -3580,7 +3621,7 @@ let AnyVacCard = class AnyVacCard extends i$2 {
         return this._zonePending?.[v.entity] ? this._zoneRectShown : null;
     }
     _refreshMap(vac) {
-        const ent = vac.map?.entity;
+        const ent = this._mapEntityFor(vac);
         if (ent)
             void this.hass.callService("homeassistant", "update_entity", { entity_id: ent });
     }
@@ -3631,7 +3672,7 @@ let AnyVacCard = class AnyVacCard extends i$2 {
         // map element — with several vacuums shown there are several .map-img and the
         // first one may belong to a different robot with different seating (docs/13 A4).
         // The floorplan is NOT a valid fallback: its content space has no mm mapping.
-        const el = vac.map?.entity
+        const el = this._mapEntityFor(vac)
             ? this.renderRoot?.querySelector(`.map-img[data-entity="${vac.entity.replace(/"/g, '\\"')}"]`)
             : null;
         if (!el)
@@ -3852,7 +3893,7 @@ let AnyVacCard = class AnyVacCard extends i$2 {
     /** Refresh-all button in the badges row (grid mode) — the map corner variant
      *  floated in dead space (field feedback 2026-07-11). */
     _renderBadgesRefresh() {
-        const withMap = this._config.vacuums.filter((v) => v.map?.entity);
+        const withMap = this._config.vacuums.filter((v) => this._mapEntityFor(v));
         if (!withMap.length)
             return A;
         return b `<button class="mtbtn badges-refresh" title="Refresh maps"
@@ -3868,7 +3909,7 @@ let AnyVacCard = class AnyVacCard extends i$2 {
      *  (no `layout:` block) is untouched — `_renderMapTools`/`_renderStatsTrio`/
      *  `_renderBadgesRefresh` below still exist for it. */
     _renderMetaBar(vacs) {
-        const withMap = vacs.filter((v) => v.map?.entity);
+        const withMap = vacs.filter((v) => this._mapEntityFor(v));
         if (!withMap.length)
             return A;
         // Pin & Go / Zone here is armed for ALL candidates at once ("*", `_armMode`) —
@@ -3962,15 +4003,16 @@ let AnyVacCard = class AnyVacCard extends i$2 {
     `;
     }
     _renderMapTools(vac) {
-        if (!vac.map && !vac.image_base)
+        if (!vac.map && !vac.image_base && !this._mapEntityFor(vac))
             return A;
         // Map commands need the integration's calibration AND this vacuum's map element
         // for the click geometry. Disabled whenever the map is rotated (any profile) —
         // the click inversion does not account for the wrapper rotation yet (docs/13 A5).
-        const canCmd = !!this._intAttrs(vac) && !!vac.map?.entity && !this._narrow;
+        const mapEnt = this._mapEntityFor(vac);
+        const canCmd = !!this._intAttrs(vac) && !!mapEnt && !this._narrow;
         const cmdTitle = this._narrow
             ? "Not available while the map is rotated"
-            : (!this._intAttrs(vac) || !vac.map?.entity)
+            : (!this._intAttrs(vac) || !mapEnt)
                 ? "Requires the AnyVac integration (≥ 0.18) + map entity"
                 : "";
         const mode = this._modeEntity === vac.entity ? this._mapMode : "normal";
@@ -3978,7 +4020,7 @@ let AnyVacCard = class AnyVacCard extends i$2 {
       <div class="map-tools">
         ${this._config.layout && this._config.vacuums.length > 1
             ? b `<span class="map-tools-label">${vac.name ?? vac.entity}</span>` : A}
-        ${vac.map?.entity ? b `<button class="mtbtn" @click=${() => this._refreshMap(vac)} title="Refresh map">
+        ${mapEnt ? b `<button class="mtbtn" @click=${() => this._refreshMap(vac)} title="Refresh map">
           <ha-icon icon="mdi:refresh"></ha-icon><span>Refresh</span>
         </button>` : A}
         <button class="mtbtn ${mode === "pin" ? "on" : ""}" ?disabled=${!canCmd}
@@ -4539,7 +4581,8 @@ let AnyVacCard = class AnyVacCard extends i$2 {
         })} />
         ` : A}
         ${shown.map((v, idx) => {
-            const mUrl = v.map?.entity ? this._mapUrl(v.map.entity) : null;
+            const mapEnt = this._mapEntityFor(v);
+            const mUrl = mapEnt ? this._mapUrl(mapEnt) : null;
             if (!mUrl)
                 return A;
             const seat = this._effectiveSeat(v);
@@ -4590,10 +4633,14 @@ let AnyVacCard = class AnyVacCard extends i$2 {
     `;
     }
     _renderMap(vac) {
+        // Deliberately the RAW config value here (not the auto-resolved one below) —
+        // this infers intent when `base` itself is unset: "configured a floorplan but
+        // never mentioned a map entity" should still default to showing just the
+        // floorplan, even though `_mapEntityFor` would now likely find one anyway.
         const base = vac.base ?? (vac.image_base?.src && !vac.map?.entity ? "image" : "map");
         const ib = vac.image_base;
         const imgSrc = ib?.src;
-        const mapEntity = vac.map?.entity;
+        const mapEntity = this._mapEntityFor(vac);
         const mapUrl = mapEntity ? this._mapUrl(mapEntity) : null;
         const showImage = (base === "image" || base === "combined") && !!imgSrc;
         const showMap = (base === "map" || base === "combined") && !!mapUrl;
@@ -6547,7 +6594,7 @@ let AnyVacCardEditor = class AnyVacCardEditor extends i$2 {
             return;
         }
         const mapVac = Math.min(this._mapVac, vacuums.length - 1);
-        const entity = vacuums[mapVac].map?.entity;
+        const entity = this._mapEntityFor(vacuums[mapVac]);
         this._refMapUrl = entity
             ? (this.hass.states[entity]?.attributes["entity_picture"] ?? "") : "";
         this._refMapVac = mapVac;
@@ -6716,6 +6763,25 @@ let AnyVacCardEditor = class AnyVacCardEditor extends i$2 {
         return dev
             ? Object.keys(reg).find((id) => reg[id]?.device_id === dev && reg[id]?.platform === "anyvac" && id.startsWith("sensor."))
             : undefined;
+    }
+    /** Mirrors the card's `_mapEntityFor` (2026-07-30 onboarding audit, docs/30 §2.1)
+     *  so the Maps tab preview/hints reflect the same auto-resolved entity the card
+     *  will actually use, not just what's explicitly typed into the picker below. */
+    _mapEntityFor(vac) {
+        if (!vac)
+            return undefined;
+        if (vac.map?.entity)
+            return vac.map.entity;
+        const reg = this.hass?.entities;
+        const dev = reg?.[vac.entity]?.device_id;
+        if (!dev)
+            return undefined;
+        const candidates = Object.keys(reg).filter((id) => reg[id]?.device_id === dev && id.startsWith("image."));
+        const live = candidates.filter((id) => {
+            const st = this.hass.states[id];
+            return !!st && st.state !== "unavailable" && st.state !== "unknown" && !!st.attributes["entity_picture"];
+        });
+        return live.length === 1 ? live[0] : (candidates.length === 1 ? candidates[0] : undefined);
     }
     /** Backend-owned room cleaning sequence (docs/19): {room_key: 1-based position},
      *  read from the AnyVac sensor. It's coordinator-wide (same value on every
@@ -7478,7 +7544,12 @@ let AnyVacCardEditor = class AnyVacCardEditor extends i$2 {
         ` : A}
 
         ${this._entityPicker("Map image entity", map.entity, ["image"], v => this._setMap(mapVac, { entity: v }))}
-        ${map.entity ? b `
+        ${!map.entity && this._mapEntityFor(vac) ? b `
+          <p class="hint">Leave blank to auto-use <code>${this._mapEntityFor(vac)}</code> —
+            found automatically on this vacuum's device. Set it explicitly only to
+            override (e.g. a multi-map vacuum where the wrong floor's image was picked).</p>
+        ` : A}
+        ${this._mapEntityFor(vac) ? b `
           <button class="btn btn--sm" style="align-self:flex-start"
             @click=${() => this._snapshotRefMap()}>
             <ha-icon icon="mdi:refresh"></ha-icon> Refresh reference map

@@ -783,7 +783,7 @@ export class AnyVacCard extends LitElement {
     for (const vac of this._config?.vacuums ?? []) {
       for (const id of [vac.entity, vac.status_entity, vac.battery_entity,
         vac.last_clean_entity, vac.progress_entity, vac.current_room_entity,
-        vac.error_entity, vac.map?.entity, this._intEntity(vac),
+        vac.error_entity, this._mapEntityFor(vac), this._intEntity(vac),
         ...Object.values(this._autoEntities(vac))]) {
         if (id) s.add(id);
       }
@@ -844,6 +844,47 @@ export class AnyVacCard extends LitElement {
         )
       : undefined;
     this._intCache.set(vac.entity, found);
+    return found;
+  }
+
+  /** The vacuum's rendered-map `image.*` entity: explicit config, else auto-resolved
+   *  from the entity registry (2026-07-30 onboarding audit, docs/30 §2.1) — this was
+   *  previously the one config field with no auto-resolve at all, unlike
+   *  `integration_entity`/`_autoEntities` above, so a fresh install showed no map
+   *  whatsoever until the user hunted down the right entity by hand.
+   *  No `translation_key` to match on here (live-verified: the official `roborock`
+   *  integration's map image entities carry none — confirmed empty on a real
+   *  registry, 2026-07-30) and a multi-map vacuum can have ONE image entity PER
+   *  SAVED FLOOR (e.g. `image.kitchen_map_0` / `image.kitchen_map_2`), so picking
+   *  "the only image.* on this device" isn't safe in general. Instead: prefer
+   *  whichever candidate is actually live (state isn't unavailable/unknown AND has
+   *  `entity_picture` — the same liveness signal `_mapUrl` already reads) since the
+   *  Roborock integration only backs the CURRENTLY selected map's image entity with
+   *  a live state; the rest sit at "unavailable" (live-verified: a 2-map vacuum's
+   *  inactive map entity has no `entity_picture` attribute at all). Falls back to
+   *  "the only candidate, whatever its state" when there's exactly one — covers a
+   *  freshly added vacuum whose first poll hasn't landed yet. Ambiguous cases (0 or
+   *  2+ simultaneously-live candidates) fall through to undefined — same as today,
+   *  the user picks manually. */
+  private _mapCache = new Map<string, string | undefined>();
+  private _mapEntityFor(vac: VacuumConfig): string | undefined {
+    if (vac.map?.entity) return vac.map.entity;
+    const reg = (this.hass as any)?.entities as Record<string, any> | undefined;
+    if (!reg || !vac.entity) return undefined;
+    if (this._mapCache.has(vac.entity)) return this._mapCache.get(vac.entity);
+    const dev = reg[vac.entity]?.device_id;
+    let found: string | undefined;
+    if (dev) {
+      const candidates = Object.keys(reg).filter(
+        (id) => reg[id]?.device_id === dev && id.startsWith("image.")
+      );
+      const live = candidates.filter((id) => {
+        const st = this.hass.states[id];
+        return !!st && st.state !== "unavailable" && st.state !== "unknown" && !!st.attributes["entity_picture"];
+      });
+      found = live.length === 1 ? live[0] : (candidates.length === 1 ? candidates[0] : undefined);
+    }
+    this._mapCache.set(vac.entity, found);
     return found;
   }
 
@@ -2732,13 +2773,13 @@ export class AnyVacCard extends LitElement {
    *  auto-seated transform, so one screen point/rectangle translates independently
    *  per vacuum via `_clickToContent`). */
   private _modeCandidates(): VacuumConfig[] {
-    return this._config.vacuums.filter((v) => this._intAttrs(v) && v.map?.entity);
+    return this._config.vacuums.filter((v) => this._intAttrs(v) && this._mapEntityFor(v));
   }
   /** Whether this vacuum's map should render the click-catch / zone-rect layer:
    *  either it's the legacy hard-coded single target, or mode is armed "*" (meta
    *  bar) and this vacuum is a valid candidate. */
   private _isModeCandidate(v: VacuumConfig): boolean {
-    return this._modeEntity === v.entity || (this._modeEntity === "*" && !!this._intAttrs(v) && !!v.map?.entity);
+    return this._modeEntity === v.entity || (this._modeEntity === "*" && !!this._intAttrs(v) && !!this._mapEntityFor(v));
   }
   /** Whether `v` still has a stake in the current zone capture once arming has
    *  already ended — i.e. it's awaiting confirm (`_zonePending`) or it's still
@@ -2793,7 +2834,7 @@ export class AnyVacCard extends LitElement {
     return this._zonePending?.[v.entity] ? this._zoneRectShown : null;
   }
   private _refreshMap(vac: VacuumConfig): void {
-    const ent = vac.map?.entity;
+    const ent = this._mapEntityFor(vac);
     if (ent) void this.hass.callService("homeassistant", "update_entity", { entity_id: ent });
   }
   private _clampPct(v: number): number {
@@ -2838,7 +2879,7 @@ export class AnyVacCard extends LitElement {
     // map element — with several vacuums shown there are several .map-img and the
     // first one may belong to a different robot with different seating (docs/13 A4).
     // The floorplan is NOT a valid fallback: its content space has no mm mapping.
-    const el = vac.map?.entity
+    const el = this._mapEntityFor(vac)
       ? (this.renderRoot?.querySelector(
           `.map-img[data-entity="${vac.entity.replace(/"/g, '\\"')}"]`
         ) as HTMLElement | null)
@@ -3028,7 +3069,7 @@ export class AnyVacCard extends LitElement {
   /** Refresh-all button in the badges row (grid mode) — the map corner variant
    *  floated in dead space (field feedback 2026-07-11). */
   private _renderBadgesRefresh() {
-    const withMap = this._config.vacuums.filter((v) => v.map?.entity);
+    const withMap = this._config.vacuums.filter((v) => this._mapEntityFor(v));
     if (!withMap.length) return nothing;
     return html`<button class="mtbtn badges-refresh" title="Refresh maps"
       @click=${() => { for (const v of withMap) this._refreshMap(v); }}>
@@ -3043,7 +3084,7 @@ export class AnyVacCard extends LitElement {
    *  (no `layout:` block) is untouched — `_renderMapTools`/`_renderStatsTrio`/
    *  `_renderBadgesRefresh` below still exist for it. */
   private _renderMetaBar(vacs: VacuumConfig[]) {
-    const withMap = vacs.filter((v) => v.map?.entity);
+    const withMap = vacs.filter((v) => this._mapEntityFor(v));
     if (!withMap.length) return nothing;
     // Pin & Go / Zone here is armed for ALL candidates at once ("*", `_armMode`) —
     // in merged mode the capture (click/drag) happens once on the shared map and
@@ -3136,14 +3177,15 @@ export class AnyVacCard extends LitElement {
   }
 
   private _renderMapTools(vac: VacuumConfig) {
-    if (!vac.map && !vac.image_base) return nothing;
+    if (!vac.map && !vac.image_base && !this._mapEntityFor(vac)) return nothing;
     // Map commands need the integration's calibration AND this vacuum's map element
     // for the click geometry. Disabled whenever the map is rotated (any profile) —
     // the click inversion does not account for the wrapper rotation yet (docs/13 A5).
-    const canCmd = !!this._intAttrs(vac) && !!vac.map?.entity && !this._narrow;
+    const mapEnt = this._mapEntityFor(vac);
+    const canCmd = !!this._intAttrs(vac) && !!mapEnt && !this._narrow;
     const cmdTitle = this._narrow
       ? "Not available while the map is rotated"
-      : (!this._intAttrs(vac) || !vac.map?.entity)
+      : (!this._intAttrs(vac) || !mapEnt)
         ? "Requires the AnyVac integration (≥ 0.18) + map entity"
         : "";
     const mode = this._modeEntity === vac.entity ? this._mapMode : "normal";
@@ -3151,7 +3193,7 @@ export class AnyVacCard extends LitElement {
       <div class="map-tools">
         ${this._config.layout && this._config.vacuums.length > 1
           ? html`<span class="map-tools-label">${vac.name ?? vac.entity}</span>` : nothing}
-        ${vac.map?.entity ? html`<button class="mtbtn" @click=${() => this._refreshMap(vac)} title="Refresh map">
+        ${mapEnt ? html`<button class="mtbtn" @click=${() => this._refreshMap(vac)} title="Refresh map">
           <ha-icon icon="mdi:refresh"></ha-icon><span>Refresh</span>
         </button>` : nothing}
         <button class="mtbtn ${mode === "pin" ? "on" : ""}" ?disabled=${!canCmd}
@@ -3680,7 +3722,8 @@ export class AnyVacCard extends LitElement {
             })} />
         ` : nothing}
         ${shown.map((v, idx) => {
-          const mUrl = v.map?.entity ? this._mapUrl(v.map.entity) : null;
+          const mapEnt = this._mapEntityFor(v);
+          const mUrl = mapEnt ? this._mapUrl(mapEnt) : null;
           if (!mUrl) return nothing;
           const seat = this._effectiveSeat(v);
           const overlay = hasImage || idx > 0;
@@ -3733,10 +3776,14 @@ export class AnyVacCard extends LitElement {
   }
 
   private _renderMap(vac: VacuumConfig) {
+    // Deliberately the RAW config value here (not the auto-resolved one below) —
+    // this infers intent when `base` itself is unset: "configured a floorplan but
+    // never mentioned a map entity" should still default to showing just the
+    // floorplan, even though `_mapEntityFor` would now likely find one anyway.
     const base = vac.base ?? (vac.image_base?.src && !vac.map?.entity ? "image" : "map");
     const ib = vac.image_base;
     const imgSrc = ib?.src;
-    const mapEntity = vac.map?.entity;
+    const mapEntity = this._mapEntityFor(vac);
     const mapUrl = mapEntity ? this._mapUrl(mapEntity) : null;
     const showImage = (base === "image" || base === "combined") && !!imgSrc;
     const showMap = (base === "map" || base === "combined") && !!mapUrl;
