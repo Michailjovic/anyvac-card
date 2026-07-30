@@ -275,13 +275,25 @@ export class AnyVacCard extends LitElement {
     return document.createElement(EDITOR_NAME);
   }
 
-  static getStubConfig(): AnyVacCardConfig {
+  /** HA passes (hass, entities, entitiesFallback) when building the "+ Add card"
+   *  preview — auto-detecting the user's actual first vacuum entity here means a
+   *  freshly dropped card already works instead of showing a nonexistent
+   *  placeholder the user must find and replace by hand. Falls back to the old
+   *  placeholder if hass isn't supplied (defensive — some call sites/older HA
+   *  versions may not pass it). */
+  static getStubConfig(hass?: HomeAssistant): AnyVacCardConfig {
+    const firstVacuum = hass
+      ? Object.keys(hass.states).filter((id) => id.startsWith("vacuum."))[0]
+      : undefined;
+    const name = firstVacuum
+      ? ((hass!.states[firstVacuum]?.attributes["friendly_name"] as string | undefined) ?? undefined)
+      : undefined;
     return {
       type: `custom:${CARD_NAME}`,
       vacuums: [
         {
-          entity: "vacuum.my_roborock",
-          name: "Roborock",
+          entity: firstVacuum ?? "vacuum.my_roborock",
+          name: name ?? "Roborock",
           color: "green",
           rooms: [],
           clean_action: { type: "native" },

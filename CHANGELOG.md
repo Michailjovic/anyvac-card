@@ -8,6 +8,37 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Planned
 
+## [0.85.0] - 2026-07-30
+
+### Changed
+
+First pass of a new-user onboarding audit (points 2-4 of that review; the
+README rewrite and a fresh single/multi-vacuum install walkthrough follow
+once the underlying config surface is settled):
+
+- Room editor: Segment ID and the three legacy fallback fields (Est. clean
+  time, Clean time fallback entity, Last clean fallback entity) — none of
+  which are ever read once a vacuum has an active AnyVac integration entity
+  (verified in `_startClean`: the integration path never touches
+  `segment_id` or these fallbacks) — are now hidden entirely for such
+  vacuums, replaced by a one-line reassurance that the integration handles
+  this server-side. Previously shown unconditionally for every room,
+  including a "Find IDs: Developer Tools → Actions → roborock.get_maps"
+  nudge that invited new users to spend time on a value the card would
+  never use. The collapsed room row's "seg N" badge is likewise hidden
+  once the integration is active.
+- Vacuums tab "Rooms" section now explains, right where a new user would
+  otherwise assume manual entry is required, that rooms with the AnyVac
+  integration appear automatically from the vacuum's own map — manual
+  entries are only for icon/name overrides or positioning on a custom
+  floorplan.
+- `getStubConfig()` (the config HA seeds when a card is freshly dropped
+  onto a dashboard) now looks up the user's actual first `vacuum.*` entity
+  from `hass.states` instead of a placeholder (`vacuum.my_roborock`) that
+  never exists — a freshly added card should now already point at a real
+  entity instead of requiring an immediate manual fix. Falls back to the
+  old placeholder if `hass` isn't supplied.
+
 ## [0.84.0] - 2026-07-30
 
 ### Changed

@@ -94,7 +94,7 @@ const t={ATTRIBUTE:1},e=t=>(...e)=>({_$litDirective$:t,values:e});let i$1 = clas
 
 const CARD_NAME = "anyvac-card";
 const EDITOR_NAME = "anyvac-card-editor";
-const CARD_VERSION = "0.84.0";
+const CARD_VERSION = "0.85.0";
 /** Hold duration in ms required to trigger START / PAUSE actions */
 const HOLD_DURATION_MS = 600;
 /** docs/25 §10 field report (2026-07-25): Android's swipe-up-from-bottom-edge
@@ -969,13 +969,25 @@ let AnyVacCard = class AnyVacCard extends i$2 {
     static getConfigElement() {
         return document.createElement(EDITOR_NAME);
     }
-    static getStubConfig() {
+    /** HA passes (hass, entities, entitiesFallback) when building the "+ Add card"
+     *  preview — auto-detecting the user's actual first vacuum entity here means a
+     *  freshly dropped card already works instead of showing a nonexistent
+     *  placeholder the user must find and replace by hand. Falls back to the old
+     *  placeholder if hass isn't supplied (defensive — some call sites/older HA
+     *  versions may not pass it). */
+    static getStubConfig(hass) {
+        const firstVacuum = hass
+            ? Object.keys(hass.states).filter((id) => id.startsWith("vacuum."))[0]
+            : undefined;
+        const name = firstVacuum
+            ? (hass.states[firstVacuum]?.attributes["friendly_name"] ?? undefined)
+            : undefined;
         return {
             type: `custom:${CARD_NAME}`,
             vacuums: [
                 {
-                    entity: "vacuum.my_roborock",
-                    name: "Roborock",
+                    entity: firstVacuum ?? "vacuum.my_roborock",
+                    name: name ?? "Roborock",
                     color: "green",
                     rooms: [],
                     clean_action: { type: "native" },
@@ -7146,6 +7158,11 @@ let AnyVacCardEditor = class AnyVacCardEditor extends i$2 {
             ${this._renderPresetsSection(idx, vac)}
 
             <div class="section-title">Rooms (${(vac.rooms ?? []).length})</div>
+            ${this._intEntityFor(vac)
+            ? b `<p class="hint">With the AnyVac integration, rooms appear automatically from
+                  this vacuum's own map — you don't need to add them here. Add a room below only to
+                  override its icon/display name, or to position it on a custom floorplan (Maps tab).</p>`
+            : b `<p class="hint">Add one entry per room this vacuum can clean.</p>`}
             ${(vac.rooms ?? []).map((r, ri) => this._renderRoomAccordion(r, idx, ri))}
             <button class="btn btn--add" @click=${() => this._addRoom(idx)}>
               <ha-icon icon="mdi:plus"></ha-icon> Add room
@@ -7348,7 +7365,7 @@ let AnyVacCardEditor = class AnyVacCardEditor extends i$2 {
           <ha-icon class="room-acc-icon" icon=${room.icon || "mdi:square"}></ha-icon>
           <div class="room-acc-info">
             <span class="room-acc-name">${room.name || room.key || "Unnamed room"}</span>
-            ${room.segment_id !== undefined
+            ${room.segment_id !== undefined && !this._intEntityFor(this._config.vacuums[vacIdx])
             ? b `<span class="room-acc-meta">seg ${room.segment_id}</span>` : A}
           </div>
           <button class="icon-btn icon-btn--danger icon-btn--sm"
@@ -7364,34 +7381,36 @@ let AnyVacCardEditor = class AnyVacCardEditor extends i$2 {
             ${this._textField("Display name", room.name, v => this._setRoom(vacIdx, roomIdx, { name: v }), "e.g. Bedroom")}
             <p class="hint">Cleaning sequence moved to a shared, backend-owned reorderable
               list — see the <strong>Maps tab</strong> (requires the AnyVac integration + merged mode).</p>
-            ${this._config.vacuums[vacIdx]?.clean_action?.type === "native-area"
-            ? b `
-                <div class="field field--row">
-                  <label>Effective area</label>
-                  <strong style="font-size:13px">${
-            /* must mirror the card's resolution order */
-            room.area_id ?? this._config.area_mappings?.[room.key] ?? room.key}</strong>
-                </div>
-                <p class="hint map-hint" @click=${() => { this._tab = "global"; }}>
-                  Set in <strong>Global tab → Area mappings</strong> →
-                </p>`
-            : b `
-                <div class="field field--row">
-                  <label>Segment ID</label>
-                  <input class="text-input text-input--sm" type="number"
-                    .value=${String(room.segment_id ?? "")} placeholder="e.g. 16"
-                    @change=${(e) => {
-                const v = parseInt(e.target.value);
-                this._setRoom(vacIdx, roomIdx, { segment_id: isNaN(v) ? undefined : v });
-            }} />
-                </div>
-                <p class="hint">Find IDs: Developer Tools → Actions → roborock.get_maps</p>`}
-            ${this._numberSlider("Est. clean time (fallback)", room.clean_time_mins ?? 0, 0, 120, 1, v => this._setRoom(vacIdx, roomIdx, { clean_time_mins: v > 0 ? v : undefined }), " min")}
-            ${this._entityPicker("Clean time fallback (input_number, legacy)", room.clean_time_entity, ["input_number"], v => this._setRoom(vacIdx, roomIdx, { clean_time_entity: v || undefined }))}
-            ${this._entityPicker("Last clean fallback (input_datetime, legacy)", room.last_clean_entity, ["input_datetime"], v => this._setRoom(vacIdx, roomIdx, { last_clean_entity: v || undefined }))}
-            <p class="hint">Legacy read-only fallbacks for setups without the AnyVac integration.
-              With the integration, clean-time estimates and last-clean history are learned and
-              stored server-side — the card never writes these helpers.</p>
+            ${this._intEntityFor(this._config.vacuums[vacIdx])
+            ? b `<p class="hint">Segment resolution, timing and clean history are handled
+                  server-side by the AnyVac integration for this vacuum — nothing to set here.</p>`
+            : this._config.vacuums[vacIdx]?.clean_action?.type === "native-area"
+                ? b `
+                  <div class="field field--row">
+                    <label>Effective area</label>
+                    <strong style="font-size:13px">${
+                /* must mirror the card's resolution order */
+                room.area_id ?? this._config.area_mappings?.[room.key] ?? room.key}</strong>
+                  </div>
+                  <p class="hint map-hint" @click=${() => { this._tab = "global"; }}>
+                    Set in <strong>Global tab → Area mappings</strong> →
+                  </p>`
+                : b `
+                  <div class="field field--row">
+                    <label>Segment ID</label>
+                    <input class="text-input text-input--sm" type="number"
+                      .value=${String(room.segment_id ?? "")} placeholder="e.g. 16"
+                      @change=${(e) => {
+                    const v = parseInt(e.target.value);
+                    this._setRoom(vacIdx, roomIdx, { segment_id: isNaN(v) ? undefined : v });
+                }} />
+                  </div>
+                  <p class="hint">Find IDs: Developer Tools → Actions → roborock.get_maps</p>
+                  ${this._numberSlider("Est. clean time (fallback)", room.clean_time_mins ?? 0, 0, 120, 1, v => this._setRoom(vacIdx, roomIdx, { clean_time_mins: v > 0 ? v : undefined }), " min")}
+                  ${this._entityPicker("Clean time fallback (input_number, legacy)", room.clean_time_entity, ["input_number"], v => this._setRoom(vacIdx, roomIdx, { clean_time_entity: v || undefined }))}
+                  ${this._entityPicker("Last clean fallback (input_datetime, legacy)", room.last_clean_entity, ["input_datetime"], v => this._setRoom(vacIdx, roomIdx, { last_clean_entity: v || undefined }))}
+                  <p class="hint">Legacy read-only fallbacks for setups without the AnyVac
+                    integration — the card never writes these helpers.</p>`}
             <p class="hint map-hint" @click=${() => { this._tab = "maps"; this._mapVac = vacIdx; this._mapRoom = roomIdx; }}>
               📍 Set position &amp; icon in the <strong>Maps tab</strong> →
             </p>

@@ -789,6 +789,11 @@ export class AnyVacCardEditor extends LitElement {
             ${this._renderPresetsSection(idx, vac)}
 
             <div class="section-title">Rooms (${(vac.rooms ?? []).length})</div>
+            ${this._intEntityFor(vac)
+              ? html`<p class="hint">With the AnyVac integration, rooms appear automatically from
+                  this vacuum's own map — you don't need to add them here. Add a room below only to
+                  override its icon/display name, or to position it on a custom floorplan (Maps tab).</p>`
+              : html`<p class="hint">Add one entry per room this vacuum can clean.</p>`}
             ${(vac.rooms ?? []).map((r, ri) => this._renderRoomAccordion(r, idx, ri))}
             <button class="btn btn--add" @click=${() => this._addRoom(idx)}>
               <ha-icon icon="mdi:plus"></ha-icon> Add room
@@ -1021,7 +1026,7 @@ export class AnyVacCardEditor extends LitElement {
           <ha-icon class="room-acc-icon" icon=${room.icon || "mdi:square"}></ha-icon>
           <div class="room-acc-info">
             <span class="room-acc-name">${room.name || room.key || "Unnamed room"}</span>
-            ${room.segment_id !== undefined
+            ${room.segment_id !== undefined && !this._intEntityFor(this._config.vacuums[vacIdx])
               ? html`<span class="room-acc-meta">seg ${room.segment_id}</span>` : nothing}
           </div>
           <button class="icon-btn icon-btn--danger icon-btn--sm"
@@ -1039,38 +1044,40 @@ export class AnyVacCardEditor extends LitElement {
               v => this._setRoom(vacIdx, roomIdx, { name: v }), "e.g. Bedroom")}
             <p class="hint">Cleaning sequence moved to a shared, backend-owned reorderable
               list — see the <strong>Maps tab</strong> (requires the AnyVac integration + merged mode).</p>
-            ${this._config.vacuums[vacIdx]?.clean_action?.type === "native-area"
-              ? html`
-                <div class="field field--row">
-                  <label>Effective area</label>
-                  <strong style="font-size:13px">${
-                    /* must mirror the card's resolution order */
-                    room.area_id ?? this._config.area_mappings?.[room.key] ?? room.key
-                  }</strong>
-                </div>
-                <p class="hint map-hint" @click=${() => { this._tab = "global"; }}>
-                  Set in <strong>Global tab → Area mappings</strong> →
-                </p>`
-              : html`
-                <div class="field field--row">
-                  <label>Segment ID</label>
-                  <input class="text-input text-input--sm" type="number"
-                    .value=${String(room.segment_id ?? "")} placeholder="e.g. 16"
-                    @change=${(e: Event) => {
-                      const v = parseInt((e.target as HTMLInputElement).value);
-                      this._setRoom(vacIdx, roomIdx, { segment_id: isNaN(v) ? undefined : v });
-                    }} />
-                </div>
-                <p class="hint">Find IDs: Developer Tools → Actions → roborock.get_maps</p>`}
-            ${this._numberSlider("Est. clean time (fallback)", room.clean_time_mins ?? 0, 0, 120, 1,
-              v => this._setRoom(vacIdx, roomIdx, { clean_time_mins: v > 0 ? v : undefined }), " min")}
-            ${this._entityPicker("Clean time fallback (input_number, legacy)", room.clean_time_entity, ["input_number"],
-              v => this._setRoom(vacIdx, roomIdx, { clean_time_entity: v || undefined }))}
-            ${this._entityPicker("Last clean fallback (input_datetime, legacy)", room.last_clean_entity, ["input_datetime"],
-              v => this._setRoom(vacIdx, roomIdx, { last_clean_entity: v || undefined }))}
-            <p class="hint">Legacy read-only fallbacks for setups without the AnyVac integration.
-              With the integration, clean-time estimates and last-clean history are learned and
-              stored server-side — the card never writes these helpers.</p>
+            ${this._intEntityFor(this._config.vacuums[vacIdx])
+              ? html`<p class="hint">Segment resolution, timing and clean history are handled
+                  server-side by the AnyVac integration for this vacuum — nothing to set here.</p>`
+              : this._config.vacuums[vacIdx]?.clean_action?.type === "native-area"
+                ? html`
+                  <div class="field field--row">
+                    <label>Effective area</label>
+                    <strong style="font-size:13px">${
+                      /* must mirror the card's resolution order */
+                      room.area_id ?? this._config.area_mappings?.[room.key] ?? room.key
+                    }</strong>
+                  </div>
+                  <p class="hint map-hint" @click=${() => { this._tab = "global"; }}>
+                    Set in <strong>Global tab → Area mappings</strong> →
+                  </p>`
+                : html`
+                  <div class="field field--row">
+                    <label>Segment ID</label>
+                    <input class="text-input text-input--sm" type="number"
+                      .value=${String(room.segment_id ?? "")} placeholder="e.g. 16"
+                      @change=${(e: Event) => {
+                        const v = parseInt((e.target as HTMLInputElement).value);
+                        this._setRoom(vacIdx, roomIdx, { segment_id: isNaN(v) ? undefined : v });
+                      }} />
+                  </div>
+                  <p class="hint">Find IDs: Developer Tools → Actions → roborock.get_maps</p>
+                  ${this._numberSlider("Est. clean time (fallback)", room.clean_time_mins ?? 0, 0, 120, 1,
+                    v => this._setRoom(vacIdx, roomIdx, { clean_time_mins: v > 0 ? v : undefined }), " min")}
+                  ${this._entityPicker("Clean time fallback (input_number, legacy)", room.clean_time_entity, ["input_number"],
+                    v => this._setRoom(vacIdx, roomIdx, { clean_time_entity: v || undefined }))}
+                  ${this._entityPicker("Last clean fallback (input_datetime, legacy)", room.last_clean_entity, ["input_datetime"],
+                    v => this._setRoom(vacIdx, roomIdx, { last_clean_entity: v || undefined }))}
+                  <p class="hint">Legacy read-only fallbacks for setups without the AnyVac
+                    integration — the card never writes these helpers.</p>`}
             <p class="hint map-hint" @click=${() => { this._tab = "maps"; this._mapVac = vacIdx; this._mapRoom = roomIdx; }}>
               📍 Set position &amp; icon in the <strong>Maps tab</strong> →
             </p>
