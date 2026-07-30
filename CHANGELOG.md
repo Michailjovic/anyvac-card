@@ -8,6 +8,20 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Planned
 
+## [0.87.1] - 2026-07-30
+
+### Fixed
+
+- `getStubConfig()` (used to prefill config when adding a new card via "+
+  Add card") no longer defaults to a Matter-bridged vacuum entity when a
+  better one is available. `hass.states` iteration order reflects
+  registration order, not any kind of preference, and Matter's vacuum
+  feature set is far more limited than a native integration's (no rooms,
+  segments, or zones) — it should never win the default pick over a
+  regular vacuum entity just because it happened to load first. Falls
+  back to whatever's first if entity registry access isn't available, or
+  if every vacuum entity really is Matter-only.
+
 ## [0.87.0] - 2026-07-30
 
 ### Changed

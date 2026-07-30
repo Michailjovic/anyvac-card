@@ -283,9 +283,16 @@ export class AnyVacCard extends LitElement {
    *  placeholder if hass isn't supplied (defensive — some call sites/older HA
    *  versions may not pass it). */
   static getStubConfig(hass?: HomeAssistant): AnyVacCardConfig {
-    const firstVacuum = hass
-      ? Object.keys(hass.states).filter((id) => id.startsWith("vacuum."))[0]
-      : undefined;
+    const vacuumIds = hass ? Object.keys(hass.states).filter((id) => id.startsWith("vacuum.")) : [];
+    // Entity registry, when available, lets us skip Matter-bridged vacuum
+    // entities — Matter's vacuum feature set is far more limited than a
+    // native integration's (no rooms/segments/zones), so it's never the
+    // right default even if it happens to be first in `hass.states`
+    // (registration order, not a ranking) — field report 2026-07-30.
+    const reg = (hass as any)?.entities as Record<string, { platform?: string }> | undefined;
+    const firstVacuum = reg
+      ? (vacuumIds.find((id) => reg[id]?.platform !== "matter") ?? vacuumIds[0])
+      : vacuumIds[0];
     const name = firstVacuum
       ? ((hass!.states[firstVacuum]?.attributes["friendly_name"] as string | undefined) ?? undefined)
       : undefined;
