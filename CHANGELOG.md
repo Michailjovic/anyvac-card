@@ -8,6 +8,19 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Planned
 
+## [0.87.2] - 2026-07-30
+
+### Fixed
+
+- Room-rectangle editor (Maps tab): grabbing a corner of a not-yet-selected
+  room to resize it always moved the whole box instead. The corner-handle
+  dots only render once a room is already selected, so the very first
+  press near a corner had no handle to land on and fell through to the
+  body's plain "move" behaviour. `_onRoomPointerDown` now detects a
+  near-corner press on the body itself (same ~16px radius as the visible
+  handle) and treats it as a resize of that corner, so the first press
+  already works — no need to select-then-drag-again.
+
 ## [0.87.1] - 2026-07-30
 
 ### Fixed

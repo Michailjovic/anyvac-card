@@ -87,7 +87,7 @@ const t={ATTRIBUTE:1},e=t=>(...e)=>({_$litDirective$:t,values:e});let i$1 = clas
 
 const CARD_NAME = "anyvac-card";
 const EDITOR_NAME = "anyvac-card-editor";
-const CARD_VERSION = "0.87.1";
+const CARD_VERSION = "0.87.2";
 /** Hold duration in ms required to trigger START / PAUSE actions */
 const HOLD_DURATION_MS = 600;
 /** docs/25 §10 field report (2026-07-25): Android's swipe-up-from-bottom-edge
@@ -6689,11 +6689,42 @@ let AnyVacCardEditor = class AnyVacCardEditor extends i$2 {
         const container = e.currentTarget.closest(".map-pos-container");
         if (!container)
             return;
+        const containerRect = container.getBoundingClientRect();
         const wasSelected = this._mapRoom === ri;
         this._mapRoom = ri;
+        // The corner-handle dots (`.room-rect-handle`) only render once a room is
+        // already selected/"active" — kept that way so the preview doesn't grow
+        // four extra dots on every room at once. That means a user's very FIRST
+        // press near a corner of a not-yet-selected room always landed on the
+        // room BODY (mode "move"), since there was no handle there yet to
+        // actually grab — reported field confusion 2026-07-30 ("grabbing a
+        // corner moves the whole thing, not just that corner"). Fix: detect a
+        // near-corner press on the body itself (same ~16px radius as the real
+        // handle dot) and treat it as a resize of that corner instead, so the
+        // very first press already behaves correctly.
+        let effectiveMode = mode;
+        if (mode === "move" && room.map_w != null) {
+            const px = ((e.clientX - containerRect.left) / containerRect.width) * 100;
+            const py = ((e.clientY - containerRect.top) / containerRect.height) * 100;
+            const cx = room.map_x ?? 50, cy = room.map_y ?? 50;
+            const halfW = room.map_w / 2, halfH = (room.map_h ?? 15) / 2;
+            const rX = (16 / containerRect.width) * 100, rY = (16 / containerRect.height) * 100;
+            const nearLeft = Math.abs(px - (cx - halfW)) <= rX;
+            const nearRight = Math.abs(px - (cx + halfW)) <= rX;
+            const nearTop = Math.abs(py - (cy - halfH)) <= rY;
+            const nearBottom = Math.abs(py - (cy + halfH)) <= rY;
+            if (nearLeft && nearTop)
+                effectiveMode = "resize-nw";
+            else if (nearRight && nearTop)
+                effectiveMode = "resize-ne";
+            else if (nearLeft && nearBottom)
+                effectiveMode = "resize-sw";
+            else if (nearRight && nearBottom)
+                effectiveMode = "resize-se";
+        }
         this._rectDrag = {
-            ri, mode,
-            container: container.getBoundingClientRect(),
+            ri, mode: effectiveMode,
+            container: containerRect,
             orig: { x: room.map_x ?? 50, y: room.map_y ?? 50, w: room.map_w ?? 0, h: room.map_h ?? 0 },
             startClientX: e.clientX, startClientY: e.clientY,
             moved: false, wasSelected,
