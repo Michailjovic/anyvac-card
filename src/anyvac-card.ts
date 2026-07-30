@@ -27,6 +27,7 @@ import {
   COLOR_HEX,
   COLOR_BG,
   COLOR_BG_ACTIVE,
+  DEFAULT_VACUUM_PALETTE,
   hexToRgba,
   CLEANING_STATES,
 } from "./const";
@@ -285,28 +286,35 @@ export class AnyVacCard extends LitElement {
   static getStubConfig(hass?: HomeAssistant): AnyVacCardConfig {
     const vacuumIds = hass ? Object.keys(hass.states).filter((id) => id.startsWith("vacuum.")) : [];
     // Entity registry, when available, lets us skip Matter-bridged vacuum
-    // entities — Matter's vacuum feature set is far more limited than a
-    // native integration's (no rooms/segments/zones), so it's never the
-    // right default even if it happens to be first in `hass.states`
-    // (registration order, not a ranking) — field report 2026-07-30.
+    // entities entirely — Matter's vacuum feature set is far more limited
+    // than a native integration's (no rooms/segments/zones), so a Matter
+    // entity is never useful alongside (or instead of) a native one. This
+    // matters more now that the stub auto-loads EVERY vacuum (field report
+    // 2026-07-31, extending the single-vacuum Matter fix from 2026-07-30):
+    // without it, any physical vacuum with a Matter bridge would show up
+    // twice — once crippled.
     const reg = (hass as any)?.entities as Record<string, { platform?: string }> | undefined;
-    const firstVacuum = reg
-      ? (vacuumIds.find((id) => reg[id]?.platform !== "matter") ?? vacuumIds[0])
-      : vacuumIds[0];
-    const name = firstVacuum
-      ? ((hass!.states[firstVacuum]?.attributes["friendly_name"] as string | undefined) ?? undefined)
-      : undefined;
+    const nonMatter = reg ? vacuumIds.filter((id) => reg[id]?.platform !== "matter") : vacuumIds;
+    const ids = nonMatter.length > 0 ? nonMatter : vacuumIds;
+    if (ids.length === 0) {
+      return {
+        type: `custom:${CARD_NAME}`,
+        vacuums: [{ entity: "vacuum.my_roborock", name: "Roborock", rooms: [], clean_action: { type: "native" } }],
+      };
+    }
+    // No explicit `color` here on purpose — leaving it unset means each
+    // vacuum picks up its position-based DEFAULT_VACUUM_PALETTE colour
+    // (see `_defaultColor`), so a fresh multi-vacuum card gets visually
+    // distinct vehicles immediately, and stays that way if the user later
+    // reorders the `vacuums` list in YAML.
     return {
       type: `custom:${CARD_NAME}`,
-      vacuums: [
-        {
-          entity: firstVacuum ?? "vacuum.my_roborock",
-          name: name ?? "Roborock",
-          color: "green",
-          rooms: [],
-          clean_action: { type: "native" },
-        },
-      ],
+      vacuums: ids.map((id) => ({
+        entity: id,
+        name: (hass!.states[id]?.attributes["friendly_name"] as string | undefined) ?? id.replace(/^vacuum\./, ""),
+        rooms: [],
+        clean_action: { type: "native" },
+      })),
     };
   }
 
@@ -846,16 +854,33 @@ export class AnyVacCard extends LitElement {
     return table[c] ?? hexToRgba(this._resolveColor(raw, fallback), active ? 0.3 : 0.18);
   }
 
+  /** Position of `vac` within the configured vacuums array, used to pick its
+   *  default palette colour when `color` isn't explicitly set. Matched by
+   *  entity id rather than object identity, since that's the only stable key
+   *  across any future re-derivation of the vacuum list. */
+  private _vacIndex(vac: VacuumConfig): number {
+    const i = this._config?.vacuums?.findIndex((v) => v.entity === vac.entity) ?? -1;
+    return i < 0 ? 0 : i;
+  }
+
+  /** Default accent colour for a vacuum with no explicit `color` — cycles
+   *  through DEFAULT_VACUUM_PALETTE by array position, so every vacuum in a
+   *  fresh multi-vacuum config is visually distinct instead of all defaulting
+   *  to the same green (field report 2026-07-31). */
+  private _defaultColor(vac: VacuumConfig): string {
+    return DEFAULT_VACUUM_PALETTE[this._vacIndex(vac) % DEFAULT_VACUUM_PALETTE.length];
+  }
+
   private _color(vac: VacuumConfig): string {
-    return this._resolveColor(vac.color, "green");
+    return this._resolveColor(vac.color, this._defaultColor(vac));
   }
 
   private _colorBg(vac: VacuumConfig): string {
-    return this._resolveBg(vac.color, "green", false);
+    return this._resolveBg(vac.color, this._defaultColor(vac), false);
   }
 
   private _colorBgActive(vac: VacuumConfig): string {
-    return this._resolveBg(vac.color, "green", true);
+    return this._resolveBg(vac.color, this._defaultColor(vac), true);
   }
 
   /** Integration sensor for a vacuum: explicit config, else auto-resolved from the

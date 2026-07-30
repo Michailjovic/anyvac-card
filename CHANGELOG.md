@@ -8,6 +8,31 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Planned
 
+## [0.93.0] - 2026-07-31
+
+### Added
+
+Two onboarding/multi-vacuum ergonomics fixes raised directly by the user.
+`getStubConfig()` (fresh "+ Add card" flow) now auto-loads **every**
+discovered `vacuum.*` entity instead of just the first one — Matter-bridged
+duplicates are still excluded whenever a native alternative exists (extends
+the single-vacuum Matter fix from 0.87.1). New `DEFAULT_VACUUM_PALETTE`
+(const.ts, 8 colours, first three match the legacy green/blue/orange) gives
+each vacuum without an explicit `color` a distinct default based on its
+position in the `vacuums` array — `_color`/`_colorBg`/`_colorBgActive` (and
+the editor's "Accent colour" hex-picker placeholder) now derive their
+fallback from `_defaultColor(vac)` instead of hardcoding green for everyone.
+A single-vacuum config with no `color` set looks exactly as before. Editor's
+"Path colour" placeholder swatch also fixed to reflect the real runtime
+default (the vacuum's resolved accent colour, matching `_renderIntegrationOverlay`'s
+`vac.path_color || color`) instead of a stale unrelated hardcoded hex.
+
+**Investigated, no change:** whether the wet/mop path should default to the
+vacuum's own colour like the dry path does, instead of the fixed
+`#40a9ff` blue — user decided to keep the fixed blue (universal "here's
+where it was wet" cue takes priority over per-vehicle identification for
+the mop trace).
+
 ## [0.92.0] - 2026-07-30
 
 ### Added

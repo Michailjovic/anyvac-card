@@ -1,6 +1,6 @@
 export const CARD_NAME = "anyvac-card";
 export const EDITOR_NAME = "anyvac-card-editor";
-export const CARD_VERSION = "0.92.0";
+export const CARD_VERSION = "0.93.0";
 
 /** Hold duration in ms required to trigger START / PAUSE actions */
 export const HOLD_DURATION_MS = 600;
@@ -75,6 +75,28 @@ export const COLOR_HEX: Record<string, string> = {
   blue:   "#2196F3",
   orange: "#faad14",
 };
+
+/**
+ * Default accent-colour palette assigned by a vacuum's position in the
+ * `vacuums` array when it has no explicit `color` set — so a fresh
+ * multi-vacuum config gets visually distinct vehicles out of the box instead
+ * of every vacuum silently falling back to the same "green" (field report
+ * 2026-07-31). The first three entries intentionally match the legacy
+ * green/blue/orange presets, so a single-vacuum config with no `color` set
+ * still looks exactly as it always has. `color` on a vacuum always overrides
+ * this — it's purely a starting point, same spirit as `_hexColorField`'s
+ * placeholder swatches.
+ */
+export const DEFAULT_VACUUM_PALETTE: string[] = [
+  "#52c41a", // green
+  "#2196F3", // blue
+  "#faad14", // orange
+  "#eb2f96", // magenta
+  "#722ed1", // purple
+  "#13c2c2", // cyan
+  "#fa541c", // volcano
+  "#a0d911", // lime
+];
 
 /** rgba versions with reduced opacity for backgrounds */
 export const COLOR_BG: Record<string, string> = {

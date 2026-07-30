@@ -23,6 +23,7 @@ import {
   EDITOR_NAME,
   CARD_VERSION,
   COLOR_HEX,
+  DEFAULT_VACUUM_PALETTE,
 } from "./const";
 import {
   assembleAnchors,
@@ -968,7 +969,7 @@ export class AnyVacCardEditor extends LitElement {
             ${this._textField("Image path", vac.image,
               v => this._setVacuum(idx, { image: v }), "/local/...")}
             ${this._hexColorField("Accent colour", vac.color ? this._resolveColor(vac.color, "green") : undefined,
-              v => this._setVacuum(idx, { color: v || undefined }), "#52c41a")}
+              v => this._setVacuum(idx, { color: v || undefined }), DEFAULT_VACUUM_PALETTE[idx % DEFAULT_VACUUM_PALETTE.length])}
             ${this._selectField<"auto" | "dry" | "wet" | "both">("Role", vac.clean_type ?? "auto",
               [{ value: "auto", label: "Auto-detect from clean action" },
                { value: "dry", label: "Dry only" },
@@ -1617,7 +1618,9 @@ export class AnyVacCardEditor extends LitElement {
 
         ${this._intEntityFor(vac) ? html`
           <div class="section-title" style="margin-top:4px">Appearance</div>
-          ${this._hexColorField("Path colour", vac.path_color, v => this._setVacuum(mapVac, { path_color: v || undefined }), "#69d2ff")}
+          ${this._hexColorField("Path colour", vac.path_color,
+            v => this._setVacuum(mapVac, { path_color: v || undefined }),
+            vac.color ? this._resolveColor(vac.color, "green") : DEFAULT_VACUUM_PALETTE[mapVac % DEFAULT_VACUUM_PALETTE.length])}
           ${this._numberSlider("Path width", vac.path_width ?? 100, 20, 300, 10, v => this._setVacuum(mapVac, { path_width: v }), "%")}
           ${this._hexColorField("Mop band colour", vac.mop_path_color, v => this._setVacuum(mapVac, { mop_path_color: v || undefined }), "#40a9ff")}
           ${this._numberSlider("Mop band opacity", vac.mop_band_opacity ?? 28, 0, 100, 5, v => this._setVacuum(mapVac, { mop_band_opacity: v }), "%")}
