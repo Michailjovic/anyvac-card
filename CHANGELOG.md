@@ -8,6 +8,19 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Planned
 
+## [0.91.0] - 2026-07-30
+
+### Changed
+
+The "Use this vacuum's current map as floorplan" button now also switches
+"Hide vacuum map" on — for every vacuum in merged mode, or just the one
+vacuum otherwise. Found while walking through a from-scratch onboarding
+test: a freshly snapshotted floorplan with all vacuums' raw maps still
+blended on top at 55% opacity looks like noise, since the floorplan photo
+already covers what the raw map layer would show. This is a one-shot side
+effect of clicking the button, not a changed default — existing configs
+that never touch this button are unaffected.
+
 ## [0.90.0] - 2026-07-30
 
 ### Added

@@ -87,7 +87,7 @@ const t={ATTRIBUTE:1},e=t=>(...e)=>({_$litDirective$:t,values:e});let i$1 = clas
 
 const CARD_NAME = "anyvac-card";
 const EDITOR_NAME = "anyvac-card-editor";
-const CARD_VERSION = "0.90.0";
+const CARD_VERSION = "0.91.0";
 /** Hold duration in ms required to trigger START / PAUSE actions */
 const HOLD_DURATION_MS = 600;
 /** docs/25 §10 field report (2026-07-25): Android's swipe-up-from-bottom-edge
@@ -6676,6 +6676,21 @@ let AnyVacCardEditor = class AnyVacCardEditor extends i$2 {
             if (!path)
                 throw new Error("no path in service response");
             this._setEditedImageBase({ src: path });
+            // A floorplan photo + everyone's raw map blended on top at once is a
+            // wall of noise for a first-time result (field report 2026-07-30) —
+            // once a floorplan exists there's nothing the raw map overlay adds
+            // that the robot position/path don't already show on their own, so
+            // hide it for whoever now shares this floorplan. One-shot side effect
+            // of this explicit button click only; never touches existing configs.
+            if (this._mergedEdit) {
+                const vacuums = this._config.vacuums.map((v) => ({ ...v, hide_map: true }));
+                this._setConfig({ vacuums });
+            }
+            else {
+                const idx = this._config.vacuums.findIndex((v) => v.entity === vac.entity);
+                if (idx >= 0)
+                    this._setVacuum(idx, { hide_map: true });
+            }
         }
         catch (err) {
             this._floorplanSnapshotError =
@@ -7677,7 +7692,10 @@ let AnyVacCardEditor = class AnyVacCardEditor extends i$2 {
               current map as a static image (via the AnyVac integration) and sets it as the
               floorplan below — the easiest way to get auto-fit working across multiple vacuums
               (docs: import rooms from this same vacuum next, then switch to another vacuum to
-              let it auto-fit against the shared rooms). Requires anyvac integration ≥ 0.88.0.</p>
+              let it auto-fit against the shared rooms). Also turns "Hide vacuum map" on for
+              ${this._config.map_mode === "merged" ? "every vacuum sharing this floorplan" : "this vacuum"},
+              since the raw map would otherwise blend on top and look muddy. Requires anyvac
+              integration ≥ 0.88.0.</p>
             ${this._floorplanSnapshotError ? b `<p class="hint" style="color:#ff6b6b">${this._floorplanSnapshotError}</p>` : A}
           ` : A}
           ${this._textField("Image src (URL)", ib?.src, v => this._setEditedImageBase({ src: v }), "/local/anyvac/flat.svg")}
