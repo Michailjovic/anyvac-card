@@ -8,6 +8,37 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Planned
 
+## [0.87.0] - 2026-07-30
+
+### Changed
+
+Unifies vacuum accent colour with the free-hex picker already used for
+`path_color`/`mop_path_color` — the two were getting harder to reconcile
+now that path colours can be any hex while the vacuum's own accent stayed
+locked to 3 presets.
+
+- `VacuumColor` (`types.ts`) relaxed from a `"green"|"blue"|"orange"` union
+  to a plain `string` — any hex value works now. The three legacy preset
+  names are still accepted and resolve to their exact original hex via
+  `COLOR_HEX`, so existing configs render identically without any change.
+- New `hexToRgba(hex, alpha)` helper in `const.ts` derives a translucent
+  background wash for a custom hex colour. The three legacy presets keep
+  their exact, independently-tuned `COLOR_BG`/`COLOR_BG_ACTIVE` values
+  (these were never a straight alpha-blend of `COLOR_HEX` — `green`'s wash
+  in particular uses a visibly different RGB triple — so preserving the
+  lookup table for presets avoids a subtle appearance shift for anyone
+  currently on the default colour).
+- Card: `_colorKey`/direct `COLOR_BG[...]` lookups replaced by
+  `_resolveColor`/`_resolveBg` (and thin `_color`/`_colorBg`/
+  `_colorBgActive` wrappers) across badges, preset chips, per-vacuum
+  action buttons and the global-action badge.
+- Editor: "Accent colour" (both per-vacuum and global action) is now a
+  `_hexColorField` (native colour swatch + text input), matching Path
+  colour/Mop band colour. A stored legacy name is displayed resolved to
+  its hex (e.g. `blue` shows as `#2196F3`) so the swatch always previews
+  correctly, but the underlying config value is only rewritten if the
+  user actually changes it.
+
 ## [0.86.0] - 2026-07-30
 
 ### Added

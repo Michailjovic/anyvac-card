@@ -27,6 +27,7 @@ import {
   COLOR_HEX,
   COLOR_BG,
   COLOR_BG_ACTIVE,
+  hexToRgba,
   CLEANING_STATES,
 } from "./const";
 import {
@@ -820,12 +821,34 @@ export class AnyVacCard extends LitElement {
 
   // ── Helpers ─────────────────────────────────────────────────────────────
 
-  private _color(vac: VacuumConfig): string {
-    return COLOR_HEX[vac.color ?? "green"] ?? COLOR_HEX["green"];
+  /** Resolves a VacuumColor (or GlobalAction colour) to a CSS colour string.
+   *  The three legacy preset names go through COLOR_HEX unchanged; anything
+   *  else (a custom hex the user picked) passes straight through. */
+  private _resolveColor(raw: string | undefined, fallback: string): string {
+    const c = raw ?? fallback;
+    return COLOR_HEX[c] ?? c;
   }
 
-  private _colorKey(vac: VacuumConfig): string {
-    return vac.color ?? "green";
+  /** Resolves the translucent background wash for a colour. Legacy presets
+   *  keep their exact, independently-tuned COLOR_BG/COLOR_BG_ACTIVE values
+   *  (unchanged look for existing configs); a custom hex is tinted on the
+   *  fly via hexToRgba so any colour gets a matching wash. */
+  private _resolveBg(raw: string | undefined, fallback: string, active: boolean): string {
+    const c = raw ?? fallback;
+    const table = active ? COLOR_BG_ACTIVE : COLOR_BG;
+    return table[c] ?? hexToRgba(this._resolveColor(raw, fallback), active ? 0.3 : 0.18);
+  }
+
+  private _color(vac: VacuumConfig): string {
+    return this._resolveColor(vac.color, "green");
+  }
+
+  private _colorBg(vac: VacuumConfig): string {
+    return this._resolveBg(vac.color, "green", false);
+  }
+
+  private _colorBgActive(vac: VacuumConfig): string {
+    return this._resolveBg(vac.color, "green", true);
   }
 
   /** Integration sensor for a vacuum: explicit config, else auto-resolved from the
@@ -2516,7 +2539,7 @@ export class AnyVacCard extends LitElement {
               padding: "4px 10px", borderRadius: "14px", cursor: "pointer",
               fontSize: "12px", lineHeight: "1",
               border: "1px solid " + (active ? color : "rgba(255,255,255,0.15)"),
-              background: active ? COLOR_BG[this._colorKey(vac)] : "rgba(255,255,255,0.04)",
+              background: active ? this._colorBg(vac) : "rgba(255,255,255,0.04)",
               color: active ? "white" : "rgba(255,255,255,0.55)",
             })}
           >
@@ -2629,7 +2652,6 @@ export class AnyVacCard extends LitElement {
     const active = this._shownSet.has(index);
     const cleaning = this._isCleaning(vac);
     const color = this._color(vac);
-    const ck = this._colorKey(vac);
     const name = vac.name ?? vac.entity.split(".")[1] ?? vac.entity;
     const holding = this._holdId === "badge-" + index;
     // docs/25 §7a / docs/28 §5: ring + glow now read STATE ("what is it
@@ -2647,7 +2669,7 @@ export class AnyVacCard extends LitElement {
     // distinction instead — works identically for hex or rgba input.
     const statusColor = this._statusInfo(vac)[1];
 
-    const bg = cleaning ? COLOR_BG_ACTIVE[ck] : active ? COLOR_BG[ck] : "rgba(30,30,30,0.85)";
+    const bg = cleaning ? this._colorBgActive(vac) : active ? this._colorBg(vac) : "rgba(30,30,30,0.85)";
     const border = cleaning
       ? "3px solid " + statusColor
       : active
@@ -2710,12 +2732,11 @@ export class AnyVacCard extends LitElement {
 
   private _renderGlobalBadge(ga: GlobalAction, idx: number) {
     const active = this._isGlobalActive(ga);
-    const color = COLOR_HEX[ga.color ?? "orange"];
-    const ck = ga.color ?? "orange";
+    const color = this._resolveColor(ga.color, "orange");
     const holdId = "global-" + idx;
     const holding = this._holdId === holdId;
 
-    const bg = active ? COLOR_BG_ACTIVE[ck] : "rgba(30,30,30,0.85)";
+    const bg = active ? this._resolveBg(ga.color, "orange", true) : "rgba(30,30,30,0.85)";
     const border = active ? "3px solid " + color : "2px solid rgba(255,255,255,0.18)";
     const shadow = active ? "0 0 18px " + color + "B0" : "none";
 
@@ -4182,7 +4203,6 @@ export class AnyVacCard extends LitElement {
 
   private _renderActions(vac: VacuumConfig, vacIdx: number) {
     const color = this._color(vac);
-    const ck = this._colorKey(vac);
 
     // Pending Pin & Go / Zone for THIS vacuum (docs/19 meta bar fix): the START
     // slot itself becomes the mode-aware action — "send here" / "clean zone
@@ -4201,7 +4221,7 @@ export class AnyVacCard extends LitElement {
         <div class="actions">
           <button
             class="action-btn ${this._holdId === hId ? "action-btn--holding" : ""}"
-            style=${styleMap({ background: COLOR_BG[ck], border: "1px solid " + color + "80" })}
+            style=${styleMap({ background: this._colorBg(vac), border: "1px solid " + color + "80" })}
             @pointerdown=${this._holdStart(hId, action)}
             @pointermove=${this._holdMove}
             @pointerup=${this._holdEnd}
@@ -4229,7 +4249,7 @@ export class AnyVacCard extends LitElement {
         <div class="actions">
           <button
             class="action-btn ${this._holdId === hId ? "action-btn--holding" : ""}"
-            style=${styleMap({ background: COLOR_BG[ck], border: "1px solid " + color + "80" })}
+            style=${styleMap({ background: this._colorBg(vac), border: "1px solid " + color + "80" })}
             @pointerdown=${this._holdStart(hId, () => this._resume(vac))}
             @pointermove=${this._holdMove}
             @pointerup=${this._holdEnd}
@@ -4272,7 +4292,7 @@ export class AnyVacCard extends LitElement {
     }
 
     const hId = "start-" + vacIdx;
-    const startBg = hasRooms ? COLOR_BG[ck] : "rgba(60,60,60,0.4)";
+    const startBg = hasRooms ? this._colorBg(vac) : "rgba(60,60,60,0.4)";
     const startBorder = hasRooms ? "1px solid " + color + "80" : "1px solid rgba(255,255,255,0.1)";
     const startIconColor = hasRooms ? color : "rgba(255,255,255,0.2)";
     const startTextColor = hasRooms ? "white" : "rgba(255,255,255,0.25)";

@@ -1,6 +1,6 @@
 export const CARD_NAME = "anyvac-card";
 export const EDITOR_NAME = "anyvac-card-editor";
-export const CARD_VERSION = "0.86.0";
+export const CARD_VERSION = "0.87.0";
 
 /** Hold duration in ms required to trigger START / PAUSE actions */
 export const HOLD_DURATION_MS = 600;
@@ -88,6 +88,24 @@ export const COLOR_BG_ACTIVE: Record<string, string> = {
   blue:   "rgba(33,150,243,0.30)",
   orange: "rgba(250,173,20,0.30)",
 };
+
+/**
+ * Converts a "#rgb" or "#rrggbb" hex string to an rgba(...) string at the
+ * given alpha. Used to derive a background tint for a custom (non-preset)
+ * VacuumColor hex, since COLOR_BG/COLOR_BG_ACTIVE above only cover the three
+ * legacy named presets. Falls back to a neutral white wash for anything that
+ * doesn't parse (e.g. a CSS colour keyword some old config might still use).
+ */
+export function hexToRgba(hex: string, alpha: number): string {
+  const m = /^#([0-9a-f]{3}|[0-9a-f]{6})$/i.exec(hex);
+  if (!m) return `rgba(255,255,255,${alpha})`;
+  let h = m[1];
+  if (h.length === 3) h = h.split("").map((c) => c + c).join("");
+  const r = parseInt(h.slice(0, 2), 16);
+  const g = parseInt(h.slice(2, 4), 16);
+  const b = parseInt(h.slice(4, 6), 16);
+  return `rgba(${r},${g},${b},${alpha})`;
+}
 
 /**
  * States that count as "actively cleaning".

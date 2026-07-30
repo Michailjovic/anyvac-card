@@ -15,7 +15,6 @@ import type {
   ScriptCleanAction,
   SettingPreset,
   GlobalPreset,
-  VacuumColor,
   GlobalAction,
   GlobalActionCall,
   RoomThreshold,
@@ -641,6 +640,15 @@ export class AnyVacCardEditor extends LitElement {
       </div>`;
   }
 
+  /** Resolves a VacuumColor (legacy preset name or custom hex) to a CSS colour
+   *  string — mirrors `_resolveColor` in anyvac-card.ts. Used for accordion
+   *  accent borders and to seed the hex swatch with the right colour even
+   *  when the stored value is still one of the three legacy names. */
+  private _resolveColor(raw: string | undefined, fallback: string): string {
+    const c = raw ?? fallback;
+    return COLOR_HEX[c] ?? c;
+  }
+
   /** Hex colour field with a native colour-picker swatch alongside the text input —
    *  the swatch writes back as a hex string, so both stay interchangeable. Falls
    *  back to the placeholder colour for the swatch when the current value isn't a
@@ -755,7 +763,7 @@ export class AnyVacCardEditor extends LitElement {
   }
 
   private _renderVacuumAccordion(vac: VacuumConfig, idx: number) {
-    const color = COLOR_HEX[vac.color ?? "green"];
+    const color = this._resolveColor(vac.color, "green");
     const isOpen = this._openVac.has(idx);
     return html`
       <div class="acc-row" style=${styleMap({ borderLeft: "3px solid " + color })}>
@@ -792,9 +800,8 @@ export class AnyVacCardEditor extends LitElement {
               v => this._setVacuum(idx, { name: v }), "e.g. S8")}
             ${this._textField("Image path", vac.image,
               v => this._setVacuum(idx, { image: v }), "/local/...")}
-            ${this._selectField<VacuumColor>("Accent colour", vac.color ?? "green",
-              [{ value: "green", label: "Green" }, { value: "blue", label: "Blue" }, { value: "orange", label: "Orange" }],
-              v => this._setVacuum(idx, { color: v }))}
+            ${this._hexColorField("Accent colour", vac.color ? this._resolveColor(vac.color, "green") : undefined,
+              v => this._setVacuum(idx, { color: v || undefined }), "#52c41a")}
             ${this._selectField<"auto" | "dry" | "wet" | "both">("Role", vac.clean_type ?? "auto",
               [{ value: "auto", label: "Auto-detect from clean action" },
                { value: "dry", label: "Dry only" },
@@ -1649,7 +1656,7 @@ export class AnyVacCardEditor extends LitElement {
   }
 
   private _renderGlobalAccordion(ga: GlobalAction, idx: number) {
-    const color = COLOR_HEX[ga.color ?? "orange"];
+    const color = this._resolveColor(ga.color, "orange");
     const isOpen = this._openGlobal.has(idx);
     const action = ga.action;
     const watches = ga.watch_entities ?? [];
@@ -1675,9 +1682,8 @@ export class AnyVacCardEditor extends LitElement {
               v => this._setGlobal(idx, { name: v }), "e.g. Whole flat")}
             ${this._textField("Image path", ga.image,
               v => this._setGlobal(idx, { image: v || undefined }), "/local/...")}
-            ${this._selectField<VacuumColor>("Accent colour", ga.color ?? "orange",
-              [{ value: "green", label: "Green" }, { value: "blue", label: "Blue" }, { value: "orange", label: "Orange" }],
-              v => this._setGlobal(idx, { color: v }))}
+            ${this._hexColorField("Accent colour", ga.color ? this._resolveColor(ga.color, "orange") : undefined,
+              v => this._setGlobal(idx, { color: v || undefined }), "#faad14")}
 
             <div class="sub-title">Watch entities (badge glows when any is cleaning)</div>
             ${watches.map((e, wi) => html`

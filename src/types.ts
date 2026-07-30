@@ -244,7 +244,14 @@ export interface GlobalAction {
 
 // ── Vacuum & card config ──────────────────────────────────────────────────
 
-export type VacuumColor = "green" | "blue" | "orange";
+/**
+ * Accent colour. Any hex string (e.g. "#52c41a") works. The three original
+ * preset names — "green" / "blue" / "orange" — are also still accepted for
+ * backward compatibility: existing configs using them keep their exact
+ * original look (see `_color`/`_colorBg`/`_colorBgActive` in the card, and
+ * `COLOR_HEX`/`COLOR_BG`/`COLOR_BG_ACTIVE` in const.ts).
+ */
+export type VacuumColor = string;
 
 export interface VacuumConfig {
   entity: string;
