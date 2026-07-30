@@ -8,6 +8,28 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Planned
 
+## [0.88.0] - 2026-07-30
+
+### Added
+
+"Use this vacuum's current map as floorplan" button (Maps tab, shared
+floorplan / image-base section) — docs/30 §4a field follow-up, diagnosed
+during a live new-user onboarding walkthrough. Merged mode's per-vacuum
+auto-seat fit needs a shared floorplan image to work at all; without one,
+the only path forward was manually eyeballing rotation/scale/offset sliders
+per vacuum against each robot's own differently-oriented raw map — close to
+impossible to get right, since there was no common reference to fit
+against. The new button calls the integration's new
+`anyvac.snapshot_map_as_floorplan` (requires anyvac ≥ 0.88.0) with the
+SAME map entity already resolved for preview (`_mapEntityFor`), and
+auto-fills `image_base.src` from the returned path — collapses the old
+"find the image URL, save it, upload it to config/www/, type the path"
+manual sequence into one click. Once set, the existing Import-then-anchor
+workflow (docs/30 §3/§4c) works as designed: import the reference vacuum's
+own rooms against its own map-turned-floorplan (near-exact match), then
+switch to another vacuum — its auto-fit activates automatically against
+the now-shared, anchored rooms.
+
 ## [0.87.2] - 2026-07-30
 
 ### Fixed

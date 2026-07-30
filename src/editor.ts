@@ -110,6 +110,14 @@ export class AnyVacCardEditor extends LitElement {
   @state() private _refMapUrl = "";
   private _refMapVac = -1;
 
+  /** "Use this vacuum's current map as floorplan" (docs/30 §4a field follow-up,
+   *  2026-07-30) — merged mode's per-vacuum auto-seat fit needs a shared
+   *  floorplan image, which today meant manually saving a map picture out of
+   *  HA and re-uploading it into config/www/. Calls the backend's
+   *  `anyvac.snapshot_map_as_floorplan` (integration ≥ 0.88.0) instead. */
+  @state() private _floorplanSnapshotBusy = false;
+  @state() private _floorplanSnapshotError = "";
+
   /** Active drag on a room's position dot / rectangle (2026-07-26 — was
    *  sliders-only, no way to see or drag the actual rectangle extent on the
    *  floorplan preview). `orig` is the room's state at drag START (not updated
@@ -165,6 +173,36 @@ export class AnyVacCardEditor extends LitElement {
     this._refMapUrl = entity
       ? ((this.hass.states[entity]?.attributes["entity_picture"] as string) ?? "") : "";
     this._refMapVac = mapVac;
+  }
+
+  /** Snapshots `vac`'s currently-resolved map image entity to a static file via
+   *  the backend and sets it as the shared floorplan (`image_base.src`) — see
+   *  `_floorplanSnapshotBusy` above for why this exists. Uses the SAME entity
+   *  the preview above is already showing (`_mapEntityFor`), so what gets
+   *  saved always matches what the user was just looking at. */
+  private async _snapshotFloorplan(vac: VacuumConfig): Promise<void> {
+    const entity = this._mapEntityFor(vac);
+    if (!entity) return;
+    this._floorplanSnapshotBusy = true;
+    this._floorplanSnapshotError = "";
+    try {
+      const res = (await (this.hass as any).callService(
+        "anyvac", "snapshot_map_as_floorplan",
+        { image_entity: entity, name: vac.name || vac.entity },
+        undefined, false, true,
+      )) as { response?: { path?: string } } | undefined;
+      const path = res?.response?.path;
+      if (!path) throw new Error("no path in service response");
+      this._setEditedImageBase({ src: path });
+    } catch (err) {
+      this._floorplanSnapshotError =
+        "Couldn't snapshot this vacuum's map — make sure the anyvac integration " +
+        "is updated to at least 0.88.0, then try again.";
+      // eslint-disable-next-line no-console
+      console.error("[anyvac-card] snapshot_map_as_floorplan failed:", err);
+    } finally {
+      this._floorplanSnapshotBusy = false;
+    }
   }
 
   // ── Config helpers ────────────────────────────────────────────────────────
@@ -1205,6 +1243,20 @@ export class AnyVacCardEditor extends LitElement {
 
         ${vac.base === "image" || vac.base === "combined" || this._config.map_mode === "merged" ? html`
           ${this._config.map_mode === "merged" ? html`<div class="section-title">Shared floorplan (all vacuums)</div>` : nothing}
+          ${this._mapEntityFor(vac) ? html`
+            <button class="btn btn--sm" style="align-self:flex-start"
+              ?disabled=${this._floorplanSnapshotBusy}
+              @click=${() => this._snapshotFloorplan(vac)}>
+              <ha-icon icon="mdi:camera"></ha-icon>
+              ${this._floorplanSnapshotBusy ? "Snapshotting…" : "Use this vacuum's current map as floorplan"}
+            </button>
+            <p class="hint">No floor plan photo of your own? This saves ${vac.name || vac.entity}'s
+              current map as a static image (via the AnyVac integration) and sets it as the
+              floorplan below — the easiest way to get auto-fit working across multiple vacuums
+              (docs: import rooms from this same vacuum next, then switch to another vacuum to
+              let it auto-fit against the shared rooms). Requires anyvac integration ≥ 0.88.0.</p>
+            ${this._floorplanSnapshotError ? html`<p class="hint" style="color:#ff6b6b">${this._floorplanSnapshotError}</p>` : nothing}
+          ` : nothing}
           ${this._textField("Image src (URL)", ib?.src, v => this._setEditedImageBase({ src: v }), "/local/anyvac/flat.svg")}
           ${this._numberSlider("Image rotation", ib?.rotation ?? 0, 0, 360, 90, v => this._setEditedImageBase({ rotation: v }), "°")}
           ${this._numberSlider("Image scale", ib?.scale ?? 100, 50, 200, 5, v => this._setEditedImageBase({ scale: v }), "%")}
