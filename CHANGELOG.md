@@ -8,6 +8,22 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Planned
 
+## [0.93.1] - 2026-07-31
+
+### Fixed
+
+`_vacCleanType()`'s `"auto"` role detection (docs/31) now prefers the
+backend's live hardware signal — `mop_signal.water_box_mode`/
+`water_mode_name` (same source `planner.py._capable()` already uses
+server-side) — over guessing from whether the user happened to fill in
+`clean_action.mop_mode`/`mop_intensity`. The old heuristic mis-detected a
+wet-capable robot as dry-only whenever its Clean action left
+`suction_level` unset (docs/30 §6 finding 4, found during the onboarding
+audit). Degraded mode (no integration, or `schema_version < 2`) has no
+`mop_signal` and keeps the old config-based guess unchanged, per canon
+rule 3. Explicit `clean_type: dry/wet/both` config still overrides
+everything, as before — this only changes the `"auto"` fallback.
+
 ## [0.93.0] - 2026-07-31
 
 ### Added

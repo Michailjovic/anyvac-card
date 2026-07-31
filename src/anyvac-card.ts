@@ -1340,11 +1340,25 @@ export class AnyVacCard extends LitElement {
     for (const th of sorted) { if (d <= th.days) return th.color; }
     return "rgba(255,77,77,0.85)";
   }
-  /** A vacuum's clean-type role (dry/wet) — explicit config, else derived from its clean_action. */
+  /** A vacuum's clean-type role (dry/wet) — explicit config, else auto-detected.
+   *  Auto-detect prefers the backend's live hardware signal (docs/31): a water
+   *  box is a HARDWARE fact (`mop_signal.water_box_mode`/`water_mode_name`,
+   *  same source `planner.py._capable()` uses server-side), unlike guessing
+   *  from whether the user happened to fill in `clean_action.mop_mode`/
+   *  `mop_intensity` — that heuristic mis-detected a wet-capable robot as
+   *  dry-only whenever its Clean action left `suction_level` unset (docs/30
+   *  §6 finding 4). Degraded mode (`_intAttrs` returns undefined — no
+   *  integration, or old schema) has no such signal and keeps the old
+   *  config-based guess, per canon rule 3 (docs/14). */
   private _vacCleanType(vac: VacuumConfig): { dry: boolean; wet: boolean } {
     if (vac.clean_type === "dry") return { dry: true, wet: false };
     if (vac.clean_type === "wet") return { dry: false, wet: true };
     if (vac.clean_type === "both") return { dry: true, wet: true };
+    const sig = this._intAttrs(vac)?.mop_signal as Record<string, any> | undefined;
+    if (sig) {
+      const wet = sig.water_box_mode != null || !!sig.water_mode_name;
+      return { dry: true, wet };
+    }
     const ca = vac.clean_action as any;
     const wet = !!(ca && (ca.mop_mode || ca.mop_mode_entity || ca.mop_intensity || ca.mop_intensity_entity));
     const dry = !wet || (ca?.suction_level != null && ca.suction_level !== "off");
