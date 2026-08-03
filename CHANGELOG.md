@@ -8,6 +8,24 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Planned
 
+## [0.93.3] - 2026-08-03
+
+### Added
+
+Two ways to control map flip (docs/32 follow-up) without hand-editing YAML:
+- Editor: "Flip portrait map 180°" / "Flip landscape map 180°" toggles in the
+  Global tab's Layout section (shown once "Fit card to available screen
+  space" is on) — a GUI equivalent of `layout.<profile>.crop.flip`, merged
+  into the existing crop config without clobbering `fit`/`offset_x`/
+  `offset_y`/`mapOrientation`.
+- Running card: a "Flip map" button in the landscape meta bar and the
+  portrait dock's layer-toggle row (only shown with a `layout:` block) flips
+  the CURRENT view for this browser tab only — doesn't touch the dashboard
+  config, doesn't persist, resets on reload. Useful for quickly checking
+  which orientation looks right on a given screen before committing to the
+  editor setting. New `_flipEff`/`_toggleFlipLive` — the live override always
+  takes priority over the persisted config default when set this session.
+
 ## [0.93.2] - 2026-08-01
 
 ### Added

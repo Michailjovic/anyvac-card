@@ -87,7 +87,7 @@ const t={ATTRIBUTE:1},e=t=>(...e)=>({_$litDirective$:t,values:e});let i$1 = clas
 
 const CARD_NAME = "anyvac-card";
 const EDITOR_NAME = "anyvac-card-editor";
-const CARD_VERSION = "0.93.2";
+const CARD_VERSION = "0.93.3";
 /** Hold duration in ms required to trigger START / PAUSE actions */
 const HOLD_DURATION_MS = 600;
 /** docs/25 §10 field report (2026-07-25): Android's swipe-up-from-bottom-edge
@@ -913,6 +913,14 @@ let AnyVacCard = class AnyVacCard extends i$2 {
          *  paint. Defaults to `true` — matches the old fixed "portrait rotates"
          *  behavior until real measurements correct it, one render later. */
         this._lastRotate = true;
+        /** docs/32 follow-up (2026-08-03): ephemeral, per-browser-tab override for
+         *  the "this looks upside down on THIS screen" flip — separate from the
+         *  persisted `layout.<profile>.crop.flip` config default. Not backend-shared
+         *  (unlike `view_layers`) and not written to the dashboard config: a quick
+         *  "try it on this device right now" toggle, reset on reload. `null` = no
+         *  override, defer to config; `true`/`false` = explicit override for the
+         *  current session. Applies to whichever profile is active when tapped. */
+        this._flipLive = null;
         this._ro = null;
         this._onWinResize = null;
         this._measureRaf = 0;
@@ -3037,7 +3045,13 @@ let AnyVacCard = class AnyVacCard extends i$2 {
              portrait has no `tools` region at all, so it silently had no way to
              toggle path visibility (field feedback 2026-07-17). Reuses the same
              compact toggle, just placed in the dock column instead of a meta bar. */this._profile === "portrait" ? b `
-            <div class="dock-layers">${this._renderLayerToggleCompact(vacs)}</div>
+            <div class="dock-layers">${this._renderLayerToggleCompact(vacs)}
+              ${this._config.layout ? b `<button class="mtbtn ${this._flipEff ? "on" : ""}"
+                  title="Flip map 180° for this screen (this session only)"
+                  @click=${() => this._toggleFlipLive()}>
+                <ha-icon icon="mdi:flip-vertical"></ha-icon>
+              </button>` : A}
+            </div>
           ` : A}
         ${withRun ? b `
           <div class="dock-head">
@@ -4105,6 +4119,11 @@ let AnyVacCard = class AnyVacCard extends i$2 {
             <ha-icon icon="mdi:sort-variant-off"></ha-icon><b>${unsequenced.length}</b>
           </span>` : A}
           ${this._renderLayerToggleCompact(vacs)}
+          ${this._config.layout ? b `<button class="mtbtn ${this._flipEff ? "on" : ""}"
+              title="Flip map 180° for this screen (this session only — the card editor's Layout section sets a permanent default)"
+              @click=${() => this._toggleFlipLive()}>
+            <ha-icon icon="mdi:flip-vertical"></ha-icon>
+          </button>` : A}
           <div class="meta-bar-divider"></div>
           <button class="mtbtn mtbtn--ghost" title="Refresh maps" @click=${refreshTap}>
             <ha-icon icon="mdi:refresh"></ha-icon>
@@ -4554,6 +4573,25 @@ let AnyVacCard = class AnyVacCard extends i$2 {
         }
         return this._cardW > 0 && this._cardW < 500; // auto: by card width
     }
+    /** docs/32 follow-up: effective flip for the CURRENT profile — `_flipLive`
+     *  override if set this session, otherwise the persisted config default.
+     *  Only meaningful with a `layout:` block (legacy render never flips). */
+    get _flipEff() {
+        if (this._flipLive !== null)
+            return this._flipLive;
+        if (!this._config.layout)
+            return false;
+        const profileCfg = this._profile === "portrait" ? this._config.layout.portrait : this._config.layout.landscape;
+        return profileCfg?.crop?.flip === true;
+    }
+    /** Meta bar / dock-layers "Flip map" button handler — toggles `_flipLive`
+     *  off the CURRENTLY DISPLAYED orientation (not the raw config value), so
+     *  one tap always visibly flips regardless of whether a config default or
+     *  an earlier tap this session set the current state. Purely local — never
+     *  touches the dashboard config or backend, resets on reload (docs/32). */
+    _toggleFlipLive() {
+        this._flipLive = !this._flipEff;
+    }
     /** docs/25 §7c: split (today's default) vs. stack portrait topology, computed
      *  from `shouldStackLayout()` — mirrors `_narrow`'s structure (manual override
      *  → computed → settle-on-previous-answer while unmeasured). Only active with
@@ -4660,7 +4698,7 @@ let AnyVacCard = class AnyVacCard extends i$2 {
         // is upside down for me") are independent and compose into one of the
         // four right angles. `.avc-rot`'s counter-rotation CSS reads the total
         // back off `--map-rot` (single computed source, not per-angle classes).
-        const flip = crop?.flip === true;
+        const flip = this._flipEff;
         const totalRotationDeg = (rotate ? 90 : 0) + (flip ? 180 : 0);
         if (totalRotationDeg !== 0) {
             if (rotate) {
@@ -6627,6 +6665,9 @@ __decorate([
 ], AnyVacCard.prototype, "_mapAvailH", void 0);
 __decorate([
     r()
+], AnyVacCard.prototype, "_flipLive", void 0);
+__decorate([
+    r()
 ], AnyVacCard.prototype, "_now", void 0);
 __decorate([
     r()
@@ -7000,6 +7041,17 @@ let AnyVacCardEditor = class AnyVacCardEditor extends i$2 {
         else {
             this._deleteRoom(Math.min(this._mapVac, this._config.vacuums.length - 1), roomIdx);
         }
+    }
+    /** docs/32 follow-up: GUI toggle for the persisted `layout.<profile>.crop.flip`
+     *  default — merges rather than replacing, so it never clobbers other crop
+     *  fields (`fit`/`offset_x`/`offset_y`/`mapOrientation`) that only YAML sets
+     *  today. `flip: false` is written as `undefined` to keep the config clean
+     *  (matches the field's own `=== true` default-off semantics). */
+    _setLayoutFlip(profile, flip) {
+        const layout = this._config.layout ?? {};
+        const profileCfg = layout[profile] ?? {};
+        const crop = { ...(profileCfg.crop ?? {}), flip: flip ? true : undefined };
+        this._setConfig({ layout: { ...layout, [profile]: { ...profileCfg, crop } } });
     }
     _setEditedImageBase(updates) {
         if (this._mergedEdit) {
@@ -8262,6 +8314,31 @@ let AnyVacCardEditor = class AnyVacCardEditor extends i$2 {
           rendering for dashboards already tuned around it. Advanced per-profile tuning
           (column/row overrides, map crop, orientation) is still YAML-only — this toggle
           turns the system on with its built-in defaults; switch to YAML mode to fine-tune.</p>
+
+        ${this._config.layout ? b `
+          <div class="field field--row">
+            <label>Flip portrait map 180°</label>
+            <label class="toggle-wrap">
+              <input type="checkbox" class="toggle-input"
+                .checked=${this._config.layout.portrait?.crop?.flip === true}
+                @change=${(e) => this._setLayoutFlip("portrait", e.target.checked)} />
+              <span class="toggle-track"></span>
+            </label>
+          </div>
+          <div class="field field--row">
+            <label>Flip landscape map 180°</label>
+            <label class="toggle-wrap">
+              <input type="checkbox" class="toggle-input"
+                .checked=${this._config.layout.landscape?.crop?.flip === true}
+                @change=${(e) => this._setLayoutFlip("landscape", e.target.checked)} />
+              <span class="toggle-track"></span>
+            </label>
+          </div>
+          <p class="hint">Turns the map upside down if it doesn't match the compass direction
+            you're used to (docs/32) — a persisted default for this card. There's also a
+            "Flip map" button in the running card's map toolbar for a quick, unsaved
+            per-screen try-out that doesn't touch this setting.</p>
+        ` : A}
 
         <div class="section-title" style="margin-top:4px">Controller</div>
         ${this._selectField("Mode", this._config.ui_mode ?? "auto", [{ value: "auto", label: "Auto — one orchestrated controller" },

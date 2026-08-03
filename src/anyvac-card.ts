@@ -209,6 +209,14 @@ export class AnyVacCard extends LitElement {
    *  paint. Defaults to `true` — matches the old fixed "portrait rotates"
    *  behavior until real measurements correct it, one render later. */
   private _lastRotate = true;
+  /** docs/32 follow-up (2026-08-03): ephemeral, per-browser-tab override for
+   *  the "this looks upside down on THIS screen" flip — separate from the
+   *  persisted `layout.<profile>.crop.flip` config default. Not backend-shared
+   *  (unlike `view_layers`) and not written to the dashboard config: a quick
+   *  "try it on this device right now" toggle, reset on reload. `null` = no
+   *  override, defer to config; `true`/`false` = explicit override for the
+   *  current session. Applies to whichever profile is active when tapped. */
+  @state() private _flipLive: boolean | null = null;
   private _ro: ResizeObserver | null = null;
   private _onWinResize: (() => void) | null = null;
   private _measureRaf = 0;
@@ -2205,7 +2213,13 @@ export class AnyVacCard extends LitElement {
              toggle path visibility (field feedback 2026-07-17). Reuses the same
              compact toggle, just placed in the dock column instead of a meta bar. */
           this._profile === "portrait" ? html`
-            <div class="dock-layers">${this._renderLayerToggleCompact(vacs)}</div>
+            <div class="dock-layers">${this._renderLayerToggleCompact(vacs)}
+              ${this._config.layout ? html`<button class="mtbtn ${this._flipEff ? "on" : ""}"
+                  title="Flip map 180° for this screen (this session only)"
+                  @click=${() => this._toggleFlipLive()}>
+                <ha-icon icon="mdi:flip-vertical"></ha-icon>
+              </button>` : nothing}
+            </div>
           ` : nothing}
         ${withRun ? html`
           <div class="dock-head">
@@ -3223,6 +3237,11 @@ export class AnyVacCard extends LitElement {
             <ha-icon icon="mdi:sort-variant-off"></ha-icon><b>${unsequenced.length}</b>
           </span>` : nothing}
           ${this._renderLayerToggleCompact(vacs)}
+          ${this._config.layout ? html`<button class="mtbtn ${this._flipEff ? "on" : ""}"
+              title="Flip map 180° for this screen (this session only — the card editor's Layout section sets a permanent default)"
+              @click=${() => this._toggleFlipLive()}>
+            <ha-icon icon="mdi:flip-vertical"></ha-icon>
+          </button>` : nothing}
           <div class="meta-bar-divider"></div>
           <button class="mtbtn mtbtn--ghost" title="Refresh maps" @click=${refreshTap}>
             <ha-icon icon="mdi:refresh"></ha-icon>
@@ -3645,6 +3664,25 @@ export class AnyVacCard extends LitElement {
     return this._cardW > 0 && this._cardW < 500;       // auto: by card width
   }
 
+  /** docs/32 follow-up: effective flip for the CURRENT profile — `_flipLive`
+   *  override if set this session, otherwise the persisted config default.
+   *  Only meaningful with a `layout:` block (legacy render never flips). */
+  private get _flipEff(): boolean {
+    if (this._flipLive !== null) return this._flipLive;
+    if (!this._config.layout) return false;
+    const profileCfg = this._profile === "portrait" ? this._config.layout.portrait : this._config.layout.landscape;
+    return profileCfg?.crop?.flip === true;
+  }
+
+  /** Meta bar / dock-layers "Flip map" button handler — toggles `_flipLive`
+   *  off the CURRENTLY DISPLAYED orientation (not the raw config value), so
+   *  one tap always visibly flips regardless of whether a config default or
+   *  an earlier tap this session set the current state. Purely local — never
+   *  touches the dashboard config or backend, resets on reload (docs/32). */
+  private _toggleFlipLive(): void {
+    this._flipLive = !this._flipEff;
+  }
+
   /** docs/25 §7c: split (today's default) vs. stack portrait topology, computed
    *  from `shouldStackLayout()` — mirrors `_narrow`'s structure (manual override
    *  → computed → settle-on-previous-answer while unmeasured). Only active with
@@ -3747,7 +3785,7 @@ export class AnyVacCard extends LitElement {
     // is upside down for me") are independent and compose into one of the
     // four right angles. `.avc-rot`'s counter-rotation CSS reads the total
     // back off `--map-rot` (single computed source, not per-angle classes).
-    const flip = crop?.flip === true;
+    const flip = this._flipEff;
     const totalRotationDeg = (rotate ? 90 : 0) + (flip ? 180 : 0);
     if (totalRotationDeg !== 0) {
       if (rotate) {

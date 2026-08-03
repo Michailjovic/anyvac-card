@@ -417,6 +417,17 @@ export class AnyVacCardEditor extends LitElement {
       this._deleteRoom(Math.min(this._mapVac, this._config.vacuums.length - 1), roomIdx);
     }
   }
+  /** docs/32 follow-up: GUI toggle for the persisted `layout.<profile>.crop.flip`
+   *  default — merges rather than replacing, so it never clobbers other crop
+   *  fields (`fit`/`offset_x`/`offset_y`/`mapOrientation`) that only YAML sets
+   *  today. `flip: false` is written as `undefined` to keep the config clean
+   *  (matches the field's own `=== true` default-off semantics). */
+  private _setLayoutFlip(profile: "portrait" | "landscape", flip: boolean): void {
+    const layout = this._config.layout ?? {};
+    const profileCfg = layout[profile] ?? {};
+    const crop = { ...(profileCfg.crop ?? {}), flip: flip ? true : undefined };
+    this._setConfig({ layout: { ...layout, [profile]: { ...profileCfg, crop } } });
+  }
   private _setEditedImageBase(updates: Partial<NonNullable<VacuumConfig["image_base"]>>): void {
     if (this._mergedEdit) {
       this._setConfig({ image_base: { ...(this._config.image_base ?? { src: "" }), ...updates } });
@@ -1741,6 +1752,31 @@ export class AnyVacCardEditor extends LitElement {
           rendering for dashboards already tuned around it. Advanced per-profile tuning
           (column/row overrides, map crop, orientation) is still YAML-only — this toggle
           turns the system on with its built-in defaults; switch to YAML mode to fine-tune.</p>
+
+        ${this._config.layout ? html`
+          <div class="field field--row">
+            <label>Flip portrait map 180°</label>
+            <label class="toggle-wrap">
+              <input type="checkbox" class="toggle-input"
+                .checked=${this._config.layout.portrait?.crop?.flip === true}
+                @change=${(e: Event) => this._setLayoutFlip("portrait", (e.target as HTMLInputElement).checked)} />
+              <span class="toggle-track"></span>
+            </label>
+          </div>
+          <div class="field field--row">
+            <label>Flip landscape map 180°</label>
+            <label class="toggle-wrap">
+              <input type="checkbox" class="toggle-input"
+                .checked=${this._config.layout.landscape?.crop?.flip === true}
+                @change=${(e: Event) => this._setLayoutFlip("landscape", (e.target as HTMLInputElement).checked)} />
+              <span class="toggle-track"></span>
+            </label>
+          </div>
+          <p class="hint">Turns the map upside down if it doesn't match the compass direction
+            you're used to (docs/32) — a persisted default for this card. There's also a
+            "Flip map" button in the running card's map toolbar for a quick, unsaved
+            per-screen try-out that doesn't touch this setting.</p>
+        ` : nothing}
 
         <div class="section-title" style="margin-top:4px">Controller</div>
         ${this._selectField<"auto" | "manual">("Mode", this._config.ui_mode ?? "auto",
