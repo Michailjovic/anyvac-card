@@ -87,7 +87,7 @@ const t={ATTRIBUTE:1},e=t=>(...e)=>({_$litDirective$:t,values:e});let i$1 = clas
 
 const CARD_NAME = "anyvac-card";
 const EDITOR_NAME = "anyvac-card-editor";
-const CARD_VERSION = "0.94.0";
+const CARD_VERSION = "0.94.1";
 /** Hold duration in ms required to trigger START / PAUSE actions */
 const HOLD_DURATION_MS = 600;
 /** docs/25 §10 field report (2026-07-25): Android's swipe-up-from-bottom-edge
@@ -4781,7 +4781,7 @@ let AnyVacCard = class AnyVacCard extends i$2 {
     `;
     }
     _renderMergedMap() {
-        const shown = [...this._shownSet].filter((i) => i < this._config.vacuums.length).map((i) => this._config.vacuums[i]);
+        const shown = this._shownOrdered().map((i) => this._config.vacuums[i]);
         if (!shown.length)
             return A;
         const primary = shown.find((v) => v.image_base?.src) ?? shown[0];
@@ -5496,10 +5496,22 @@ let AnyVacCard = class AnyVacCard extends i$2 {
     `;
     }
     // ── Main render ─────────────────────────────────────────────────────────
+    /** Ordered, deduped snapshot of `_shownSet` as configured-array indices.
+     *  `Set` preserves INSERTION order, not numeric order — `_toggleShownMulti`
+     *  deletes then later re-`add`s an index when a vacuum is hidden and shown
+     *  again, which moves it to the END of the set's iteration order (field
+     *  feedback 2026-08-03: "S7 hidden then shown again jumps to last place").
+     *  Every place that turns `_shownSet` into a displayed list should go
+     *  through this instead of spreading the Set directly, so the vacuums
+     *  always render in their configured order regardless of show/hide
+     *  history. */
+    _shownOrdered() {
+        return [...this._shownSet].filter((i) => i < this._config.vacuums.length).sort((a, b) => a - b);
+    }
     /** Vacuum indexes shown in the grid. Portrait split = single-vacuum focus
      *  (docs/18 §7b): only the first of the shown set renders; badges switch it. */
     _gridShown() {
-        const shown = [...this._shownSet].filter((i) => i < this._config.vacuums.length);
+        const shown = this._shownOrdered();
         if (this._profile === "portrait" && this._config.map_mode !== "merged" && shown.length > 1) {
             return shown.slice(0, 1);
         }
@@ -5605,13 +5617,12 @@ let AnyVacCard = class AnyVacCard extends i$2 {
         ${this._config.map_mode === "merged"
             ? b `
               ${this._renderResponsive(this._renderMergedMap())}
-              ${[...this._shownSet].filter(i => i < this._config.vacuums.length).map(i => b `
+              ${this._shownOrdered().map(i => b `
                 ${this._renderMapTools(this._config.vacuums[i])}
                 ${this._renderStatusCard(this._config.vacuums[i], i)}
               `)}
             `
-            : [...this._shownSet]
-                .filter(i => i < this._config.vacuums.length)
+            : this._shownOrdered()
                 .map(i => b `
                 ${this._renderResponsive(this._renderMap(this._config.vacuums[i]))}
                 ${this._renderMapTools(this._config.vacuums[i])}
@@ -5719,14 +5730,22 @@ AnyVacCard.styles = i$5 `
     .vac-picker {
       display: flex;
       flex-direction: column;
-      gap: 6px;
-      padding: 6px;
+      gap: 4px;
+      padding: 5px;
       box-sizing: border-box;
       background: rgba(255, 255, 255, 0.03);
       border: 1px solid rgba(255, 255, 255, 0.08);
       border-radius: 12px;
     }
-    .vac-picker .badge { width: 100%; box-sizing: border-box; }
+    /* v1.1.0 follow-up (2026-08-03): field feedback that the picker column's
+     * full-size badges (same .badge used by the legacy/portrait horizontal
+     * badge row, 44px avatar + generous padding) were too large for what's
+     * just a vertical vacuum switcher, right above an already-compact dock.
+     * Scoped to .vac-picker only — the legacy/portrait badge row keeps its
+     * established size unchanged. */
+    .vac-picker .badge { width: 100%; box-sizing: border-box; padding: 4px 12px 4px 4px; gap: 8px; }
+    .vac-picker .badge-img, .vac-picker .badge-icon { width: 26px; height: 26px; --mdc-icon-size: 18px; }
+    .vac-picker .badge-name { font-size: 12px; }
 
     /* Dock (docs/12 §3): selection + plan + pinning in one column */
     .dock {

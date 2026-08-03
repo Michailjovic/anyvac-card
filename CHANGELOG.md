@@ -8,6 +8,22 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Planned
 
+## [0.94.1] - 2026-08-03
+
+### Fixed
+
+Field feedback right after 0.94.0's landscape `picker` column screenshot:
+- Picker badges (`.vac-picker .badge`) were still full-size (44px avatar,
+  same padding as the legacy/portrait horizontal badge row) — shrunk to a
+  26px avatar and tighter padding/font, scoped to the picker column only so
+  the legacy/portrait badge row is unaffected.
+- Vacuum ordering in the status column, picker, and merged-map draw order
+  could silently reshuffle after hiding and re-showing a vacuum — `Set`
+  preserves insertion order, and re-adding a hidden index moves it to the
+  end. New `_shownOrdered()` sorts by configured index everywhere a shown
+  list gets displayed, so vacuums always render in their configured order
+  (e.g. S6/S7/S8) regardless of show/hide history.
+
 ## [0.94.0] - 2026-08-03
 
 ### Changed
