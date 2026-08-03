@@ -8,6 +8,27 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Planned
 
+## [0.93.2] - 2026-08-01
+
+### Added
+
+New `layout.landscape.crop.flip` / `layout.portrait.crop.flip` (docs/32),
+independent of `mapOrientation`: rotates the whole map block (floorplan +
+rooms + paths + markers, same `.avc-rot` mechanism that already keeps
+rooms clickable under the auto-fit 90° rotation) by an additional 180°.
+Fixes a real onboarding-blocker found during the 2026-08-01 field test —
+the existing `image_base.rotation` slider only rotates the floorplan
+`<img>` itself, not the separately-positioned room buttons next to it, so
+using it after rooms are placed visually detaches them from the floorplan.
+`.avc-rot`'s counter-rotation CSS (keeps on-map text/icons upright) moved
+from six hardcoded `rotate(-90deg)` rules to one `--map-rot` custom
+property computed per render, so it covers all four resulting angles
+(0/90/180/270) instead of just the old fixed 90° case. Default `false` —
+no behavior change without the new key. The 270° case (auto-rotated *and*
+flipped together) is derived by symmetry with the field-proven 90° formula
+but not yet independently field-verified. Typecheck + build clean (sandbox
+`/tmp`).
+
 ## [0.93.1] - 2026-07-31
 
 ### Fixed

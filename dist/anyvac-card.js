@@ -87,7 +87,7 @@ const t={ATTRIBUTE:1},e=t=>(...e)=>({_$litDirective$:t,values:e});let i$1 = clas
 
 const CARD_NAME = "anyvac-card";
 const EDITOR_NAME = "anyvac-card-editor";
-const CARD_VERSION = "0.93.1";
+const CARD_VERSION = "0.93.2";
 /** Hold duration in ms required to trigger START / PAUSE actions */
 const HOLD_DURATION_MS = 600;
 /** docs/25 §10 field report (2026-07-25): Android's swipe-up-from-bottom-edge
@@ -4605,7 +4605,7 @@ let AnyVacCard = class AnyVacCard extends i$2 {
             const rW = Math.round(W * scale);
             const rH = Math.round(visH * scale);
             return b `
-        <div class="avc-rot" style="position:relative;width:${rW}px;height:${rH}px;margin:0 auto;overflow:hidden">
+        <div class="avc-rot" style="position:relative;width:${rW}px;height:${rH}px;margin:0 auto;overflow:hidden;--map-rot:90deg">
           <div style="position:absolute;top:0;left:0;width:${rH}px;height:${rW}px;transform-origin:top left;transform:translateX(${rW}px) rotate(90deg)">
             ${mapHtml}
           </div>
@@ -4656,17 +4656,48 @@ let AnyVacCard = class AnyVacCard extends i$2 {
         // shifts.
         const panX = -(rW - boxW) / 2 + ((crop?.offset_x ?? 0) / 100) * ((rW - boxW) / 2);
         const panY = -(rH - boxH) / 2 + ((crop?.offset_y ?? 0) / 100) * ((rH - boxH) / 2);
-        if (rotate) {
-            // Stashed for `_refineGridColumns` (portrait's map/dock column split) —
-            // plain field, doesn't trigger a render itself.
-            this._lastPortraitFitW = rW;
+        // docs/32 — `rotate` (90°-for-fit, above) and `flip` (180°, manual "this
+        // is upside down for me") are independent and compose into one of the
+        // four right angles. `.avc-rot`'s counter-rotation CSS reads the total
+        // back off `--map-rot` (single computed source, not per-angle classes).
+        const flip = crop?.flip === true;
+        const totalRotationDeg = (rotate ? 90 : 0) + (flip ? 180 : 0);
+        if (totalRotationDeg !== 0) {
+            if (rotate) {
+                // Stashed for `_refineGridColumns` (portrait's map/dock column
+                // split) — only meaningful when the axes actually swap (90°/270°);
+                // a flip-only 180° keeps native width/height and already fits the
+                // static grid template on its own, same as the unrotated 0° case.
+                this._lastPortraitFitW = rW;
+            }
+            // Content div dimensions: swapped (rH×rW) for a quarter turn (90°/
+            // 270°, same as the original 90°-only code), native (rW×rH) for a
+            // flip-only 180° (no axis swap — rotating 180° maps a box onto
+            // itself, centered rotation needs no translate at all).
+            const innerW = rotate ? rH : rW;
+            const innerH = rotate ? rW : rH;
+            let rotTransform;
+            if (totalRotationDeg === 90) {
+                rotTransform = "transform-origin:top left;transform:translateX(" + rW + "px) rotate(90deg)";
+            }
+            else if (totalRotationDeg === 180) {
+                rotTransform = "transform-origin:center;transform:rotate(180deg)";
+            }
+            else {
+                // 270° = 90° (rotate) + 180° (flip) combined — derived by symmetry
+                // with the field-proven 90° formula (translateX↔translateY mirrors
+                // the clockwise↔counter-clockwise direction); not yet field-verified
+                // on its own, unlike 90°/180° individually.
+                rotTransform = "transform-origin:top left;transform:translateY(" + rH + "px) rotate(270deg)";
+            }
             // .avc-rot lets CSS counter-rotate small on-map chips (gauges, prog
             // chips, room icons) so their text stays upright while the map itself
-            // is rotated.
+            // is rotated — `--map-rot` feeds the same counter-rotation to all
+            // four angles from one place (anyvac-card.ts CSS block).
             return b `
-        <div class="avc-rot" style="position:relative;width:${boxW}px;height:${boxH}px;margin:0 auto;overflow:hidden">
+        <div class="avc-rot" style="position:relative;width:${boxW}px;height:${boxH}px;margin:0 auto;overflow:hidden;--map-rot:${totalRotationDeg}deg">
           <div style="position:absolute;top:0;left:0;width:100%;height:100%;transform:translate(${panX}px,${panY}px)">
-            <div style="position:absolute;top:0;left:0;width:${rH}px;height:${rW}px;transform-origin:top left;transform:translateX(${rW}px) rotate(90deg)">
+            <div style="position:absolute;top:0;left:0;width:${innerW}px;height:${innerH}px;${rotTransform}">
               ${mapHtml}
             </div>
           </div>
@@ -5960,12 +5991,15 @@ AnyVacCard.styles = i$5 `
       min-width: 64px;
     }
 
-    /* Counter-rotate small on-map chips inside the rotated portrait map so their
-     *  text stays upright (the rotation wrapper adds .avc-rot). */
-    .avc-rot .room-gauge { transform: rotate(-90deg); }
-    .avc-rot .rl-prog { transform: rotate(-90deg); }
+    /* Counter-rotate small on-map chips inside the rotated map so their text
+     *  stays upright (the rotation wrapper adds .avc-rot). --map-rot is set
+     *  inline on the .avc-rot wrapper to the actual total angle (docs/32 —
+     *  90/180/270 degrees, not just the old fixed 90° case), so one rule now
+     *  covers all of them instead of a hardcoded -90deg. */
+    .avc-rot .room-gauge { transform: rotate(calc(-1 * var(--map-rot))); }
+    .avc-rot .rl-prog { transform: rotate(calc(-1 * var(--map-rot))); }
     .avc-rot .room-btn > ha-icon,
-    .avc-rot .room-overlay > ha-icon { transform: rotate(-90deg); }
+    .avc-rot .room-overlay > ha-icon { transform: rotate(calc(-1 * var(--map-rot))); }
 
     /* Portrait grid: compact badges (horizontal scroll, no wrap) + compact dock */
     .avc-grid--portrait .badges-row--grid {
@@ -6268,8 +6302,10 @@ AnyVacCard.styles = i$5 `
        genuinely unreadable, not just a minor legibility ding — worth the
        counter-rotation the icon/gauges already get elsewhere in .avc-rot
        (rotated portrait map). Whole box (see -inner above), not just text,
-       so border/background rotate together with the content they wrap. */
-    .avc-rot .room-inspect-inner { transform: rotate(-90deg); }
+       so border/background rotate together with the content they wrap.
+       --map-rot (docs/32) — same one variable as the other counter-rotation
+       rules, covers all four total angles, not just the old fixed 90 degrees. */
+    .avc-rot .room-inspect-inner { transform: rotate(calc(-1 * var(--map-rot))); }
 
     /* ── Debug per-room progress gauges (dry + wet) ──────────────────── */
     .room-gauges {

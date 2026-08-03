@@ -36,6 +36,13 @@ export interface MapCropConfig {
    *  one specific (wide) floorplan. "normal"/"rotated" force a side, for
    *  edge cases the computed rule doesn't call the way the user wants. */
   mapOrientation?: "auto" | "normal" | "rotated";
+  /** docs/32. Independent of `mapOrientation` — that picks 0°/90° for the best
+   *  aspect-ratio fit, this adds a further 180° on top when the floorplan is
+   *  simply upside down relative to what the user is used to. Composes with
+   *  `mapOrientation: "rotated"` (or the auto-computed rotated case) into a
+   *  270° total; both directions render via the same `.avc-rot` mechanism
+   *  that already keeps room click-positions correct under rotation. */
+  flip?: boolean;
 }
 
 /** docs/25 §4 — compute whether rotating the floorplan 90° fits the portrait
