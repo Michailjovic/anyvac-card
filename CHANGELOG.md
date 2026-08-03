@@ -8,6 +8,16 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Planned
 
+## [1.0.0] - 2026-08-03
+
+First stable release. Full responsive layout system (portrait/landscape,
+docs/18-21), rooms/seating/coverage sourced live from the integration
+(docs/15/20/29/30), sequence-aware orchestrated cleaning with per-room
+pinning and progressive wet dispatch (docs/18-19/23), dock control +
+consumables (docs/25 §10), map flip/rotation (docs/32), and the compact
+landscape cockpit (docs/33). See CHANGELOG history above for the full
+path here.
+
 ## [0.94.2] - 2026-08-03
 
 ### Fixed
