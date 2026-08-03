@@ -2583,19 +2583,28 @@ export class AnyVacCard extends LitElement {
     this._activePresets = next;
   }
 
+  /** v1.1.0 (2026-08-03): sits INLINE beside the START button now
+   *  (`.actions--idle`, `_renderActions`) instead of stacked above it as its
+   *  own full-width wrapping row — was the single caller (only used from
+   *  the idle branch of `_renderActions`), so repurposing its own layout in
+   *  place is safe. `overflow-x:auto` degrades gracefully for 3+ presets
+   *  (scrolls) instead of wrapping to a second row, which would reintroduce
+   *  the extra vertical row this redesign removes; `flex-shrink:0` on each
+   *  chip keeps them from being squashed illegibly narrow by the sibling
+   *  START button's own `flex:1`. */
   private _renderPresetChips(vac: VacuumConfig) {
     const presets = this._settingPresets(vac);
     if (presets.length < 2) return nothing;  // only when there is a real choice
     const activeId = this._activePresetId(vac);
     const color = this._color(vac);
     return html`
-      <div style="display:flex;flex-wrap:wrap;gap:6px;margin-bottom:8px;justify-content:center">
+      <div class="preset-chip-row">
         ${presets.map((p) => {
           const active = p.id === activeId;
           return html`<button
             @click=${(e: Event) => { e.stopPropagation(); this._setActivePreset(vac, p.id); }}
             style=${styleMap({
-              display: "inline-flex", alignItems: "center", gap: "4px",
+              display: "inline-flex", alignItems: "center", gap: "4px", flexShrink: "0",
               padding: "4px 10px", borderRadius: "14px", cursor: "pointer",
               fontSize: "12px", lineHeight: "1",
               border: "1px solid " + (active ? color : "rgba(255,255,255,0.15)"),
@@ -4251,10 +4260,19 @@ export class AnyVacCard extends LitElement {
 
   // ── Render: status card ─────────────────────────────────────────────────
 
+  /** v1.1.0 (2026-08-03, user-approved mockup): condensed two-line info block
+   *  that sits BESIDE the small circular avatar (`.status-avatar`,
+   *  `_renderStatusCard`) instead of the old wide `.status-left`/`.status-right`
+   *  split — name+status on line 1, room+battery+last-clean on line 2. The
+   *  live cleaning percentage folds into line 1 next to the status label
+   *  (`_renderProgress` below still renders the actual bar; this is just the
+   *  number, so it's visible even where the bar's thin track is easy to miss). */
   private _renderStatusRow(vac: VacuumConfig) {
     const [label, labelColor] = this._statusInfo(vac);
     const bat = this._battery(vac);
     const lastClean = this._lastCleanStr(vac);
+    const name = vac.name ?? vac.entity.split(".")[1] ?? vac.entity;
+    const prog = this._progress(vac);
 
     // Current room
     const crid = this._ent(vac, "current_room");
@@ -4271,31 +4289,34 @@ export class AnyVacCard extends LitElement {
       ${hasError ? html`
         <div class="error-row">
           <ha-icon icon="mdi:alert-circle" style="color:#ff4d4f"></ha-icon>
-          <span style="color:#ff4d4f;font-size:12px;font-weight:600">${errState}</span>
+          <span style="color:#ff4d4f;font-size:11px;font-weight:600">${errState}</span>
         </div>
       ` : nothing}
-      <div class="status-row">
-        <div class="status-main">
-          <span class="status-label" style=${styleMap({ color: labelColor })}>${label}</span>
-          ${currentRoom ? html`
-            <span class="current-room">
-              <ha-icon icon="mdi:map-marker" style="--mdc-icon-size:13px;color:rgba(255,255,255,0.4)"></ha-icon>
-              ${currentRoom}
+      <div class="status-line1">
+        <span class="model-label">${name}</span>
+        <span class="status-label" style=${styleMap({ color: labelColor })}>
+          ${label}${prog !== null ? html` &middot; ${prog}&thinsp;%` : nothing}
+        </span>
+      </div>
+      <div class="status-line2">
+        ${currentRoom ? html`
+          <span class="current-room">
+            <ha-icon icon="mdi:map-marker" style="--mdc-icon-size:12px;color:rgba(255,255,255,0.4)"></ha-icon>
+            ${currentRoom}
+          </span>
+        ` : html`<span></span>`}
+        <span class="status-meta">
+          ${bat !== null ? html`
+            <span class="battery">
+              <ha-icon icon=${this._batIcon(bat)} style=${styleMap({ color: this._batColor(bat) })}></ha-icon>
+              <span style=${styleMap({ color: this._batColor(bat) })}>${bat}&thinsp;%</span>
             </span>
           ` : nothing}
-        </div>
-        <div class="status-meta">
-          ${bat !== null ? html`
-            <div class="battery">
-              <span style=${styleMap({ color: this._batColor(bat) })}>${bat}&thinsp;%</span>
-              <ha-icon icon=${this._batIcon(bat)} style=${styleMap({ color: this._batColor(bat) })}></ha-icon>
-            </div>
-          ` : nothing}
-          <div class="last-clean">
-            <span>${lastClean}</span>
+          <span class="last-clean">
             <ha-icon icon="mdi:history"></ha-icon>
-          </div>
-        </div>
+            <span>${lastClean}</span>
+          </span>
+        </span>
       </div>
     `;
   }
@@ -4409,13 +4430,22 @@ export class AnyVacCard extends LitElement {
     const startBorder = hasRooms ? "1px solid " + color + "80" : "1px solid rgba(255,255,255,0.1)";
     const startIconColor = hasRooms ? color : "rgba(255,255,255,0.2)";
     const startTextColor = hasRooms ? "white" : "rgba(255,255,255,0.25)";
+    // v1.1.0 (2026-08-03, user-approved mockup): the old per-room icon strip
+    // (every configured room as its own tiny icon, colored if selected) was
+    // read-only display, not a control — replaced with a plain "N/M rooms"
+    // count. Selection itself still happens on the map / via the room list,
+    // unchanged; this just stopped being the tallest thing in the idle state.
+    const rooms = this._roomsFor(vac);
+    const selCount = rooms.filter((r) => this._isRoomSelected(r, vac)).length;
+    const roomsStr = rooms.length > 0 ? `${selCount}/${rooms.length} rooms` : "";
+    const metaStr = [roomsStr, timeStr].filter(Boolean).join(" · ");
 
     return html`
-      <div class="actions">
+      <div class="actions actions--idle">
         ${this._renderPresetChips(vac)}
         <button
           class="action-btn ${hasRooms && this._holdId === hId ? "action-btn--holding" : ""}"
-          style=${styleMap({ background: startBg, border: startBorder })}
+          style=${styleMap({ background: startBg, border: startBorder, flex: "1" })}
           ?disabled=${!hasRooms}
           @pointerdown=${hasRooms ? this._holdStart(hId, () => this._startClean(vac)) : nothing}
           @pointermove=${this._holdMove}
@@ -4427,23 +4457,21 @@ export class AnyVacCard extends LitElement {
           <ha-icon icon="mdi:play" style=${styleMap({ color: startIconColor })}></ha-icon>
           <div class="start-body">
             <span style=${styleMap({ color: startTextColor })}>${hasRooms ? "START" : "Select rooms"}</span>
-            ${(this._roomsFor(vac)).length > 0 ? html`
-              <div class="room-icons">
-                ${(this._roomsFor(vac)).map(r => html`
-                  <ha-icon
-                    icon=${r.icon || "mdi:square"}
-                    style=${styleMap({ color: this._isRoomSelected(r, vac) ? color : "rgba(255,255,255,0.15)" })}
-                  ></ha-icon>
-                `)}
-              </div>
-            ` : nothing}
-            ${timeStr ? html`<small style="color:rgba(255,255,255,0.4)">${timeStr}</small>` : nothing}
+            ${metaStr ? html`<small style="color:rgba(255,255,255,0.4)">${metaStr}</small>` : nothing}
           </div>
         </button>
       </div>
     `;
   }
 
+  /** v1.1.0 (2026-08-03): compact header replaces the old 150px-image /
+   *  1fr-info grid split — a small circular avatar (mirrors `.vac-icon-btn`'s
+   *  established look, docs/25 §7) beside the condensed two-line info block
+   *  (`_renderStatusRow`). The avatar keeps the SAME click target as before
+   *  (`_fireMoreInfo`, opens HA's stock more-info dialog) — user-requested
+   *  "rescue control" for whatever this card's own actions don't cover — but
+   *  a small `.avatar-info-badge` now marks it visually so shrinking the
+   *  avatar doesn't also make that escape hatch less discoverable. */
   private _renderStatusCard(vac: VacuumConfig, vacIdx: number) {
     const cleaning = this._isCleaning(vac);
     const color = this._color(vac);
@@ -4452,31 +4480,33 @@ export class AnyVacCard extends LitElement {
     const cardBorder = cleaning ? "2px solid " + color : "1px solid rgba(255,255,255,0.08)";
     const cardShadow = cleaning ? "0 0 22px " + color + "40" : "none";
     const imgFilter = cleaning
-      ? "drop-shadow(0 0 20px " + color + "D8)"
-      : "drop-shadow(0 4px 12px " + color + "33)";
+      ? "drop-shadow(0 0 8px " + color + "D8)"
+      : "drop-shadow(0 2px 5px " + color + "33)";
 
     return html`
       <div class="status-card" style=${styleMap({ border: cardBorder, boxShadow: cardShadow })}>
-        <div class="status-left" style="cursor:pointer"
-          @click=${() => this._fireMoreInfo(vac.entity)}
-          title="Open ${name} info">
-          <div class="model-label">${name}</div>
-          ${vac.image ? html`
-            <img class="vac-img" src=${vac.image} alt=${name}
-              style=${styleMap({ opacity: cleaning ? "0.9" : "0.6", filter: imgFilter })}
-            />
-          ` : html`
-            <ha-icon icon="mdi:robot-vacuum"
-              style=${styleMap({ color, fontSize: "80px", opacity: cleaning ? "0.9" : "0.5" })}
-            ></ha-icon>
-          `}
+        <div class="status-header">
+          <div class="status-avatar" style=${styleMap({ borderColor: color })}
+            @click=${() => this._fireMoreInfo(vac.entity)}
+            title="Open ${name} info — native controls, in case this card can't do something">
+            ${vac.image ? html`
+              <img src=${vac.image} alt=${name}
+                style=${styleMap({ opacity: cleaning ? "0.9" : "0.6", filter: imgFilter })}
+              />
+            ` : html`
+              <ha-icon icon="mdi:robot-vacuum"
+                style=${styleMap({ color, fontSize: "22px", opacity: cleaning ? "0.9" : "0.5" })}
+              ></ha-icon>
+            `}
+            <span class="avatar-info-badge"><ha-icon icon="mdi:information-outline"></ha-icon></span>
+          </div>
+          <div class="status-info">
+            ${this._renderStatusRow(vac)}
+          </div>
         </div>
-        <div class="status-right">
-          ${this._renderStatusRow(vac)}
-          ${this._renderProgress(vac)}
-          ${this._renderActions(vac, vacIdx)}
-          ${this._renderDebugProgress(vac)}
-        </div>
+        ${this._renderProgress(vac)}
+        ${this._renderActions(vac, vacIdx)}
+        ${this._renderDebugProgress(vac)}
       </div>
     `;
   }
@@ -5479,86 +5509,74 @@ export class AnyVacCard extends LitElement {
       justify-content: center;
     }
 
-    /* ── Status card ─────────────────────────────────────────────────── */
+    /* ── Status card (v1.1.0, 2026-08-03 — compact redesign, docs/33) ──── */
     .status-card {
-      display: grid;
-      grid-template-columns: 150px 1fr;
+      display: flex;
+      flex-direction: column;
+      gap: 4px;
+      padding: 10px 12px;
       background: rgba(0, 0, 0, 0.6);
       backdrop-filter: blur(12px);
       -webkit-backdrop-filter: blur(12px);
-      border-radius: 20px;
+      border-radius: 16px;
       overflow: hidden;
       transition: border 0.4s, box-shadow 0.4s;
     }
 
-    .status-left {
-      display: flex;
-      flex-direction: column;
-      align-items: center;
-      justify-content: flex-start;
-      padding: 4px 0 0;
-    }
+    .status-header { display: flex; align-items: center; gap: 10px; }
 
-    .model-label {
-      font-size: 10px;
-      letter-spacing: 3px;
-      color: rgba(255, 255, 255, 0.3);
-      text-transform: uppercase;
-      text-align: center;
-      margin-bottom: -10px;
+    /* Mirrors .vac-icon-btn's established circular-avatar look (docs/25 §7)
+     * — same ring/fallback-icon language, reused here so the two places a
+     * vacuum gets a small round portrait in this card stay visually
+     * consistent. The info badge marks the "tap for HA's native more-info
+     * dialog" escape hatch (user-requested "rescue control" — shrinking the
+     * avatar shouldn't make this less discoverable, just smaller). */
+    .status-avatar {
+      position: relative;
+      flex-shrink: 0;
+      width: 44px; height: 44px;
+      border-radius: 50%;
+      border: 1.5px solid rgba(255,255,255,0.2);
+      background: rgba(255,255,255,0.05);
+      display: flex; align-items: center; justify-content: center;
+      overflow: hidden;
+      cursor: pointer;
     }
-
-    .vac-img {
-      width: 110%;
-      margin-bottom: -15px;
-      object-fit: contain;
-      display: block;
+    .status-avatar img {
+      width: 100%; height: 100%; object-fit: cover;
       transition: opacity 0.5s, filter 0.5s;
     }
-
-    .status-right {
-      display: flex;
-      flex-direction: column;
-      gap: 4px;
+    .avatar-info-badge {
+      position: absolute; bottom: -2px; right: -2px;
+      width: 14px; height: 14px; border-radius: 50%;
+      background: rgba(30,30,30,0.95); border: 1px solid rgba(0,0,0,0.6);
+      display: flex; align-items: center; justify-content: center;
     }
+    .avatar-info-badge ha-icon { --mdc-icon-size: 9px; color: rgba(255,255,255,0.6); }
 
-    /* ── Status row ──────────────────────────────────────────────────── */
-    .status-row {
-      display: flex;
-      align-items: flex-start;
-      justify-content: space-between;
-      padding: 8px 12px 4px 16px;
-    }
+    .status-info { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 2px; }
 
     .error-row {
       display: flex; align-items: center; gap: 6px;
-      padding: 4px 12px 0 16px; animation: pulse-error 2s ease-in-out infinite;
+      padding-bottom: 2px; animation: pulse-error 2s ease-in-out infinite;
     }
     @keyframes pulse-error { 0%,100% { opacity:1; } 50% { opacity:0.6; } }
 
-    .status-main { display: flex; flex-direction: column; gap: 2px; }
-    .status-label { font-size: 20px; font-weight: 700; }
+    .status-line1 { display: flex; align-items: baseline; justify-content: space-between; gap: 8px; }
+    .model-label { font-size: 13px; font-weight: 500; color: rgba(255,255,255,0.85); }
+    .status-label { font-size: 12px; font-weight: 600; text-align: right; }
+
+    .status-line2 { display: flex; align-items: center; justify-content: space-between; gap: 8px; }
     .current-room { display: flex; align-items: center; gap: 3px; font-size: 11px; color: rgba(255,255,255,0.45); }
 
-    .status-meta {
-      display: flex;
-      flex-direction: column;
-      align-items: flex-end;
-      gap: 3px;
-      flex-shrink: 0;
-    }
-
+    .status-meta { display: flex; align-items: center; gap: 8px; flex-shrink: 0; }
     .battery { display: flex; align-items: center; gap: 3px; font-size: 11px; font-weight: 600; }
-    .battery ha-icon { --mdc-icon-size: 15px; }
-
-    .last-clean {
-      display: flex; align-items: center; gap: 4px;
-      font-size: 11px; color: rgba(255, 255, 255, 0.45);
-    }
-    .last-clean ha-icon { --mdc-icon-size: 12px; color: rgba(255, 255, 255, 0.25); }
+    .battery ha-icon { --mdc-icon-size: 13px; }
+    .last-clean { display: flex; align-items: center; gap: 3px; font-size: 11px; color: rgba(255, 255, 255, 0.45); }
+    .last-clean ha-icon { --mdc-icon-size: 11px; color: rgba(255, 255, 255, 0.25); }
 
     /* ── Progress bar ────────────────────────────────────────────────── */
-    .progress { display: flex; align-items: center; gap: 8px; padding: 0 16px 4px; }
+    .progress { display: flex; align-items: center; gap: 8px; }
     .progress-track {
       flex: 1; height: 3px;
       background: rgba(255, 255, 255, 0.08); border-radius: 2px; overflow: hidden;
@@ -5567,7 +5585,7 @@ export class AnyVacCard extends LitElement {
     .progress-label { font-size: 11px; font-weight: 600; flex-shrink: 0; }
 
     /* ── Debug per-room progress strip ───────────────────────────────── */
-    .dbg-prog { display: flex; flex-wrap: wrap; gap: 6px 12px; padding: 0 16px 12px; }
+    .dbg-prog { display: flex; flex-wrap: wrap; gap: 6px 12px; padding-top: 2px; }
     .dbg-prog-item { display: flex; align-items: center; gap: 3px; font-size: 11px; color: rgba(255,255,255,0.55); --mdc-icon-size: 14px; }
     .dbg-prog-name { color: rgba(255,255,255,0.45); }
     .dbg-prog-item b { font-weight: 700; }
@@ -5578,7 +5596,19 @@ export class AnyVacCard extends LitElement {
     .mini-gauge span { width: 16px; height: 16px; border-radius: 50%; background: rgba(0,0,0,0.82); color: #fff; font-size: 8px; font-weight: 700; display: flex; align-items: center; justify-content: center; }
 
     /* ── Action buttons ──────────────────────────────────────────────── */
-    .actions { display: flex; gap: 8px; padding: 0 12px 14px; }
+    .actions { display: flex; gap: 8px; }
+    /* v1.1.0: preset chips sit INLINE beside START (was its own stacked row
+     * above it) — overflow-x:auto lets a long preset list scroll instead
+     * of wrapping to a second row, which is exactly the extra height this
+     * redesign removes. flex-shrink:0 keeps it from being squeezed by
+     * START's flex:1 on narrow cards; a hard max-width caps how much of
+     * the row it can claim even when there's room, so START never shrinks
+     * to an unreadable sliver with many presets. */
+    .preset-chip-row {
+      display: flex; gap: 6px; flex-shrink: 0; max-width: 45%;
+      overflow-x: auto; scrollbar-width: none;
+    }
+    .preset-chip-row::-webkit-scrollbar { display: none; }
 
     .action-btn {
       position: relative;
@@ -5588,8 +5618,8 @@ export class AnyVacCard extends LitElement {
       align-items: center;
       justify-content: center;
       gap: 8px;
-      padding: 10px 14px;
-      border-radius: 14px;
+      padding: 8px 12px;
+      border-radius: 12px;
       cursor: pointer;
       transition: opacity 0.2s;
       font-family: inherit;
@@ -5597,8 +5627,8 @@ export class AnyVacCard extends LitElement {
 
     .action-btn:disabled { cursor: default; opacity: 0.7; }
 
-    .action-btn ha-icon { --mdc-icon-size: 22px; flex-shrink: 0; position: relative; z-index: 1; }
-    .action-btn span { font-size: 14px; font-weight: 700; color: white; position: relative; z-index: 1; }
+    .action-btn ha-icon { --mdc-icon-size: 18px; flex-shrink: 0; position: relative; z-index: 1; }
+    .action-btn span { font-size: 13px; font-weight: 700; color: white; position: relative; z-index: 1; }
 
     .action-btn--secondary {
       background: rgba(64, 169, 255, 0.08);
@@ -5622,14 +5652,6 @@ export class AnyVacCard extends LitElement {
 
     .start-body small { font-size: 10px; }
 
-    .room-icons {
-      display: flex;
-      align-items: center;
-      gap: 4px;
-      margin-top: 1px;
-    }
-
-    .room-icons ha-icon { --mdc-icon-size: 14px; }
     .map-clickcatch { position: absolute; inset: 0; cursor: crosshair; z-index: 5; }
     .map-tools { display: flex; gap: 6px; margin: 6px 0 0; }
     .mtbtn { display: inline-flex; align-items: center; gap: 4px; padding: 5px 10px; border-radius: 8px; border: 1px solid rgba(255,255,255,0.18); background: rgba(255,255,255,0.06); color: inherit; cursor: pointer; font-size: 12px; font-weight: 600; }

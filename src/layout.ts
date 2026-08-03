@@ -267,8 +267,29 @@ export const DEFAULT_PROFILES: Record<LayoutProfile, ResolvedProfileGrid> = {
     // `width: 100%`, which intrinsic-sizing treats as auto/shrink-to-fit —
     // its own natural width (vacuum name, always short) drives the column
     // the same way, no separate handling needed.
+    // v1.1.0 (2026-08-03, docs/33): rows 4/5 (status column + picker/dock)
+    // used to be bare "auto" — sized to whatever their content needed, with
+    // NO upper bound, taken out of the grid's height BEFORE the map's `1fr`
+    // row gets whatever's left over. A content-heavy status column (many
+    // vacuums, or before the same-day compact status-card redesign) could
+    // therefore squeeze the map down to a sliver with no floor at all.
+    // `minmax(0, 26%)` on each gives the map row a genuine floor (badges +
+    // tools + these two capped rows can claim at most ~26%+26%+their own
+    // small auto share, guaranteeing map gets roughly half the grid even in
+    // the worst case) while leaving the LOWER bound at 0 so small content
+    // (the common case) still shrinks to fit exactly as before — this only
+    // ever changes behavior when content would have exceeded the cap.
+    // `status`'s own `overflow: "auto"` (place map below) already turns
+    // "content taller than its row" into an internal scrollbar instead of
+    // grid overflow, so capping the row is safe: excess content scrolls,
+    // it doesn't get clipped invisibly. `picker`/`dock` (the other row4/5
+    // occupants) are already compact (docs/18/19 A5 polish) and unlikely to
+    // ever hit this cap in practice. Purely declarative — no JS measurement
+    // involved, so this carries none of the docs/21 §5b JS-vs-styleMap risk.
+    // Manual `layout.landscape.rows` overrides bypass this entirely
+    // (`resolveProfile`), so anyone who already hand-tuned rows is unaffected.
     columns: ["minmax(0, 1fr)", "max-content"],
-    rows: ["auto", "1fr", "auto", "auto", "auto"],
+    rows: ["auto", "1fr", "auto", "minmax(0, 26%)", "minmax(0, 26%)"],
     place: {
       badges: { row: 1, col: "1/3" },
       map: { row: 2, col: "1/3" },

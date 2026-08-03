@@ -8,6 +8,31 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Planned
 
+## [0.94.0] - 2026-08-03
+
+### Changed
+
+v1.1.0 — status card compact redesign + landscape grid row cap (docs/33),
+user-approved via before/after mockup:
+- Status card avatar shrunk from a fixed 150px image column to a 44px
+  circular avatar (mirrors `.vac-icon-btn`'s established look) with a new
+  info badge marking the tap-to-open-more-info "rescue control" escape
+  hatch — smaller, not less discoverable.
+- Status/battery/room/last-clean condensed from a wide multi-column row
+  into two compact lines beside the avatar; live cleaning % now shown
+  inline next to the status label too, not just in the progress bar.
+- Preset chips now sit inline beside the START button (horizontally
+  scrollable for 3+ presets) instead of stacking above it as their own row.
+- The per-room icon strip inside START (read-only, selection happens on
+  the map) replaced with a plain "N/M rooms" count — same information,
+  none of the height.
+- Card roughly 230px → 130px, no functionality lost.
+- `layout.landscape` default rows: the status/picker/dock rows (previously
+  unbounded `"auto"`) now cap at `minmax(0, 26%)` each, guaranteeing the
+  map a real floor regardless of how many vacuums are configured — excess
+  content scrolls within its own region instead of squeezing the map.
+  Manual `layout.landscape.rows` overrides are unaffected.
+
 ## [0.93.3] - 2026-08-03
 
 ### Added
