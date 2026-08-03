@@ -8,6 +8,25 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Planned
 
+## [1.0.2] - 2026-08-03
+
+### Fixed
+
+Two field reports right after 1.0.1:
+- Room assign chips (dry/wet vacuum avatar) — 1.0.1 hid them entirely
+  whenever the map is rotated (any profile) instead of just hiding them in
+  portrait; feedback was that hiding lost the info rather than being an
+  acceptable tradeoff. Now shown unconditionally and properly counter-
+  rotated (same `.avc-rot`/`--map-rot` mechanism as the room icon, gauge,
+  and inspect popup) so they stay upright and readable under any rotation.
+- The live "Flip map" toggle (meta bar / dock button, session-only by
+  design) reset to the config default on every page reload — expected on
+  wall-mounted/kiosk tablets that get refreshed often. Now persisted via
+  localStorage (same mechanism as the shown-vacuum set and room
+  selection) — survives reload, still per-browser rather than backend-
+  shared, since "how this screen likes its map" isn't necessarily the same
+  preference on a different screen.
+
 ## [1.0.1] - 2026-08-03
 
 ### Fixed

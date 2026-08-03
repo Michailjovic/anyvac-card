@@ -87,7 +87,7 @@ const t={ATTRIBUTE:1},e=t=>(...e)=>({_$litDirective$:t,values:e});let i$1 = clas
 
 const CARD_NAME = "anyvac-card";
 const EDITOR_NAME = "anyvac-card-editor";
-const CARD_VERSION = "1.0.1";
+const CARD_VERSION = "1.0.2";
 /** Hold duration in ms required to trigger START / PAUSE actions */
 const HOLD_DURATION_MS = 600;
 /** docs/25 §10 field report (2026-07-25): Android's swipe-up-from-bottom-edge
@@ -1144,6 +1144,7 @@ let AnyVacCard = class AnyVacCard extends i$2 {
             this._initialized = true;
             this._shownSet = this._loadShown();
             this._localRoomSel = this._loadRoomSel();
+            this._flipLive = this._loadFlipLive();
         }
         else {
             const valid = new Set();
@@ -2453,6 +2454,33 @@ let AnyVacCard = class AnyVacCard extends i$2 {
         }
         catch { /* ignore */ }
         return new Set(this._config.vacuums.map((_, i) => i));
+    }
+    /** docs/32 §5 follow-up (field feedback, 2026-08-03): the live flip toggle
+     *  was deliberately in-memory-only ("try it on this screen right now") —
+     *  but a page refresh (common on wall-mounted tablets/kiosk dashboards)
+     *  reset it to the config default every time, which read as "doesn't
+     *  stick" rather than "session-scoped by design". Persisted via
+     *  localStorage instead (same mechanism as `_shownSet`/room selection) —
+     *  survives reload, but stays per-BROWSER like those, not backend-shared
+     *  like `view_layers`: this is "how THIS screen likes its map", which can
+     *  legitimately differ from another screen showing the same dashboard. */
+    _saveFlipLive() {
+        try {
+            if (this._flipLive === null)
+                localStorage.removeItem("roborock-card:flip");
+            else
+                localStorage.setItem("roborock-card:flip", JSON.stringify(this._flipLive));
+        }
+        catch { /* storage unavailable */ }
+    }
+    _loadFlipLive() {
+        try {
+            const raw = localStorage.getItem("roborock-card:flip");
+            if (raw !== null)
+                return JSON.parse(raw) === true;
+        }
+        catch { /* ignore */ }
+        return null;
     }
     _saveRoomSel(vacEntity) {
         try {
@@ -4653,6 +4681,7 @@ let AnyVacCard = class AnyVacCard extends i$2 {
      *  touches the dashboard config or backend, resets on reload (docs/32). */
     _toggleFlipLive() {
         this._flipLive = !this._flipEff;
+        this._saveFlipLive();
     }
     /** docs/25 §7c: split (today's default) vs. stack portrait topology, computed
      *  from `shouldStackLayout()` — mirrors `_narrow`'s structure (manual override
@@ -5178,14 +5207,14 @@ let AnyVacCard = class AnyVacCard extends i$2 {
             </ha-icon>
           ` : A}
           ${this._renderRoomAgeDots(room, vac)}
-          ${ /* A rotated map makes these tiny and sideways (originally gated on
-                 `_profile !== "portrait"`, since only portrait rotated the map —
-                 field-caught 2026-08-03: landscape can rotate a tall/narrow
-                 floorplan too, since 0.81.1, and these chips weren't updated to
-                 match — they rendered sideways there as well). Same assignment
-                 is reachable via hold-to-inspect (§7b) instead — only show them
-                 inline where there's room to read them, i.e. whenever the map
-                 ISN'T currently rotated, regardless of profile. */(dryEnt || wetEnt) && !this._narrow ? b `
+          ${ /* Two field fixes same day (2026-08-03): (1) was hidden under
+                 portrait rotation only, then (2) hidden under ANY rotation
+                 (landscape rotates too, since 0.81.1) — user feedback on (2)
+                 was that hiding made the info disappear entirely instead of
+                 being a reasonable tradeoff. Now shown unconditionally and
+                 counter-rotated via .avc-rot's --map-rot rule (same mechanism
+                 as the room icon/gauge/inspect-popup), matching every other
+                 on-map label instead of being a special case that just hides. */(dryEnt || wetEnt) ? b `
             <span class="room-overlay-assign">
               ${dryEnt ? this._vacChip(dryEnt) : A}
               ${wetEnt ? this._vacChip(wetEnt) : A}
@@ -6148,6 +6177,13 @@ AnyVacCard.styles = i$5 `
     .avc-rot .rl-prog { transform: rotate(calc(-1 * var(--map-rot))); }
     .avc-rot .room-btn > ha-icon,
     .avc-rot .room-overlay > ha-icon { transform: rotate(calc(-1 * var(--map-rot))); }
+    /* Field-caught 2026-08-03: the assign chips were HIDDEN under rotation
+     * (see the render fn's comment) rather than counter-rotated like every
+     * other on-map label — user feedback was that this made the info
+     * disappear entirely instead of just needing hold-to-inspect, which
+     * wasn't an acceptable tradeoff. Counter-rotated properly instead, same
+     * as everything else in this rule block. */
+    .avc-rot .room-overlay-assign { transform: rotate(calc(-1 * var(--map-rot))); }
 
     /* Portrait grid: compact badges (horizontal scroll, no wrap) + compact dock */
     .avc-grid--portrait .badges-row--grid {

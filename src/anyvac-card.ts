@@ -336,6 +336,7 @@ export class AnyVacCard extends LitElement {
       this._initialized = true;
       this._shownSet = this._loadShown();
       this._localRoomSel = this._loadRoomSel();
+      this._flipLive = this._loadFlipLive();
     } else {
       const valid = new Set<number>();
       for (const i of this._shownSet) { if (i < config.vacuums.length) valid.add(i); }
@@ -1617,6 +1618,30 @@ export class AnyVacCard extends LitElement {
       }
     } catch { /* ignore */ }
     return new Set(this._config.vacuums.map((_, i) => i));
+  }
+
+  /** docs/32 §5 follow-up (field feedback, 2026-08-03): the live flip toggle
+   *  was deliberately in-memory-only ("try it on this screen right now") —
+   *  but a page refresh (common on wall-mounted tablets/kiosk dashboards)
+   *  reset it to the config default every time, which read as "doesn't
+   *  stick" rather than "session-scoped by design". Persisted via
+   *  localStorage instead (same mechanism as `_shownSet`/room selection) —
+   *  survives reload, but stays per-BROWSER like those, not backend-shared
+   *  like `view_layers`: this is "how THIS screen likes its map", which can
+   *  legitimately differ from another screen showing the same dashboard. */
+  private _saveFlipLive(): void {
+    try {
+      if (this._flipLive === null) localStorage.removeItem("roborock-card:flip");
+      else localStorage.setItem("roborock-card:flip", JSON.stringify(this._flipLive));
+    } catch { /* storage unavailable */ }
+  }
+
+  private _loadFlipLive(): boolean | null {
+    try {
+      const raw = localStorage.getItem("roborock-card:flip");
+      if (raw !== null) return JSON.parse(raw) === true;
+    } catch { /* ignore */ }
+    return null;
   }
 
   private _saveRoomSel(vacEntity: string): void {
@@ -3707,6 +3732,7 @@ export class AnyVacCard extends LitElement {
    *  touches the dashboard config or backend, resets on reload (docs/32). */
   private _toggleFlipLive(): void {
     this._flipLive = !this._flipEff;
+    this._saveFlipLive();
   }
 
   /** docs/25 §7c: split (today's default) vs. stack portrait topology, computed
@@ -4225,15 +4251,15 @@ export class AnyVacCard extends LitElement {
             </ha-icon>
           ` : nothing}
           ${this._renderRoomAgeDots(room, vac)}
-          ${/* A rotated map makes these tiny and sideways (originally gated on
-               `_profile !== "portrait"`, since only portrait rotated the map —
-               field-caught 2026-08-03: landscape can rotate a tall/narrow
-               floorplan too, since 0.81.1, and these chips weren't updated to
-               match — they rendered sideways there as well). Same assignment
-               is reachable via hold-to-inspect (§7b) instead — only show them
-               inline where there's room to read them, i.e. whenever the map
-               ISN'T currently rotated, regardless of profile. */
-            (dryEnt || wetEnt) && !this._narrow ? html`
+          ${/* Two field fixes same day (2026-08-03): (1) was hidden under
+               portrait rotation only, then (2) hidden under ANY rotation
+               (landscape rotates too, since 0.81.1) — user feedback on (2)
+               was that hiding made the info disappear entirely instead of
+               being a reasonable tradeoff. Now shown unconditionally and
+               counter-rotated via .avc-rot's --map-rot rule (same mechanism
+               as the room icon/gauge/inspect-popup), matching every other
+               on-map label instead of being a special case that just hides. */
+            (dryEnt || wetEnt) ? html`
             <span class="room-overlay-assign">
               ${dryEnt ? this._vacChip(dryEnt) : nothing}
               ${wetEnt ? this._vacChip(wetEnt) : nothing}
@@ -5216,6 +5242,13 @@ export class AnyVacCard extends LitElement {
     .avc-rot .rl-prog { transform: rotate(calc(-1 * var(--map-rot))); }
     .avc-rot .room-btn > ha-icon,
     .avc-rot .room-overlay > ha-icon { transform: rotate(calc(-1 * var(--map-rot))); }
+    /* Field-caught 2026-08-03: the assign chips were HIDDEN under rotation
+     * (see the render fn's comment) rather than counter-rotated like every
+     * other on-map label — user feedback was that this made the info
+     * disappear entirely instead of just needing hold-to-inspect, which
+     * wasn't an acceptable tradeoff. Counter-rotated properly instead, same
+     * as everything else in this rule block. */
+    .avc-rot .room-overlay-assign { transform: rotate(calc(-1 * var(--map-rot))); }
 
     /* Portrait grid: compact badges (horizontal scroll, no wrap) + compact dock */
     .avc-grid--portrait .badges-row--grid {
