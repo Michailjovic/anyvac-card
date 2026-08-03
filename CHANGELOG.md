@@ -8,6 +8,24 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Planned
 
+## [0.94.2] - 2026-08-03
+
+### Fixed
+
+Field-caught right after 0.94.1: a visible gap between the landscape
+`picker` column (vacuum pills) and the dock/room-list below it. Root cause
+— `picker` and `dock` used to be two independent grid rows, with `status`
+spanning both so its column height matched them combined; that span made
+the grid distribute status's own content height across both rows,
+inflating picker's row well past its short actual content. Fixed by
+folding `picker` into `dock`'s own template (renders as the first thing
+inside it, `_renderDock`'s new `withPicker` param) instead of a separate
+grid row — both are now one naturally-stacked flow with no cross-row
+sizing to create a gap. `DEFAULT_PROFILES.landscape` collapsed from 5 rows
+to 4 accordingly (`status`/`dock` now share a single `minmax(0, 50%)` row
+instead of two independent `minmax(0, 26%)` rows). A manual config that
+still explicitly places its own `picker` region is unaffected.
+
 ## [0.94.1] - 2026-08-03
 
 ### Fixed

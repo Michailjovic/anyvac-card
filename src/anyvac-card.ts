@@ -2164,10 +2164,26 @@ export class AnyVacCard extends LitElement {
     `;
   }
 
-  private _renderDock(withRun: boolean) {
+  /** `withPicker` (v1.1.0 follow-up, docs/33): the landscape vacuum picker
+   *  used to be its own grid region, sitting in a SEPARATE row above dock —
+   *  `status` spanned both rows so its column height matched theirs
+   *  combined, but that span inflated the picker's row past its own short
+   *  content whenever status was taller, leaving a visible gap between the
+   *  picker pills and the room list below (field-caught 2026-08-03). Now
+   *  picker renders as the first thing INSIDE dock instead, so both are one
+   *  naturally-stacked flow with no cross-row sizing to create a gap.
+   *  Gated on the CALLER checking `!("picker" in prof.place)` — a manual
+   *  config that still explicitly places its own `picker` region keeps
+   *  getting that (unchanged), and doesn't also get a duplicate here. */
+  private _renderDock(withRun: boolean, withPicker = false) {
     const vacs = this._config.vacuums;
     const rooms = this._mergedRoomDefs(vacs);
-    if (!rooms.length) return nothing;
+    // Room-less configs (e.g. a fresh install before any rooms exist, docs/30)
+    // used to make the WHOLE picker region disappear too, back when picker
+    // was its own independent grid region — now that it renders from inside
+    // here (see `withPicker` doc above), bail out only on the room-list
+    // content, not on the picker itself, so it doesn't regress that case.
+    if (!rooms.length) return withPicker ? this._renderVacuumPicker() : nothing;
     const hasInt = vacs.some((v) => this._intAttrs(v));
     const mode = this._planMode;
     const selKeys = this._allRoomKeys().filter((k) => this._isRoomSelectedAny(k, vacs));
@@ -2205,6 +2221,7 @@ export class AnyVacCard extends LitElement {
     const showRoomList = this._profile !== "portrait" || !!this._config.debug_dense_dock;
     return html`
       <div class="dock">
+        ${withPicker ? this._renderVacuumPicker() : nothing}
         ${this._renderVacuumIconStrip()}
         ${/* Dry/wet PATH visibility on the map (view_layers) — a different concern
              from the dock-mode buttons below (which pick what to CLEAN). Landscape
@@ -4634,8 +4651,11 @@ export class AnyVacCard extends LitElement {
         return this._renderMetaBar(vacsOf(shown));
       case "dock":
         // The dock carries the orchestrated run footer when no `start` region is
-        // placed in this profile (landscape, docs/18 §7d).
-        return this._renderDock(!("start" in prof.place));
+        // placed in this profile (landscape, docs/18 §7d). `withPicker`:
+        // fold the vacuum picker into dock's own flow (docs/33 follow-up)
+        // UNLESS this profile still explicitly places its own `picker`
+        // region (manual config, kept working unchanged).
+        return this._renderDock(!("start" in prof.place), !("picker" in prof.place));
       case "start":
         return this._renderStartBar();
       case "status":

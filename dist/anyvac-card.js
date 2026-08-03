@@ -87,7 +87,7 @@ const t={ATTRIBUTE:1},e=t=>(...e)=>({_$litDirective$:t,values:e});let i$1 = clas
 
 const CARD_NAME = "anyvac-card";
 const EDITOR_NAME = "anyvac-card-editor";
-const CARD_VERSION = "0.94.1";
+const CARD_VERSION = "0.94.2";
 /** Hold duration in ms required to trigger START / PAUSE actions */
 const HOLD_DURATION_MS = 600;
 /** docs/25 §10 field report (2026-07-25): Android's swipe-up-from-bottom-edge
@@ -651,36 +651,51 @@ const DEFAULT_PROFILES = {
         // `width: 100%`, which intrinsic-sizing treats as auto/shrink-to-fit —
         // its own natural width (vacuum name, always short) drives the column
         // the same way, no separate handling needed.
-        // v1.1.0 (2026-08-03, docs/33): rows 4/5 (status column + picker/dock)
-        // used to be bare "auto" — sized to whatever their content needed, with
-        // NO upper bound, taken out of the grid's height BEFORE the map's `1fr`
+        // v1.1.0 (2026-08-03, docs/33): row 4 (status column + picker/dock) used
+        // to be bare "auto" — sized to whatever its content needed, with NO
+        // upper bound, taken out of the grid's height BEFORE the map's `1fr`
         // row gets whatever's left over. A content-heavy status column (many
         // vacuums, or before the same-day compact status-card redesign) could
         // therefore squeeze the map down to a sliver with no floor at all.
-        // `minmax(0, 26%)` on each gives the map row a genuine floor (badges +
-        // tools + these two capped rows can claim at most ~26%+26%+their own
-        // small auto share, guaranteeing map gets roughly half the grid even in
-        // the worst case) while leaving the LOWER bound at 0 so small content
-        // (the common case) still shrinks to fit exactly as before — this only
-        // ever changes behavior when content would have exceeded the cap.
-        // `status`'s own `overflow: "auto"` (place map below) already turns
+        // `minmax(0, 50%)` gives the map row a genuine floor while leaving the
+        // LOWER bound at 0 so small content (the common case) still shrinks to
+        // fit exactly as before. `status`'s own `overflow: "auto"` already turns
         // "content taller than its row" into an internal scrollbar instead of
-        // grid overflow, so capping the row is safe: excess content scrolls,
-        // it doesn't get clipped invisibly. `picker`/`dock` (the other row4/5
-        // occupants) are already compact (docs/18/19 A5 polish) and unlikely to
-        // ever hit this cap in practice. Purely declarative — no JS measurement
+        // grid overflow, so capping the row is safe: excess content scrolls, it
+        // doesn't get clipped invisibly. Purely declarative — no JS measurement
         // involved, so this carries none of the docs/21 §5b JS-vs-styleMap risk.
         // Manual `layout.landscape.rows` overrides bypass this entirely
         // (`resolveProfile`), so anyone who already hand-tuned rows is unaffected.
+        //
+        // v1.1.0 follow-up (2026-08-03, field-caught): `picker` and `dock` used
+        // to be TWO separate grid rows (4 and 5), with `status` spanning both
+        // ("4/6") so its column matched their combined height. That span made
+        // the row-sizing algorithm distribute status's OWN content height
+        // across both tracks — inflating row 4 (picker's row) well past what
+        // the picker itself needed whenever status was tall, which left a
+        // visible gap between the short picker pills and the dock/room-list
+        // below them (a live screenshot showed this directly: status column
+        // trails off with empty space of its own further down, same underlying
+        // cause — neither column's content matches its allotted track height 1:1
+        // once a spanning item is involved). Fix: collapse to a SINGLE row for
+        // both columns — `picker` is no longer its own grid region at all, it
+        // renders as the first thing inside `dock`'s own template instead
+        // (`_renderDock`'s new `withPicker` param, gated on `!("picker" in
+        // prof.place)` so a manual config that still explicitly places `picker`
+        // itself keeps working, unchanged). With one shared row, each column
+        // is free to size to its own natural stacked content (picker pills
+        // immediately followed by the mode row/room list, no cross-column
+        // spanning distribution to inflate the gap between them) — the
+        // remaining per-column vertical slack (right column shorter than left,
+        // or vice versa) is just genuinely-natural leftover space, not a bug.
         columns: ["minmax(0, 1fr)", "max-content"],
-        rows: ["auto", "1fr", "auto", "minmax(0, 26%)", "minmax(0, 26%)"],
+        rows: ["auto", "1fr", "auto", "minmax(0, 50%)"],
         place: {
             badges: { row: 1, col: "1/3" },
             map: { row: 2, col: "1/3" },
             tools: { row: 3, col: "1/3", align: "start" },
-            status: { row: "4/6", col: 1, overflow: "auto" },
-            picker: { row: 4, col: 2, align: "start" },
-            dock: { row: 5, col: 2, overflow: "auto" },
+            status: { row: 4, col: 1, overflow: "auto" },
+            dock: { row: 4, col: 2, overflow: "auto" },
         },
     },
     portrait: {
@@ -3016,11 +3031,27 @@ let AnyVacCard = class AnyVacCard extends i$2 {
       </div>
     `;
     }
-    _renderDock(withRun) {
+    /** `withPicker` (v1.1.0 follow-up, docs/33): the landscape vacuum picker
+     *  used to be its own grid region, sitting in a SEPARATE row above dock —
+     *  `status` spanned both rows so its column height matched theirs
+     *  combined, but that span inflated the picker's row past its own short
+     *  content whenever status was taller, leaving a visible gap between the
+     *  picker pills and the room list below (field-caught 2026-08-03). Now
+     *  picker renders as the first thing INSIDE dock instead, so both are one
+     *  naturally-stacked flow with no cross-row sizing to create a gap.
+     *  Gated on the CALLER checking `!("picker" in prof.place)` — a manual
+     *  config that still explicitly places its own `picker` region keeps
+     *  getting that (unchanged), and doesn't also get a duplicate here. */
+    _renderDock(withRun, withPicker = false) {
         const vacs = this._config.vacuums;
         const rooms = this._mergedRoomDefs(vacs);
+        // Room-less configs (e.g. a fresh install before any rooms exist, docs/30)
+        // used to make the WHOLE picker region disappear too, back when picker
+        // was its own independent grid region — now that it renders from inside
+        // here (see `withPicker` doc above), bail out only on the room-list
+        // content, not on the picker itself, so it doesn't regress that case.
         if (!rooms.length)
-            return A;
+            return withPicker ? this._renderVacuumPicker() : A;
         const hasInt = vacs.some((v) => this._intAttrs(v));
         const mode = this._planMode;
         const selKeys = this._allRoomKeys().filter((k) => this._isRoomSelectedAny(k, vacs));
@@ -3059,6 +3090,7 @@ let AnyVacCard = class AnyVacCard extends i$2 {
         const showRoomList = this._profile !== "portrait" || !!this._config.debug_dense_dock;
         return b `
       <div class="dock">
+        ${withPicker ? this._renderVacuumPicker() : A}
         ${this._renderVacuumIconStrip()}
         ${ /* Dry/wet PATH visibility on the map (view_layers) — a different concern
              from the dock-mode buttons below (which pick what to CLEAN). Landscape
@@ -5552,8 +5584,11 @@ let AnyVacCard = class AnyVacCard extends i$2 {
                 return this._renderMetaBar(vacsOf(shown));
             case "dock":
                 // The dock carries the orchestrated run footer when no `start` region is
-                // placed in this profile (landscape, docs/18 §7d).
-                return this._renderDock(!("start" in prof.place));
+                // placed in this profile (landscape, docs/18 §7d). `withPicker`:
+                // fold the vacuum picker into dock's own flow (docs/33 follow-up)
+                // UNLESS this profile still explicitly places its own `picker`
+                // region (manual config, kept working unchanged).
+                return this._renderDock(!("start" in prof.place), !("picker" in prof.place));
             case "start":
                 return this._renderStartBar();
             case "status":
