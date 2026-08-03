@@ -8,6 +8,15 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Planned
 
+## [1.0.3] - 2026-08-03
+
+### Changed
+
+Room assign chip (dry/wet vacuum avatar on a selected room) moved from
+the bottom-left to the bottom-right corner of the room, per field
+feedback, and given a drop shadow so it stays legible sitting on top of
+busy path colors on the map.
+
 ## [1.0.2] - 2026-08-03
 
 ### Fixed

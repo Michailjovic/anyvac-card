@@ -87,7 +87,7 @@ const t={ATTRIBUTE:1},e=t=>(...e)=>({_$litDirective$:t,values:e});let i$1 = clas
 
 const CARD_NAME = "anyvac-card";
 const EDITOR_NAME = "anyvac-card-editor";
-const CARD_VERSION = "1.0.2";
+const CARD_VERSION = "1.0.3";
 /** Hold duration in ms required to trigger START / PAUSE actions */
 const HOLD_DURATION_MS = 600;
 /** docs/25 §10 field report (2026-07-25): Android's swipe-up-from-bottom-edge
@@ -6425,15 +6425,23 @@ AnyVacCard.styles = i$5 `
     /* Who's assigned to a selected room (docs/19 A1) — small chips, not area
        tinting, so assignment doesn't fight with the selection highlight or the
        age-gradient colors. */
+    /* Field feedback (2026-08-03): moved from bottom-left to bottom-right —
+     * user's judgment call after seeing it live, no functional reason for
+     * either corner. Also given a drop shadow (.room-overlay-assign
+     * .dock-chip) since the chip's own background is a fairly transparent
+     * color30-alpha (works fine in the dense dock list it's shared with,
+     * but needed more contrast sitting directly on top of busy path
+     * colors on the map). */
     .room-overlay-assign {
       position: absolute;
       bottom: 2px;
-      left: 2px;
+      right: 2px;
       display: flex;
       gap: 2px;
       pointer-events: none;
       z-index: 4;
     }
+    .room-overlay-assign .dock-chip { box-shadow: 0 1px 4px rgba(0,0,0,0.7); }
 
     /* docs/25 §7b: hold-to-inspect popup — per-room detail moved out of the
        (now hidden-by-default) portrait dock room list. cursor:default plus
