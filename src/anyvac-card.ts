@@ -4225,10 +4225,15 @@ export class AnyVacCard extends LitElement {
             </ha-icon>
           ` : nothing}
           ${this._renderRoomAgeDots(room, vac)}
-          ${/* Portrait's rotated map makes these tiny and sideways, and the
-               same assignment is now reachable via hold-to-inspect (§7b)
-               instead — only show them inline where there's room to read them. */
-            (dryEnt || wetEnt) && this._profile !== "portrait" ? html`
+          ${/* A rotated map makes these tiny and sideways (originally gated on
+               `_profile !== "portrait"`, since only portrait rotated the map —
+               field-caught 2026-08-03: landscape can rotate a tall/narrow
+               floorplan too, since 0.81.1, and these chips weren't updated to
+               match — they rendered sideways there as well). Same assignment
+               is reachable via hold-to-inspect (§7b) instead — only show them
+               inline where there's room to read them, i.e. whenever the map
+               ISN'T currently rotated, regardless of profile. */
+            (dryEnt || wetEnt) && !this._narrow ? html`
             <span class="room-overlay-assign">
               ${dryEnt ? this._vacChip(dryEnt) : nothing}
               ${wetEnt ? this._vacChip(wetEnt) : nothing}

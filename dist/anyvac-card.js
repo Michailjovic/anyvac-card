@@ -87,7 +87,7 @@ const t={ATTRIBUTE:1},e=t=>(...e)=>({_$litDirective$:t,values:e});let i$1 = clas
 
 const CARD_NAME = "anyvac-card";
 const EDITOR_NAME = "anyvac-card-editor";
-const CARD_VERSION = "1.0.0";
+const CARD_VERSION = "1.0.1";
 /** Hold duration in ms required to trigger START / PAUSE actions */
 const HOLD_DURATION_MS = 600;
 /** docs/25 §10 field report (2026-07-25): Android's swipe-up-from-bottom-edge
@@ -5178,9 +5178,14 @@ let AnyVacCard = class AnyVacCard extends i$2 {
             </ha-icon>
           ` : A}
           ${this._renderRoomAgeDots(room, vac)}
-          ${ /* Portrait's rotated map makes these tiny and sideways, and the
-                 same assignment is now reachable via hold-to-inspect (§7b)
-                 instead — only show them inline where there's room to read them. */(dryEnt || wetEnt) && this._profile !== "portrait" ? b `
+          ${ /* A rotated map makes these tiny and sideways (originally gated on
+                 `_profile !== "portrait"`, since only portrait rotated the map —
+                 field-caught 2026-08-03: landscape can rotate a tall/narrow
+                 floorplan too, since 0.81.1, and these chips weren't updated to
+                 match — they rendered sideways there as well). Same assignment
+                 is reachable via hold-to-inspect (§7b) instead — only show them
+                 inline where there's room to read them, i.e. whenever the map
+                 ISN'T currently rotated, regardless of profile. */(dryEnt || wetEnt) && !this._narrow ? b `
             <span class="room-overlay-assign">
               ${dryEnt ? this._vacChip(dryEnt) : A}
               ${wetEnt ? this._vacChip(wetEnt) : A}

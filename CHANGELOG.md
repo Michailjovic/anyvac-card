@@ -8,6 +8,18 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Planned
 
+## [1.0.1] - 2026-08-03
+
+### Fixed
+
+Room assignment chips (dry/wet vacuum avatar, bottom-left of a selected
+room) rendered sideways in landscape whenever the map auto-rotates a
+tall/narrow floorplan — the "hide when unreadable" guard was gated on
+`_profile !== "portrait"`, a leftover from before landscape could rotate
+too (0.81.1). Now gated on `!this._narrow` (is the map currently rotated,
+regardless of profile) — same fallback as before (hold-to-inspect still
+shows the assignment), just no longer landscape-blind.
+
 ## [1.0.0] - 2026-08-03
 
 First stable release. Full responsive layout system (portrait/landscape,
