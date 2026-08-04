@@ -24,6 +24,25 @@ switch, one-tap start bar:
 
 ![Portrait cockpit](media/portrait-cockpit.png)
 
+### Landscape layout, region by region
+
+![Landscape layout, annotated](media/landscape-annotated.png)
+
+| # | Region | What it does |
+|---|---|---|
+| 1 | **Map** | The shared floorplan (or the vacuum's own map in split mode), with live robot position and dry/wet cleaning paths colour-coded per vacuum. Tap a room to select it — this is the only way to pick specific rooms, on this or any other region. The small avatar chip in a room's corner shows which vacuum is currently assigned to clean it. |
+| 2 | **Meta bar** | Left: **Pin & Go** (tap a point on the map to send a robot straight there) and **Zone** (draw a rectangle to spot-clean an area, draggable/resizable before you confirm). Right: per-layer dry/wet path visibility toggles and a manual refresh button — an amber warning icon can also appear here for unassigned or unsequenced rooms (see Troubleshooting below). |
+| 3 | **Status cards** | One card per vacuum — current state and room, battery, when it last charged, and its own **START**, showing that vacuum's own room selection and ETA. This is where you monitor an individual robot, and in `ui_mode: manual` it's the primary way to start each robot independently on its own presets. |
+| 4 | **Vacuum picker** | One pill per vacuum. Hold a pill to show/hide that vacuum on the merged map — handy with 3+ robots sharing one floorplan when the overlapping paths get busy. |
+| 5 | **Mode row** | The **Dry / Wet / Both** pass selector for the orchestrated clean, plus **Dock**, which opens the dock sheet (Empty / Wash / Dry / Pump / Self-clean, plus consumable levels — see the Global tab walkthrough below). |
+| 6 | **Room list** | One row per room: dry/wet last-cleaned age, learned coverage %, and avatar chips showing the assigned vacuum for each pass. Tap an avatar to cycle or pin a specific robot to that room; rows are tap targets too, equivalent to tapping the room on the map. |
+| 7 | **Footer** | A running summary of the current selection (room count and estimated time) and the orchestrated **Start · hold** button — hold to confirm, same gesture as the portrait start bar. |
+
+The portrait layout (screenshot above) carries the same seven ideas, just
+stacked into a single column and reachable with one thumb: map on top, then
+the vacuum icon strip (equivalent to the picker), the mode row, and the start
+bar at the very bottom.
+
 ## What it's built around
 
 - **Pick where, not how.** Rooms are tap targets on the map. Cleaning
