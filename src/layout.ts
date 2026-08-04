@@ -224,6 +224,14 @@ export interface LayoutConfig {
   landscape?: ProfileGridConfig;
 }
 
+/** v1.1.0 field fix (2026-08-04, docs/33 follow-up): the landscape map row's
+ *  minimum height, in px — see the row-4 comment below for why this floor
+ *  moved from row 4's growth limit onto the map's own row instead. Picked
+ *  as "clearly usable, rarely binding": only kicks in when the status+dock
+ *  column actually wants more than (grid height − this) for its own
+ *  content, which needs several vacuums or a long room list. */
+const LANDSCAPE_MAP_FLOOR_PX = 260;
+
 /**
  * Canonical docs/18 §4 default profiles (Phase B). Landscape = cockpit: map left
  * (scrolls in split mode, §7b), dock (selection + plan + orchestrated run, §7d)
@@ -273,15 +281,32 @@ export const DEFAULT_PROFILES: Record<LayoutProfile, ResolvedProfileGrid> = {
     // row gets whatever's left over. A content-heavy status column (many
     // vacuums, or before the same-day compact status-card redesign) could
     // therefore squeeze the map down to a sliver with no floor at all.
-    // `minmax(0, 50%)` gives the map row a genuine floor while leaving the
-    // LOWER bound at 0 so small content (the common case) still shrinks to
-    // fit exactly as before. `status`'s own `overflow: "auto"` already turns
-    // "content taller than its row" into an internal scrollbar instead of
-    // grid overflow, so capping the row is safe: excess content scrolls, it
-    // doesn't get clipped invisibly. Purely declarative — no JS measurement
-    // involved, so this carries none of the docs/21 §5b JS-vs-styleMap risk.
-    // Manual `layout.landscape.rows` overrides bypass this entirely
-    // (`resolveProfile`), so anyone who already hand-tuned rows is unaffected.
+    // `minmax(0, 50%)` was meant to give the map row a genuine floor while
+    // leaving the LOWER bound at 0 so small content (the common case) still
+    // shrinks to fit — but that's not how `minmax()` behaves once a `1fr`
+    // row shares the grid: a non-flexible track's percentage MAX is its
+    // growth limit, and CSS Grid's "maximize tracks" step grows every
+    // non-flexible track up to its growth limit FIRST, using up whatever
+    // free space the grid has, before `fr` tracks get whatever's left —
+    // regardless of how little that track's own content actually needs.
+    // Field-caught 2026-08-04: one vacuum + a short room list still
+    // inflated row 4 to a full 50% of the grid, leaving dead space below
+    // the real content and starving the map's `1fr` row of height it had
+    // no other claimant for (visible as both a gap above the START footer
+    // AND the map rendering narrower than the card, letterboxed, because
+    // it no longer had enough height for its aspect ratio to reach full
+    // width). Fix: put the floor on the map's OWN row instead —
+    // `minmax(<mapFloorPx>, 1fr)` guarantees the map at least
+    // `LANDSCAPE_MAP_FLOOR_PX` regardless of what row 4 wants, and row 4
+    // goes back to bare `"auto"` so it genuinely shrinks to its content
+    // again. `status`'s own `overflow: "auto"` still turns "content taller
+    // than the map's leftover space" into an internal scrollbar instead of
+    // grid overflow, so an unbounded row 4 is safe: excess content
+    // scrolls, it doesn't get clipped invisibly. Purely declarative — no
+    // JS measurement involved, so this carries none of the docs/21 §5b
+    // JS-vs-styleMap risk. Manual `layout.landscape.rows` overrides bypass
+    // this entirely (`resolveProfile`), so anyone who already hand-tuned
+    // rows is unaffected.
     //
     // v1.1.0 follow-up (2026-08-03, field-caught): `picker` and `dock` used
     // to be TWO separate grid rows (4 and 5), with `status` spanning both
@@ -305,7 +330,7 @@ export const DEFAULT_PROFILES: Record<LayoutProfile, ResolvedProfileGrid> = {
     // remaining per-column vertical slack (right column shorter than left,
     // or vice versa) is just genuinely-natural leftover space, not a bug.
     columns: ["minmax(0, 1fr)", "max-content"],
-    rows: ["auto", "1fr", "auto", "minmax(0, 50%)"],
+    rows: ["auto", `minmax(${LANDSCAPE_MAP_FLOOR_PX}px, 1fr)`, "auto", "auto"],
     place: {
       badges: { row: 1, col: "1/3" },
       map: { row: 2, col: "1/3" },

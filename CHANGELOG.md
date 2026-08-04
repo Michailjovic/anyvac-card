@@ -8,6 +8,27 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Planned
 
+## [1.0.8] - 2026-08-04
+
+### Fixed
+
+Landscape layout: row 4 (status column + picker/dock) could balloon to a
+full 50% of the grid's height even with modest content (e.g. one vacuum
+and a short room list) — leaving dead space between the room list and the
+START footer, and starving the map's `1fr` row of height it had no other
+claimant for (visible as the map rendering narrower than the card,
+letterboxed, since it no longer had enough height for its aspect ratio to
+reach full width). Root cause: `minmax(0, 50%)`'s percentage max is a
+*growth limit*, not a content cap — CSS Grid's "maximize tracks" step
+grows every non-flexible track up to its growth limit before `fr` tracks
+get whatever free space is left, regardless of how little that track's
+own content needs. Fix: the floor moved from row 4's growth limit onto
+the map's own row instead (`minmax(260px, 1fr)`), and row 4 goes back to
+bare `"auto"` so it genuinely shrinks to its content again — the map now
+gets all the leftover space by default, with a guaranteed minimum even
+when status/dock content is unusually tall (many vacuums, long room
+list). Manual `layout.landscape.rows` overrides are unaffected.
+
 ## [1.0.7] - 2026-08-03
 
 ### Fixed
