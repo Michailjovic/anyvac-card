@@ -87,7 +87,7 @@ const t={ATTRIBUTE:1},e=t=>(...e)=>({_$litDirective$:t,values:e});let i$1 = clas
 
 const CARD_NAME = "anyvac-card";
 const EDITOR_NAME = "anyvac-card-editor";
-const CARD_VERSION = "1.0.8";
+const CARD_VERSION = "1.0.9";
 /** Hold duration in ms required to trigger START / PAUSE actions */
 const HOLD_DURATION_MS = 600;
 /** docs/25 §10 field report (2026-07-25): Android's swipe-up-from-bottom-edge
@@ -3101,9 +3101,11 @@ let AnyVacCard = class AnyVacCard extends i$2 {
         // used to make the WHOLE picker region disappear too, back when picker
         // was its own independent grid region — now that it renders from inside
         // here (see `withPicker` doc above), bail out only on the room-list
-        // content, not on the picker itself, so it doesn't regress that case.
+        // content, not on the picker/icon-strip above it, so it doesn't regress
+        // that case. Mirrors the main return's `withPicker` + icon-strip pair
+        // below (each self-gates to its own profile, so exactly one renders).
         if (!rooms.length)
-            return withPicker ? this._renderVacuumPicker() : A;
+            return b `${withPicker ? this._renderVacuumPicker() : A}${this._renderVacuumIconStrip()}`;
         const hasInt = vacs.some((v) => this._intAttrs(v));
         const mode = this._planMode;
         const selKeys = this._allRoomKeys().filter((k) => this._isRoomSelectedAny(k, vacs));
@@ -5693,7 +5695,18 @@ let AnyVacCard = class AnyVacCard extends i$2 {
                 // fold the vacuum picker into dock's own flow (docs/33 follow-up)
                 // UNLESS this profile still explicitly places its own `picker`
                 // region (manual config, kept working unchanged).
-                return this._renderDock(!("start" in prof.place), !("picker" in prof.place));
+                // Field-caught 2026-08-04: `!("picker" in prof.place)` alone is also
+                // true for BOTH portrait profiles (`DEFAULT_PROFILES.portrait` and
+                // `STACK_PORTRAIT_PROFILE`) — neither has ever placed a `picker`
+                // region, because portrait deliberately uses the vacuum ICON STRIP
+                // instead (0.69.0, docs/25 §7a) as its single "show/hide vacuums"
+                // control. Without the `_profile === "landscape"` guard, portrait
+                // rendered the pill-list picker AND the icon strip at once — two
+                // redundant controls for the same thing, stacked on top of each
+                // other. Only landscape (and a manual profile that structurally
+                // mirrors it) gets the auto-folded picker; portrait keeps relying
+                // on the icon strip alone, same as before docs/33.
+                return this._renderDock(!("start" in prof.place), this._profile === "landscape" && !("picker" in prof.place));
             case "start":
                 return this._renderStartBar();
             case "status":

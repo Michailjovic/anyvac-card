@@ -8,6 +8,21 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Planned
 
+## [1.0.9] - 2026-08-04
+
+### Fixed
+
+Portrait rendered both the vacuum picker (pill list) AND the vacuum icon
+strip at once — two redundant controls for the same "show/hide a vacuum"
+action, stacked on top of each other. Root cause: the `withPicker` fold
+introduced in 1.0.8's sibling change (docs/33 follow-up, "picker" folded
+into "dock") was gated on `!("picker" in prof.place)`, which is also true
+for both portrait profiles — neither has ever placed a `picker` region,
+because portrait deliberately uses the icon strip instead (0.69.0). Fixed
+by also requiring `profile === "landscape"`; the room-less early-return
+path was updated the same way so a fresh install without rooms yet still
+shows the right single control per profile instead of nothing.
+
 ## [1.0.8] - 2026-08-04
 
 ### Fixed
