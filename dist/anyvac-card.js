@@ -94,7 +94,7 @@ const t={ATTRIBUTE:1},e=t=>(...e)=>({_$litDirective$:t,values:e});let i$1 = clas
 
 const CARD_NAME = "anyvac-card";
 const EDITOR_NAME = "anyvac-card-editor";
-const CARD_VERSION = "1.0.5";
+const CARD_VERSION = "1.0.7";
 /** Hold duration in ms required to trigger START / PAUSE actions */
 const HOLD_DURATION_MS = 600;
 /** docs/25 §10 field report (2026-07-25): Android's swipe-up-from-bottom-edge
@@ -5214,45 +5214,63 @@ let AnyVacCard = class AnyVacCard extends i$2 {
             </ha-icon>
           ` : A}
           ${this._renderRoomAgeDots(room, vac)}
-          ${ /* Field fixes same day (2026-08-03): (1) was hidden under
-                 portrait rotation only, then (2) hidden under ANY rotation
-                 (landscape rotates too, since 0.81.1) — user feedback on (2)
-                 was that hiding made the info disappear entirely instead of
-                 being a reasonable tradeoff, so (3) now shown unconditionally
-                 and counter-rotated via .avc-rot's --map-rot rule (same
-                 mechanism as the room icon/gauge/inspect-popup) to stay
-                 upright. That counter-rotation only fixes the TEXT's own
-                 orientation though — the chip's ANCHOR point (which corner of
-                 the room box it sits at) is set via plain CSS bottom/right
-                 BEFORE the ambient .avc-rot rotation, so the ambient rotation
-                 still carries that anchor point to a different VISUAL corner.
-                 (4) 1.0.4 only special-cased 180° (opposite-corner swap under
-                 transform-origin:center) and left 90°/270° on the untouched
-                 bottom-right default, reasoning the translate+rotate combo
-                 used there (see _renderResponsive's rotTransform) might not
-                 reduce to a simple corner swap — field-caught wrong (rightmost
-                 chips clipped off the map edge near the top): translation
-                 only moves the WHOLE rotated block, it doesn't change which
-                 direction a LOCAL corner vector points after rotation, so the
-                 same corner-cycle math applies regardless of translate.
-                 CSS rotate(θ) is clockwise; tracing all four local corners
-                 through each of the four θ values (0/90/180/270) that
-                 totalRot can be gives one full local→visual corner cycle
-                 (TL→TR→BR→BL→TL as θ goes 0→90→180→270) — inverting that to
-                 "which local corner ends up visually bottom-right" for each
-                 θ gives the table below. Mirrors the same rotate/flip inputs
-                 _renderResponsive computes totalRotationDeg from. */(dryEnt || wetEnt) ? (() => {
+          ${ /* Field fixes same day (2026-08-03), full history in CHANGELOG
+                 1.0.1-1.0.6: the edge-anchored approach (CSS top/bottom/left/
+                 right, counter-rotated via .avc-rot's --map-rot rule) picked
+                 the CORRECT local room corner for all four right angles
+                 (verified by matrix simulation, see below — that part was
+                 never wrong) but was still off for 90°/270° specifically:
+                 those two ALSO apply a ±90° SELF-rotation to the chip itself
+                 (to cancel the ambient rotation and keep its text upright),
+                 and a ±90° self-rotation SWAPS the chip's own effective
+                 width/height before the ambient rotation carries it further —
+                 a "2px from local top/right" edge inset doesn't account for
+                 that swap, so the chip landed roughly chip-height px off from
+                 the intended corner (matches the field-reported "overflows
+                 past the top/right of the map" symptom exactly: ~21px
+                 overshoot ≈ 2px inset + 19px chip height). 0°/180° never had
+                 this problem (a 0° or 180° self-rotation never swaps width/
+                 height), which is why 1.0.4/1.0.5 field-tested fine for those
+                 two despite the same root gap existing latently for 90/270.
+                 Fix: a rotation-proof anchoring trick instead of edge insets.
+                 A zero-size OUTER anchor point sits at the local room corner
+                 that maps to visual bottom-right (same corner table as
+                 before, just expressed as a point instead of a CSS edge).
+                 The INNER chip pins to that point via its OWN bottom-right
+                 corner as transform-origin (100% 100%) — the pivot a
+                 rotation turns around is invariant under that SAME rotation
+                 regardless of angle, sidestepping the width/height-swap
+                 problem entirely — plus a small translate for the 2px visual
+                 inset, pre-solved per angle so it always reads as "2px up-
+                 and-left of the room's true corner" in FINAL screen space.
+                 Verified by simulating the full CSS transform chain as 2D
+                 affine matrices (Python), checked against the live-measured
+                 DOM geometry from the actual bug report, for all four angles
+                 and multiple room/chip sizes — not just reasoned by hand, since
+                 the earlier hand-derived fixes (1.0.4/1.0.5) had already gone
+                 wrong twice. Dropped 1.0.6's max-width/wrap-reverse narrow-room
+                 guard: the live measurement that motivated it (~21px overflow
+                 on rooms of very different widths, including a 990px-wide one)
+                 turned out to be fully explained by this same rotation bug,
+                 not a real content-width problem — simplifying back out rather
+                 than keep an untested fix for an invalidated hypothesis. */(dryEnt || wetEnt) ? (() => {
                 const totalRot = (this._narrow ? 90 : 0) + (this._flipEff ? 180 : 0);
-                // Local corner that maps to visual bottom-right under each of
-                // the four right angles (see comment above for the derivation).
-                const anchor = totalRot === 90 ? { top: "2px", bottom: "auto", left: "auto", right: "2px" } // local TR
-                    : totalRot === 180 ? { top: "2px", bottom: "auto", left: "2px", right: "auto" } // local TL
-                        : totalRot === 270 ? { top: "auto", bottom: "2px", left: "2px", right: "auto" } // local BL
-                            : { top: "auto", bottom: "2px", left: "auto", right: "2px" }; // local BR (0°)
+                // Local room corner that maps to visual bottom-right — same
+                // table as 1.0.5, now a point instead of an edge inset.
+                const outerPos = totalRot === 90 ? { top: "0%", left: "100%" } // local TR
+                    : totalRot === 180 ? { top: "0%", left: "0%" } // local TL
+                        : totalRot === 270 ? { top: "100%", left: "0%" } // local BL
+                            : { top: "100%", left: "100%" }; // local BR (0°)
+                const rad = (totalRot * Math.PI) / 180;
+                const dx = (-2 * (Math.cos(rad) + Math.sin(rad))).toFixed(2);
+                const dy = (-2 * (Math.cos(rad) - Math.sin(rad))).toFixed(2);
                 return b `
-                <span class="room-overlay-assign" style=${o(anchor)}>
-                  ${dryEnt ? this._vacChip(dryEnt) : A}
-                  ${wetEnt ? this._vacChip(wetEnt) : A}
+                <span class="room-overlay-assign-anchor" style=${o(outerPos)}>
+                  <span class="room-overlay-assign"
+                    style=${o({ transform: `translate(${dx}px, ${dy}px) rotate(calc(-1 * var(--map-rot)))` })}>
+                    ${dryEnt ? this._vacChip(dryEnt) : A}
+                    ${wetEnt ? this._vacChip(wetEnt) : A}
+                  </span>
                 </span>
               `;
             })() : A}
@@ -6213,13 +6231,16 @@ AnyVacCard.styles = i$6 `
     .avc-rot .rl-prog { transform: rotate(calc(-1 * var(--map-rot))); }
     .avc-rot .room-btn > ha-icon,
     .avc-rot .room-overlay > ha-icon { transform: rotate(calc(-1 * var(--map-rot))); }
-    /* Field-caught 2026-08-03: the assign chips were HIDDEN under rotation
-     * (see the render fn's comment) rather than counter-rotated like every
-     * other on-map label — user feedback was that this made the info
-     * disappear entirely instead of just needing hold-to-inspect, which
-     * wasn't an acceptable tradeoff. Counter-rotated properly instead, same
-     * as everything else in this rule block. */
-    .avc-rot .room-overlay-assign { transform: rotate(calc(-1 * var(--map-rot))); }
+    /* Field-caught 2026-08-03, superseded 1.0.7: the assign chip used to be
+     * counter-rotated via this shared .avc-rot rule like every other on-map
+     * label (room-gauge, rl-prog, room icons above). That's fine for SQUARE
+     * elements (a 90° self-rotation doesn't change a square's footprint),
+     * but the assign chip is a non-square pill row — a 90°/270° self-
+     * rotation swaps its own width/height before the ambient rotation
+     * carries it further, which broke its edge-anchored position (see the
+     * render fn's comment for the full story). Now handled by an inline
+     * transform (translate + rotate together) computed per-render, so this
+     * shared rule no longer applies to it. */
 
     /* Portrait grid: compact badges (horizontal scroll, no wrap) + compact dock */
     .avc-grid--portrait .badges-row--grid {
@@ -6468,10 +6489,27 @@ AnyVacCard.styles = i$6 `
      * color30-alpha (works fine in the dense dock list it's shared with,
      * but needed more contrast sitting directly on top of busy path
      * colors on the map). */
+    /* Rotation-proof anchoring (1.0.7, see render fn comment for the full
+     * derivation/history): .room-overlay-assign-anchor is a zero-size point
+     * positioned (via the render fn's inline top/left) at the local room
+     * corner that maps to visual bottom-right, for whichever of the four
+     * right angles is currently active. .room-overlay-assign itself pins to
+     * that point via its OWN bottom-right corner as transform-origin — the
+     * pivot a rotation turns around never moves under that SAME rotation,
+     * so this stays correct regardless of the chip's own self-rotation
+     * swapping its width/height (the thing that broke the old edge-anchored
+     * 2px insets specifically for 90°/270°). The actual rotate()+translate()
+     * is set inline per-render (computed from totalRot), not here. */
+    .room-overlay-assign-anchor {
+      position: absolute;
+      pointer-events: none;
+      z-index: 4;
+    }
     .room-overlay-assign {
       position: absolute;
-      bottom: 2px;
-      right: 2px;
+      bottom: 0;
+      right: 0;
+      transform-origin: 100% 100%;
       display: flex;
       gap: 2px;
       pointer-events: none;

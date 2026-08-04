@@ -8,6 +8,47 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Planned
 
+## [1.0.7] - 2026-08-03
+
+### Fixed
+
+Room assign chip was still landing off-corner under 90°/270° map rotation
+(auto-rotate-for-fit, e.g. landscape with a tall/narrow floorplan) — root
+cause turned out to be different from 1.0.4/1.0.5's diagnosis: those two
+angles ALSO apply a ±90° self-rotation to the chip itself (to keep its
+text upright), and that self-rotation swaps the chip's own effective
+width/height before the ambient rotation carries it further, so a plain
+"2px from local edge" inset landed roughly chip-height pixels off from
+the intended corner (0°/180° never had this problem, since neither
+rotates the chip's own footprint). Confirmed via live DOM measurement on
+the actual reported dashboard, then re-derived and verified with a full
+2D affine-matrix simulation of the CSS transform chain (checked against
+that live geometry, and against multiple synthetic room/chip sizes)
+before writing any code — the corner CHOICE from 1.0.5 was always right,
+only the inset mechanism needed to change. New anchoring: a zero-size
+point sits at the correct local room corner, and the chip pins to it via
+its own bottom-right corner as `transform-origin` (invariant under its
+own rotation, unlike an edge inset), with a per-angle pre-solved
+translate for the 2px visual gap. Also dropped 1.0.6's max-width/wrap
+narrow-room guard — the live measurement that motivated it (~21px
+overflow on rooms of very different widths, including a 990px-wide one)
+turned out to be fully explained by this same rotation bug, not a real
+content-width problem.
+
+## [1.0.6] - 2026-08-03
+
+### Fixed
+
+Room assign chip could visually spill past its own room's left edge —
+with no width limit it was a shrink-to-fit box anchored only by its
+right/bottom corner, so a room narrower than two 24px-min-width avatar
+pills side by side (bathroom/hallway-sized rooms on a merged map
+routinely are) let the chip's left edge grow past the room's own
+boundary uncontained. Capped to the room's own width (`max-width:
+calc(100% - 4px)`), with a second chip that doesn't fit wrapping onto a
+row above the anchored one instead of spilling sideways — always grows
+away from the pinned bottom-right corner, never past it.
+
 ## [1.0.5] - 2026-08-03
 
 ### Fixed
