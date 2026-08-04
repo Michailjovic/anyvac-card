@@ -1,0 +1,30 @@
+# No `anyvac` integration — the card falls back to controlling the vacuum
+# directly via `vacuum.*` services. This is a "dumb controller": no
+# orchestration, no learned per-room timing, no coverage %, no auto-detected
+# rooms/map — everything below has to be filled in by hand.
+#
+# Use this only if you don't want to install the companion integration.
+# Segment IDs: Developer Tools → find the vacuum's `roborock.get_maps`
+# attributes for the actual numbers on your own map.
+
+type: custom:anyvac-card
+vacuums:
+  - entity: vacuum.s6_kitchen
+    map:
+      entity: image.s6_kitchen_map_0
+    clean_action:
+      type: native
+      repeat: 1
+    rooms:
+      - key: Kitchen
+        name: Kitchen
+        segment_id: 16
+        map_x: 20
+        map_y: 30
+        clean_time_dry: 12
+      - key: Living room
+        name: Living room
+        segment_id: 17
+        map_x: 55
+        map_y: 40
+        clean_time_dry: 25

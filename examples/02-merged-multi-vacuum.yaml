@@ -1,0 +1,46 @@
+# Multiple vacuums, sharing one floorplan and orchestrated together
+# (`ui_mode: auto`, the default — one Dry/Wet/Both controller for all of
+# them instead of one per robot).
+#
+# Requirements this scenario has that a single-vacuum config doesn't:
+#   - image_base.src: a shared floorplan is required in merged mode — without
+#     one, each vacuum's raw map overlays the others unaligned at 1:1 scale.
+#     Easiest path: open the Maps tab, pick a reference vacuum, and click
+#     "Use this vacuum's current map as floorplan" — it fills this field and
+#     places that vacuum's rooms for you, no manual file upload needed.
+#   - Room names must match across vacuums' own Roborock app configurations
+#     (e.g. both robots need to call the same room "Kitchen" in their own
+#     app, not just in Home Assistant) — that's how the card and the
+#     integration know it's the same physical room across robots, both for
+#     shared map placement and for deciding which robot cleans it.
+
+type: custom:anyvac-card
+layout: {}
+map_mode: merged
+image_base:
+  src: /local/anyvac/floorplan.png # filled in automatically, see above
+vacuums:
+  - entity: vacuum.s6_kitchen
+    name: S6
+    color: "#52c41a"
+  - entity: vacuum.s7_maxv
+    name: S7 MaxV
+    color: "#2196F3"
+  - entity: vacuum.s8_maxv_ultra
+    name: S8 MaxV Ultra
+    color: "#faad14"
+
+# Optional: whole-flat and per-scenario one-tap presets (Global tab).
+# With none defined, tapping Start with no rooms selected already runs a
+# sensible "whole home, dry" default — these just add labeled shortcuts.
+global_presets:
+  - id: whole_home_dry
+    label: Whole home (dry)
+    icon: mdi:broom
+    scope: all
+    mode: dry
+  - id: whole_home_both
+    label: Whole home (dry + wet)
+    icon: mdi:water-plus
+    scope: all
+    mode: both

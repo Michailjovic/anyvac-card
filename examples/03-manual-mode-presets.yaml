@@ -1,0 +1,29 @@
+# Per-robot controllers instead of one orchestrated one (`ui_mode: manual`) —
+# each vacuum gets its own card with its own "how" preset chips. Pick a
+# preset, tap rooms on the map, hit Start. No cross-vacuum load-balancing;
+# each robot only ever runs what you send it.
+#
+# Works with or without the `anyvac` integration — presets apply their
+# settings via clean_action either way.
+
+type: custom:anyvac-card
+layout: {}
+ui_mode: manual
+vacuums:
+  - entity: vacuum.s8_maxv_ultra
+    presets:
+      - id: quick_dry
+        label: Quick dry
+        icon: mdi:broom
+        suction_level: standard
+        repeat: 1
+      - id: deep_dry
+        label: Deep clean
+        icon: mdi:broom
+        suction_level: max
+        repeat: 2
+      - id: mop
+        label: Mop
+        icon: mdi:water
+        mop_intensity: high
+        repeat: 1

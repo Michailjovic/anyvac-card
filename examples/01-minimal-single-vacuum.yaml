@@ -1,0 +1,12 @@
+# One vacuum, `anyvac` integration active.
+#
+# This is the whole config. The map image, room list, and per-room
+# timing/coverage are all picked up automatically from the integration —
+# nothing else to add. `layout: {}` opts into the responsive grid with
+# sensible built-in defaults (recommended; omit for the older
+# unconstrained render).
+
+type: custom:anyvac-card
+layout: {}
+vacuums:
+  - entity: vacuum.s8_maxv_ultra
