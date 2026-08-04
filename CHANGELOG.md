@@ -8,6 +8,21 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Planned
 
+## [1.0.4] - 2026-08-03
+
+### Fixed
+
+Room assign chip position shifted to the wrong corner whenever the map
+flip (180°) was on — the chip's anchor (bottom-right) was set in the
+room's pre-rotation coordinate frame, so the ambient 180° rotation carried
+it to the visual top-left instead. Now the anchor corner is picked based
+on the actual total rotation (mirrors `_renderResponsive`'s own
+`rotate`/`flip` inputs) — pure 180° anchors top-left-local so it lands
+bottom-right-visual; the un-rotated (0°) case is unaffected. Not yet
+independently verified for the 90°/270° rotate-for-fit + flip combination
+(different transform shape, not a simple corner swap) — flagged rather
+than guessed, same as the existing docs/32 caveat on that combination.
+
 ## [1.0.3] - 2026-08-03
 
 ### Changed

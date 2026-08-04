@@ -4251,20 +4251,46 @@ export class AnyVacCard extends LitElement {
             </ha-icon>
           ` : nothing}
           ${this._renderRoomAgeDots(room, vac)}
-          ${/* Two field fixes same day (2026-08-03): (1) was hidden under
+          ${/* Three field fixes same day (2026-08-03): (1) was hidden under
                portrait rotation only, then (2) hidden under ANY rotation
                (landscape rotates too, since 0.81.1) — user feedback on (2)
                was that hiding made the info disappear entirely instead of
-               being a reasonable tradeoff. Now shown unconditionally and
-               counter-rotated via .avc-rot's --map-rot rule (same mechanism
-               as the room icon/gauge/inspect-popup), matching every other
-               on-map label instead of being a special case that just hides. */
-            (dryEnt || wetEnt) ? html`
-            <span class="room-overlay-assign">
-              ${dryEnt ? this._vacChip(dryEnt) : nothing}
-              ${wetEnt ? this._vacChip(wetEnt) : nothing}
-            </span>
-          ` : nothing}
+               being a reasonable tradeoff, so (3) now shown unconditionally
+               and counter-rotated via .avc-rot's --map-rot rule (same
+               mechanism as the room icon/gauge/inspect-popup) to stay
+               upright. That counter-rotation only fixes the TEXT's own
+               orientation though — the chip's ANCHOR point (which corner of
+               the room box it sits at) is set via plain CSS bottom/right
+               BEFORE the ambient .avc-rot rotation, so the ambient rotation
+               still carries that anchor point to a different VISUAL corner
+               (field-caught: with `flip` (180°) on, bottom-right-local ends
+               up looking like top-left-visual, since a 180° rotation about
+               center swaps opposite corners) — the user wants it to always
+               look bottom-right, not "bottom-right in some coordinate frame
+               that shifts under rotation". Fixed for the 180°-only case
+               (pure flip, transform-origin:center — swap to anchoring
+               top-left-local, which maps to bottom-right-visual under a
+               clean 180°) by picking the anchor from `totalRot` below,
+               mirroring the same rotate/flip inputs `_renderResponsive`
+               computes `totalRotationDeg` from. NOT independently verified
+               for 90°/270° (rotate-for-fit combined with flip) — those
+               transforms compose a translate with the rotation, so the
+               corner mapping isn't the simple opposite-corner swap 180°
+               is; left as the pre-existing bottom-right default there
+               rather than guess, same honesty precedent as docs/32's own
+               "270° derived by symmetry, not verified" note. */
+            (dryEnt || wetEnt) ? (() => {
+              const totalRot = (this._narrow ? 90 : 0) + (this._flipEff ? 180 : 0);
+              const anchor = totalRot === 180
+                ? { top: "2px", bottom: "auto", left: "2px", right: "auto" }
+                : { top: "auto", bottom: "2px", left: "auto", right: "2px" };
+              return html`
+                <span class="room-overlay-assign" style=${styleMap(anchor)}>
+                  ${dryEnt ? this._vacChip(dryEnt) : nothing}
+                  ${wetEnt ? this._vacChip(wetEnt) : nothing}
+                </span>
+              `;
+            })() : nothing}
           ${this._renderRoomGauge(opts?.vacs ?? [vac], room)}
         </button>
         ${this._inspectKey === room.key ? this._renderRoomInspect(room, vac, selected, opts) : nothing}
