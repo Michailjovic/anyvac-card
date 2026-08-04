@@ -8,6 +8,20 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Planned
 
+## [1.0.5] - 2026-08-03
+
+### Fixed
+
+Room assign chip still landed in the wrong corner for the 90°/270° map
+rotation states (auto-rotate-for-fit combined with flip) — 1.0.4 only
+handled the 0°/180° cases and left these on the untouched bottom-right
+default, since the translate+rotate transform used for a quarter turn
+looked different from the pure `transform-origin:center` 180° case.
+Field-caught: translation only moves the whole rotated block, it doesn't
+change which direction a local corner vector points after rotation, so
+the same corner-cycle math applies regardless. All four right angles are
+now covered by the same anchor-picking logic.
+
 ## [1.0.4] - 2026-08-03
 
 ### Fixed

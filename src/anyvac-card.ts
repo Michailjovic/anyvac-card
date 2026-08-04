@@ -4251,7 +4251,7 @@ export class AnyVacCard extends LitElement {
             </ha-icon>
           ` : nothing}
           ${this._renderRoomAgeDots(room, vac)}
-          ${/* Three field fixes same day (2026-08-03): (1) was hidden under
+          ${/* Field fixes same day (2026-08-03): (1) was hidden under
                portrait rotation only, then (2) hidden under ANY rotation
                (landscape rotates too, since 0.81.1) — user feedback on (2)
                was that hiding made the info disappear entirely instead of
@@ -4262,28 +4262,32 @@ export class AnyVacCard extends LitElement {
                orientation though — the chip's ANCHOR point (which corner of
                the room box it sits at) is set via plain CSS bottom/right
                BEFORE the ambient .avc-rot rotation, so the ambient rotation
-               still carries that anchor point to a different VISUAL corner
-               (field-caught: with `flip` (180°) on, bottom-right-local ends
-               up looking like top-left-visual, since a 180° rotation about
-               center swaps opposite corners) — the user wants it to always
-               look bottom-right, not "bottom-right in some coordinate frame
-               that shifts under rotation". Fixed for the 180°-only case
-               (pure flip, transform-origin:center — swap to anchoring
-               top-left-local, which maps to bottom-right-visual under a
-               clean 180°) by picking the anchor from `totalRot` below,
-               mirroring the same rotate/flip inputs `_renderResponsive`
-               computes `totalRotationDeg` from. NOT independently verified
-               for 90°/270° (rotate-for-fit combined with flip) — those
-               transforms compose a translate with the rotation, so the
-               corner mapping isn't the simple opposite-corner swap 180°
-               is; left as the pre-existing bottom-right default there
-               rather than guess, same honesty precedent as docs/32's own
-               "270° derived by symmetry, not verified" note. */
+               still carries that anchor point to a different VISUAL corner.
+               (4) 1.0.4 only special-cased 180° (opposite-corner swap under
+               transform-origin:center) and left 90°/270° on the untouched
+               bottom-right default, reasoning the translate+rotate combo
+               used there (see _renderResponsive's rotTransform) might not
+               reduce to a simple corner swap — field-caught wrong (rightmost
+               chips clipped off the map edge near the top): translation
+               only moves the WHOLE rotated block, it doesn't change which
+               direction a LOCAL corner vector points after rotation, so the
+               same corner-cycle math applies regardless of translate.
+               CSS rotate(θ) is clockwise; tracing all four local corners
+               through each of the four θ values (0/90/180/270) that
+               totalRot can be gives one full local→visual corner cycle
+               (TL→TR→BR→BL→TL as θ goes 0→90→180→270) — inverting that to
+               "which local corner ends up visually bottom-right" for each
+               θ gives the table below. Mirrors the same rotate/flip inputs
+               _renderResponsive computes totalRotationDeg from. */
             (dryEnt || wetEnt) ? (() => {
               const totalRot = (this._narrow ? 90 : 0) + (this._flipEff ? 180 : 0);
-              const anchor = totalRot === 180
-                ? { top: "2px", bottom: "auto", left: "2px", right: "auto" }
-                : { top: "auto", bottom: "2px", left: "auto", right: "2px" };
+              // Local corner that maps to visual bottom-right under each of
+              // the four right angles (see comment above for the derivation).
+              const anchor =
+                totalRot === 90  ? { top: "2px", bottom: "auto", left: "auto", right: "2px" }  // local TR
+                : totalRot === 180 ? { top: "2px", bottom: "auto", left: "2px", right: "auto" }  // local TL
+                : totalRot === 270 ? { top: "auto", bottom: "2px", left: "2px", right: "auto" }  // local BL
+                : { top: "auto", bottom: "2px", left: "auto", right: "2px" };                    // local BR (0°)
               return html`
                 <span class="room-overlay-assign" style=${styleMap(anchor)}>
                   ${dryEnt ? this._vacChip(dryEnt) : nothing}
