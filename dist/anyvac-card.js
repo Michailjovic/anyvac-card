@@ -1,2906 +1,82 @@
-/******************************************************************************
-Copyright (c) Microsoft Corporation.
-
-Permission to use, copy, modify, and/or distribute this software for any
-purpose with or without fee is hereby granted.
-
-THE SOFTWARE IS PROVIDED "AS IS" AND THE AUTHOR DISCLAIMS ALL WARRANTIES WITH
-REGARD TO THIS SOFTWARE INCLUDING ALL IMPLIED WARRANTIES OF MERCHANTABILITY
-AND FITNESS. IN NO EVENT SHALL THE AUTHOR BE LIABLE FOR ANY SPECIAL, DIRECT,
-INDIRECT, OR CONSEQUENTIAL DAMAGES OR ANY DAMAGES WHATSOEVER RESULTING FROM
-LOSS OF USE, DATA OR PROFITS, WHETHER IN AN ACTION OF CONTRACT, NEGLIGENCE OR
-OTHER TORTIOUS ACTION, ARISING OUT OF OR IN CONNECTION WITH THE USE OR
-PERFORMANCE OF THIS SOFTWARE.
-***************************************************************************** */
-/* global Reflect, Promise, SuppressedError, Symbol, Iterator */
-
-
-function __decorate(decorators, target, key, desc) {
-    var c = arguments.length, r = c < 3 ? target : desc === null ? desc = Object.getOwnPropertyDescriptor(target, key) : desc, d;
-    if (typeof Reflect === "object" && typeof Reflect.decorate === "function") r = Reflect.decorate(decorators, target, key, desc);
-    else for (var i = decorators.length - 1; i >= 0; i--) if (d = decorators[i]) r = (c < 3 ? d(r) : c > 3 ? d(target, key, r) : d(target, key)) || r;
-    return c > 3 && r && Object.defineProperty(target, key, r), r;
-}
-
-typeof SuppressedError === "function" ? SuppressedError : function (error, suppressed, message) {
-    var e = new Error(message);
-    return e.name = "SuppressedError", e.error = error, e.suppressed = suppressed, e;
-};
-
+/* AnyVac Card — https://github.com/Michailjovic/anyvac-card */
+function t(t,e,o,i){var s,n=arguments.length,a=n<3?e:null===i?i=Object.getOwnPropertyDescriptor(e,o):i;if("object"==typeof Reflect&&"function"==typeof Reflect.decorate)a=Reflect.decorate(t,e,o,i);else for(var r=t.length-1;r>=0;r--)(s=t[r])&&(a=(n<3?s(a):n>3?s(e,o,a):s(e,o))||a);return n>3&&a&&Object.defineProperty(e,o,a),a}"function"==typeof SuppressedError&&SuppressedError;
 /**
  * @license
  * Copyright 2019 Google LLC
  * SPDX-License-Identifier: BSD-3-Clause
  */
-const t$3=globalThis,e$3=t$3.ShadowRoot&&(void 0===t$3.ShadyCSS||t$3.ShadyCSS.nativeShadow)&&"adoptedStyleSheets"in Document.prototype&&"replace"in CSSStyleSheet.prototype,s$2=Symbol(),o$5=new WeakMap;let n$4 = class n{constructor(t,e,o){if(this._$cssResult$=true,o!==s$2)throw Error("CSSResult is not constructable. Use `unsafeCSS` or `css` instead.");this.cssText=t,this.t=e;}get styleSheet(){let t=this.o;const s=this.t;if(e$3&&void 0===t){const e=void 0!==s&&1===s.length;e&&(t=o$5.get(s)),void 0===t&&((this.o=t=new CSSStyleSheet).replaceSync(this.cssText),e&&o$5.set(s,t));}return t}toString(){return this.cssText}};const r$4=t=>new n$4("string"==typeof t?t:t+"",void 0,s$2),i$5=(t,...e)=>{const o=1===t.length?t[0]:e.reduce((e,s,o)=>e+(t=>{if(true===t._$cssResult$)return t.cssText;if("number"==typeof t)return t;throw Error("Value passed to 'css' function must be a 'css' function result: "+t+". Use 'unsafeCSS' to pass non-literal values, but take care to ensure page security.")})(s)+t[o+1],t[0]);return new n$4(o,t,s$2)},S$1=(s,o)=>{if(e$3)s.adoptedStyleSheets=o.map(t=>t instanceof CSSStyleSheet?t:t.styleSheet);else for(const e of o){const o=document.createElement("style"),n=t$3.litNonce;void 0!==n&&o.setAttribute("nonce",n),o.textContent=e.cssText,s.appendChild(o);}},c$2=e$3?t=>t:t=>t instanceof CSSStyleSheet?(t=>{let e="";for(const s of t.cssRules)e+=s.cssText;return r$4(e)})(t):t;
-
+const e=globalThis,o=e.ShadowRoot&&(void 0===e.ShadyCSS||e.ShadyCSS.nativeShadow)&&"adoptedStyleSheets"in Document.prototype&&"replace"in CSSStyleSheet.prototype,i=Symbol(),s=new WeakMap;let n=class{constructor(t,e,o){if(this._$cssResult$=!0,o!==i)throw Error("CSSResult is not constructable. Use `unsafeCSS` or `css` instead.");this.cssText=t,this.t=e}get styleSheet(){let t=this.o;const e=this.t;if(o&&void 0===t){const o=void 0!==e&&1===e.length;o&&(t=s.get(e)),void 0===t&&((this.o=t=new CSSStyleSheet).replaceSync(this.cssText),o&&s.set(e,t))}return t}toString(){return this.cssText}};const a=(t,...e)=>{const o=1===t.length?t[0]:e.reduce((e,o,i)=>e+(t=>{if(!0===t._$cssResult$)return t.cssText;if("number"==typeof t)return t;throw Error("Value passed to 'css' function must be a 'css' function result: "+t+". Use 'unsafeCSS' to pass non-literal values, but take care to ensure page security.")})(o)+t[i+1],t[0]);return new n(o,t,i)},r=o?t=>t:t=>t instanceof CSSStyleSheet?(t=>{let e="";for(const o of t.cssRules)e+=o.cssText;return(t=>new n("string"==typeof t?t:t+"",void 0,i))(e)})(t):t,{is:l,defineProperty:c,getOwnPropertyDescriptor:d,getOwnPropertyNames:h,getOwnPropertySymbols:p,getPrototypeOf:m}=Object,u=globalThis,_=u.trustedTypes,g=_?_.emptyScript:"",f=u.reactiveElementPolyfillSupport,b=(t,e)=>t,y={toAttribute(t,e){switch(e){case Boolean:t=t?g:null;break;case Object:case Array:t=null==t?t:JSON.stringify(t)}return t},fromAttribute(t,e){let o=t;switch(e){case Boolean:o=null!==t;break;case Number:o=null===t?null:Number(t);break;case Object:case Array:try{o=JSON.parse(t)}catch(t){o=null}}return o}},v=(t,e)=>!l(t,e),x={attribute:!0,type:String,converter:y,reflect:!1,useDefault:!1,hasChanged:v};
 /**
  * @license
  * Copyright 2017 Google LLC
  * SPDX-License-Identifier: BSD-3-Clause
- */const{is:i$4,defineProperty:e$2,getOwnPropertyDescriptor:h$1,getOwnPropertyNames:r$3,getOwnPropertySymbols:o$4,getPrototypeOf:n$3}=Object,a$1=globalThis,c$1=a$1.trustedTypes,l$1=c$1?c$1.emptyScript:"",p$1=a$1.reactiveElementPolyfillSupport,d$1=(t,s)=>t,u$1={toAttribute(t,s){switch(s){case Boolean:t=t?l$1:null;break;case Object:case Array:t=null==t?t:JSON.stringify(t);}return t},fromAttribute(t,s){let i=t;switch(s){case Boolean:i=null!==t;break;case Number:i=null===t?null:Number(t);break;case Object:case Array:try{i=JSON.parse(t);}catch(t){i=null;}}return i}},f$1=(t,s)=>!i$4(t,s),b$1={attribute:true,type:String,converter:u$1,reflect:false,useDefault:false,hasChanged:f$1};Symbol.metadata??=Symbol("metadata"),a$1.litPropertyMetadata??=new WeakMap;let y$1 = class y extends HTMLElement{static addInitializer(t){this._$Ei(),(this.l??=[]).push(t);}static get observedAttributes(){return this.finalize(),this._$Eh&&[...this._$Eh.keys()]}static createProperty(t,s=b$1){if(s.state&&(s.attribute=false),this._$Ei(),this.prototype.hasOwnProperty(t)&&((s=Object.create(s)).wrapped=true),this.elementProperties.set(t,s),!s.noAccessor){const i=Symbol(),h=this.getPropertyDescriptor(t,i,s);void 0!==h&&e$2(this.prototype,t,h);}}static getPropertyDescriptor(t,s,i){const{get:e,set:r}=h$1(this.prototype,t)??{get(){return this[s]},set(t){this[s]=t;}};return {get:e,set(s){const h=e?.call(this);r?.call(this,s),this.requestUpdate(t,h,i);},configurable:true,enumerable:true}}static getPropertyOptions(t){return this.elementProperties.get(t)??b$1}static _$Ei(){if(this.hasOwnProperty(d$1("elementProperties")))return;const t=n$3(this);t.finalize(),void 0!==t.l&&(this.l=[...t.l]),this.elementProperties=new Map(t.elementProperties);}static finalize(){if(this.hasOwnProperty(d$1("finalized")))return;if(this.finalized=true,this._$Ei(),this.hasOwnProperty(d$1("properties"))){const t=this.properties,s=[...r$3(t),...o$4(t)];for(const i of s)this.createProperty(i,t[i]);}const t=this[Symbol.metadata];if(null!==t){const s=litPropertyMetadata.get(t);if(void 0!==s)for(const[t,i]of s)this.elementProperties.set(t,i);}this._$Eh=new Map;for(const[t,s]of this.elementProperties){const i=this._$Eu(t,s);void 0!==i&&this._$Eh.set(i,t);}this.elementStyles=this.finalizeStyles(this.styles);}static finalizeStyles(s){const i=[];if(Array.isArray(s)){const e=new Set(s.flat(1/0).reverse());for(const s of e)i.unshift(c$2(s));}else void 0!==s&&i.push(c$2(s));return i}static _$Eu(t,s){const i=s.attribute;return  false===i?void 0:"string"==typeof i?i:"string"==typeof t?t.toLowerCase():void 0}constructor(){super(),this._$Ep=void 0,this.isUpdatePending=false,this.hasUpdated=false,this._$Em=null,this._$Ev();}_$Ev(){this._$ES=new Promise(t=>this.enableUpdating=t),this._$AL=new Map,this._$E_(),this.requestUpdate(),this.constructor.l?.forEach(t=>t(this));}addController(t){(this._$EO??=new Set).add(t),void 0!==this.renderRoot&&this.isConnected&&t.hostConnected?.();}removeController(t){this._$EO?.delete(t);}_$E_(){const t=new Map,s=this.constructor.elementProperties;for(const i of s.keys())this.hasOwnProperty(i)&&(t.set(i,this[i]),delete this[i]);t.size>0&&(this._$Ep=t);}createRenderRoot(){const t=this.shadowRoot??this.attachShadow(this.constructor.shadowRootOptions);return S$1(t,this.constructor.elementStyles),t}connectedCallback(){this.renderRoot??=this.createRenderRoot(),this.enableUpdating(true),this._$EO?.forEach(t=>t.hostConnected?.());}enableUpdating(t){}disconnectedCallback(){this._$EO?.forEach(t=>t.hostDisconnected?.());}attributeChangedCallback(t,s,i){this._$AK(t,i);}_$ET(t,s){const i=this.constructor.elementProperties.get(t),e=this.constructor._$Eu(t,i);if(void 0!==e&&true===i.reflect){const h=(void 0!==i.converter?.toAttribute?i.converter:u$1).toAttribute(s,i.type);this._$Em=t,null==h?this.removeAttribute(e):this.setAttribute(e,h),this._$Em=null;}}_$AK(t,s){const i=this.constructor,e=i._$Eh.get(t);if(void 0!==e&&this._$Em!==e){const t=i.getPropertyOptions(e),h="function"==typeof t.converter?{fromAttribute:t.converter}:void 0!==t.converter?.fromAttribute?t.converter:u$1;this._$Em=e;const r=h.fromAttribute(s,t.type);this[e]=r??this._$Ej?.get(e)??r,this._$Em=null;}}requestUpdate(t,s,i,e=false,h){if(void 0!==t){const r=this.constructor;if(false===e&&(h=this[t]),i??=r.getPropertyOptions(t),!((i.hasChanged??f$1)(h,s)||i.useDefault&&i.reflect&&h===this._$Ej?.get(t)&&!this.hasAttribute(r._$Eu(t,i))))return;this.C(t,s,i);} false===this.isUpdatePending&&(this._$ES=this._$EP());}C(t,s,{useDefault:i,reflect:e,wrapped:h},r){i&&!(this._$Ej??=new Map).has(t)&&(this._$Ej.set(t,r??s??this[t]),true!==h||void 0!==r)||(this._$AL.has(t)||(this.hasUpdated||i||(s=void 0),this._$AL.set(t,s)),true===e&&this._$Em!==t&&(this._$Eq??=new Set).add(t));}async _$EP(){this.isUpdatePending=true;try{await this._$ES;}catch(t){Promise.reject(t);}const t=this.scheduleUpdate();return null!=t&&await t,!this.isUpdatePending}scheduleUpdate(){return this.performUpdate()}performUpdate(){if(!this.isUpdatePending)return;if(!this.hasUpdated){if(this.renderRoot??=this.createRenderRoot(),this._$Ep){for(const[t,s]of this._$Ep)this[t]=s;this._$Ep=void 0;}const t=this.constructor.elementProperties;if(t.size>0)for(const[s,i]of t){const{wrapped:t}=i,e=this[s];true!==t||this._$AL.has(s)||void 0===e||this.C(s,void 0,i,e);}}let t=false;const s=this._$AL;try{t=this.shouldUpdate(s),t?(this.willUpdate(s),this._$EO?.forEach(t=>t.hostUpdate?.()),this.update(s)):this._$EM();}catch(s){throw t=false,this._$EM(),s}t&&this._$AE(s);}willUpdate(t){}_$AE(t){this._$EO?.forEach(t=>t.hostUpdated?.()),this.hasUpdated||(this.hasUpdated=true,this.firstUpdated(t)),this.updated(t);}_$EM(){this._$AL=new Map,this.isUpdatePending=false;}get updateComplete(){return this.getUpdateComplete()}getUpdateComplete(){return this._$ES}shouldUpdate(t){return  true}update(t){this._$Eq&&=this._$Eq.forEach(t=>this._$ET(t,this[t])),this._$EM();}updated(t){}firstUpdated(t){}};y$1.elementStyles=[],y$1.shadowRootOptions={mode:"open"},y$1[d$1("elementProperties")]=new Map,y$1[d$1("finalized")]=new Map,p$1?.({ReactiveElement:y$1}),(a$1.reactiveElementVersions??=[]).push("2.1.2");
-
-/**
- * @license
- * Copyright 2017 Google LLC
- * SPDX-License-Identifier: BSD-3-Clause
- */
-const t$2=globalThis,i$3=t=>t,s$1=t$2.trustedTypes,e$1=s$1?s$1.createPolicy("lit-html",{createHTML:t=>t}):void 0,h="$lit$",o$3=`lit$${Math.random().toFixed(9).slice(2)}$`,n$2="?"+o$3,r$2=`<${n$2}>`,l=document,c=()=>l.createComment(""),a=t=>null===t||"object"!=typeof t&&"function"!=typeof t,u=Array.isArray,d=t=>u(t)||"function"==typeof t?.[Symbol.iterator],f="[ \t\n\f\r]",v=/<(?:(!--|\/[^a-zA-Z])|(\/?[a-zA-Z][^>\s]*)|(\/?$))/g,_=/-->/g,m=/>/g,p=RegExp(`>|${f}(?:([^\\s"'>=/]+)(${f}*=${f}*(?:[^ \t\n\f\r"'\`<>=]|("|')|))|$)`,"g"),g=/'/g,$=/"/g,y=/^(?:script|style|textarea|title)$/i,x=t=>(i,...s)=>({_$litType$:t,strings:i,values:s}),b=x(1),w=x(2),E=Symbol.for("lit-noChange"),A=Symbol.for("lit-nothing"),C=new WeakMap,P=l.createTreeWalker(l,129);function V(t,i){if(!u(t)||!t.hasOwnProperty("raw"))throw Error("invalid template strings array");return void 0!==e$1?e$1.createHTML(i):i}const N=(t,i)=>{const s=t.length-1,e=[];let n,l=2===i?"<svg>":3===i?"<math>":"",c=v;for(let i=0;i<s;i++){const s=t[i];let a,u,d=-1,f=0;for(;f<s.length&&(c.lastIndex=f,u=c.exec(s),null!==u);)f=c.lastIndex,c===v?"!--"===u[1]?c=_:void 0!==u[1]?c=m:void 0!==u[2]?(y.test(u[2])&&(n=RegExp("</"+u[2],"g")),c=p):void 0!==u[3]&&(c=p):c===p?">"===u[0]?(c=n??v,d=-1):void 0===u[1]?d=-2:(d=c.lastIndex-u[2].length,a=u[1],c=void 0===u[3]?p:'"'===u[3]?$:g):c===$||c===g?c=p:c===_||c===m?c=v:(c=p,n=void 0);const x=c===p&&t[i+1].startsWith("/>")?" ":"";l+=c===v?s+r$2:d>=0?(e.push(a),s.slice(0,d)+h+s.slice(d)+o$3+x):s+o$3+(-2===d?i:x);}return [V(t,l+(t[s]||"<?>")+(2===i?"</svg>":3===i?"</math>":"")),e]};class S{constructor({strings:t,_$litType$:i},e){let r;this.parts=[];let l=0,a=0;const u=t.length-1,d=this.parts,[f,v]=N(t,i);if(this.el=S.createElement(f,e),P.currentNode=this.el.content,2===i||3===i){const t=this.el.content.firstChild;t.replaceWith(...t.childNodes);}for(;null!==(r=P.nextNode())&&d.length<u;){if(1===r.nodeType){if(r.hasAttributes())for(const t of r.getAttributeNames())if(t.endsWith(h)){const i=v[a++],s=r.getAttribute(t).split(o$3),e=/([.?@])?(.*)/.exec(i);d.push({type:1,index:l,name:e[2],strings:s,ctor:"."===e[1]?I:"?"===e[1]?L:"@"===e[1]?z:H}),r.removeAttribute(t);}else t.startsWith(o$3)&&(d.push({type:6,index:l}),r.removeAttribute(t));if(y.test(r.tagName)){const t=r.textContent.split(o$3),i=t.length-1;if(i>0){r.textContent=s$1?s$1.emptyScript:"";for(let s=0;s<i;s++)r.append(t[s],c()),P.nextNode(),d.push({type:2,index:++l});r.append(t[i],c());}}}else if(8===r.nodeType)if(r.data===n$2)d.push({type:2,index:l});else {let t=-1;for(;-1!==(t=r.data.indexOf(o$3,t+1));)d.push({type:7,index:l}),t+=o$3.length-1;}l++;}}static createElement(t,i){const s=l.createElement("template");return s.innerHTML=t,s}}function M(t,i,s=t,e){if(i===E)return i;let h=void 0!==e?s._$Co?.[e]:s._$Cl;const o=a(i)?void 0:i._$litDirective$;return h?.constructor!==o&&(h?._$AO?.(false),void 0===o?h=void 0:(h=new o(t),h._$AT(t,s,e)),void 0!==e?(s._$Co??=[])[e]=h:s._$Cl=h),void 0!==h&&(i=M(t,h._$AS(t,i.values),h,e)),i}class R{constructor(t,i){this._$AV=[],this._$AN=void 0,this._$AD=t,this._$AM=i;}get parentNode(){return this._$AM.parentNode}get _$AU(){return this._$AM._$AU}u(t){const{el:{content:i},parts:s}=this._$AD,e=(t?.creationScope??l).importNode(i,true);P.currentNode=e;let h=P.nextNode(),o=0,n=0,r=s[0];for(;void 0!==r;){if(o===r.index){let i;2===r.type?i=new k(h,h.nextSibling,this,t):1===r.type?i=new r.ctor(h,r.name,r.strings,this,t):6===r.type&&(i=new Z(h,this,t)),this._$AV.push(i),r=s[++n];}o!==r?.index&&(h=P.nextNode(),o++);}return P.currentNode=l,e}p(t){let i=0;for(const s of this._$AV) void 0!==s&&(void 0!==s.strings?(s._$AI(t,s,i),i+=s.strings.length-2):s._$AI(t[i])),i++;}}class k{get _$AU(){return this._$AM?._$AU??this._$Cv}constructor(t,i,s,e){this.type=2,this._$AH=A,this._$AN=void 0,this._$AA=t,this._$AB=i,this._$AM=s,this.options=e,this._$Cv=e?.isConnected??true;}get parentNode(){let t=this._$AA.parentNode;const i=this._$AM;return void 0!==i&&11===t?.nodeType&&(t=i.parentNode),t}get startNode(){return this._$AA}get endNode(){return this._$AB}_$AI(t,i=this){t=M(this,t,i),a(t)?t===A||null==t||""===t?(this._$AH!==A&&this._$AR(),this._$AH=A):t!==this._$AH&&t!==E&&this._(t):void 0!==t._$litType$?this.$(t):void 0!==t.nodeType?this.T(t):d(t)?this.k(t):this._(t);}O(t){return this._$AA.parentNode.insertBefore(t,this._$AB)}T(t){this._$AH!==t&&(this._$AR(),this._$AH=this.O(t));}_(t){this._$AH!==A&&a(this._$AH)?this._$AA.nextSibling.data=t:this.T(l.createTextNode(t)),this._$AH=t;}$(t){const{values:i,_$litType$:s}=t,e="number"==typeof s?this._$AC(t):(void 0===s.el&&(s.el=S.createElement(V(s.h,s.h[0]),this.options)),s);if(this._$AH?._$AD===e)this._$AH.p(i);else {const t=new R(e,this),s=t.u(this.options);t.p(i),this.T(s),this._$AH=t;}}_$AC(t){let i=C.get(t.strings);return void 0===i&&C.set(t.strings,i=new S(t)),i}k(t){u(this._$AH)||(this._$AH=[],this._$AR());const i=this._$AH;let s,e=0;for(const h of t)e===i.length?i.push(s=new k(this.O(c()),this.O(c()),this,this.options)):s=i[e],s._$AI(h),e++;e<i.length&&(this._$AR(s&&s._$AB.nextSibling,e),i.length=e);}_$AR(t=this._$AA.nextSibling,s){for(this._$AP?.(false,true,s);t!==this._$AB;){const s=i$3(t).nextSibling;i$3(t).remove(),t=s;}}setConnected(t){ void 0===this._$AM&&(this._$Cv=t,this._$AP?.(t));}}class H{get tagName(){return this.element.tagName}get _$AU(){return this._$AM._$AU}constructor(t,i,s,e,h){this.type=1,this._$AH=A,this._$AN=void 0,this.element=t,this.name=i,this._$AM=e,this.options=h,s.length>2||""!==s[0]||""!==s[1]?(this._$AH=Array(s.length-1).fill(new String),this.strings=s):this._$AH=A;}_$AI(t,i=this,s,e){const h=this.strings;let o=false;if(void 0===h)t=M(this,t,i,0),o=!a(t)||t!==this._$AH&&t!==E,o&&(this._$AH=t);else {const e=t;let n,r;for(t=h[0],n=0;n<h.length-1;n++)r=M(this,e[s+n],i,n),r===E&&(r=this._$AH[n]),o||=!a(r)||r!==this._$AH[n],r===A?t=A:t!==A&&(t+=(r??"")+h[n+1]),this._$AH[n]=r;}o&&!e&&this.j(t);}j(t){t===A?this.element.removeAttribute(this.name):this.element.setAttribute(this.name,t??"");}}class I extends H{constructor(){super(...arguments),this.type=3;}j(t){this.element[this.name]=t===A?void 0:t;}}class L extends H{constructor(){super(...arguments),this.type=4;}j(t){this.element.toggleAttribute(this.name,!!t&&t!==A);}}class z extends H{constructor(t,i,s,e,h){super(t,i,s,e,h),this.type=5;}_$AI(t,i=this){if((t=M(this,t,i,0)??A)===E)return;const s=this._$AH,e=t===A&&s!==A||t.capture!==s.capture||t.once!==s.once||t.passive!==s.passive,h=t!==A&&(s===A||e);e&&this.element.removeEventListener(this.name,this,s),h&&this.element.addEventListener(this.name,this,t),this._$AH=t;}handleEvent(t){"function"==typeof this._$AH?this._$AH.call(this.options?.host??this.element,t):this._$AH.handleEvent(t);}}class Z{constructor(t,i,s){this.element=t,this.type=6,this._$AN=void 0,this._$AM=i,this.options=s;}get _$AU(){return this._$AM._$AU}_$AI(t){M(this,t);}}const B=t$2.litHtmlPolyfillSupport;B?.(S,k),(t$2.litHtmlVersions??=[]).push("3.3.3");const D=(t,i,s)=>{const e=s?.renderBefore??i;let h=e._$litPart$;if(void 0===h){const t=s?.renderBefore??null;e._$litPart$=h=new k(i.insertBefore(c(),t),t,void 0,s??{});}return h._$AI(t),h};
-
-/**
- * @license
- * Copyright 2017 Google LLC
- * SPDX-License-Identifier: BSD-3-Clause
- */const s=globalThis;let i$2 = class i extends y$1{constructor(){super(...arguments),this.renderOptions={host:this},this._$Do=void 0;}createRenderRoot(){const t=super.createRenderRoot();return this.renderOptions.renderBefore??=t.firstChild,t}update(t){const r=this.render();this.hasUpdated||(this.renderOptions.isConnected=this.isConnected),super.update(t),this._$Do=D(r,this.renderRoot,this.renderOptions);}connectedCallback(){super.connectedCallback(),this._$Do?.setConnected(true);}disconnectedCallback(){super.disconnectedCallback(),this._$Do?.setConnected(false);}render(){return E}};i$2._$litElement$=true,i$2["finalized"]=true,s.litElementHydrateSupport?.({LitElement:i$2});const o$2=s.litElementPolyfillSupport;o$2?.({LitElement:i$2});(s.litElementVersions??=[]).push("4.2.2");
-
+ */Symbol.metadata??=Symbol("metadata"),u.litPropertyMetadata??=new WeakMap;let w=class extends HTMLElement{static addInitializer(t){this._$Ei(),(this.l??=[]).push(t)}static get observedAttributes(){return this.finalize(),this._$Eh&&[...this._$Eh.keys()]}static createProperty(t,e=x){if(e.state&&(e.attribute=!1),this._$Ei(),this.prototype.hasOwnProperty(t)&&((e=Object.create(e)).wrapped=!0),this.elementProperties.set(t,e),!e.noAccessor){const o=Symbol(),i=this.getPropertyDescriptor(t,o,e);void 0!==i&&c(this.prototype,t,i)}}static getPropertyDescriptor(t,e,o){const{get:i,set:s}=d(this.prototype,t)??{get(){return this[e]},set(t){this[e]=t}};return{get:i,set(e){const n=i?.call(this);s?.call(this,e),this.requestUpdate(t,n,o)},configurable:!0,enumerable:!0}}static getPropertyOptions(t){return this.elementProperties.get(t)??x}static _$Ei(){if(this.hasOwnProperty(b("elementProperties")))return;const t=m(this);t.finalize(),void 0!==t.l&&(this.l=[...t.l]),this.elementProperties=new Map(t.elementProperties)}static finalize(){if(this.hasOwnProperty(b("finalized")))return;if(this.finalized=!0,this._$Ei(),this.hasOwnProperty(b("properties"))){const t=this.properties,e=[...h(t),...p(t)];for(const o of e)this.createProperty(o,t[o])}const t=this[Symbol.metadata];if(null!==t){const e=litPropertyMetadata.get(t);if(void 0!==e)for(const[t,o]of e)this.elementProperties.set(t,o)}this._$Eh=new Map;for(const[t,e]of this.elementProperties){const o=this._$Eu(t,e);void 0!==o&&this._$Eh.set(o,t)}this.elementStyles=this.finalizeStyles(this.styles)}static finalizeStyles(t){const e=[];if(Array.isArray(t)){const o=new Set(t.flat(1/0).reverse());for(const t of o)e.unshift(r(t))}else void 0!==t&&e.push(r(t));return e}static _$Eu(t,e){const o=e.attribute;return!1===o?void 0:"string"==typeof o?o:"string"==typeof t?t.toLowerCase():void 0}constructor(){super(),this._$Ep=void 0,this.isUpdatePending=!1,this.hasUpdated=!1,this._$Em=null,this._$Ev()}_$Ev(){this._$ES=new Promise(t=>this.enableUpdating=t),this._$AL=new Map,this._$E_(),this.requestUpdate(),this.constructor.l?.forEach(t=>t(this))}addController(t){(this._$EO??=new Set).add(t),void 0!==this.renderRoot&&this.isConnected&&t.hostConnected?.()}removeController(t){this._$EO?.delete(t)}_$E_(){const t=new Map,e=this.constructor.elementProperties;for(const o of e.keys())this.hasOwnProperty(o)&&(t.set(o,this[o]),delete this[o]);t.size>0&&(this._$Ep=t)}createRenderRoot(){const t=this.shadowRoot??this.attachShadow(this.constructor.shadowRootOptions);return((t,i)=>{if(o)t.adoptedStyleSheets=i.map(t=>t instanceof CSSStyleSheet?t:t.styleSheet);else for(const o of i){const i=document.createElement("style"),s=e.litNonce;void 0!==s&&i.setAttribute("nonce",s),i.textContent=o.cssText,t.appendChild(i)}})(t,this.constructor.elementStyles),t}connectedCallback(){this.renderRoot??=this.createRenderRoot(),this.enableUpdating(!0),this._$EO?.forEach(t=>t.hostConnected?.())}enableUpdating(t){}disconnectedCallback(){this._$EO?.forEach(t=>t.hostDisconnected?.())}attributeChangedCallback(t,e,o){this._$AK(t,o)}_$ET(t,e){const o=this.constructor.elementProperties.get(t),i=this.constructor._$Eu(t,o);if(void 0!==i&&!0===o.reflect){const s=(void 0!==o.converter?.toAttribute?o.converter:y).toAttribute(e,o.type);this._$Em=t,null==s?this.removeAttribute(i):this.setAttribute(i,s),this._$Em=null}}_$AK(t,e){const o=this.constructor,i=o._$Eh.get(t);if(void 0!==i&&this._$Em!==i){const t=o.getPropertyOptions(i),s="function"==typeof t.converter?{fromAttribute:t.converter}:void 0!==t.converter?.fromAttribute?t.converter:y;this._$Em=i;const n=s.fromAttribute(e,t.type);this[i]=n??this._$Ej?.get(i)??n,this._$Em=null}}requestUpdate(t,e,o,i=!1,s){if(void 0!==t){const n=this.constructor;if(!1===i&&(s=this[t]),o??=n.getPropertyOptions(t),!((o.hasChanged??v)(s,e)||o.useDefault&&o.reflect&&s===this._$Ej?.get(t)&&!this.hasAttribute(n._$Eu(t,o))))return;this.C(t,e,o)}!1===this.isUpdatePending&&(this._$ES=this._$EP())}C(t,e,{useDefault:o,reflect:i,wrapped:s},n){o&&!(this._$Ej??=new Map).has(t)&&(this._$Ej.set(t,n??e??this[t]),!0!==s||void 0!==n)||(this._$AL.has(t)||(this.hasUpdated||o||(e=void 0),this._$AL.set(t,e)),!0===i&&this._$Em!==t&&(this._$Eq??=new Set).add(t))}async _$EP(){this.isUpdatePending=!0;try{await this._$ES}catch(t){Promise.reject(t)}const t=this.scheduleUpdate();return null!=t&&await t,!this.isUpdatePending}scheduleUpdate(){return this.performUpdate()}performUpdate(){if(!this.isUpdatePending)return;if(!this.hasUpdated){if(this.renderRoot??=this.createRenderRoot(),this._$Ep){for(const[t,e]of this._$Ep)this[t]=e;this._$Ep=void 0}const t=this.constructor.elementProperties;if(t.size>0)for(const[e,o]of t){const{wrapped:t}=o,i=this[e];!0!==t||this._$AL.has(e)||void 0===i||this.C(e,void 0,o,i)}}let t=!1;const e=this._$AL;try{t=this.shouldUpdate(e),t?(this.willUpdate(e),this._$EO?.forEach(t=>t.hostUpdate?.()),this.update(e)):this._$EM()}catch(e){throw t=!1,this._$EM(),e}t&&this._$AE(e)}willUpdate(t){}_$AE(t){this._$EO?.forEach(t=>t.hostUpdated?.()),this.hasUpdated||(this.hasUpdated=!0,this.firstUpdated(t)),this.updated(t)}_$EM(){this._$AL=new Map,this.isUpdatePending=!1}get updateComplete(){return this.getUpdateComplete()}getUpdateComplete(){return this._$ES}shouldUpdate(t){return!0}update(t){this._$Eq&&=this._$Eq.forEach(t=>this._$ET(t,this[t])),this._$EM()}updated(t){}firstUpdated(t){}};w.elementStyles=[],w.shadowRootOptions={mode:"open"},w[b("elementProperties")]=new Map,w[b("finalized")]=new Map,f?.({ReactiveElement:w}),(u.reactiveElementVersions??=[]).push("2.1.2");
 /**
  * @license
  * Copyright 2017 Google LLC
  * SPDX-License-Identifier: BSD-3-Clause
  */
-const t$1=t=>(e,o)=>{ void 0!==o?o.addInitializer(()=>{customElements.define(t,e);}):customElements.define(t,e);};
-
+const $=globalThis,k=t=>t,S=$.trustedTypes,R=S?S.createPolicy("lit-html",{createHTML:t=>t}):void 0,M="$lit$",A=`lit$${Math.random().toFixed(9).slice(2)}$`,z="?"+A,P=`<${z}>`,C=document,E=()=>C.createComment(""),T=t=>null===t||"object"!=typeof t&&"function"!=typeof t,F=Array.isArray,D="[ \t\n\f\r]",O=/<(?:(!--|\/[^a-zA-Z])|(\/?[a-zA-Z][^>\s]*)|(\/?$))/g,I=/-->/g,V=/>/g,N=RegExp(`>|${D}(?:([^\\s"'>=/]+)(${D}*=${D}*(?:[^ \t\n\f\r"'\`<>=]|("|')|))|$)`,"g"),H=/'/g,B=/"/g,j=/^(?:script|style|textarea|title)$/i,W=t=>(e,...o)=>({_$litType$:t,strings:e,values:o}),q=W(1),L=W(2),U=Symbol.for("lit-noChange"),G=Symbol.for("lit-nothing"),Z=new WeakMap,K=C.createTreeWalker(C,129);function Y(t,e){if(!F(t)||!t.hasOwnProperty("raw"))throw Error("invalid template strings array");return void 0!==R?R.createHTML(e):e}const X=(t,e)=>{const o=t.length-1,i=[];let s,n=2===e?"<svg>":3===e?"<math>":"",a=O;for(let e=0;e<o;e++){const o=t[e];let r,l,c=-1,d=0;for(;d<o.length&&(a.lastIndex=d,l=a.exec(o),null!==l);)d=a.lastIndex,a===O?"!--"===l[1]?a=I:void 0!==l[1]?a=V:void 0!==l[2]?(j.test(l[2])&&(s=RegExp("</"+l[2],"g")),a=N):void 0!==l[3]&&(a=N):a===N?">"===l[0]?(a=s??O,c=-1):void 0===l[1]?c=-2:(c=a.lastIndex-l[2].length,r=l[1],a=void 0===l[3]?N:'"'===l[3]?B:H):a===B||a===H?a=N:a===I||a===V?a=O:(a=N,s=void 0);const h=a===N&&t[e+1].startsWith("/>")?" ":"";n+=a===O?o+P:c>=0?(i.push(r),o.slice(0,c)+M+o.slice(c)+A+h):o+A+(-2===c?e:h)}return[Y(t,n+(t[o]||"<?>")+(2===e?"</svg>":3===e?"</math>":"")),i]};class J{constructor({strings:t,_$litType$:e},o){let i;this.parts=[];let s=0,n=0;const a=t.length-1,r=this.parts,[l,c]=X(t,e);if(this.el=J.createElement(l,o),K.currentNode=this.el.content,2===e||3===e){const t=this.el.content.firstChild;t.replaceWith(...t.childNodes)}for(;null!==(i=K.nextNode())&&r.length<a;){if(1===i.nodeType){if(i.hasAttributes())for(const t of i.getAttributeNames())if(t.endsWith(M)){const e=c[n++],o=i.getAttribute(t).split(A),a=/([.?@])?(.*)/.exec(e);r.push({type:1,index:s,name:a[2],strings:o,ctor:"."===a[1]?it:"?"===a[1]?st:"@"===a[1]?nt:ot}),i.removeAttribute(t)}else t.startsWith(A)&&(r.push({type:6,index:s}),i.removeAttribute(t));if(j.test(i.tagName)){const t=i.textContent.split(A),e=t.length-1;if(e>0){i.textContent=S?S.emptyScript:"";for(let o=0;o<e;o++)i.append(t[o],E()),K.nextNode(),r.push({type:2,index:++s});i.append(t[e],E())}}}else if(8===i.nodeType)if(i.data===z)r.push({type:2,index:s});else{let t=-1;for(;-1!==(t=i.data.indexOf(A,t+1));)r.push({type:7,index:s}),t+=A.length-1}s++}}static createElement(t,e){const o=C.createElement("template");return o.innerHTML=t,o}}function Q(t,e,o=t,i){if(e===U)return e;let s=void 0!==i?o._$Co?.[i]:o._$Cl;const n=T(e)?void 0:e._$litDirective$;return s?.constructor!==n&&(s?._$AO?.(!1),void 0===n?s=void 0:(s=new n(t),s._$AT(t,o,i)),void 0!==i?(o._$Co??=[])[i]=s:o._$Cl=s),void 0!==s&&(e=Q(t,s._$AS(t,e.values),s,i)),e}class tt{constructor(t,e){this._$AV=[],this._$AN=void 0,this._$AD=t,this._$AM=e}get parentNode(){return this._$AM.parentNode}get _$AU(){return this._$AM._$AU}u(t){const{el:{content:e},parts:o}=this._$AD,i=(t?.creationScope??C).importNode(e,!0);K.currentNode=i;let s=K.nextNode(),n=0,a=0,r=o[0];for(;void 0!==r;){if(n===r.index){let e;2===r.type?e=new et(s,s.nextSibling,this,t):1===r.type?e=new r.ctor(s,r.name,r.strings,this,t):6===r.type&&(e=new at(s,this,t)),this._$AV.push(e),r=o[++a]}n!==r?.index&&(s=K.nextNode(),n++)}return K.currentNode=C,i}p(t){let e=0;for(const o of this._$AV)void 0!==o&&(void 0!==o.strings?(o._$AI(t,o,e),e+=o.strings.length-2):o._$AI(t[e])),e++}}class et{get _$AU(){return this._$AM?._$AU??this._$Cv}constructor(t,e,o,i){this.type=2,this._$AH=G,this._$AN=void 0,this._$AA=t,this._$AB=e,this._$AM=o,this.options=i,this._$Cv=i?.isConnected??!0}get parentNode(){let t=this._$AA.parentNode;const e=this._$AM;return void 0!==e&&11===t?.nodeType&&(t=e.parentNode),t}get startNode(){return this._$AA}get endNode(){return this._$AB}_$AI(t,e=this){t=Q(this,t,e),T(t)?t===G||null==t||""===t?(this._$AH!==G&&this._$AR(),this._$AH=G):t!==this._$AH&&t!==U&&this._(t):void 0!==t._$litType$?this.$(t):void 0!==t.nodeType?this.T(t):(t=>F(t)||"function"==typeof t?.[Symbol.iterator])(t)?this.k(t):this._(t)}O(t){return this._$AA.parentNode.insertBefore(t,this._$AB)}T(t){this._$AH!==t&&(this._$AR(),this._$AH=this.O(t))}_(t){this._$AH!==G&&T(this._$AH)?this._$AA.nextSibling.data=t:this.T(C.createTextNode(t)),this._$AH=t}$(t){const{values:e,_$litType$:o}=t,i="number"==typeof o?this._$AC(t):(void 0===o.el&&(o.el=J.createElement(Y(o.h,o.h[0]),this.options)),o);if(this._$AH?._$AD===i)this._$AH.p(e);else{const t=new tt(i,this),o=t.u(this.options);t.p(e),this.T(o),this._$AH=t}}_$AC(t){let e=Z.get(t.strings);return void 0===e&&Z.set(t.strings,e=new J(t)),e}k(t){F(this._$AH)||(this._$AH=[],this._$AR());const e=this._$AH;let o,i=0;for(const s of t)i===e.length?e.push(o=new et(this.O(E()),this.O(E()),this,this.options)):o=e[i],o._$AI(s),i++;i<e.length&&(this._$AR(o&&o._$AB.nextSibling,i),e.length=i)}_$AR(t=this._$AA.nextSibling,e){for(this._$AP?.(!1,!0,e);t!==this._$AB;){const e=k(t).nextSibling;k(t).remove(),t=e}}setConnected(t){void 0===this._$AM&&(this._$Cv=t,this._$AP?.(t))}}class ot{get tagName(){return this.element.tagName}get _$AU(){return this._$AM._$AU}constructor(t,e,o,i,s){this.type=1,this._$AH=G,this._$AN=void 0,this.element=t,this.name=e,this._$AM=i,this.options=s,o.length>2||""!==o[0]||""!==o[1]?(this._$AH=Array(o.length-1).fill(new String),this.strings=o):this._$AH=G}_$AI(t,e=this,o,i){const s=this.strings;let n=!1;if(void 0===s)t=Q(this,t,e,0),n=!T(t)||t!==this._$AH&&t!==U,n&&(this._$AH=t);else{const i=t;let a,r;for(t=s[0],a=0;a<s.length-1;a++)r=Q(this,i[o+a],e,a),r===U&&(r=this._$AH[a]),n||=!T(r)||r!==this._$AH[a],r===G?t=G:t!==G&&(t+=(r??"")+s[a+1]),this._$AH[a]=r}n&&!i&&this.j(t)}j(t){t===G?this.element.removeAttribute(this.name):this.element.setAttribute(this.name,t??"")}}class it extends ot{constructor(){super(...arguments),this.type=3}j(t){this.element[this.name]=t===G?void 0:t}}class st extends ot{constructor(){super(...arguments),this.type=4}j(t){this.element.toggleAttribute(this.name,!!t&&t!==G)}}class nt extends ot{constructor(t,e,o,i,s){super(t,e,o,i,s),this.type=5}_$AI(t,e=this){if((t=Q(this,t,e,0)??G)===U)return;const o=this._$AH,i=t===G&&o!==G||t.capture!==o.capture||t.once!==o.once||t.passive!==o.passive,s=t!==G&&(o===G||i);i&&this.element.removeEventListener(this.name,this,o),s&&this.element.addEventListener(this.name,this,t),this._$AH=t}handleEvent(t){"function"==typeof this._$AH?this._$AH.call(this.options?.host??this.element,t):this._$AH.handleEvent(t)}}class at{constructor(t,e,o){this.element=t,this.type=6,this._$AN=void 0,this._$AM=e,this.options=o}get _$AU(){return this._$AM._$AU}_$AI(t){Q(this,t)}}const rt=$.litHtmlPolyfillSupport;rt?.(J,et),($.litHtmlVersions??=[]).push("3.3.3");const lt=globalThis;
 /**
  * @license
  * Copyright 2017 Google LLC
  * SPDX-License-Identifier: BSD-3-Clause
- */const o$1={attribute:true,type:String,converter:u$1,reflect:false,hasChanged:f$1},r$1=(t=o$1,e,r)=>{const{kind:n,metadata:i}=r;let s=globalThis.litPropertyMetadata.get(i);if(void 0===s&&globalThis.litPropertyMetadata.set(i,s=new Map),"setter"===n&&((t=Object.create(t)).wrapped=true),s.set(r.name,t),"accessor"===n){const{name:o}=r;return {set(r){const n=e.get.call(this);e.set.call(this,r),this.requestUpdate(o,n,t,true,r);},init(e){return void 0!==e&&this.C(o,void 0,t,e),e}}}if("setter"===n){const{name:o}=r;return function(r){const n=this[o];e.call(this,r),this.requestUpdate(o,n,t,true,r);}}throw Error("Unsupported decorator location: "+n)};function n$1(t){return (e,o)=>"object"==typeof o?r$1(t,e,o):((t,e,o)=>{const r=e.hasOwnProperty(o);return e.constructor.createProperty(o,t),r?Object.getOwnPropertyDescriptor(e,o):void 0})(t,e,o)}
-
-/**
- * @license
- * Copyright 2017 Google LLC
- * SPDX-License-Identifier: BSD-3-Clause
- */function r(r){return n$1({...r,state:true,attribute:false})}
-
+ */let ct=class extends w{constructor(){super(...arguments),this.renderOptions={host:this},this._$Do=void 0}createRenderRoot(){const t=super.createRenderRoot();return this.renderOptions.renderBefore??=t.firstChild,t}update(t){const e=this.render();this.hasUpdated||(this.renderOptions.isConnected=this.isConnected),super.update(t),this._$Do=((t,e,o)=>{const i=o?.renderBefore??e;let s=i._$litPart$;if(void 0===s){const t=o?.renderBefore??null;i._$litPart$=s=new et(e.insertBefore(E(),t),t,void 0,o??{})}return s._$AI(t),s})(e,this.renderRoot,this.renderOptions)}connectedCallback(){super.connectedCallback(),this._$Do?.setConnected(!0)}disconnectedCallback(){super.disconnectedCallback(),this._$Do?.setConnected(!1)}render(){return U}};ct._$litElement$=!0,ct.finalized=!0,lt.litElementHydrateSupport?.({LitElement:ct});const dt=lt.litElementPolyfillSupport;dt?.({LitElement:ct}),(lt.litElementVersions??=[]).push("4.2.2");
 /**
  * @license
  * Copyright 2017 Google LLC
  * SPDX-License-Identifier: BSD-3-Clause
  */
-const t={ATTRIBUTE:1},e=t=>(...e)=>({_$litDirective$:t,values:e});let i$1 = class i{constructor(t){}get _$AU(){return this._$AM._$AU}_$AT(t,e,i){this._$Ct=t,this._$AM=e,this._$Ci=i;}_$AS(t,e){return this.update(t,e)}update(t,e){return this.render(...e)}};
-
+const ht=t=>(e,o)=>{void 0!==o?o.addInitializer(()=>{customElements.define(t,e)}):customElements.define(t,e)},pt={attribute:!0,type:String,converter:y,reflect:!1,hasChanged:v},mt=(t=pt,e,o)=>{const{kind:i,metadata:s}=o;let n=globalThis.litPropertyMetadata.get(s);if(void 0===n&&globalThis.litPropertyMetadata.set(s,n=new Map),"setter"===i&&((t=Object.create(t)).wrapped=!0),n.set(o.name,t),"accessor"===i){const{name:i}=o;return{set(o){const s=e.get.call(this);e.set.call(this,o),this.requestUpdate(i,s,t,!0,o)},init(e){return void 0!==e&&this.C(i,void 0,t,e),e}}}if("setter"===i){const{name:i}=o;return function(o){const s=this[i];e.call(this,o),this.requestUpdate(i,s,t,!0,o)}}throw Error("Unsupported decorator location: "+i)};
+/**
+ * @license
+ * Copyright 2017 Google LLC
+ * SPDX-License-Identifier: BSD-3-Clause
+ */function ut(t){return(e,o)=>"object"==typeof o?mt(t,e,o):((t,e,o)=>{const i=e.hasOwnProperty(o);return e.constructor.createProperty(o,t),i?Object.getOwnPropertyDescriptor(e,o):void 0})(t,e,o)}
+/**
+ * @license
+ * Copyright 2017 Google LLC
+ * SPDX-License-Identifier: BSD-3-Clause
+ */function _t(t){return ut({...t,state:!0,attribute:!1})}
+/**
+ * @license
+ * Copyright 2017 Google LLC
+ * SPDX-License-Identifier: BSD-3-Clause
+ */const gt=1;let ft=class{constructor(t){}get _$AU(){return this._$AM._$AU}_$AT(t,e,o){this._$Ct=t,this._$AM=e,this._$Ci=o}_$AS(t,e){return this.update(t,e)}update(t,e){return this.render(...e)}};
 /**
  * @license
  * Copyright 2018 Google LLC
  * SPDX-License-Identifier: BSD-3-Clause
- */const n="important",i=" !"+n,o=e(class extends i$1{constructor(t$1){if(super(t$1),t$1.type!==t.ATTRIBUTE||"style"!==t$1.name||t$1.strings?.length>2)throw Error("The `styleMap` directive must be used in the `style` attribute and must be the only part in the attribute.")}render(t){return Object.keys(t).reduce((e,r)=>{const s=t[r];return null==s?e:e+`${r=r.includes("-")?r:r.replace(/(?:^(webkit|moz|ms|o)|)(?=[A-Z])/g,"-$&").toLowerCase()}:${s};`},"")}update(e,[r]){const{style:s}=e.element;if(void 0===this.ft)return this.ft=new Set(Object.keys(r)),this.render(r);for(const t of this.ft)null==r[t]&&(this.ft.delete(t),t.includes("-")?s.removeProperty(t):s[t]=null);for(const t in r){const e=r[t];if(null!=e){this.ft.add(t);const r="string"==typeof e&&e.endsWith(i);t.includes("-")||r?s.setProperty(t,r?e.slice(0,-11):e,r?n:""):s[t]=e;}}return E}});
-
-const CARD_NAME = "anyvac-card";
-const EDITOR_NAME = "anyvac-card-editor";
-const CARD_VERSION = "1.0.10";
-/** Hold duration in ms required to trigger START / PAUSE actions */
-const HOLD_DURATION_MS = 600;
-/** docs/25 §10 field report (2026-07-25): Android's swipe-up-from-bottom-edge
- *  gesture (app switcher / gesture nav) starts its touch on whatever's under
- *  the finger — often the START bar in portrait, since it sits flush against
- *  the screen's bottom edge. Touch pointers get implicit capture to their
- *  initial target, so `pointerleave`/`pointercancel` never fire as the finger
- *  slides upward mid-swipe; only `pointermove` does. This is the movement
- *  threshold (px) beyond which a hold-in-progress is treated as a drag/swipe
- *  and cancelled instead of left to fire after HOLD_DURATION_MS. */
-const HOLD_MOVE_CANCEL_PX = 12;
-/**
- * Maps Roborock status strings to [human-readable label, accent colour].
- * This unified map covers S6 / S7 / S8 MaxV Ultra.
- */
-const STATUS_MAP = {
-    // ── Dry cleaning ──────────────────────────────────────────────────────
-    cleaning: ["🧹 Cleaning", "#52c41a"],
-    segment_cleaning: ["🧹 Cleaning rooms", "#52c41a"],
-    zoned_cleaning: ["🧹 Zone cleaning", "#52c41a"],
-    spot_cleaning: ["🎯 Spot cleaning", "#52c41a"],
-    starting: ["▶️ Starting", "#52c41a"],
-    // ── Wet / mop ────────────────────────────────────────────────────────
-    segment_mopping: ["🫧 Mopping rooms", "#40a9ff"],
-    zoned_mopping: ["🫧 Zone mopping", "#40a9ff"],
-    robot_status_mopping: ["🫧 Mopping", "#40a9ff"],
-    // ── Combined dry + wet ───────────────────────────────────────────────
-    clean_mop_cleaning: ["🧹🫧 Vacuuming+mopping", "#52c41a"],
-    clean_mop_mopping: ["🧹🫧 Vacuuming+mopping", "#52c41a"],
-    segment_clean_mop_cleaning: ["🧹🫧 Rooms (vac)", "#52c41a"],
-    segment_clean_mop_mopping: ["🧹🫧 Rooms (mop)", "#52c41a"],
-    zoned_clean_mop_cleaning: ["🧹🫧 Zones (vac)", "#52c41a"],
-    zoned_clean_mop_mopping: ["🧹🫧 Zones (mop)", "#52c41a"],
-    // ── Mop washing ──────────────────────────────────────────────────────
-    washing_the_mop: ["🚿 Washing mop", "#9254de"],
-    washing_the_mop_2: ["🚿 Washing mop", "#9254de"],
-    going_to_wash_the_mop: ["🚿 Going to wash mop", "#9254de"],
-    air_drying_stopping: ["💨 Drying mop", "#9254de"],
-    back_to_dock_washing_duster: ["🏠 Dock + washing", "#faad14"],
-    // ── Navigation ───────────────────────────────────────────────────────
-    returning_home: ["🏠 Returning home", "#faad14"],
-    docking: ["🏠 Docking", "#faad14"],
-    going_to_target: ["🎯 Going to target", "#40a9ff"],
-    // ── Docked / idle ────────────────────────────────────────────────────
-    charging: ["⚡ Charging", "rgba(255,255,255,0.75)"],
-    charging_complete: ["✅ Fully charged", "#52c41a"],
-    docked: ["✅ Docked", "rgba(255,255,255,0.75)"],
-    charger_disconnected: ["🔌 Charger disconnected", "#faad14"],
-    emptying_the_bin: ["🗑️ Emptying bin", "#faad14"],
-    idle: ["💤 Idle", "rgba(255,255,255,0.45)"],
-    paused: ["⏸️ Paused", "#faad14"],
-    // ── Special ──────────────────────────────────────────────────────────
-    mapping: ["🗺️ Mapping", "#40a9ff"],
-    remote_control_active: ["🕹️ Remote control", "#40a9ff"],
-    manual_mode: ["🕹️ Manual mode", "#40a9ff"],
-    updating: ["⬆️ Updating", "#faad14"],
-    in_call: ["📞 In call", "#faad14"],
-    shutting_down: ["⏹️ Shutting down", "rgba(255,255,255,0.4)"],
-    // ── Error states ─────────────────────────────────────────────────────
-    error: ["❌ Error", "#ff4d4f"],
-    charging_problem: ["⚠️ Charging problem", "#ff4d4f"],
-    locked: ["🔒 Locked", "#ff4d4f"],
-    device_offline: ["📴 Offline", "#ff4d4f"],
-};
-/** Colour hex values for VacuumColor variants */
-const COLOR_HEX = {
-    green: "#52c41a",
-    blue: "#2196F3",
-    orange: "#faad14",
-};
-/**
- * Default accent-colour palette assigned by a vacuum's position in the
- * `vacuums` array when it has no explicit `color` set — so a fresh
- * multi-vacuum config gets visually distinct vehicles out of the box instead
- * of every vacuum silently falling back to the same "green" (field report
- * 2026-07-31). The first three entries intentionally match the legacy
- * green/blue/orange presets, so a single-vacuum config with no `color` set
- * still looks exactly as it always has. `color` on a vacuum always overrides
- * this — it's purely a starting point, same spirit as `_hexColorField`'s
- * placeholder swatches.
- */
-const DEFAULT_VACUUM_PALETTE = [
-    "#52c41a", // green
-    "#2196F3", // blue
-    "#faad14", // orange
-    "#eb2f96", // magenta
-    "#722ed1", // purple
-    "#13c2c2", // cyan
-    "#fa541c", // volcano
-    "#a0d911", // lime
-];
-/** rgba versions with reduced opacity for backgrounds */
-const COLOR_BG = {
-    green: "rgba(46,204,113,0.18)",
-    blue: "rgba(33,150,243,0.18)",
-    orange: "rgba(250,173,20,0.18)",
-};
-const COLOR_BG_ACTIVE = {
-    green: "rgba(46,204,113,0.30)",
-    blue: "rgba(33,150,243,0.30)",
-    orange: "rgba(250,173,20,0.30)",
-};
-/**
- * Converts a "#rgb" or "#rrggbb" hex string to an rgba(...) string at the
- * given alpha. Used to derive a background tint for a custom (non-preset)
- * VacuumColor hex, since COLOR_BG/COLOR_BG_ACTIVE above only cover the three
- * legacy named presets. Falls back to a neutral white wash for anything that
- * doesn't parse (e.g. a CSS colour keyword some old config might still use).
- */
-function hexToRgba(hex, alpha) {
-    const m = /^#([0-9a-f]{3}|[0-9a-f]{6})$/i.exec(hex);
-    if (!m)
-        return `rgba(255,255,255,${alpha})`;
-    let h = m[1];
-    if (h.length === 3)
-        h = h.split("").map((c) => c + c).join("");
-    const r = parseInt(h.slice(0, 2), 16);
-    const g = parseInt(h.slice(2, 4), 16);
-    const b = parseInt(h.slice(4, 6), 16);
-    return `rgba(${r},${g},${b},${alpha})`;
-}
-/**
- * States that count as "actively cleaning".
- * NOTE (docs/14 rule 4): since HA 2025 the VACUUM ENTITY state is only ever a
- * VacuumActivity enum value — of these entries it can only match "cleaning", and a
- * mid-clean mop wash even reports "docked". Never use the vacuum entity state for
- * end-of-clean detection. The raw Roborock states below remain for STATUS SENSORS
- * watched via global_actions.watch_entities.
- */
-const CLEANING_STATES = new Set([
-    "cleaning",
-    "segment_cleaning",
-    "zoned_cleaning",
-    "spot_cleaning",
-    "segment_mopping",
-    "zoned_mopping",
-    "robot_status_mopping",
-    "clean_mop_cleaning",
-    "clean_mop_mopping",
-    "segment_clean_mop_cleaning",
-    "segment_clean_mop_mopping",
-    "zoned_clean_mop_cleaning",
-    "zoned_clean_mop_mopping",
-]);
-
-/**
- * Auto-seating maths (docs/15): fit each vacuum map onto the shared floorplan
- * automatically, using the card's room rectangles as anchors.
- *
- * Anchor pairing is by NAME (card room key == the room name in the Roborock app ==
- * the integration's room name), so no manual clicking is needed. Each vacuum is
- * fitted INDEPENDENTLY against the floorplan — hand-drawn room differences between
- * robots don't matter, they just yield slightly different per-robot transforms and
- * show up in the residual.
- *
- * Unit convention: all fitting happens in "wrap units" where the floorplan wrap is
- * 1.0 wide and 1/AR tall (AR = wrap width/height). Map pixels are normalised by the
- * rendered map width NW, so the fitted scale is directly the CSS `width` fraction.
- */
-// ── Geometry helpers (kontrakt v2: the integration publishes px, no mm here) ──
-/** Rendered map pixel dimensions (rotation-aware) from the sensor's image_dims. */
-function mapPxDims(dims) {
-    if (!dims)
-        return null;
-    const sc = dims.scale ?? 1;
-    let NW = (dims.width ?? 0) * sc;
-    let NH = (dims.height ?? 0) * sc;
-    const rot = dims.rotation ?? 0;
-    if (rot === 90 || rot === 270) {
-        const t = NW;
-        NW = NH;
-        NH = t;
-    }
-    return NW > 0 && NH > 0 ? { NW, NH } : null;
-}
-/**
- * Build fit anchors by pairing the card's floorplan rooms with the integration
- * sensor's room bboxes. Kontrakt v2: bboxes come pre-transformed in rendered-map
- * pixels (`rooms[].bbox_px`, integration ≥ 0.18) — the card does no mm math.
- */
-function assembleAnchors(cardRooms, at, ar) {
-    if (!at)
-        return [];
-    const dims = mapPxDims(at.image_dims);
-    const intRooms = Array.isArray(at.rooms) ? at.rooms : [];
-    if (!dims || !intRooms.length)
-        return [];
-    const { NW, NH } = dims;
-    const out = [];
-    for (const cr of cardRooms) {
-        if (cr.map_x == null || cr.map_y == null)
-            continue;
-        const ir = intRooms.find((r) => r.name === cr.key) ?? intRooms.find((r) => r.name === cr.name);
-        const bp = ir?.bbox_px;
-        if (!bp || [bp.x0, bp.y0, bp.x1, bp.y1].some((v) => v == null))
-            continue;
-        const cxPx = (bp.x0 + bp.x1) / 2;
-        const cyPx = (bp.y0 + bp.y1) / 2;
-        const anchor = {
-            q: { x: (cxPx - NW / 2) / NW, y: (cyPx - NH / 2) / NW },
-            a: { x: cr.map_x / 100, y: cr.map_y / 100 / ar },
-        };
-        if (cr.map_w != null && cr.map_h != null && cr.map_w > 0 && cr.map_h > 0) {
-            anchor.sizeQ = { w: (bp.x1 - bp.x0) / NW, h: (bp.y1 - bp.y0) / NW };
-            anchor.sizeA = { w: cr.map_w / 100, h: cr.map_h / 100 / ar };
-        }
-        out.push(anchor);
-    }
-    return out;
-}
-// ── The fit ───────────────────────────────────────────────────────────────────
-const RAD = Math.PI / 180;
-function seatFromFrame(theta, s, c, ar, residual, n, rawTheta) {
-    let rot = Math.round(theta / RAD) % 360;
-    if (rot < 0)
-        rot += 360;
-    return {
-        rotation: rot,
-        scale: s * 100,
-        offset_x: c.x * 100 - 50,
-        offset_y: c.y * ar * 100 - 50,
-        residual_pct: residual * 100,
-        anchors: n,
-        raw_rotation: Math.round((rawTheta / RAD) * 10) / 10,
-    };
-}
-/**
- * Least-squares similarity fit (rotation snapped to 90° steps) mapping map anchors
- * onto floorplan anchors. Returns null when the anchors cannot determine a seat.
- */
-function computeSeatFit(anchors, ar) {
-    if (!anchors.length || !(ar > 0))
-        return null;
-    if (anchors.length >= 2) {
-        const n = anchors.length;
-        const qm = { x: 0, y: 0 }, am = { x: 0, y: 0 };
-        for (const p of anchors) {
-            qm.x += p.q.x;
-            qm.y += p.q.y;
-            am.x += p.a.x;
-            am.y += p.a.y;
-        }
-        qm.x /= n;
-        qm.y /= n;
-        am.x /= n;
-        am.y /= n;
-        let numCos = 0, numSin = 0, denom = 0;
-        for (const p of anchors) {
-            const dqx = p.q.x - qm.x, dqy = p.q.y - qm.y;
-            const dax = p.a.x - am.x, day = p.a.y - am.y;
-            numCos += dqx * dax + dqy * day;
-            numSin += dqx * day - dqy * dax;
-            denom += dqx * dqx + dqy * dqy;
-        }
-        if (denom > 1e-8) {
-            const rawTheta = Math.atan2(numSin, numCos);
-            // Snap to the nearest 90° (Roborock maps and floorplans are axis-aligned),
-            // then refit scale + translation with the snapped rotation.
-            const theta = Math.round(rawTheta / (Math.PI / 2)) * (Math.PI / 2);
-            const cos = Math.cos(theta), sin = Math.sin(theta);
-            let num = 0;
-            for (const p of anchors) {
-                const dqx = p.q.x - qm.x, dqy = p.q.y - qm.y;
-                const rx = cos * dqx - sin * dqy, ry = sin * dqx + cos * dqy;
-                num += rx * (p.a.x - am.x) + ry * (p.a.y - am.y);
-            }
-            const s = num / denom;
-            if (s > 1e-4) {
-                const c = { x: am.x - s * (cos * qm.x - sin * qm.y), y: am.y - s * (sin * qm.x + cos * qm.y) };
-                let err = 0;
-                for (const p of anchors) {
-                    const rx = c.x + s * (cos * p.q.x - sin * p.q.y) - p.a.x;
-                    const ry = c.y + s * (sin * p.q.x + cos * p.q.y) - p.a.y;
-                    err += rx * rx + ry * ry;
-                }
-                return seatFromFrame(theta, s, c, ar, Math.sqrt(err / n), n, rawTheta);
-            }
-        }
-        // Degenerate spread (coincident centres) → fall through to the 1-anchor path.
-    }
-    // Single usable anchor: translation from centres, scale from bbox↔rect sizes,
-    // orientation by testing the four axis-aligned rotations for best size agreement.
-    const p = anchors.find((x) => x.sizeQ && x.sizeA) ?? null;
-    if (!p || !p.sizeQ || !p.sizeA || p.sizeQ.w < 1e-6 || p.sizeQ.h < 1e-6)
-        return null;
-    let best = null;
-    for (const k of [0, 1, 2, 3]) {
-        const theta = k * (Math.PI / 2);
-        const w = k % 2 === 0 ? p.sizeQ.w : p.sizeQ.h;
-        const h = k % 2 === 0 ? p.sizeQ.h : p.sizeQ.w;
-        const sw = p.sizeA.w / w, sh = p.sizeA.h / h;
-        if (!(sw > 0) || !(sh > 0))
-            continue;
-        const s = Math.sqrt(sw * sh);
-        const mism = Math.abs(Math.log(sw / sh));
-        if (!best || mism < best.mism - 1e-9)
-            best = { theta, s, mism };
-    }
-    if (!best)
-        return null;
-    const cos = Math.cos(best.theta), sin = Math.sin(best.theta);
-    const c = {
-        x: p.a.x - best.s * (cos * p.q.x - sin * p.q.y),
-        y: p.a.y - best.s * (sin * p.q.x + cos * p.q.y),
-    };
-    return seatFromFrame(best.theta, best.s, c, ar, 0, 1, best.theta);
-}
-// ── Forward transform (room import) ──────────────────────────────────────────
-/**
- * Transform an integration room bbox (rendered-map px, `bbox_px`) into floorplan
- * rectangle percentages, given a seat (auto-fitted or manual) — used by the
- * editor's room import.
- */
-/**
- * Place a room bbox onto a KNOWN crop of the same image (docs/30 §8) — used
- * right after `anyvac.snapshot_map_as_floorplan`, whose response includes
- * the exact (px) crop box it applied. Unlike `roomBboxToRect` this needs no
- * seat/rotation/AR at all: the saved floorplan file IS that crop, displayed
- * un-rotated, so a room's position within it is a plain re-normalisation of
- * `bbox_px` by the crop's own origin and size — no fit, no anchors, no
- * ambiguity. Only valid for the SAME vacuum the floorplan was snapshotted
- * from; other vacuums have unrelated coordinate systems and still need the
- * existing anchor-based auto-fit (`assembleAnchors`/`computeSeatFit`).
- */
-function placeRoomInCrop(bp, crop) {
-    const cropW = crop.x1 - crop.x0;
-    const cropH = crop.y1 - crop.y0;
-    if (!(cropW > 0) || !(cropH > 0))
-        return null;
-    const cx = (bp.x0 + bp.x1) / 2 - crop.x0;
-    const cy = (bp.y0 + bp.y1) / 2 - crop.y0;
-    const w = bp.x1 - bp.x0;
-    const h = bp.y1 - bp.y0;
-    const clamp = (v, lo, hi) => Math.min(hi, Math.max(lo, v));
-    return {
-        map_x: clamp(Math.round((cx / cropW) * 1000) / 10, 0, 100),
-        map_y: clamp(Math.round((cy / cropH) * 1000) / 10, 0, 100),
-        map_w: clamp(Math.round((w / cropW) * 1000) / 10, 2, 100),
-        map_h: clamp(Math.round((h / cropH) * 1000) / 10, 2, 100),
-    };
-}
-function roomBboxToRect(ir, at, seat, ar) {
-    const dims = mapPxDims(at?.image_dims);
-    const bp = ir?.bbox_px;
-    if (!dims || !bp || [bp.x0, bp.y0, bp.x1, bp.y1].some((v) => v == null))
-        return null;
-    const { NW, NH } = dims;
-    const q = { x: ((bp.x0 + bp.x1) / 2 - NW / 2) / NW, y: ((bp.y0 + bp.y1) / 2 - NH / 2) / NW };
-    let w = (bp.x1 - bp.x0) / NW;
-    let h = (bp.y1 - bp.y0) / NW;
-    const s = seat.scale / 100;
-    const theta = seat.rotation * RAD;
-    const cos = Math.cos(theta), sin = Math.sin(theta);
-    const c = { x: (50 + seat.offset_x) / 100, y: (50 + seat.offset_y) / 100 / ar };
-    const u = { x: c.x + s * (cos * q.x - sin * q.y), y: c.y + s * (sin * q.x + cos * q.y) };
-    const rot90 = Math.round(seat.rotation / 90) % 2 !== 0;
-    if (rot90) {
-        const tmp = w;
-        w = h;
-        h = tmp;
-    }
-    const clamp = (v, lo, hi) => Math.min(hi, Math.max(lo, v));
-    return {
-        map_x: clamp(Math.round(u.x * 1000) / 10, 0, 100),
-        map_y: clamp(Math.round(u.y * ar * 1000) / 10, 0, 100),
-        map_w: clamp(Math.round(s * w * 1000) / 10, 2, 100),
-        map_h: clamp(Math.round(s * h * ar * 1000) / 10, 2, 100),
-    };
-}
-
-/**
- * layout.ts — two-profile percentage-grid layout runtime (docs/18).
- *
- * Model: two complete layout profiles (portrait / landscape), picked by the
- * aspect ratio of the available viewport — never by device type and never by
- * width breakpoints. Each profile is a CSS grid whose tracks are percentages
- * of the available viewport; the UI is a set of named regions placed into the
- * grid per profile. A region not placed in a profile is not rendered there.
- */
-/** docs/25 §4 — compute whether rotating the floorplan 90° fits the portrait
- *  map region better than leaving it upright. Pure geometry: for each
- *  orientation, "how big could the floorplan render inside this box" is the
- *  contain-fit scale (`min(boxW/contentW, boxH/contentH)`); pick whichever
- *  orientation yields the larger rendered map (bigger = more legible rooms,
- *  bigger tap targets). Ties (near-square floorplans, where it barely
- *  matters either way) default to NOT rotating — it's the cheaper option
- *  (no counter-rotating on-map labels via `.avc-rot`).
- *
- *  `floorplanAR` = floorplan width / height. `boxW`/`boxH` = the measured
- *  portrait map region. Returns `undefined` when there isn't enough data to
- *  decide yet (region not measured) — callers should keep their previous
- *  answer rather than flicker on an unmeasured 0×0 box. */
-function shouldRotateMap(floorplanAR, boxW, boxH) {
-    if (boxW <= 4 || boxH <= 4 || floorplanAR <= 0)
-        return undefined;
-    // Normalize floorplan height to 1 → width is floorplanAR. Contain-fit scale
-    // is min(boxAxis / contentAxis) per axis; rotating swaps which axis is which.
-    const scaleUpright = Math.min(boxW / floorplanAR, boxH);
-    const scaleRotated = Math.min(boxW, boxH / floorplanAR);
-    // Equal scale (or upright wins/ties) → don't rotate.
-    return scaleRotated > scaleUpright;
-}
-/** docs/25 §7c — portrait map/dock topology as a computed choice, generalizing
- *  `shouldRotateMap()` (§4) from "which way is the floorplan rotated" up one
- *  level to "which overall arrangement fits the floorplan better":
- *
- *  - "split": today's default (`DEFAULT_PROFILES.portrait`) — map and dock
- *    side by side, map gets the full available height, its width follows its
- *    own aspect ratio (post §4 rotation choice).
- *  - "stack": map full-width on top, dock/vacuum row/START below it full-width.
- *    Map gets the full available width, height follows its aspect ratio
- *    (capped so the dock doesn't get squeezed to a sliver).
- *
- *  **Model history (2026-07-24, two corrections same day, both from live
- *  field feedback on the SAME real floorplan — a 4-storey narrow building):**
- *
- *  1. First version reserved the SAME FRACTION of the box for both
- *     candidates (dock keeps a fraction of width in split, the SAME
- *     fraction of height in stack) — wrong, because a real dock's content
- *     (icon strip + layer toggles + mode row, now that the room list is
- *     hidden by default, §7c/§7e) is a roughly FIXED pixel height, not
- *     proportional to the box. Replaced the height fraction with a fixed
- *     `dockHeightPx` estimate (~150px).
- *  2. That alone still wasn't enough — live numbers from the field
- *     (908×1726px content box, ~0.185 floorplan aspect ratio) showed WHY:
- *     split reserves ZERO height for the dock (it sits beside the map, not
- *     below it), so split's "achieved map size" is the box's FULL height
- *     no matter what `dockHeightPx` is set to, while stack's is always
- *     `boxH − dockHeightPx` — strictly less. For a sufficiently narrow
- *     floorplan (map's width need is trivial either way, so both
- *     candidates end up height-bound), split therefore ALWAYS wins on raw
- *     "biggest achievable map" — not a tuning problem, a structural one:
- *     that metric literally cannot prefer stack for a narrow floorplan,
- *     no matter the dock cost estimate. But "biggest map" isn't actually
- *     what looked better — a ~9% smaller map (1576 vs 1726 in the field
- *     numbers) with a properly-sized dock row read as clearly better than
- *     a marginally bigger map next to a mostly-empty column. `STACK_BIAS`
- *     directly encodes that: stack wins by default UNLESS split's raw
- *     score exceeds stack's by more than this margin — i.e. split has to
- *     be a clear, not marginal, win to justify a wide, likely-underused
- *     side column instead of a snug full-width row below the map.
- *  3. `stackBias: 1.3` still wasn't quite enough (2026-07-24, same
- *     floorplan, same day): live A/B on the user's actual reported box
- *     (360×580 and 360×514, both under the earlier 650px rule-of-thumb)
- *     showed split "winning" the raw metric by only ~4% — comfortably
- *     inside the 1.3 margin — while a live screenshot comparison (forced
- *     `topology: stack` vs the computed `split` on the SAME box, via
- *     Claude in Chrome against the user's running instance) showed stack
- *     was still clearly better: for this floorplan the map ends up a
- *     similarly narrow sliver either way (extreme ~0.27 rotated aspect
- *     ratio), so the two candidates' RAW map sizes are almost the same —
- *     but split's leftover dock column only ever holds ~250px of actual
- *     content (avatars/chips/mode row) no matter how much width it's
- *     handed, so anything past that is dead space, while stack's full-
- *     width dock row uses its allotment properly. That "wasted width"
- *     cost isn't in the raw metric at all, so a small default bias never
- *     fully compensated for it. Raised to `1.5`, verified by hand against
- *     both real reported boxes (needs bias > 1.41 for the 514 case) —
- *     comfortably flips both to stack while leaving split able to win
- *     outright for boxes tall enough that it's a genuinely clear margin.
- *
- *  `floorplanAR` = floorplan width / height (post-rotation, i.e. whatever
- *  `_narrow`/`shouldRotateMap` already decided to actually render).
- *  `boxW`/`boxH` = the full portrait content box (map + dock combined, minus
- *  START bar). Returns `undefined` when there isn't enough data yet, same
- *  convention as `shouldRotateMap()`. */
-function shouldStackLayout(floorplanAR, boxW, boxH, opts = {}) {
-    // ~150px estimate: vac-icon-strip (~50-64px) + dock-layers row (~30px) +
-    // dock-head mode row (~40px) + dock container padding/gaps (~24px), per
-    // today's minimalist portrait dock (docs/25 §7c/§7e — no permanent room
-    // list). Only needs to be roughly right: the actual STACK_PORTRAIT_PROFILE
-    // dock row is CSS "auto" (sized to real content, not this estimate) — this
-    // number only steers the split-vs-stack DECISION, not final layout.
-    const { dockWidthFrac = 0.28, dockHeightPx = 150, stackBias = 1.5 } = opts;
-    if (boxW <= 4 || boxH <= 4 || floorplanAR <= 0)
-        return undefined;
-    const splitMapW = boxW * (1 - dockWidthFrac);
-    const scaleSplit = Math.min(splitMapW / floorplanAR, boxH);
-    const stackMapH = Math.max(boxH - dockHeightPx, 0);
-    const scaleStack = Math.min(boxW / floorplanAR, stackMapH);
-    // Stack is the default; split only wins by a clear (not marginal) margin
-    // — see model history above for why a raw size comparison alone always
-    // favors split for narrow floorplans regardless of the dock estimate.
-    return !(scaleSplit > scaleStack * stackBias);
-}
-/** docs/25 §7c — the "stack" portrait arrangement (map full-width on top,
- *  dock/vacuum-row/START stacked full-width below it), used in place of
- *  `DEFAULT_PROFILES.portrait` when `shouldStackLayout()` (or a manual
- *  `topology: "stack"` override) picks it. `rows: ["minmax(0, 1fr)", "auto",
- *  "auto"]` mirrors the landscape pattern (docs/19 A5 addendum) — the map
- *  takes whatever's left after dock/start size to their own content, not
- *  the other way around.
- *
- *  `minmax(0, ...)`, not bare `"1fr"` (field bug, 2026-07-24): a bare `1fr`
- *  track's implicit minimum is `auto` (its content's min-content size), not
- *  `0`. `_renderResponsive()` returns the RAW, unwrapped map template
- *  (unbounded natural/intrinsic size — no fit box yet) until the map region
- *  has been measured once (`_mapRegW/_mapRegH`). On a brand-new stack
- *  render, that first unmeasured paint's natural size became the row's
- *  forced minimum, blowing the whole grid out to ~2 phone-screens tall —
- *  and it never recovered, because the very next measurement pass read the
- *  ALREADY-blown-out region size back as "correct" and locked it in (the
- *  settle-loop has no notion of "too big", only "changed by ≥2px"). `auto`
- *  rows (split's `[90, 10]`, or landscape's non-map rows) never had this
- *  because they're either a definite percentage of a definite grid height,
- *  or genuinely want their content's natural size. `minmax(0, 1fr)` caps
- *  the row to its fair share of the (already height-constrained) grid from
- *  frame one — the oversized raw content just gets clipped by the region's
- *  existing `overflow:hidden` (`regionStyles()`) instead of stretching the
- *  grid, and the following measurement pass reads the correctly-sized
- *  region, breaking the lock-in for good. */
-const STACK_PORTRAIT_PROFILE = {
-    columns: [100],
-    rows: ["minmax(0, 1fr)", "auto", "auto"],
-    place: {
-        map: { row: 1, col: 1 },
-        dock: { row: 2, col: 1, overflow: "auto" },
-        start: { row: 3, col: 1 },
-    },
-};
-/** v1.1.0 field fix (2026-08-04, docs/33 follow-up): the landscape map row's
- *  minimum height, in px — see the row-4 comment below for why this floor
- *  moved from row 4's growth limit onto the map's own row instead. Picked
- *  as "clearly usable, rarely binding": only kicks in when the status+dock
- *  column actually wants more than (grid height − this) for its own
- *  content, which needs several vacuums or a long room list. */
-const LANDSCAPE_MAP_FLOOR_PX = 260;
-/**
- * Canonical docs/18 §4 default profiles (Phase B). Landscape = cockpit: map left
- * (scrolls in split mode, §7b), dock (selection + plan + orchestrated run, §7d)
- * and per-robot status cards right. Portrait = docs/12: slim badges bar, tall
- * rotated map, right thumb dock, full-width START bar. Overridable per config.
- */
-const DEFAULT_PROFILES = {
-    landscape: {
-        // Phase C (docs/19 A5): map + meta bar go full-width — the map is the main
-        // instrument, not a 70%-column tenant. Below that the cockpit splits in
-        // two: left column = per-robot status/controller cards (unchanged);
-        // right column = a slim vertical vacuum picker (replaces the old
-        // horizontal badge-row tabs for this purpose) with the room list docked
-        // directly beneath it.
-        // Row 1 is "auto", not a fixed %: badges only ever holds global-action
-        // badges now (vacuum picking moved to `picker`, docs/19 A5) — a hardcoded
-        // percentage reserved dead black space whenever no global_actions are
-        // configured (field-caught 2026-07-15). "auto" collapses to whatever the
-        // row actually contains, same as the tools/status/picker/dock rows below.
-        // The "1fr" lives on the MAP's row instead (field feedback from a tall
-        // panel-view page 2026-07-15): everything below the map should size to
-        // its own natural content height, and the map should get whatever's left
-        // over — not the other way around, which is what put the flex on the
-        // status/dock row before and left the map a fixed, often-too-small size
-        // on tall viewports.
-        // docs/28 §4 (2026-07-25): columns changed from a fixed `[70, 30]` split
-        // to content-driven — the right column (`picker` + `dock`, same grid
-        // track) should never grow past what it actually needs, and the
-        // controller column (`status`) should absorb whatever's left, unbounded
-        // (wide status cards aren't a problem the way a wide, mostly-empty dock
-        // column is, docs/25 §7c's stack/split finding on the portrait side).
-        // `max-content` is safe here in a way the abandoned portrait attempt
-        // (docs/21 §5b) wasn't: THAT column's `.dock-row` used `flex-wrap: wrap`
-        // with no per-element width cap, so its max-content contribution was
-        // always the unwrapped single-line size — never smaller than what was
-        // already allocated. Landscape's `.dock-row` doesn't wrap the row; the
-        // one variable-length field (`.dock-name`, room name) instead gets its
-        // OWN fixed `max-width` (docs/28 §4) so an outlier long name wraps to a
-        // second line inside that cap instead of setting the column's width.
-        // `.vac-picker .badge` (the `picker` region sharing this column) is
-        // `width: 100%`, which intrinsic-sizing treats as auto/shrink-to-fit —
-        // its own natural width (vacuum name, always short) drives the column
-        // the same way, no separate handling needed.
-        // v1.1.0 (2026-08-03, docs/33): row 4 (status column + picker/dock) used
-        // to be bare "auto" — sized to whatever its content needed, with NO
-        // upper bound, taken out of the grid's height BEFORE the map's `1fr`
-        // row gets whatever's left over. A content-heavy status column (many
-        // vacuums, or before the same-day compact status-card redesign) could
-        // therefore squeeze the map down to a sliver with no floor at all.
-        // `minmax(0, 50%)` was meant to give the map row a genuine floor while
-        // leaving the LOWER bound at 0 so small content (the common case) still
-        // shrinks to fit — but that's not how `minmax()` behaves once a `1fr`
-        // row shares the grid: a non-flexible track's percentage MAX is its
-        // growth limit, and CSS Grid's "maximize tracks" step grows every
-        // non-flexible track up to its growth limit FIRST, using up whatever
-        // free space the grid has, before `fr` tracks get whatever's left —
-        // regardless of how little that track's own content actually needs.
-        // Field-caught 2026-08-04: one vacuum + a short room list still
-        // inflated row 4 to a full 50% of the grid, leaving dead space below
-        // the real content and starving the map's `1fr` row of height it had
-        // no other claimant for (visible as both a gap above the START footer
-        // AND the map rendering narrower than the card, letterboxed, because
-        // it no longer had enough height for its aspect ratio to reach full
-        // width). Fix: put the floor on the map's OWN row instead —
-        // `minmax(<mapFloorPx>, 1fr)` guarantees the map at least
-        // `LANDSCAPE_MAP_FLOOR_PX` regardless of what row 4 wants, and row 4
-        // goes back to bare `"auto"` so it genuinely shrinks to its content
-        // again. `status`'s own `overflow: "auto"` still turns "content taller
-        // than the map's leftover space" into an internal scrollbar instead of
-        // grid overflow, so an unbounded row 4 is safe: excess content
-        // scrolls, it doesn't get clipped invisibly. Purely declarative — no
-        // JS measurement involved, so this carries none of the docs/21 §5b
-        // JS-vs-styleMap risk. Manual `layout.landscape.rows` overrides bypass
-        // this entirely (`resolveProfile`), so anyone who already hand-tuned
-        // rows is unaffected.
-        //
-        // v1.1.0 follow-up (2026-08-03, field-caught): `picker` and `dock` used
-        // to be TWO separate grid rows (4 and 5), with `status` spanning both
-        // ("4/6") so its column matched their combined height. That span made
-        // the row-sizing algorithm distribute status's OWN content height
-        // across both tracks — inflating row 4 (picker's row) well past what
-        // the picker itself needed whenever status was tall, which left a
-        // visible gap between the short picker pills and the dock/room-list
-        // below them (a live screenshot showed this directly: status column
-        // trails off with empty space of its own further down, same underlying
-        // cause — neither column's content matches its allotted track height 1:1
-        // once a spanning item is involved). Fix: collapse to a SINGLE row for
-        // both columns — `picker` is no longer its own grid region at all, it
-        // renders as the first thing inside `dock`'s own template instead
-        // (`_renderDock`'s new `withPicker` param, gated on `!("picker" in
-        // prof.place)` so a manual config that still explicitly places `picker`
-        // itself keeps working, unchanged). With one shared row, each column
-        // is free to size to its own natural stacked content (picker pills
-        // immediately followed by the mode row/room list, no cross-column
-        // spanning distribution to inflate the gap between them) — the
-        // remaining per-column vertical slack (right column shorter than left,
-        // or vice versa) is just genuinely-natural leftover space, not a bug.
-        columns: ["minmax(0, 1fr)", "max-content"],
-        rows: ["auto", `minmax(${LANDSCAPE_MAP_FLOOR_PX}px, 1fr)`, "auto", "auto"],
-        place: {
-            badges: { row: 1, col: "1/3" },
-            map: { row: 2, col: "1/3" },
-            tools: { row: 3, col: "1/3", align: "start" },
-            status: { row: 4, col: 1, overflow: "auto" },
-            dock: { row: 4, col: 2, overflow: "auto" },
-        },
-    },
-    portrait: {
-        // Phase C follow-up (docs/19): the top badges row is dropped — merged mode
-        // has no split-mode "shown" focus to switch, so it was only costing height.
-        // The map takes that space back; each vacuum's emergency more-info access
-        // moves into a small icon strip at the top of the dock column instead
-        // (`_renderVacuumIconStrip`, portrait-only).
-        // Declarative fallback columns (used until the first fit measurement lands,
-        // see `_refineGridColumns`): the map is height-fit (fills row 1's full
-        // height, `_renderResponsive`), which usually leaves it NARROWER than a
-        // fixed 72% column. A CSS "auto" track can't pick that up on its own — the
-        // fitted width lives on an absolutely-positioned inner div precisely so it
-        // does NOT feed back into layout/reflow, which also means it carries no
-        // intrinsic-size signal for track auto-sizing. So the actual column split
-        // is measured-and-applied in JS instead (same settle-and-stop pattern as
-        // `_refineGridHeight`), col2 = 1fr picks up whatever col1 doesn't need
-        // (field feedback 2026-07-15: "the freed-up width should go to the
-        // sidebar, not sit empty").
-        columns: [72, 28],
-        rows: [90, 10],
-        place: {
-            map: { row: 1, col: 1 },
-            dock: { row: 1, col: 2, overflow: "auto" },
-            start: { row: 2, col: "1/3" },
-        },
-    },
-};
-/** Pick the active profile from the available viewport. */
-function pickProfile(cfg, availW, availH) {
-    const o = cfg?.orientation;
-    if (o === "portrait" || o === "landscape")
-        return o;
-    if (!availW || !availH)
-        return "landscape";
-    return availW / availH < (cfg?.threshold ?? 1.0) ? "portrait" : "landscape";
-}
-/** Merge the profile's grid config with the built-in defaults. `crop` isn't
- *  merged here (it has no "default profile" data to fall back to — it's just
- *  present or absent) — callers read `cfg[profile]?.crop` directly. */
-function resolveProfile(cfg, profile) {
-    const p = cfg[profile] ?? {};
-    const d = DEFAULT_PROFILES[profile];
-    return {
-        columns: p.columns?.length ? p.columns : d.columns,
-        rows: p.rows?.length ? p.rows : d.rows,
-        place: p.place && Object.keys(p.place).length ? p.place : d.place,
-    };
-}
-/** `fr`, not `%` — CSS Grid's `fr` unit distributes space AFTER subtracting
- *  `gap`, so proportional tracks never overflow their container by the gap
- *  amount. Plain `%` tracks summing to 100% do: any region spanning 2+
- *  tracks (e.g. `col: "1/3"`) then overflows the grid by (gaps spanned ×
- *  gap size) — confirmed live on a real dashboard 2026-07-17 (docs/21 §5b
- *  second follow-up): a landscape `columns: [70, 30]` with the default 6px
- *  gap overflowed `badges`/`map`/`tools` (all `col: "1/3"`) by exactly 6px,
- *  which cascaded into a page-level horizontal AND vertical scrollbar (the
- *  vertical one was a pure side effect — fixing the column unit alone
- *  removed both). Numerically identical ratio for the config author (a
- *  `70`/`30` split still renders 70:30); only the CSS unit changes. */
-function track(v) {
-    return typeof v === "number" ? v + "fr" : v;
-}
-function trackList(list) {
-    return list.map(track).join(" ");
-}
-/** CSS height for the grid root. The measured refinement (innerHeight − rootTop)
- *  is applied on top of this by the card; this is the declarative fallback.
- *  `svh` (not vh/dvh) so a mobile URL-bar show/hide doesn't make the layout jump. */
-function resolveHeightCss(cfg) {
-    const h = cfg.height ?? "viewport";
-    if (h === "viewport")
-        return "calc(100svh - var(--header-height, 0px))";
-    if (h === "container")
-        return "100%";
-    return h;
-}
-/** Inline styles for the grid root (static styles can't express a dynamic grid).
- *
- *  REVERTED 2026-07-16 (mobile crash, card 0.59.0 → 0.61.0): `height` and
- *  `gridTemplateColumns` were pulled out of this object on the theory that
- *  Lit's `styleMap` re-applying every key on every render was silently
- *  fighting the JS-measured overrides in `updated()`. That was true (and
- *  is the reason portrait's column split never visibly changed across
- *  0.56–0.58), but the fix itself is what broke the HA mobile companion
- *  app — user bisected it precisely to 0.59.0, with 0.55.0–0.58.0 all
- *  confirmed non-crashing. Exact mechanism not fully confirmed, but the
- *  safe move is putting both properties back here and accepting that the
- *  JS refinement in `updated()` fights (and mostly loses) against this
- *  declarative object again — a cosmetic imperfection, not a crash. Do NOT
- *  remove these from styleMap again without a mobile-tested alternative. */
-function gridRootStyles(cfg, prof) {
-    return {
-        display: "grid",
-        width: "100%",
-        height: resolveHeightCss(cfg),
-        alignContent: "start",
-        gridTemplateColumns: trackList(prof.columns),
-        gridTemplateRows: trackList(prof.rows),
-        gap: cfg.gap ?? "6px",
-        boxSizing: "border-box",
-    };
-}
-/** Inline styles for a region wrapper. `position:relative` keeps absolutely
- *  positioned children (map overlays, layer toggles) correct in both profiles. */
-function regionStyles(place) {
-    const s = {
-        gridRow: String(place.row ?? "auto"),
-        gridColumn: String(place.col ?? "1"),
-        overflow: place.overflow ?? "hidden",
-        position: "relative",
-        minWidth: "0",
-        minHeight: "0",
-    };
-    if (place.align && place.align !== "stretch")
-        s.alignSelf = place.align;
-    return s;
-}
-
-var _a;
-/** docs/25 §10 third follow-up: nominal total consumable lifespans, used to
- *  turn a "time left" sensor into a "% remaining" readout. NOT from any
- *  Roborock API field (the protocol only ever reports remaining time) —
- *  triangulated from THREE independent live data points (S6/S7 MaxV/S8
- *  MaxV Ultra all converge on the same round totals once time-left is
- *  divided out) and cross-checked against Roborock's own published HEPA
- *  filter service interval ("every 150 hours of runtime"). Deliberately
- *  covers only the 4 consumables with this convergent evidence — the two
- *  dock-mounted ones (cleaning brush, strainer) had just one data point
- *  each with no round-number pattern to anchor on, so those stay in hours
- *  rather than showing a guessed percentage. */
-const CARE_TOTAL_HOURS = {
-    main_brush_time_left: 300,
-    side_brush_time_left: 200,
-    filter_time_left: 150,
-    sensor_time_left: 30,
-};
-console.info(`%c ANYVAC-CARD %c v${CARD_VERSION} `, "background:#2196F3;color:#fff;font-weight:700;padding:2px 4px;border-radius:3px 0 0 3px", "background:#1a1a1a;color:#fff;font-weight:400;padding:2px 4px;border-radius:0 3px 3px 0");
-let AnyVacCard = class AnyVacCard extends i$2 {
-    constructor() {
-        super(...arguments);
-        /** Set by Lovelace when the dashboard is in edit mode */
-        this.editMode = false;
-        this._shownSet = new Set([0]);
-        /** ID of the button currently being held — drives the fill animation */
-        this._holdId = null;
-        this._mapMode = "normal";
-        /** docs/25 §7b: hold-to-inspect on a room — the room key whose detail
-         *  popup (age/pin) is currently open, or null. Set by a hold gesture on
-         *  the room overlay; a tap while open dismisses it instead of toggling
-         *  selection (see `_renderRoomOverlay`'s pointer handlers). */
-        this._inspectKey = null;
-        /** docs/25 §7 field follow-up (2026-07-24): dock sheet (Empty/Wash/Dry +
-         *  per-vacuum status), opened from a new "Dock" button in the dock-head
-         *  row. `_dockSheetIdx` is which vacuum's tab is active — local UI state,
-         *  not backend-shared (same reasoning as `_inspectKey`: navigation, not
-         *  orchestration input). */
-        this._dockSheetOpen = false;
-        this._dockSheetIdx = 0;
-        /** docs/25 §10 follow-up (2026-07-25): the START bar's left segment mirrors
-         *  the manufacturer app's 3-section bottom bar (mode / START / Dock, see
-         *  docs/25 §10) — mode picker sheet, same in-flow pattern as `_dockSheetOpen`
-         *  right next to it. Mutually exclusive with the dock sheet (toggling one
-         *  closes the other) purely to keep the narrow dock column from showing two
-         *  panels stacked at once. */
-        this._modeSheetOpen = false;
-        /** docs/25 §10 field-caught (2026-07-25): reset-button visual feedback.
-         *  Live diagnosis on the field-reporting user's real HA found the reset
-         *  DOES work — the official `roborock` integration's own consumable
-         *  sensor just takes up to one poll cycle (~30s, live-measured) to reflect
-         *  it, and (separately, now fixed above in `_watchedEntities`) the card
-         *  wasn't even re-rendering on that entity's change. A 30s silent wait
-         *  after tapping reads as broken even once the card DOES re-render
-         *  promptly — so the tapped button shows a spinner until the watched
-         *  sensor's `last_changed` moves past the press time, with a hard-timeout
-         *  fallback (`_careResetPending` cleanup in `updated()`) in case the
-         *  vacuum is offline and the poll never lands. Keyed by the row's sensor
-         *  entity id when there is one (globally unique, unlike `CareRow.key`
-         *  which is a translation_key shared across vacuums), else the reset
-         *  button's own entity id. */
-        this._careResetPending = new Map();
-        this._modeEntity = null;
-        this._dbg = "";
-        this._zoneDrag = null;
-        /** Frozen copy of `_zoneDrag` at drop time, in the same wrap-relative % — kept
-         *  around purely so the drawn rectangle stays visible while `_zonePending` is
-         *  awaiting a per-vacuum confirm (drag itself is cleared right away to fix the
-         *  "won't let go" bug, but the box shouldn't just vanish on release). */
-        this._zoneRectShown = null;
-        /** Pending zone(s) awaiting per-vacuum confirmation, keyed by entity_id (docs/19
-         *  §Pin&Go/Zone fix). Legacy single-target flow (split mode / per-vacuum tools)
-         *  only ever populates one key; the merged multi-candidate flow (meta bar) may
-         *  populate several at once — the user confirms on whichever vacuum's own
-         *  status card they want to execute it. */
-        this._zonePending = null;
-        /** Whether the current `_zoneRectShown`/`_zonePending` capture is the merged
-         *  multi-candidate flow (meta bar, "*") vs. the legacy single-target flow
-         *  (per-vacuum tools / split mode). Set once at draw time so post-drop editing
-         *  (move/resize, docs/19 follow-up) knows how to recompute `_zonePending`
-         *  without depending on `_modeEntity`, which is already reset to null by then. */
-        this._zoneMulti = false;
-        /** Active move/resize drag on an already-drawn `_zoneRectShown`, distinct from
-         *  `_zoneDrag` (drawing a brand new rectangle). `move` carries the grab offset
-         *  from the box's top-left corner plus its fixed width/height; the corner
-         *  variants just say which corner is being dragged. */
-        this._zoneEdit = null;
-        /** Pending pin(s) awaiting per-vacuum confirmation, keyed by entity_id — same
-         *  shape/reasoning as `_zonePending`, but for Pin & Go. */
-        this._pinPending = null;
-        this._layers = { dry: true, wet: false };
-        this._layerMenu = null;
-        this._layerHoldTimer = null;
-        this._layerHeld = false;
-        /** Výběr místností — drží se lokálně v kartě (bez potřeby input_boolean helper entity) */
-        this._localRoomSel = new Map();
-        /** Active setting preset per vacuum (Manual mode): vac.entity -> preset id. */
-        this._activePresets = new Map();
-        /** Plan preview mode (Auto): which passes to plan/run. */
-        this._planMode = "both";
-        /** Currently selected global preset id (Auto): tiles select, the plan runs. */
-        this._activeGlobalPreset = null;
-        /** Responsive: measured card width + map aspect ratio (W/H) for portrait rotation. */
-        this._cardW = 0;
-        this._mapAR = 3.636;
-        /** Active layout profile (docs/18) — picked by viewport aspect ratio. */
-        this._profile = "landscape";
-        /** Measured inner box of the map region (grid mode) for the exact rotated fit. */
-        this._mapRegW = 0;
-        this._mapRegH = 0;
-        /** docs/25 §7c: measured combined map+dock content box (portrait grid root
-         *  minus the START row) — the box the split-vs-stack topology choice is
-         *  computed against, BEFORE that choice picks map's own (narrower/shorter)
-         *  region. Distinct from `_mapRegW`/`_mapRegH`, which measure the map
-         *  region AFTER a topology is already applied. */
-        this._mapAvailW = 0;
-        this._mapAvailH = 0;
-        /** docs/25 §7c: last computed split-vs-stack decision, same "keep the
-         *  previous answer while unmeasured" convention as `_lastRotate`. Defaults
-         *  to `false` (split) — matches today's shipped default until real
-         *  measurements correct it. */
-        this._lastStack = false;
-        /** Portrait only: the map's last computed fitted width (`_renderResponsive`),
-         *  fed into `_refineGridColumns` to override the map/dock column split so the
-         *  sidebar gets whatever width the height-fitted map doesn't need. Plain
-         *  field (not @state) — read post-render in `updated()`, never drives a
-         *  render itself. */
-        this._lastPortraitFitW = 0;
-        /** docs/25 §4: last computed map-rotation decision, kept as the answer while
-         *  the map region hasn't been measured yet (`shouldRotateMap` returns
-         *  `undefined`) so the map doesn't flicker between orientations on first
-         *  paint. Defaults to `true` — matches the old fixed "portrait rotates"
-         *  behavior until real measurements correct it, one render later. */
-        this._lastRotate = true;
-        /** docs/32 follow-up (2026-08-03): ephemeral, per-browser-tab override for
-         *  the "this looks upside down on THIS screen" flip — separate from the
-         *  persisted `layout.<profile>.crop.flip` config default. Not backend-shared
-         *  (unlike `view_layers`) and not written to the dashboard config: a quick
-         *  "try it on this device right now" toggle, reset on reload. `null` = no
-         *  override, defer to config; `true`/`false` = explicit override for the
-         *  current session. Applies to whichever profile is active when tapped. */
-        this._flipLive = null;
-        this._ro = null;
-        this._onWinResize = null;
-        this._measureRaf = 0;
-        /** docs/21 §5a: `setTimeout` handle used instead of `_measureRaf` when the
-         *  tab is backgrounded (`document.hidden`) — `requestAnimationFrame` never
-         *  fires on an inactive tab (kiosk/wall-mounted tablets, `browser_mod`
-         *  popups), so a card measure scheduled while hidden would otherwise hang
-         *  forever. Only one of `_measureRaf`/`_measureTimer` is ever active. */
-        this._measureTimer = null;
-        /** docs/21 §5b follow-up (2026-07-17, ported from `room-overlay-card`
-         *  v5.0): one late-settling remeasure after every render, NOT tied to any
-         *  DOM mutation or resize. Fonts/images (the floorplan `image_base`,
-         *  per-vacuum `image`, map images) can finish loading and shift the
-         *  card's own position on the page — without changing the card's own box
-         *  size and without any observable DOM mutation — leaving the grid pinned
-         *  to a stale height (dead scroll space below it) until *something else*
-         *  happens to trigger a remeasure. Cleared and rescheduled every render,
-         *  so it never piles up timers. */
-        this._settleTimer = null;
-        /** docs/21 §5b/§5c: nearest `hui-panel-view` ancestor observer. HA
-         *  reparents the card into `hui-card-options` on edit-mode toggle without
-         *  firing any event, and the host's own box doesn't always change size
-         *  when that happens — `ResizeObserver(this)` alone can miss it. `_warned`
-         *  is a one-shot flag so a missing ancestor (internal HA DOM, not public
-         *  API) logs once, not on every failed lookup. */
-        this._panelViewMo = null;
-        this._panelViewWarned = false;
-        /** docs/21 §5b third follow-up (2026-07-17): the panel-view node the current
-         *  `_panelViewMo` is actually watching. HA can rebuild `hui-panel-view`'s
-         *  node identity across a hard refresh in multiple DOM-construction phases
-         *  — once `_panelViewMo` was set, the old code never re-checked whether the
-         *  watched node was still the live one, so a stale reference silently
-         *  stopped receiving edit-mode mutations (fixed only by a second toggle,
-         *  which happened to trigger a remeasure some other way). Reported live by
-         *  the user after a hard refresh. Ported from room-overlay-card v5.0, which
-         *  always re-verifies liveness instead of trusting a once-set flag. */
-        this._panelViewNode = null;
-        /** docs/21 §5b third follow-up: one-shot observer for the edit-mode actions
-         *  bar mounting AFTER the transition mutation `_panelViewMo` reacts to (see
-         *  `_watchEditBar`). */
-        this._barMo = null;
-        /** docs/21 §5b third follow-up: watches the actions bar's OWN box once
-         *  found, to catch its height CSS-transitioning in after it mounts (see
-         *  `_observeEditBar`) — confirmed live, not just in theory. */
-        this._editBarRo = null;
-        /** Per-second clock for the debug progress timers (mm:ss). Only ticks while a vacuum is
-         *  cleaning/paused and debug_room_progress is on, so it does not re-render otherwise. */
-        this._now = Date.now();
-        this._tickTimer = null;
-        // NOTE (docs/14 canon): the card holds NO cleaning-session state. Tracking, history,
-        // estimates and room detection live in the anyvac integration — the card only renders
-        // sensor data and sends intents.
-        this._holdTimer = null;
-        /** docs/25 §10 field report: pointerdown position for the in-progress hold,
-         *  used by `_holdMove` to detect a drag/swipe starting on a hold button
-         *  (see `HOLD_MOVE_CANCEL_PX` doc comment). Null when no hold is active. */
-        this._holdStartPos = null;
-        this._initialized = false;
-        /** Entities whose state changes should trigger a re-render */
-        this._watched = null;
-        /** Integration sensor for a vacuum: explicit config, else auto-resolved from the
-         *  entity registry — the AnyVac map sensor sits on the SAME device as the vacuum
-         *  entity (platform "anyvac"), so no manual plumbing is needed (docs/14 Fáze 3). */
-        this._intCache = new Map();
-        /** The vacuum's rendered-map `image.*` entity: explicit config, else auto-resolved
-         *  from the entity registry (2026-07-30 onboarding audit, docs/30 §2.1) — this was
-         *  previously the one config field with no auto-resolve at all, unlike
-         *  `integration_entity`/`_autoEntities` above, so a fresh install showed no map
-         *  whatsoever until the user hunted down the right entity by hand.
-         *  No `translation_key` to match on here (live-verified: the official `roborock`
-         *  integration's map image entities carry none — confirmed empty on a real
-         *  registry, 2026-07-30) and a multi-map vacuum can have ONE image entity PER
-         *  SAVED FLOOR (e.g. `image.kitchen_map_0` / `image.kitchen_map_2`), so picking
-         *  "the only image.* on this device" isn't safe in general. Instead: prefer
-         *  whichever candidate is actually live (state isn't unavailable/unknown AND has
-         *  `entity_picture` — the same liveness signal `_mapUrl` already reads) since the
-         *  Roborock integration only backs the CURRENTLY selected map's image entity with
-         *  a live state; the rest sit at "unavailable" (live-verified: a 2-map vacuum's
-         *  inactive map entity has no `entity_picture` attribute at all). Falls back to
-         *  "the only candidate, whatever its state" when there's exactly one — covers a
-         *  freshly added vacuum whose first poll hasn't landed yet. Ambiguous cases (0 or
-         *  2+ simultaneously-live candidates) fall through to undefined — same as today,
-         *  the user picks manually. */
-        /** Only the REGISTRY-derived half is cached (2026-08-08 fix): the candidate
-         *  list per vacuum is stable and expensive (a scan of every entity), while
-         *  liveness is volatile and cheap (a couple of state lookups), so they must
-         *  not share a cache entry. Caching the finished answer meant a vacuum with
-         *  2+ saved maps — exactly the S6 case this resolver was written for — that
-         *  was first asked before the Roborock integration's first poll saw
-         *  `live.length === 0`, fell through to `undefined`, and cached THAT
-         *  permanently: no map at all until the page was reloaded. */
-        this._mapCandCache = new Map();
-        this._autoCache = new Map();
-        /** docs/25 §10 follow-up (2026-07-24): consumable/"care" rows auto-discovered from
-         *  the official `roborock` integration's OWN entities — zero new config keys, zero
-         *  new backend code, same spirit as `_intEntity`/`_autoEntities` above. Two device
-         *  scopes are involved: the vacuum's own device carries brush/filter/sensor
-         *  consumables; dock-mounted consumables (cleaning brush, strainer) and the S7/S8
-         *  water-tank binary sensors live on a SEPARATE `"<name> Dock"` HA device. That
-         *  second device is found not by name-matching (fragile, user-renamable) but via
-         *  its `identifiers` — live-verified on the user's HA (2026-07-24): the dock
-         *  device's `roborock` identifier is always the vacuum's own duid with `_dock`
-         *  appended (e.g. vacuum id `7bUI4dOp7O1qnECi7UfFW3` → dock id
-         *  `7bUI4dOp7O1qnECi7UfFW3_dock`), which is a backend-assigned id, not a slug.
-         *  Rows are matched by `translation_key` (not entity_id substring) — the same
-         *  robust-to-renaming approach `_autoEntities` already uses, and confirmed stable
-         *  across S6/S7 MaxV/S8 MaxV Ultra live registries. A vacuum/dock lacking a given
-         *  entity (e.g. S6 has no dock device at all; S7's dock lacks reset buttons for its
-         *  own consumables) simply omits that row — no guessing, no placeholders. */
-        /** Cache key is `entity|tier`, not just the entity (2026-08-08 fix): the row
-         *  set BRANCHES on `_dockTier(vac)` below, which reads `dock_status.dock_type`
-         *  off the integration sensor — live state, not registry data. Before the
-         *  first AnyVac poll lands, the tier reads "none", so the dock-mounted rows
-         *  (dock brush, strainer, tank sensors) were skipped and that incomplete list
-         *  was cached forever: those rows only ever appeared if a page reload happened
-         *  to land after a poll. Keying on the tier makes a tier change compute a
-         *  fresh list instead, while still caching every distinct answer exactly once. */
-        this._careCache = new Map();
-        this._holdEnd = () => {
-            this._cancelHold();
-        };
-        /** docs/25 §10 field report (2026-07-25): see `HOLD_MOVE_CANCEL_PX` doc
-         *  comment — cancels an in-progress hold once the pointer has moved past
-         *  the threshold from its start position, catching the Android
-         *  swipe-up-from-bottom-edge case where leave/cancel never fire. */
-        this._holdMove = (e) => {
-            if (!this._holdStartPos || this._holdTimer === null)
-                return;
-            const dx = e.clientX - this._holdStartPos.x;
-            const dy = e.clientY - this._holdStartPos.y;
-            if (dx * dx + dy * dy > HOLD_MOVE_CANCEL_PX * HOLD_MOVE_CANCEL_PX) {
-                this._cancelHold();
-            }
-        };
-        /** Backend plan preview (anyvac.plan, response-only): room key -> vacuum entity,
-         *  plus the sequence-aware ETA (docs/19) computed server-side from the real
-         *  per-robot assignment + the Roborock app's room order (room_sequence). */
-        this._planPreview = null;
-        this._planFetchKey = "";
-        /** Learn the floorplan's aspect ratio once it loads, for the rotation maths. */
-        this._onFloorplanLoad = (e) => {
-            const img = e.target;
-            if (img?.naturalWidth && img.naturalHeight) {
-                const ar = img.naturalWidth / img.naturalHeight;
-                if (ar > 0.1 && Math.abs(ar - this._mapAR) > 0.01)
-                    this._mapAR = ar;
-            }
-        };
-    }
-    // ── Lovelace card API ───────────────────────────────────────────────────
-    static getConfigElement() {
-        return document.createElement(EDITOR_NAME);
-    }
-    /** HA passes (hass, entities, entitiesFallback) when building the "+ Add card"
-     *  preview — auto-detecting the user's actual first vacuum entity here means a
-     *  freshly dropped card already works instead of showing a nonexistent
-     *  placeholder the user must find and replace by hand. Falls back to the old
-     *  placeholder if hass isn't supplied (defensive — some call sites/older HA
-     *  versions may not pass it). */
-    static getStubConfig(hass) {
-        const vacuumIds = hass ? Object.keys(hass.states).filter((id) => id.startsWith("vacuum.")) : [];
-        // Entity registry, when available, lets us skip Matter-bridged vacuum
-        // entities entirely — Matter's vacuum feature set is far more limited
-        // than a native integration's (no rooms/segments/zones), so a Matter
-        // entity is never useful alongside (or instead of) a native one. This
-        // matters more now that the stub auto-loads EVERY vacuum (field report
-        // 2026-07-31, extending the single-vacuum Matter fix from 2026-07-30):
-        // without it, any physical vacuum with a Matter bridge would show up
-        // twice — once crippled.
-        const reg = hass?.entities;
-        const nonMatter = reg ? vacuumIds.filter((id) => reg[id]?.platform !== "matter") : vacuumIds;
-        const ids = nonMatter.length > 0 ? nonMatter : vacuumIds;
-        if (ids.length === 0) {
-            return {
-                type: `custom:${CARD_NAME}`,
-                vacuums: [{ entity: "vacuum.my_roborock", name: "Roborock", rooms: [], clean_action: { type: "native" } }],
-            };
-        }
-        // No explicit `color` here on purpose — leaving it unset means each
-        // vacuum picks up its position-based DEFAULT_VACUUM_PALETTE colour
-        // (see `_defaultColor`), so a fresh multi-vacuum card gets visually
-        // distinct vehicles immediately, and stays that way if the user later
-        // reorders the `vacuums` list in YAML.
-        return {
-            type: `custom:${CARD_NAME}`,
-            vacuums: ids.map((id) => ({
-                entity: id,
-                name: hass.states[id]?.attributes["friendly_name"] ?? id.replace(/^vacuum\./, ""),
-                rooms: [],
-                clean_action: { type: "native" },
-            })),
-        };
-    }
-    setConfig(config) {
-        if (!config.vacuums || !Array.isArray(config.vacuums) || config.vacuums.length === 0) {
-            throw new Error("[anyvac-card] 'vacuums' must be a non-empty array");
-        }
-        this._config = config;
-        this._watched = null;
-        // A config edit can change which entities a vacuum resolves to (explicit
-        // `integration_entity`/`map.entity` overrides, a renamed or reordered
-        // vacuum), so every auto-resolved answer keyed on `vac.entity` is suspect —
-        // these were previously never cleared anywhere at all (2026-08-08 fix).
-        this._intCache.clear();
-        this._mapCandCache.clear();
-        this._autoCache.clear();
-        this._careCache.clear();
-        if (!this._initialized) {
-            this._initialized = true;
-            this._shownSet = this._loadShown();
-            this._localRoomSel = this._loadRoomSel();
-            this._flipLive = this._loadFlipLive();
-        }
-        else {
-            const valid = new Set();
-            for (const i of this._shownSet) {
-                if (i < config.vacuums.length)
-                    valid.add(i);
-            }
-            this._shownSet = valid.size > 0 ? valid : new Set(config.vacuums.map((_, i) => i));
-        }
-    }
-    getCardSize() {
-        return 6;
-    }
-    // ── Lifecycle ───────────────────────────────────────────────────────────
-    connectedCallback() {
-        super.connectedCallback();
-        this.style.setProperty("--hold-ms", HOLD_DURATION_MS + "ms");
-        if (!this._ro && typeof ResizeObserver !== "undefined") {
-            this._ro = new ResizeObserver(() => this._scheduleMeasure());
-            this._ro.observe(this);
-        }
-        if (!this._onWinResize) {
-            this._onWinResize = () => this._scheduleMeasure();
-            window.addEventListener("resize", this._onWinResize, { passive: true });
-            window.addEventListener("orientationchange", this._onWinResize, { passive: true });
-        }
-        this._setupPanelViewObserver();
-        this._scheduleMeasure();
-        if (!this._tickTimer) {
-            this._tickTimer = window.setInterval(() => {
-                // Only re-render (update the clock) when debug progress is on AND a vacuum is
-                // mid-clean or paused — otherwise stay idle to avoid needless re-renders.
-                if (this._config?.debug_room_progress &&
-                    (this._config.vacuums ?? []).some((v) => this._isCleaning(v) || this._isPaused(v))) {
-                    this._now = Date.now();
-                }
-            }, 1000);
-        }
-    }
-    /** Coalesce all width re-measures into one tick (RO + window resize +
-     *  orientationchange + edit-mode reparenting, docs/21 §5b). Also re-picks
-     *  the layout profile (docs/18) and refines the grid height.
-     *
-     *  docs/21 §5a: `requestAnimationFrame` never fires on a backgrounded tab
-     *  (kiosk/wall-mounted tablets, `browser_mod` popups, a second window) —
-     *  confirmed live, not just in theory. Fall back to `setTimeout(fn, 0)`
-     *  while `document.hidden`, so a measure scheduled in the background still
-     *  actually runs instead of hanging until the tab regains focus. */
-    _scheduleMeasure() {
-        if (this._measureRaf || this._measureTimer !== null)
-            return;
-        const run = () => {
-            this._measureRaf = 0;
-            this._measureTimer = null;
-            this._doMeasure();
-        };
-        if (typeof document !== "undefined" && document.hidden) {
-            this._measureTimer = window.setTimeout(run, 0);
-        }
-        else {
-            this._measureRaf = requestAnimationFrame(run);
-        }
-    }
-    /** docs/21 §5f: pick the layout profile from the card's OWN measured box,
-     *  not `window.innerWidth`/`innerHeight`. The card previously used the
-     *  full browser viewport for this — correct only when the card happens to
-     *  span the whole window. On any dashboard where it doesn't (two cards
-     *  side by side, a sections/grid view, a sidebar, split-screen), the
-     *  viewport's aspect ratio can disagree with the card's own box, picking
-     *  the wrong profile regardless of how correct the profile's own grid math
-     *  is. `_cardW` already tracks the real width (ResizeObserver on `this`);
-     *  this adds the matching height side. */
-    _doMeasure() {
-        const rect = this.getBoundingClientRect();
-        const w = Math.round(rect.width);
-        if (w && Math.abs(w - this._cardW) >= 2)
-            this._cardW = w;
-        const lay = this._config?.layout;
-        if (lay) {
-            const availW = this._cardW || w || window.innerWidth;
-            const availH = this._availableHeight(lay, rect);
-            const p = pickProfile(lay, availW, availH);
-            if (p !== this._profile)
-                this._profile = p;
-            this._refineGridHeight();
-        }
-    }
-    /** Available height for profile picking (docs/21 §5f) — mirrors the height
-     *  mode `resolveHeightCss`/`_refineGridHeight` already use, just applied
-     *  one tick earlier (profile choice happens before the grid root can be
-     *  measured on first paint, so it can't read `.avc-grid` yet). `"container"`
-     *  = the card's own rendered height (whatever its parent actually gave
-     *  it). `"viewport"` (default) and any custom CSS length: window bottom
-     *  minus the card's own top — the same technique `_refineGridHeight` uses
-     *  for the grid height itself, so profile picking and final sizing agree. */
-    _availableHeight(lay, rect) {
-        if ((lay.height ?? "viewport") === "container") {
-            return rect.height > 1 ? Math.round(rect.height) : window.innerHeight;
-        }
-        const top = rect.top;
-        if (top >= 0 && top < window.innerHeight) {
-            return Math.max(1, Math.round(window.innerHeight - top - this._editBarHeight()));
-        }
-        return window.innerHeight;
-    }
-    /** docs/21 §5b follow-up (2026-07-17, ported from a sibling project's
-     *  battle-tested fix — room-overlay-card v5.0): HA's edit-mode "Move /
-     *  Edit / Delete" actions bar renders as a REAL sibling inside
-     *  `hui-card-options`' OWN shadow root — a separate shadow tree from both
-     *  the card's own and `hui-panel-view`'s, and NOT an overlay. A card
-     *  pinned to the full viewport height without reserving room for it gets
-     *  its content pushed under/behind that bar. Measure the bar's REAL
-     *  rendered height (never hardcoded — it isn't a constant across HA
-     *  versions/themes) so callers can subtract exactly that much. Internal
-     *  HA DOM, best-effort: any miss just returns 0 (today's behavior). */
-    _editBarHeight() {
-        try {
-            const opts = this._findCardOptionsAncestor();
-            if (!opts?.shadowRoot)
-                return 0;
-            const bar = opts.shadowRoot.querySelector(".card-actions");
-            if (!bar)
-                return 0;
-            const br = bar.getBoundingClientRect();
-            if (!(br.height > 0))
-                return 0;
-            const bcs = getComputedStyle(bar);
-            return Math.ceil(br.height + (parseFloat(bcs.marginTop) || 0) + (parseFloat(bcs.marginBottom) || 0));
-        }
-        catch {
-            return 0;
-        }
-    }
-    /** docs/21 §5b, widened 2026-07-17: find the nearest `hui-panel-view` OR
-     *  `hui-view` ancestor across shadow root boundaries (HA nests the card
-     *  several shadow roots deep). Watching both, not just `hui-panel-view`,
-     *  is a lesson learned the hard way in a sibling project — which HA
-     *  dashboard/view type resolves to which tag varies, and a card that only
-     *  ever checks one can silently never find its ancestor. Internal HA DOM,
-     *  not public API — callers must degrade loudly (§5c), not assume it's
-     *  always found. */
-    _findPanelViewAncestor() {
-        let node = this.parentElement ?? this.getRootNode().host ?? null;
-        let hops = 0;
-        while (node && hops++ < 20) {
-            if (node instanceof Element && (node.tagName === "HUI-PANEL-VIEW" || node.tagName === "HUI-VIEW"))
-                return node;
-            const el = node;
-            node = el.parentElement ?? el.getRootNode()?.host ?? null;
-        }
-        return null;
-    }
-    /** Nearest `hui-card-options` ancestor, if the card is currently wrapped
-     *  in one (edit mode). Its actions bar lives in ITS OWN shadow root — a
-     *  separate tree from `hui-panel-view`'s — so it needs to be watched
-     *  (and re-found) independently; see `_setupPanelViewObserver`. */
-    _findCardOptionsAncestor() {
-        let node = this.parentElement ?? this.getRootNode().host ?? null;
-        let hops = 0;
-        while (node && hops++ < 12) {
-            if (node instanceof Element && node.tagName === "HUI-CARD-OPTIONS")
-                return node;
-            const el = node;
-            node = el.parentElement ?? el.getRootNode()?.host ?? null;
-        }
-        return null;
-    }
-    /** docs/21 §5b: HA reparents the card into `hui-card-options` on edit-mode
-     *  toggle without firing any event, and the host's own box doesn't always
-     *  change size when it happens — `ResizeObserver(this)` can miss it. Watch
-     *  the nearest panel-view ancestor (and its shadow root, if any) for DOM
-     *  mutations and force a remeasure on any change. `_scheduleMeasure` is
-     *  itself coalesced, so an extra call here is cheap.
-     *
-     *  2026-07-17: also (re-)adopt `hui-card-options`' own shadow root on every
-     *  mutation — its actions bar (whose height `_editBarHeight` reserves) is
-     *  a separate shadow tree that can appear/change after the wrapper itself
-     *  shows up, and re-observing an already-observed target is a cheap
-     *  no-op, so this is safe to do unconditionally rather than only once. */
-    _setupPanelViewObserver() {
-        if (typeof MutationObserver === "undefined")
-            return;
-        // docs/21 §5b third follow-up: re-verify liveness on every call instead of
-        // early-returning forever once `_panelViewMo` is non-null — a stale
-        // watched node is otherwise indistinguishable from a healthy one until an
-        // edit-mode mutation silently fails to reach it.
-        if (this._panelViewMo && this._panelViewNode?.isConnected)
-            return;
-        if (this._panelViewMo) {
-            this._panelViewMo.disconnect();
-            this._panelViewMo = null;
-            this._panelViewNode = null;
-        }
-        const panelView = this._findPanelViewAncestor();
-        if (!panelView) {
-            if (!this._panelViewWarned) {
-                this._panelViewWarned = true;
-                try {
-                    console.warn("[anyvac-card] hui-panel-view/hui-view ancestor not found (HA internal DOM may " +
-                        "have changed) — edit-mode layout refresh via MutationObserver is disabled; " +
-                        "resize-based refresh still works.");
-                }
-                catch { /* noop */ }
-            }
-            return;
-        }
-        const mo = new MutationObserver(() => {
-            this._scheduleMeasure();
-            this._watchEditBar();
-            const opts = this._findCardOptionsAncestor();
-            if (opts?.shadowRoot) {
-                try {
-                    mo.observe(opts.shadowRoot, { childList: true, subtree: true });
-                }
-                catch { /* noop */ }
-            }
-        });
-        try {
-            mo.observe(panelView, { childList: true, subtree: true });
-        }
-        catch { /* noop */ }
-        if (panelView.shadowRoot) {
-            try {
-                mo.observe(panelView.shadowRoot, { childList: true, subtree: true });
-            }
-            catch { /* noop */ }
-        }
-        const initialOpts = this._findCardOptionsAncestor();
-        if (initialOpts?.shadowRoot) {
-            try {
-                mo.observe(initialOpts.shadowRoot, { childList: true, subtree: true });
-            }
-            catch { /* noop */ }
-        }
-        this._panelViewMo = mo;
-        this._panelViewNode = panelView;
-        this._watchEditBar();
-    }
-    /** docs/21 §5b third follow-up (2026-07-17, ported from room-overlay-card
-     *  v5.0 + confirmed live, 2026-07-17, on the user's real dashboard): two
-     *  separate races around the edit-mode actions bar, not one.
-     *
-     *  (1) `hui-card-options` itself can appear in the DOM BEFORE it has been
-     *  upgraded to a custom element — its `shadowRoot` reads `null` for a beat
-     *  even though the wrapper node already exists. Confirmed live: instrumented
-     *  the real dashboard and captured `hui-card-options appeared, shadowRoot=
-     *  false` at the moment of the reparenting mutation. `_setupPanelViewObserver`
-     *  already re-checks on every mutation, but this dedicated one-shot watcher
-     *  is what specifically waits for the shadow root (and then the bar inside
-     *  it) to actually exist.
-     *
-     *  (2) Once `.card-actions` exists, HA animates its height in — it does NOT
-     *  just appear at full size. Confirmed live: the bar's own settled height
-     *  was 64.8px, but the grid only ever reserved 54px and stayed there
-     *  indefinitely (no further remeasure was ever triggered, since nothing
-     *  else on the card changed state) — a single remeasure right after the bar
-     *  *appears* races the transition and can permanently under-reserve. Fixed
-     *  by watching the bar's own box with a `ResizeObserver` once found: it
-     *  fires on every frame of the height transition, so whichever remeasure
-     *  runs last after the transition settles gets the real height — no fixed
-     *  delay, no guessing at a transition duration. */
-    _watchEditBar() {
-        if (this._barMo) {
-            this._barMo.disconnect();
-            this._barMo = null;
-        }
-        const opts = this._findCardOptionsAncestor();
-        if (!opts?.shadowRoot)
-            return;
-        const existing = opts.shadowRoot.querySelector(".card-actions");
-        if (existing) {
-            this._observeEditBar(existing);
-            return;
-        }
-        const root = opts.shadowRoot;
-        const mo = new MutationObserver(() => {
-            const bar = root.querySelector(".card-actions");
-            if (bar) {
-                mo.disconnect();
-                this._barMo = null;
-                this._observeEditBar(bar);
-            }
-        });
-        try {
-            mo.observe(root, { childList: true, subtree: true });
-        }
-        catch {
-            return;
-        }
-        this._barMo = mo;
-    }
-    /** Remeasure now, and keep remeasuring on every box change of the actions
-     *  bar itself until it's disconnected (edit-mode exit, or the card itself
-     *  disconnects) — see `_watchEditBar`'s doc comment for why a one-shot
-     *  measurement isn't enough. */
-    _observeEditBar(bar) {
-        this._scheduleMeasure();
-        if (typeof ResizeObserver === "undefined")
-            return;
-        if (this._editBarRo) {
-            this._editBarRo.disconnect();
-            this._editBarRo = null;
-        }
-        const ro = new ResizeObserver(() => this._scheduleMeasure());
-        try {
-            ro.observe(bar);
-        }
-        catch {
-            return;
-        }
-        this._editBarRo = ro;
-    }
-    /** Measured refinement of the grid height: innerHeight − rootTop beats the raw
-     *  `calc(100svh − header)` when the root is offset (padding, safe-area). Applied
-     *  directly to the element on top of `gridRootStyles()`'s declarative fallback
-     *  (see that function's doc comment re: the 0.59.0 mobile-crash revert — this
-     *  layered approach, not sole JS ownership, is the confirmed-stable one).
-     *  2026-07-17: also reserves room for the edit-mode actions bar (`_editBarHeight`)
-     *  so entering edit mode doesn't push it under/behind the pinned-height grid. */
-    _refineGridHeight() {
-        const lay = this._config?.layout;
-        if (!lay)
-            return;
-        const root = this.renderRoot?.querySelector(".avc-grid");
-        if (!root)
-            return;
-        if ((lay.height ?? "viewport") === "viewport") {
-            const top = root.getBoundingClientRect().top;
-            if (top >= 0 && top < window.innerHeight) {
-                const h = Math.round(window.innerHeight - top - this._editBarHeight());
-                if (h > 120)
-                    root.style.height = h + "px";
-            }
-        }
-        // Measure the map region for the exact rotated-map fit (docs/18 §7). Guarded
-        // by a ±2 px threshold so the update→measure cycle settles instead of looping.
-        const reg = this.renderRoot?.querySelector(".avc-region--map");
-        if (reg) {
-            const w = Math.round(reg.clientWidth);
-            const h2 = Math.round(reg.clientHeight);
-            if (w && Math.abs(w - this._mapRegW) >= 2)
-                this._mapRegW = w;
-            if (h2 && Math.abs(h2 - this._mapRegH) >= 2)
-                this._mapRegH = h2;
-        }
-        // docs/25 §7c: measure the combined map+dock box (root minus the START
-        // row) for the split-vs-stack topology decision — independent of which
-        // topology is currently rendered, so it stays correct across the switch.
-        if (this._profile === "portrait") {
-            const startEl = this.renderRoot?.querySelector(".avc-region--start");
-            const gapPx = parseFloat(getComputedStyle(root).rowGap || getComputedStyle(root).gap || "0") || 0;
-            const startH = startEl ? Math.round(startEl.getBoundingClientRect().height) : 0;
-            const aw = Math.round(root.clientWidth);
-            const ah = Math.round(root.clientHeight - startH - (startH ? gapPx : 0));
-            if (aw && Math.abs(aw - this._mapAvailW) >= 2)
-                this._mapAvailW = aw;
-            if (ah > 0 && Math.abs(ah - this._mapAvailH) >= 2)
-                this._mapAvailH = ah;
-        }
-    }
-    disconnectedCallback() {
-        super.disconnectedCallback();
-        this._cancelHold();
-        if (this._measureRaf) {
-            cancelAnimationFrame(this._measureRaf);
-            this._measureRaf = 0;
-        }
-        if (this._measureTimer !== null) {
-            clearTimeout(this._measureTimer);
-            this._measureTimer = null;
-        }
-        if (this._settleTimer !== null) {
-            clearTimeout(this._settleTimer);
-            this._settleTimer = null;
-        }
-        if (this._tickTimer) {
-            clearInterval(this._tickTimer);
-            this._tickTimer = null;
-        }
-        if (this._onWinResize) {
-            window.removeEventListener("resize", this._onWinResize);
-            window.removeEventListener("orientationchange", this._onWinResize);
-            this._onWinResize = null;
-        }
-        if (this._ro) {
-            this._ro.disconnect();
-            this._ro = null;
-        }
-        // _panelViewWarned is intentionally NOT reset here — if the panel-view
-        // ancestor lookup already failed once, a reconnect (HA can disconnect +
-        // reconnect the card) shouldn't spam a second identical warning.
-        if (this._panelViewMo) {
-            this._panelViewMo.disconnect();
-            this._panelViewMo = null;
-        }
-        this._panelViewNode = null;
-        if (this._barMo) {
-            this._barMo.disconnect();
-            this._barMo = null;
-        }
-        if (this._editBarRo) {
-            this._editBarRo.disconnect();
-            this._editBarRo = null;
-        }
-    }
-    firstUpdated() {
-        // Seed the width immediately; the ResizeObserver may not fire before the
-        // first paint (and never fires if the host has no layout box yet).
-        const w = Math.round(this.getBoundingClientRect().width);
-        if (w)
-            this._cardW = w;
-        this._scheduleMeasure();
-    }
-    updated() {
-        // docs/25 §10 field-caught (2026-07-25): clear a reset spinner as soon as
-        // the watched sensor/button it's keyed on actually moves past the press
-        // time — the 40s timeout in the reset click handler is only the hard
-        // fallback for an offline vacuum whose poll never lands. Cheap (a
-        // handful of entries at most) so it runs on every render unconditionally
-        // rather than gating on `changed.has("hass")` — this override doesn't
-        // currently take a `PropertyValues` param and adding one just for this
-        // check isn't worth it.
-        if (this._careResetPending.size) {
-            let next = null;
-            for (const [key, pressedAt] of this._careResetPending) {
-                const st = this.hass?.states[key];
-                const changedMs = st ? Date.parse(st.last_changed) : NaN;
-                if (Number.isFinite(changedMs) && changedMs > pressedAt) {
-                    if (!next)
-                        next = new Map(this._careResetPending);
-                    next.delete(key);
-                }
-            }
-            if (next)
-                this._careResetPending = next;
-        }
-        // Grid mode: re-apply the measured height after every render (the declarative
-        // svh calc stays as the pre-measure fallback).
-        this._refineGridHeight();
-        this._refineGridColumns();
-        // docs/21 §5b: re-attempt the panel-view observer hookup on every render,
-        // not just connectedCallback — HA can disconnect/reconnect the card, and
-        // the ancestor may not have been in the tree yet on the very first
-        // connectedCallback. docs/21 §5b third follow-up: no longer gated on
-        // `!this._panelViewMo` — the call itself now re-verifies liveness (a
-        // stale watched node needs the exact same re-hookup as never having
-        // found one), so this must run every render, not just until first set.
-        this._setupPanelViewObserver();
-        // docs/21 §5b follow-up: one 250ms late-settling remeasure, see
-        // `_settleTimer`'s doc comment. Cleared + rescheduled every render.
-        if (this._settleTimer !== null)
-            clearTimeout(this._settleTimer);
-        this._settleTimer = window.setTimeout(() => {
-            this._settleTimer = null;
-            this._scheduleMeasure();
-        }, 250);
-    }
-    /** Portrait only (docs/19 follow-up): the map is height-fit
-     *  (`_renderResponsive`), which usually leaves it narrower than the fixed
-     *  72% column — override the actual column split so `dock` picks up
-     *  whatever `map` doesn't need, instead of that width sitting empty. A CSS
-     *  "auto" track can't do this on its own: the fitted width lives on an
-     *  absolutely-positioned inner div specifically so it doesn't feed back
-     *  into layout, which also means it carries no intrinsic-size signal for
-     *  track auto-sizing — so the split is measured and applied directly, same
-     *  as `_refineGridHeight` does for the root height.
-     *
-     *  History (2026-07-16, all same day): tried capping `dock` to its own
-     *  content width (first via live `width:max-content`, then via a detached
-     *  clone measurement) because a flat `1fr` handed it every px the map's
-     *  fit didn't need. Neither showed any visible effect in the field, which
-     *  led to a theory that Lit's `styleMap` (which also lists
-     *  `gridTemplateColumns` in `gridRootStyles()`) was re-applying the
-     *  static declarative value over this function's override on every
-     *  render — so `gridTemplateColumns`/`height` were pulled out of
-     *  `gridRootStyles()` entirely to make this function+`_refineGridHeight`
-     *  the sole owners. That "fix" (0.59.0) is what crashed the HA mobile
-     *  companion app (user-confirmed bisection: 0.55.0–0.58.0 fine, 0.59.0
-     *  first to crash) — reverted back to layering on top of the declarative
-     *  value (see `gridRootStyles()`'s doc comment), and the dock-content-cap
-     *  measurement is dropped too (parked, not reproduced as the crash cause
-     *  but not worth the added DOM-clone risk while re-verifying). Net effect
-     *  right now: same simple map-only fit as 0.56.0 (`mapW = rW`, `dock`
-     *  stays `1fr`) — the sidebar-overshoot cosmetic issue is back, on
-     *  purpose, in exchange for confirmed mobile stability. */
-    /** 2026-07-16 addendum: dropped the idea of auto-shrinking `dock` to its
-     *  own "natural" content width entirely — `.dock-row` uses `flex-wrap:
-     *  wrap` in portrait (deliberately, so long room names/badges reflow
-     *  instead of overflowing), which means it doesn't HAVE a fixed natural
-     *  width the way non-wrapping content would: any max-content-style
-     *  measurement returns the *unwrapped* single-line size, which is often
-     *  wider than the space actually available, i.e. never smaller than
-     *  what's already allocated — that's almost certainly why every earlier
-     *  attempt measured "no room to spare" and left the split unchanged, not
-     *  a bug in the measurement itself. There's no single objectively-right
-     *  split to compute here; it's a visual trade-off. So: respect an
-     *  explicit `layout.portrait.columns` in the user's own config as a
-     *  manual override (skip the dynamic fit entirely, let the declarative
-     *  value stand) — that's the fast, safe way to actually tune this to
-     *  taste, instead of chasing an auto-computed number that doesn't really
-     *  exist for wrapping content. */
-    _refineGridColumns() {
-        if (this._profile !== "portrait" || !this._lastPortraitFitW)
-            return;
-        if (this._config.layout?.portrait?.columns?.length)
-            return;
-        // Stack topology has a single 100%-width column — no split to refine.
-        if (this._stackTopology)
-            return;
-        const root = this.renderRoot?.querySelector(".avc-grid");
-        if (!root)
-            return;
-        const total = root.clientWidth;
-        const gapPx = parseFloat(getComputedStyle(root).columnGap || "0") || 0;
-        const avail = total - gapPx;
-        let mapW = Math.round(this._lastPortraitFitW);
-        if (avail > 0)
-            mapW = Math.min(mapW, avail);
-        const want = Math.round(mapW) + "px 1fr";
-        if (root.style.gridTemplateColumns !== want)
-            root.style.gridTemplateColumns = want;
-    }
-    /**
-     * Re-render only when a relevant entity changed — the hass object is
-     * replaced on every state change anywhere in HA.
-     */
-    shouldUpdate(changed) {
-        if (!changed.has("hass") || changed.size > 1)
-            return true;
-        const old = changed.get("hass");
-        if (!old || !this._config)
-            return true;
-        for (const id of this._watchedEntities()) {
-            if (old.states[id] !== this.hass.states[id])
-                return true;
-        }
-        return false;
-    }
-    _watchedEntities() {
-        // Before the early return, not after: `_registry()` is what drops `_watched`
-        // when the entity registry changes, and every other caller of it sits behind
-        // this cache — so without this line a registry change (integration reload,
-        // a vacuum gaining its AnyVac sensor) would not reach the watched set until
-        // some unrelated render happened to run first.
-        this._registry();
-        if (this._watched)
-            return this._watched;
-        const s = new Set();
-        for (const vac of this._config?.vacuums ?? []) {
-            for (const id of [vac.entity, vac.status_entity, vac.battery_entity,
-                vac.last_clean_entity, vac.progress_entity, vac.current_room_entity,
-                vac.error_entity, this._mapEntityFor(vac), this._intEntity(vac),
-                ...Object.values(this._autoEntities(vac))]) {
-                if (id)
-                    s.add(id);
-            }
-            for (const r of this._roomsFor(vac)) {
-                if (r.last_clean_entity)
-                    s.add(r.last_clean_entity);
-                if (r.clean_time_entity)
-                    s.add(r.clean_time_entity);
-            }
-            // docs/25 §10 field-caught (2026-07-25): the dock sheet's care rows
-            // (`_careItems`) are auto-discovered from the official `roborock`
-            // integration's OWN entities and were never added here — pressing a
-            // reset button DID work (live-verified: the underlying sensor updates
-            // within one ~30s roborock poll cycle) but the card only re-renders on
-            // a watched-entity change (`shouldUpdate` above), so the refreshed %
-            // silently sat in `hass.states` until some UNRELATED watched entity
-            // (battery tick, status change, ...) happened to trigger a render —
-            // which read as "reset doesn't work". Care items aren't computed yet
-            // this early in some code paths (entity registry may still be
-            // loading), so this reads `_careItems` defensively — it already
-            // no-ops safely without a loaded registry.
-            for (const row of this._careItems(vac)) {
-                if (row.entity)
-                    s.add(row.entity);
-                if (row.reset)
-                    s.add(row.reset);
-                if (row.binary)
-                    s.add(row.binary);
-            }
-        }
-        for (const ga of this._config?.global_actions ?? []) {
-            for (const e of ga.watch_entities ?? [])
-                if (e)
-                    s.add(e);
-        }
-        // Don't freeze the list before the entity registry is loaded — the auto-resolved
-        // sibling sensors (status/battery/room/error) would otherwise never be watched.
-        if (this.hass?.entities)
-            this._watched = s;
-        return s;
-    }
-    // ── Helpers ─────────────────────────────────────────────────────────────
-    /** Resolves a VacuumColor (or GlobalAction colour) to a CSS colour string.
-     *  The three legacy preset names go through COLOR_HEX unchanged; anything
-     *  else (a custom hex the user picked) passes straight through. */
-    _resolveColor(raw, fallback) {
-        const c = raw ?? fallback;
-        return COLOR_HEX[c] ?? c;
-    }
-    /** Resolves the translucent background wash for a colour. Legacy presets
-     *  keep their exact, independently-tuned COLOR_BG/COLOR_BG_ACTIVE values
-     *  (unchanged look for existing configs); a custom hex is tinted on the
-     *  fly via hexToRgba so any colour gets a matching wash. */
-    _resolveBg(raw, fallback, active) {
-        const c = raw ?? fallback;
-        const table = active ? COLOR_BG_ACTIVE : COLOR_BG;
-        return table[c] ?? hexToRgba(this._resolveColor(raw, fallback), active ? 0.3 : 0.18);
-    }
-    /** Position of `vac` within the configured vacuums array, used to pick its
-     *  default palette colour when `color` isn't explicitly set. Matched by
-     *  entity id rather than object identity, since that's the only stable key
-     *  across any future re-derivation of the vacuum list. */
-    _vacIndex(vac) {
-        const i = this._config?.vacuums?.findIndex((v) => v.entity === vac.entity) ?? -1;
-        return i < 0 ? 0 : i;
-    }
-    /** Default accent colour for a vacuum with no explicit `color` — cycles
-     *  through DEFAULT_VACUUM_PALETTE by array position, so every vacuum in a
-     *  fresh multi-vacuum config is visually distinct instead of all defaulting
-     *  to the same green (field report 2026-07-31). */
-    _defaultColor(vac) {
-        return DEFAULT_VACUUM_PALETTE[this._vacIndex(vac) % DEFAULT_VACUUM_PALETTE.length];
-    }
-    _color(vac) {
-        return this._resolveColor(vac.color, this._defaultColor(vac));
-    }
-    _colorBg(vac) {
-        return this._resolveBg(vac.color, this._defaultColor(vac), false);
-    }
-    _colorBgActive(vac) {
-        return this._resolveBg(vac.color, this._defaultColor(vac), true);
-    }
-    _registry() {
-        const reg = this.hass?.entities;
-        if (reg !== this._regRef) {
-            this._regRef = reg;
-            this._intCache.clear();
-            this._mapCandCache.clear();
-            this._autoCache.clear();
-            this._careCache.clear();
-            this._watched = null;
-        }
-        return reg;
-    }
-    _intEntity(vac) {
-        if (vac.integration_entity)
-            return vac.integration_entity;
-        const reg = this._registry();
-        if (!reg || !vac.entity)
-            return undefined;
-        if (this._intCache.has(vac.entity))
-            return this._intCache.get(vac.entity);
-        const dev = reg[vac.entity]?.device_id;
-        const found = dev
-            ? Object.keys(reg).find((id) => reg[id]?.device_id === dev && reg[id]?.platform === "anyvac" && id.startsWith("sensor."))
-            : undefined;
-        this._intCache.set(vac.entity, found);
-        return found;
-    }
-    _mapEntityFor(vac) {
-        if (vac.map?.entity)
-            return vac.map.entity;
-        const reg = this._registry();
-        if (!reg || !vac.entity)
-            return undefined;
-        let candidates = this._mapCandCache.get(vac.entity);
-        if (!candidates) {
-            const dev = reg[vac.entity]?.device_id;
-            if (!dev)
-                return undefined; // registry not ready for this vacuum yet — don't cache
-            candidates = Object.keys(reg).filter((id) => reg[id]?.device_id === dev && id.startsWith("image."));
-            this._mapCandCache.set(vac.entity, candidates);
-        }
-        if (candidates.length === 1)
-            return candidates[0]; // unambiguous, liveness irrelevant
-        const live = candidates.filter((id) => {
-            const st = this.hass.states[id];
-            return !!st && st.state !== "unavailable" && st.state !== "unknown" && !!st.attributes["entity_picture"];
-        });
-        return live.length === 1 ? live[0] : undefined;
-    }
-    /** Kontrakt v2 gate: attributes of the vacuum's integration sensor, only when the
-     *  integration speaks schema_version ≥ 2. Older backends → smart features off. */
-    _intAttrs(vac) {
-        const ent = this._intEntity(vac);
-        const at = ent ? this.hass.states[ent]?.attributes : undefined;
-        if (!at)
-            return undefined;
-        return (at.schema_version ?? 0) >= 2 ? at : undefined;
-    }
-    /** Human-readable warning when an integration sensor exists but speaks an old schema. */
-    _schemaWarning() {
-        for (const v of this._config?.vacuums ?? []) {
-            const ent = this._intEntity(v);
-            const at = ent ? this.hass.states[ent]?.attributes : undefined;
-            if (at && (at.schema_version ?? 0) < 2) {
-                return `AnyVac integration is too old for this card (schema ${at.schema_version ?? 1} < 2). ` +
-                    "Update the anyvac integration to ≥ 0.18.0.";
-            }
-        }
-        return null;
-    }
-    /** Resolve a vacuum's sibling entities (battery/status/last-clean/progress/room/error) from its
-     *  device, so the user does not have to fill them in. Matched by translation_key / device_class. */
-    _autoEntities(vac) {
-        const reg = this._registry();
-        if (!reg || !vac.entity)
-            return {};
-        const cached = this._autoCache.get(vac.entity);
-        if (cached)
-            return cached;
-        const dev = reg[vac.entity]?.device_id;
-        if (!dev)
-            return {};
-        const sibs = Object.keys(reg).filter((id) => reg[id]?.device_id === dev);
-        const byTk = (tk) => sibs.find((id) => reg[id]?.translation_key === tk);
-        const byDc = (dc) => sibs.find((id) => this.hass.states[id]?.attributes?.device_class === dc);
-        const out = {
-            status: byTk("status"),
-            battery: byDc("battery"),
-            last_clean: byTk("last_clean_end"),
-            progress: byTk("clean_percent"),
-            current_room: byTk("current_room"),
-            error: byTk("vacuum_error"),
-        };
-        this._autoCache.set(vac.entity, out);
-        return out;
-    }
-    _ent(vac, kind) {
-        const explicit = vac[kind + "_entity"];
-        return explicit ?? this._autoEntities(vac)[kind];
-    }
-    _statusInfo(vac) {
-        const raw = this.hass.states[this._ent(vac, "status") ?? vac.entity]?.state ?? "unknown";
-        return STATUS_MAP[raw] ?? [raw, "rgba(255,255,255,0.5)"];
-    }
-    _careItems(vac) {
-        const reg = this._registry();
-        const devs = this.hass?.devices;
-        if (!reg || !devs || !vac.entity)
-            return [];
-        const tier = this._dockTier(vac);
-        const cacheKey = vac.entity + "|" + tier;
-        if (this._careCache.has(cacheKey))
-            return this._careCache.get(cacheKey);
-        const devId = reg[vac.entity]?.device_id;
-        const vacDevice = devId ? devs[devId] : undefined;
-        const duid = vacDevice?.identifiers?.find(([domain]) => domain === "roborock")?.[1];
-        const dockDevice = duid
-            ? Object.values(devs).find((d) => d.identifiers?.some(([domain, id]) => domain === "roborock" && id === `${duid}_dock`))
-            : undefined;
-        const dockDevId = dockDevice?.id;
-        const byTk = (deviceId, tk, domain) => deviceId
-            ? Object.keys(reg).find((id) => reg[id]?.device_id === deviceId && reg[id]?.translation_key === tk && id.startsWith(domain + "."))
-            : undefined;
-        const rows = [];
-        const consumable = (label, tk, resetTk, deviceId) => {
-            const entity = byTk(deviceId, tk, "sensor");
-            const reset = byTk(deviceId, resetTk, "button");
-            if (entity || reset)
-                rows.push({ key: tk, label, entity, reset, totalHours: CARE_TOTAL_HOURS[tk] });
-        };
-        consumable("Main brush", "main_brush_time_left", "reset_main_brush_consumable", devId);
-        consumable("Side brush", "side_brush_time_left", "reset_side_brush_consumable", devId);
-        consumable("Filter", "filter_time_left", "reset_air_filter_consumable", devId);
-        consumable("Sensors", "sensor_time_left", "reset_sensor_consumable", devId);
-        // Dock-mounted consumables/tank status only apply to a wash-capable dock —
-        // an empty-only dock's entities can still exist in HA's registry (created
-        // per device model, not per physically-installed accessory) but always
-        // report "unavailable"; gate on the same dock_type tier as the actions
-        // above instead of just checking entity presence (docs/25 §10 3rd
-        // follow-up, live-confirmed on the field-reporting user's S7 MaxV).
-        if (tier === "full") {
-            consumable("Dock brush", "cleaning_brush_time_left", "reset_dock_cleaning_brush_consumable", dockDevId);
-            consumable("Strainer", "strainer_time_left", "reset_dock_strainer_consumable", dockDevId);
-            const binary = (label, tk) => {
-                const entity = byTk(dockDevId, tk, "binary_sensor");
-                if (entity)
-                    rows.push({ key: tk, label, binary: entity });
-            };
-            binary("Dirty water tank", "dirty_box_full");
-            binary("Clean water tank", "clean_box_empty");
-            binary("Cleaning fluid", "clean_fluid_empty");
-        }
-        this._careCache.set(cacheKey, rows);
-        return rows;
-    }
-    /** Formats a consumable row: a % of nominal lifespan when the total is known
-     *  (`CARE_TOTAL_HOURS`), else a plain hour figure — always normalized to
-     *  hours regardless of the sensor's own unit (HA's `roborock` integration
-     *  reports some consumables in seconds and others already in hours for no
-     *  documented reason; live-confirmed inconsistent across S6 (`s`) vs S7/S8
-     *  (`h`) on the field-reporting user's own entities). Falls back to a dash
-     *  when the entity is unavailable/unknown. */
-    _careValue(row) {
-        if (!row.entity)
-            return "—";
-        const st = this.hass.states[row.entity];
-        if (!st || st.state === "unavailable" || st.state === "unknown")
-            return "—";
-        const raw = Number(st.state);
-        if (Number.isNaN(raw))
-            return st.state;
-        const unit = st.attributes?.unit_of_measurement;
-        const hours = unit === "s" ? raw / 3600 : unit === "min" ? raw / 60 : raw;
-        if (row.totalHours) {
-            const pct = Math.max(0, Math.min(100, Math.round((hours / row.totalHours) * 100)));
-            return `${pct} %`;
-        }
-        return `${Math.round(hours)} h`;
-    }
-    _isCleaning(vac) {
-        return CLEANING_STATES.has(this.hass.states[vac.entity]?.state ?? "");
-    }
-    /** True when the vacuum's error entity/attribute reports an active error
-     *  (shared by the status card error row and the map robot-error halo). */
-    _hasError(vac) {
-        const erid = this._ent(vac, "error");
-        const errState = erid ? this.hass.states[erid]?.state : null;
-        return !!errState && errState !== "none" && errState !== "unknown" && errState !== "unavailable";
-    }
-    _isPaused(vac) {
-        return this.hass.states[vac.entity]?.state === "paused";
-    }
-    _battery(vac) {
-        const bid = this._ent(vac, "battery");
-        if (!bid)
-            return null;
-        const n = parseInt(this.hass.states[bid]?.state ?? "");
-        return isNaN(n) ? null : n;
-    }
-    _lastCleanStr(vac) {
-        const lid = this._ent(vac, "last_clean");
-        const raw = lid ? this.hass.states[lid]?.state : undefined;
-        if (!raw || raw === "unavailable" || raw === "unknown")
-            return "—";
-        const d = new Date(raw);
-        const diff = Math.floor((Date.now() - d.getTime()) / 86400000);
-        const t = d.toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" });
-        if (diff === 0)
-            return "Today · " + t;
-        if (diff === 1)
-            return "Yesterday · " + t;
-        return d.toLocaleDateString([], { day: "2-digit", month: "2-digit" }) + " · " + t;
-    }
-    _progress(vac) {
-        const pid = this._ent(vac, "progress");
-        if (!pid)
-            return null;
-        const n = parseInt(this.hass.states[pid]?.state ?? "");
-        return isNaN(n) || n === 0 ? null : n;
-    }
-    /** First integration sensor that exposes the shared (backend) selection. */
-    _selSensor() {
-        for (const v of this._config.vacuums) {
-            const ent = this._intEntity(v);
-            if (ent && Array.isArray(this.hass.states[ent]?.attributes?.selected_rooms))
-                return ent;
-        }
-        return undefined;
-    }
-    /** Shared room selection (card-level, by room key) from the backend, or null when
-     *  no integration is available (then the card falls back to local state). */
-    _backendSel() {
-        const ent = this._selSensor();
-        if (!ent)
-            return null;
-        return new Set(this.hass.states[ent]?.attributes?.selected_rooms ?? []);
-    }
-    _setBackendSel(rooms, mode) {
-        this._call("anyvac", "select_rooms", { rooms, mode });
-    }
-    _isRoomSelected(room, vac) {
-        const be = this._backendSel();
-        if (be)
-            return be.has(room.key);
-        return this._localRoomSel.get(vac.entity + ":" + room.key) ?? false;
-    }
-    /** Effective dry/wet layer visibility: the backend-shared state when the integration
-     *  provides it (persists refreshes + syncs across devices, like the room selection),
-     *  else the local component state. */
-    _layersEff() {
-        const ent = this._selSensor();
-        const vl = ent ? this.hass.states[ent]?.attributes?.view_layers : undefined;
-        if (vl && typeof vl.dry === "boolean" && typeof vl.wet === "boolean") {
-            return { dry: vl.dry, wet: vl.wet };
-        }
-        return this._layers;
-    }
-    /** Static (config-authored) rooms for a vacuum: card-level `rooms` if defined
-     *  (merged config), else the vacuum's own. Never touches the integration —
-     *  also the anchor source for auto-seating (see `_effectiveSeat`). */
-    _staticRoomsFor(vac) {
-        return (this._config.rooms?.length ? this._config.rooms : vac.rooms) ?? [];
-    }
-    /** Rooms z integrace (docs/20, RATIFIKOVÁNO 2026-07-22): live-merged view for
-     *  RENDERING — a room the integration reports this poll gets its geometry
-     *  computed on the fly from `bbox_px` at the vacuum's current effective seat
-     *  (`roomBboxToRect`, same maths the one-shot Import already used, just called
-     *  every render instead of once) UNLESS a matching static config room pins an
-     *  explicit `map_x`/`map_y` — that override always wins outright (and doubles
-     *  as an auto-seating anchor, see `_effectiveSeat`). Icon/name/threshold fields
-     *  from a matching static room are layered on top either way. A config room
-     *  with no live counterpart this poll (custom room, or the integration briefly
-     *  missing data) still renders as configured — never silently dropped. Falls
-     *  back to the plain static list whenever there's no usable integration data
-     *  or no floorplan seat yet (degraded mode, schema < 2, fresh install). */
-    _roomsFor(vac) {
-        const at = this._intAttrs(vac);
-        const intRooms = Array.isArray(at?.rooms) ? at.rooms : [];
-        if (!at || !intRooms.length)
-            return this._staticRoomsFor(vac);
-        const seat = this._effectiveSeat(vac);
-        const ar = this._wrapAspect(this._baseHeightFor(vac));
-        const staticRooms = this._staticRoomsFor(vac);
-        const byKey = new Map(staticRooms.filter((r) => r.key).map((r) => [r.key, r]));
-        const seen = new Set();
-        const out = [];
-        for (const ir of intRooms) {
-            const nm = ir?.name;
-            if (!nm)
-                continue;
-            seen.add(nm);
-            const cfg = byKey.get(nm);
-            if (cfg && cfg.map_x != null && cfg.map_y != null) {
-                out.push(cfg);
-                continue;
-            } // explicit override/anchor wins
-            const rect = roomBboxToRect(ir, at, seat, ar);
-            if (!rect) {
-                if (cfg)
-                    out.push(cfg);
-                continue;
-            } // no seat yet -> whatever static has, if anything
-            out.push({ ...(cfg ?? { key: nm, name: nm, icon: "mdi:floor-plan" }), ...rect });
-        }
-        for (const cfg of staticRooms)
-            if (cfg.key && !seen.has(cfg.key))
-                out.push(cfg);
-        return out;
-    }
-    _hasSelectedRooms(vac) {
-        return (this._roomsFor(vac)).some((r) => this._isRoomSelected(r, vac));
-    }
-    /** Resolve a vacuum to a single current clean type ("dry"/"wet").
-     *  Prefers the live backend signal (integration sensor `clean_type`, which
-     *  follows the actual water mode), then the configured clean_action. This is
-     *  what makes a dual-capable vacuum (clean_type: both) pick the right estimate. */
-    _liveCleanType(vac) {
-        // 1) When the vacuum has selectable presets, the active one is the user's
-        //    current intent — derive its mode from its values (so picking "Mokrý"
-        //    flips the estimate to wet immediately, before the clean even starts).
-        if ((vac.presets?.length ?? 0) >= 2) {
-            const ap = this._activePreset(vac);
-            const wet = (ap.mop_intensity != null && ap.mop_intensity !== "" && ap.mop_intensity !== "off")
-                || (ap.mop_mode != null && ap.mop_mode !== "");
-            return wet ? "wet" : "dry";
-        }
-        // 2) Live backend signal (follows the actual water mode).
-        const ct = this._intAttrs(vac)?.clean_type;
-        if (ct === "wet" || ct === "dry")
-            return ct;
-        // 3) Fallback: the vacuum's configured role (wet-only robots default to wet).
-        const role = this._vacCleanType(vac);
-        return role.wet && !role.dry ? "wet" : "dry";
-    }
-    /** Self-calibrated clean-time estimate learned by the backend integration,
-     *  per room name + type (dry/wet). Null when no integration / no learned value. */
-    _backendEstimate(vac, room, kind) {
-        const re = this._intAttrs(vac)?.rooms_estimate;
-        if (!re)
-            return null;
-        const rec = re[room.name ?? ""] ?? re[room.key];
-        const v = rec ? rec[kind] : undefined;
-        return (typeof v === "number" && v > 0) ? v : null;
-    }
-    _roomCleanMins(room, vac) {
-        const ct = this._vacCleanType(vac);
-        // Dual-capable vacuum (both dry+wet) must resolve to the CURRENT live mode,
-        // otherwise a dry run falls back to the wet estimate (and vice versa).
-        const useWet = (ct.wet && !ct.dry) ? true
-            : (ct.dry && !ct.wet) ? false
-                : (this._liveCleanType(vac) === "wet");
-        // 1) Backend self-calibrated estimate (learned from real single-room cleans).
-        const learned = this._backendEstimate(vac, room, useWet ? "wet" : "dry");
-        if (learned != null)
-            return learned;
-        // 2) Static config for the matching type, then the other type as a last resort.
-        const primary = useWet ? room.clean_time_wet : room.clean_time_dry;
-        if (primary != null && primary > 0)
-            return primary;
-        const alt = useWet ? room.clean_time_dry : room.clean_time_wet;
-        if (alt != null && alt > 0)
-            return alt;
-        if (room.clean_time_entity) {
-            const val = parseFloat(this.hass.states[room.clean_time_entity]?.state ?? "");
-            if (!isNaN(val) && val > 0)
-                return val;
-        }
-        return room.clean_time_mins ?? 0;
-    }
-    _totalCleanMins(vac) {
-        return (this._roomsFor(vac)).reduce((sum, r) => {
-            if (!this._isRoomSelected(r, vac))
-                return sum;
-            return sum + this._roomCleanMins(r, vac);
-        }, 0);
-    }
-    _intRoomRec(vac, room) {
-        const rlc = this._intAttrs(vac)?.rooms_last_cleaned;
-        if (!rlc)
-            return null;
-        return (rlc[room.key] ?? rlc[room.name ?? ""] ?? null);
-    }
-    /** Persistent "last completed clean covered X%" per room (docs/29) — durable across
-     *  restarts/dock trips, unlike `_roomProgForType`'s live in-session gauge (which reads
-     *  `rooms_progress` and goes blank the moment the vacuum docks). Missing kind = no
-     *  completed clean with an established baseline yet; the caller renders "—", never a
-     *  misleading 0%/100%. */
-    _roomCoverageRec(vac, room) {
-        const rc = this._intAttrs(vac)?.rooms_coverage;
-        if (!rc)
-            return null;
-        return (rc[room.key] ?? rc[room.name ?? ""] ?? null);
-    }
-    _ageDaysFromIso(iso) {
-        if (!iso)
-            return null;
-        const t = new Date(iso).getTime();
-        return isNaN(t) ? null : (Date.now() - t) / 86400000;
-    }
-    /** Room age in days. With an integration sensor, uses last_dry/last_wet/any per the active
-     *  layer(s) (both on -> the worse/older); otherwise falls back to the last_clean helper entity. */
-    _roomAgeDays(room, vac) {
-        if (vac) {
-            const rec = this._intRoomRec(vac, room);
-            if (rec) {
-                const dry = this._ageDaysFromIso(rec.dry);
-                const wet = this._ageDaysFromIso(rec.wet);
-                const any = this._ageDaysFromIso(rec.any);
-                const L = this._layersEff();
-                const dOn = L.dry, wOn = L.wet;
-                let d;
-                if (dOn && wOn)
-                    d = Math.max(dry ?? 9999, wet ?? 9999);
-                else if (dOn)
-                    d = dry;
-                else if (wOn)
-                    d = wet;
-                else
-                    d = any;
-                if (d !== null)
-                    return d;
-            }
-        }
-        if (!room.last_clean_entity)
-            return null;
-        const raw = this.hass.states[room.last_clean_entity]?.state;
-        if (!raw || raw === "unavailable" || raw === "unknown")
-            return null;
-        return (Date.now() - new Date(raw).getTime()) / 86400000;
-    }
-    _colorForAgeDays(d) {
-        if (d === null)
-            return "rgba(255,77,77,0.85)";
-        const ths = this._config.room_thresholds ?? [
-            { days: 2, color: "rgba(46,204,113,0.85)" },
-            { days: 5, color: "rgba(250,173,20,0.85)" },
-            { days: 10, color: "rgba(255,152,0,0.85)" },
-        ];
-        const sorted = [...ths].sort((a, b) => a.days - b.days);
-        for (const th of sorted) {
-            if (d <= th.days)
-                return th.color;
-        }
-        return "rgba(255,77,77,0.85)";
-    }
-    /** A vacuum's clean-type role (dry/wet) — explicit config, else auto-detected.
-     *  Auto-detect prefers the backend's live hardware signal (docs/31): a water
-     *  box is a HARDWARE fact (`mop_signal.water_box_mode`/`water_mode_name`,
-     *  same source `planner.py._capable()` uses server-side), unlike guessing
-     *  from whether the user happened to fill in `clean_action.mop_mode`/
-     *  `mop_intensity` — that heuristic mis-detected a wet-capable robot as
-     *  dry-only whenever its Clean action left `suction_level` unset (docs/30
-     *  §6 finding 4). Degraded mode (`_intAttrs` returns undefined — no
-     *  integration, or old schema) has no such signal and keeps the old
-     *  config-based guess, per canon rule 3 (docs/14). */
-    _vacCleanType(vac) {
-        if (vac.clean_type === "dry")
-            return { dry: true, wet: false };
-        if (vac.clean_type === "wet")
-            return { dry: false, wet: true };
-        if (vac.clean_type === "both")
-            return { dry: true, wet: true };
-        const sig = this._intAttrs(vac)?.mop_signal;
-        if (sig) {
-            const wet = sig.water_box_mode != null || !!sig.water_mode_name;
-            return { dry: true, wet };
-        }
-        const ca = vac.clean_action;
-        const wet = !!(ca && (ca.mop_mode || ca.mop_mode_entity || ca.mop_intensity || ca.mop_intensity_entity));
-        const dry = !wet || (ca?.suction_level != null && ca.suction_level !== "off");
-        return { dry, wet };
-    }
-    /** Debug: per-room cleaning progress from the integration (rooms_progress). */
-    _roomProgress(vac, room) {
-        const rp = this._intAttrs(vac)?.rooms_progress;
-        if (!rp)
-            return null;
-        return (rp[room.key] ?? rp[room.name ?? ""] ?? null);
-    }
-    /** Per-clean-type coverage for a room (dry from the vacuum trace, wet from the mop
-     *  trace), taken from whichever vacuum has the highest value and coloured by it. Used
-     *  by the per-layer (dry/wet) room menus. */
-    _roomProgForType(room, vacs, type) {
-        let best = null;
-        let bestVac = null;
-        let bestCal = false;
-        for (const v of vacs) {
-            const p = this._roomProgress(v, room);
-            if (!p)
-                continue;
-            const val = type === "dry" ? p.dry_pct : p.wet_pct;
-            if (val !== null && val !== undefined && (best === null || val > best)) {
-                best = val;
-                bestVac = v;
-                bestCal = !!(type === "dry" ? p.dry_calibrating : p.wet_calibrating);
-            }
-        }
-        if (best === null || !bestVac)
-            return null;
-        return { pct: best, kind: "S", title: `${type} coverage ${best}%`, color: this._color(bestVac), calibrating: bestCal };
-    }
-    _progColor(pct) {
-        return pct >= 90 ? "#52c41a" : pct >= 50 ? "#faad14" : "#40a9ff";
-    }
-    /** Dry + wet mini gauges in the room's corner (debug_room_progress). Values are
-     *  aggregated ACROSS the given vacuums — in merged mode the old single gauge read
-     *  only the representative (first) vacuum, so most rooms showed nothing (docs/16 §1).
-     *  Dry ring wears the best dry vacuum's colour; wet ring is always wet-blue. */
-    _renderRoomGauge(vacs, room) {
-        if (!this._config.debug_room_progress)
-            return A;
-        const dry = this._roomProgForType(room, vacs, "dry");
-        const wet = this._roomProgForType(room, vacs, "wet");
-        if (!dry && !wet)
-            return A;
-        const g = (pct, title, ring, calibrating) => b `
-      <span class="room-gauge" title=${title}
-        style=${o({ background: `conic-gradient(${ring} ${pct * 3.6}deg, rgba(255,255,255,0.12) 0)` })}>
-        <span>${pct}${calibrating ? "~" : ""}</span>
-      </span>`;
-        return b `<div class="room-gauges">
-      ${dry ? g(dry.pct, "dry · " + dry.title, dry.color, dry.calibrating) : A}
-      ${wet ? g(wet.pct, "wet · " + wet.title, "#40a9ff", wet.calibrating) : A}
-    </div>`;
-    }
-    /** Inline % chip for the room menus/dock rows — live in-session coverage while a room
-     *  is actively (or was just) being cleaned. Promoted out of the debug gate (docs/29
-     *  §4.4): it's the same data as the persistent post-clean % (`_roomCoverageRec`), just
-     *  live during the session, so there's no reason to show one and hide the other.
-     *  `debug_room_progress` still gates the rest of the debug strip (map corner gauges,
-     *  the status card's mm:ss timer) — this chip alone is production UI now. Coloured by
-     *  the vacuum when provided. */
-    _renderProgChip(p) {
-        if (!p)
-            return A;
-        return b `<span class="rl-prog" title=${p.title}
-      style=${o({ color: p.color ?? this._progColor(p.pct) })}>${p.pct}${p.calibrating ? "~" : ""}%<small>${p.kind}</small></span>`;
-    }
-    _batIcon(pct) {
-        if (pct > 80)
-            return "mdi:battery";
-        if (pct > 50)
-            return "mdi:battery-60";
-        if (pct > 20)
-            return "mdi:battery-30";
-        return "mdi:battery-10";
-    }
-    _batColor(pct) {
-        if (pct > 50)
-            return "#52c41a";
-        if (pct > 20)
-            return "#faad14";
-        return "#ff4d4f";
-    }
-    _mapUrl(entity) {
-        const state = this.hass.states[entity];
-        if (!state)
-            return "";
-        const pic = state.attributes["entity_picture"];
-        if (!pic)
-            return "";
-        const ts = new Date(state.last_updated).getTime();
-        const sep = pic.includes("?") ? "&" : "?";
-        return this.hass.hassUrl(pic + sep + "_t=" + ts);
-    }
-    _timeStr(mins) {
-        const total = Math.round(mins);
-        if (total <= 0)
-            return "";
-        if (total >= 60) {
-            const h = Math.floor(total / 60);
-            const m = total % 60;
-            return m > 0 ? "~" + h + " h " + m + " min" : "~" + h + " h";
-        }
-        return "~" + total + " min";
-    }
-    // ── Global action helpers ───────────────────────────────────────────────
-    /** True if any watched entity is in a cleaning state */
-    _isGlobalActive(ga) {
-        return (ga.watch_entities ?? []).some((e) => CLEANING_STATES.has(this.hass.states[e]?.state ?? ""));
-    }
-    async _triggerGlobal(ga) {
-        const action = ga.action;
-        try {
-            if (action.type === "script") {
-                await this.hass.callService("script", "turn_on", {
-                    entity_id: action.entity_id,
-                    variables: action.variables ?? {},
-                });
-            }
-            else {
-                const [domain, svc] = action.service.split(".");
-                await this.hass.callService(domain, svc, action.data ?? {});
-            }
-        }
-        catch (err) {
-            console.error("[anyvac-card] global action failed:", err);
-        }
-    }
-    // ── Hold-action helpers ─────────────────────────────────────────────────
-    _cancelHold() {
-        if (this._holdTimer !== null) {
-            clearTimeout(this._holdTimer);
-            this._holdTimer = null;
-        }
-        this._holdId = null;
-        this._holdStartPos = null;
-    }
-    /**
-     * Returns a pointerdown handler that:
-     *  1. Sets _holdId to `id` (triggers fill animation)
-     *  2. Fires `action` after HOLD_DURATION_MS
-     *  Pair with `@pointermove=${this._holdMove}` alongside the usual
-     *  pointerup/leave/cancel bindings — see `HOLD_MOVE_CANCEL_PX` doc comment
-     *  for why `pointermove` needs its own explicit cancel path (touch capture
-     *  means leave/cancel don't fire during a swipe starting on the button).
-     */
-    _holdStart(id, action) {
-        return (e) => {
-            e.preventDefault();
-            this._cancelHold();
-            this._holdId = id;
-            this._holdStartPos = { x: e.clientX, y: e.clientY };
-            this._holdTimer = setTimeout(() => {
-                this._holdTimer = null;
-                this._holdId = null;
-                this._holdStartPos = null;
-                action();
-            }, HOLD_DURATION_MS);
-        };
-    }
-    _toggleShown(index) {
-        // Portrait grid = single-vacuum focus (docs/18 §7b): a badge tap SWITCHES the
-        // focused vacuum instead of toggling set membership — no room for more on a phone.
-        if (this._config.layout && this._profile === "portrait") {
-            this._shownSet = new Set([index]);
-            this._saveShown();
-            return;
-        }
-        this._toggleShownMulti(index);
-    }
-    /** Plain multi-select membership toggle (add/remove from `_shownSet`, never
-     *  collapsing to single-focus) — always keeps at least one vacuum shown.
-     *  Used directly by contexts that need "hide just this one" regardless of
-     *  profile, e.g. the portrait vac-icon-strip hold gesture, which must be
-     *  able to hide one of three merged-map vacuums while leaving the other
-     *  two visible (docs/19 follow-up, field feedback 2026-07-17). */
-    _toggleShownMulti(index) {
-        const next = new Set(this._shownSet);
-        if (next.has(index)) {
-            if (next.size > 1)
-                next.delete(index);
-        }
-        else {
-            next.add(index);
-        }
-        this._shownSet = next;
-        this._saveShown();
-    }
-    // ── Service calls ───────────────────────────────────────────────────────
-    async _call(domain, service, data) {
-        try {
-            await this.hass.callService(domain, service, data);
-        }
-        catch (err) {
-            console.error("[anyvac-card] " + domain + "." + service + " failed:", err);
-        }
-    }
-    _fireMoreInfo(entityId) {
-        this.dispatchEvent(new CustomEvent("hass-more-info", {
-            bubbles: true, composed: true, detail: { entityId },
-        }));
-    }
-    // ── localStorage persistence ──────────────────────────────────────────────
-    _saveShown() {
-        try {
-            const ids = [...this._shownSet].map(i => this._config.vacuums[i]?.entity).filter(Boolean);
-            localStorage.setItem("roborock-card:shown", JSON.stringify(ids));
-        }
-        catch { /* storage unavailable */ }
-    }
-    _loadShown() {
-        try {
-            const raw = localStorage.getItem("roborock-card:shown");
-            if (raw) {
-                const ids = JSON.parse(raw);
-                const indices = ids
-                    .map(id => this._config.vacuums.findIndex(v => v.entity === id))
-                    .filter(i => i >= 0);
-                if (indices.length > 0)
-                    return new Set(indices);
-            }
-        }
-        catch { /* ignore */ }
-        return new Set(this._config.vacuums.map((_, i) => i));
-    }
-    /** docs/32 §5 follow-up (field feedback, 2026-08-03): the live flip toggle
-     *  was deliberately in-memory-only ("try it on this screen right now") —
-     *  but a page refresh (common on wall-mounted tablets/kiosk dashboards)
-     *  reset it to the config default every time, which read as "doesn't
-     *  stick" rather than "session-scoped by design". Persisted via
-     *  localStorage instead (same mechanism as `_shownSet`/room selection) —
-     *  survives reload, but stays per-BROWSER like those, not backend-shared
-     *  like `view_layers`: this is "how THIS screen likes its map", which can
-     *  legitimately differ from another screen showing the same dashboard. */
-    _saveFlipLive() {
-        try {
-            if (this._flipLive === null)
-                localStorage.removeItem("roborock-card:flip");
-            else
-                localStorage.setItem("roborock-card:flip", JSON.stringify(this._flipLive));
-        }
-        catch { /* storage unavailable */ }
-    }
-    _loadFlipLive() {
-        try {
-            const raw = localStorage.getItem("roborock-card:flip");
-            if (raw !== null)
-                return JSON.parse(raw) === true;
-        }
-        catch { /* ignore */ }
-        return null;
-    }
-    _saveRoomSel(vacEntity) {
-        try {
-            const prefix = vacEntity + ":";
-            const sel = {};
-            for (const [k, v] of this._localRoomSel.entries()) {
-                if (k.startsWith(prefix))
-                    sel[k.slice(prefix.length)] = v;
-            }
-            localStorage.setItem("roborock-card:sel:" + vacEntity, JSON.stringify(sel));
-        }
-        catch { /* ignore */ }
-    }
-    _loadRoomSel() {
-        const map = new Map();
-        try {
-            for (const vac of this._config.vacuums) {
-                const raw = localStorage.getItem("roborock-card:sel:" + vac.entity);
-                if (raw) {
-                    const sel = JSON.parse(raw);
-                    for (const [k, v] of Object.entries(sel)) {
-                        if (v)
-                            map.set(vac.entity + ":" + k, true);
-                    }
-                }
-            }
-        }
-        catch { /* ignore */ }
-        return map;
-    }
-    _pause(vac) {
-        this._call("vacuum", "pause", { entity_id: vac.entity });
-    }
-    _resume(vac) {
-        this._call("vacuum", "start", { entity_id: vac.entity });
-    }
-    _dock(vac) {
-        this._call("vacuum", "return_to_base", { entity_id: vac.entity });
-    }
-    _toggleRoom(room, vac) {
-        if (this._backendSel()) {
-            this._setBackendSel([room.key], "toggle");
-            return;
-        }
-        const k = vac.entity + ":" + room.key;
-        const next = new Map(this._localRoomSel);
-        next.set(k, !(next.get(k) ?? false));
-        this._localRoomSel = next;
-        this._saveRoomSel(vac.entity);
-    }
-    _isRoomSelectedAny(key, vacs) {
-        const be = this._backendSel();
-        if (be)
-            return be.has(key);
-        return vacs.some((v) => this._localRoomSel.get(v.entity + ":" + key) ?? false);
-    }
-    /** Merged mode: toggle a room across every shown vacuum that has it (one rectangle -> both controllers). */
-    _toggleRoomAcross(key, vacs) {
-        // docs/18 §7e follow-up (field report 2026-07-25): a manual pin
-        // (`_cycleRoomPin` → `anyvac.pin_room`) only ever auto-clears once the
-        // room is actually cleaned — pick a vacuum once, and it "sticks" through
-        // every future selection until a clean happens, even across
-        // deselect/reselect. Clearing it here too — the moment the room is
-        // DEselected — gives the user an obvious, always-available way back to
-        // auto: untick the room, tick it again. Both `kind` and `vacuum` omitted
-        // from the call data is the documented unpin-both-passes shorthand
-        // (`coordinator.set_room_pin`: "kind None = unpin the room entirely"),
-        // same as a fresh room that was never pinned — deselecting clears
-        // whatever dry/wet pins it had, not just one pass.
-        // Computed from `_isRoomSelectedAny` BEFORE either selection-storage
-        // path below mutates state, so it covers both the backend-tracked and
-        // local-selection branches with one check.
-        if (this._isRoomSelectedAny(key, vacs) && vacs.some((v) => this._intAttrs(v))) {
-            void this._call("anyvac", "pin_room", { room: key });
-        }
-        if (this._backendSel()) {
-            this._setBackendSel([key], "toggle");
-            return;
-        }
-        const target = !this._isRoomSelectedAny(key, vacs);
-        const next = new Map(this._localRoomSel);
-        for (const v of vacs) {
-            if (this._roomsFor(v).some((r) => r.key === key))
-                next.set(v.entity + ":" + key, target);
-        }
-        this._localRoomSel = next;
-        for (const v of vacs)
-            this._saveRoomSel(v.entity);
-    }
-    // ── Auto mode: orchestrated cleans (naive fan-out v1) ─────────────────────
-    /** All distinct room keys across vacuums. */
-    _allRoomKeys() {
-        const keys = new Set();
-        for (const v of this._config.vacuums)
-            for (const r of this._roomsFor(v))
-                keys.add(r.key);
-        return [...keys];
-    }
-    /** Vacuums the plan/orchestrator may use = the currently shown (held) badges. */
-    _planVacuums() {
-        const shown = this._config.vacuums.filter((_, i) => this._shownSet.has(i));
-        return shown.length ? shown : this._config.vacuums;
-    }
-    // ── Clean intent → backend planner (kontrakt v2, docs/14 §3.7) ─────────────
-    /** Per-kind vacuum restriction for anyvac.clean/plan, from the configured roles —
-     *  preserves the user's dry/wet split even when a robot is both-capable. */
-    _v2Vacuums() {
-        const dry = [], wet = [];
-        for (const v of this._config.vacuums) {
-            const role = this._vacCleanType(v);
-            if (role.dry)
-                dry.push(v.entity);
-            if (role.wet)
-                wet.push(v.entity);
-        }
-        return { dry, wet };
-    }
-    /** Rooms the backend plan (anyvac.plan) could NOT assign a robot to for the
-     *  current mode — e.g. the mode needs a wet pass but every vacuum configured
-     *  with a wet role (docs/14 §3.7 `_v2Vacuums`) can't/didn't take the room.
-     *  Found live 2026-07-18: a "Both" run where the card's `clean_type` config
-     *  restricted wet to a single vacuum produced ZERO visible feedback when
-     *  that vacuum's assignment came back empty — the user just watched dry
-     *  finish and nothing else happen, with no error anywhere. This is derived
-     *  from the SAME plan preview already fetched for the ETA/avatars (a
-     *  selected room missing from `dryOf`/`wetOf` for a kind the mode requires
-     *  IS the unassigned signal) — no new backend call, no new event plumbing.
-     *  `plan.unassigned` also exists server-side (planner.py) but isn't needed
-     *  here; that field is for `anyvac.plan`/`anyvac.clean` callers outside the
-     *  card (automations), not for this. */
-    _unassignedRooms(selKeys, mode, hasInt) {
-        if (!hasInt || selKeys.length === 0)
-            return [];
-        const preview = this._planPreview;
-        if (!preview || preview.key !== this._planKey(selKeys, mode))
-            return [];
-        const needDry = mode !== "wet";
-        const needWet = mode !== "dry";
-        const out = [];
-        for (const k of selKeys) {
-            if ((needDry && !preview.dry.has(k)) || (needWet && !preview.wet.has(k)))
-                out.push(k);
-        }
-        return out;
-    }
-    /** Per-vacuum, per-pass settings for anyvac.clean (2026-07-26) — every capable
-     *  vacuum contributes its OWN active preset's fan speed / mop mode / mop
-     *  intensity / repeat, keyed by entity id. Mirrors the extraction already used
-     *  for the single-vacuum manual START (`_startClean`): a pass only reads
-     *  mop_mode/mop_intensity when it's actually the wet pass (the backend forces
-     *  mop off for a dry pass regardless).
-     *  Previously this searched each vacuum's own preset LIST for one that
-     *  "looked" wet/dry and, worse, stopped after the FIRST capable vacuum per
-     *  kind — so one vacuum's fan_speed silently won for every other vacuum doing
-     *  that pass (e.g. S6's preset overriding S7's), and the active preset chip
-     *  the user actually picked was ignored in favor of that heuristic search. */
-    _v2Settings() {
-        const out = {};
-        for (const kind of ["dry", "wet"]) {
-            for (const v of this._config.vacuums) {
-                const role = this._vacCleanType(v);
-                if (!(kind === "dry" ? role.dry : role.wet))
-                    continue;
-                const ap = this._activePreset(v);
-                const s = {};
-                if (ap.suction_level)
-                    s.fan_speed = ap.suction_level;
-                if (kind === "wet" && ap.mop_mode)
-                    s.mop_mode = ap.mop_mode;
-                if (kind === "wet" && ap.mop_intensity)
-                    s.mop_intensity = ap.mop_intensity;
-                if (ap.repeat && ap.repeat > 1)
-                    s.repeat = ap.repeat;
-                if (Object.keys(s).length)
-                    (out[kind] ?? (out[kind] = {}))[v.entity] = s;
-            }
-        }
-        return Object.keys(out).length ? out : undefined;
-    }
-    /** Identity of a plan preview: everything the backend's answer depends on.
-     *
-     *  room_pins is part of it (not just selKeys/mode/vacuums) so that tapping an
-     *  avatar to cycle a room's pin (_cycleRoomPin → anyvac.pin_room) invalidates
-     *  the cached plan and re-fetches as soon as the backend's room_pins attribute
-     *  updates — without it the dock avatar stayed stuck on the old assignment
-     *  until something else (e.g. deselecting/reselecting the room) happened to
-     *  change selKeys and force a refetch (field-caught 2026-07-23).
-     *
-     *  Extracted into one method 2026-08-08: `_unassignedRooms` built the same key
-     *  inline but was never updated when room_pins was added here, so its
-     *  three-element key could never equal this four-element one — it returned []
-     *  unconditionally, silently disabling the whole unassigned-rooms warning
-     *  (card 0.66.5: the red `mdi:robot-off` markers in dock rows, the dock footer
-     *  summary and the landscape meta bar count). Both callers now share this, so
-     *  they cannot drift apart again. */
-    _planKey(selKeys, mode) {
-        return JSON.stringify([selKeys, mode, this._v2Vacuums(), this._pinsAttr()]);
-    }
-    _fetchPlan(selKeys, mode) {
-        const key = this._planKey(selKeys, mode);
-        if (key === this._planFetchKey)
-            return;
-        this._planFetchKey = key;
-        void (async () => {
-            try {
-                const res = await this.hass.callService("anyvac", "plan", { rooms: selKeys, mode, vacuums: this._v2Vacuums() }, undefined, false, true);
-                if (this._planFetchKey !== key)
-                    return; // stale response
-                const plan = res?.response?.plan ?? {};
-                const inv = (m) => {
-                    const out = new Map();
-                    for (const [ent, rooms] of Object.entries(m ?? {}))
-                        for (const r of rooms)
-                            out.set(r, ent);
-                    return out;
-                };
-                this._planPreview = {
-                    key, dry: inv(plan.dry), wet: inv(plan.wet),
-                    eta: typeof plan.eta_min === "number" ? plan.eta_min : null,
-                    unsequenced: Array.isArray(plan.unsequenced) ? plan.unsequenced : [],
-                };
-            }
-            catch (err) {
-                console.warn("[anyvac-card] anyvac.plan preview failed:", err);
-                if (this._planFetchKey === key)
-                    this._planPreview = { key, dry: new Map(), wet: new Map(), eta: null, unsequenced: [] };
-            }
-        })();
-    }
-    /** Selection time estimate: prefer the backend's sequence-aware ETA (anyvac.plan,
-     *  docs/19) when the integration is present; otherwise (degraded mode — no
-     *  backend to ask) fall back to the rough client-side sum (docs/14 §8, direct
-     *  vac.* calls / local estimates are the accepted degraded-mode behavior). */
-    _etaFor(selKeys, mode, hasInt) {
-        if (hasInt && selKeys.length)
-            this._fetchPlan(selKeys, mode);
-        const fromPlan = this._planPreview?.eta;
-        if (hasInt && fromPlan != null)
-            return fromPlan;
-        return this._selEstMins(selKeys);
-    }
-    /** Send the clean intent — planning (capability, LPT assignment, segment resolve,
-     *  dry→wet gating, repeat) is entirely backend-side now (anyvac.clean, docs/14
-     *  §3.7). The old client-side plan builder + run_job assembly was deleted. */
-    async _runOrchestrated(roomKeys, mode) {
-        if (!roomKeys.length)
-            return;
-        await this._call("anyvac", "clean", {
-            rooms: roomKeys,
-            mode,
-            vacuums: this._v2Vacuums(),
-            ...(this._v2Settings() ? { settings: this._v2Settings() } : {}),
-        });
-    }
-    /** Select a global preset (does NOT run): set the plan mode + apply its room scope,
-     *  so the plan preview reflects it. The user runs it via the plan's "Start · hold". */
-    _selectGlobalPreset(gp) {
-        this._activeGlobalPreset = gp.id;
-        if (gp.mode)
-            this._planMode = gp.mode;
-        if (gp.scope === "all" || Array.isArray(gp.scope)) {
-            const keys = gp.scope === "all" ? this._allRoomKeys() : gp.scope;
-            // Backend-shared selection first (docs/14 §3.11); local only without integration.
-            if (this._backendSel()) {
-                this._setBackendSel(keys, "set");
-                return;
-            }
-            const sel = new Map(this._localRoomSel);
-            for (const v of this._config.vacuums)
-                for (const r of this._roomsFor(v))
-                    sel.delete(v.entity + ":" + r.key);
-            for (const k of keys)
-                for (const v of this._config.vacuums) {
-                    if (this._roomsFor(v).some((r) => r.key === k))
-                        sel.set(v.entity + ":" + k, true);
-                }
-            this._localRoomSel = sel;
-            for (const v of this._config.vacuums)
-                this._saveRoomSel(v.entity);
-        }
-        // scope "select" → keep the user's current room selection
-    }
-    /** Two-letter abbreviation for a vacuum (fallback when no icon). */
-    _vacAbbrev(vac) {
-        const n = vac.name ?? vac.entity.split(".")[1] ?? "";
-        return (n.replace(/[^A-Za-z0-9]/g, "").slice(0, 2) || "??").toUpperCase();
-    }
-    /** Plan preview: per selected room, which vacuum cleans it dry / wet, with a
-     *  dry/wet/both mode toggle and a hold-to-run button. Reacts to the selected
-     *  (held) vacuum badges and the currently selected rooms. */
-    _renderPlanPreview() {
-        if (this._config.ui_mode !== "auto")
-            return A;
-        const selKeys = this._allRoomKeys().filter((k) => this._isRoomSelectedAny(k, this._config.vacuums));
-        if (!selKeys.length)
-            return A;
-        const mode = this._planMode;
-        const apLabel = (this._config.global_presets ?? []).find((g) => g.id === this._activeGlobalPreset)?.label;
-        const showDry = mode === "dry" || mode === "both";
-        const showWet = mode === "wet" || mode === "both";
-        // The preview is the BACKEND's real assignment (anyvac.plan, response-only) —
-        // the card no longer computes plans locally (docs/14 §3.7). Debounced by key;
-        // until the response lands the cells show "—".
-        this._fetchPlan(selKeys, mode);
-        const dryOf = this._planPreview?.dry ?? new Map();
-        const wetOf = this._planPreview?.wet ?? new Map();
-        const roomDef = (k) => {
-            for (const v of this._config.vacuums) {
-                const r = this._roomsFor(v).find((x) => x.key === k);
-                if (r)
-                    return r;
-            }
-            return undefined;
-        };
-        const cell = (entity) => {
-            const v = this._config.vacuums.find((x) => x.entity === entity);
-            if (!v)
-                return b `<span style="font-size:11px;opacity:.25">—</span>`;
-            const c = this._color(v);
-            return b `<span style="display:inline-flex;align-items:center;justify-content:center;min-width:24px;height:17px;padding:0 5px;border-radius:9px;font-size:10px;font-weight:700;color:#fff;background:${c}30;border:1px solid ${c}">${this._vacAbbrev(v)}</span>`;
-        };
-        const modeBtn = (m, label) => {
-            const on = mode === m;
-            return b `<button @click=${(e) => { e.stopPropagation(); this._planMode = m; }}
-        style="padding:2px 8px;border-radius:8px;font-size:10px;font-weight:700;cursor:pointer;font-family:inherit;border:1px solid ${on ? "rgba(255,255,255,0.5)" : "rgba(255,255,255,0.15)"};background:${on ? "rgba(255,255,255,0.12)" : "transparent"};color:${on ? "#fff" : "rgba(255,255,255,0.5)"}">${label}</button>`;
-        };
-        const runHid = "plan-run";
-        return b `
+ */const bt="important",yt=" !"+bt,vt=(t=>(...e)=>({_$litDirective$:t,values:e}))(class extends ft{constructor(t){if(super(t),t.type!==gt||"style"!==t.name||t.strings?.length>2)throw Error("The `styleMap` directive must be used in the `style` attribute and must be the only part in the attribute.")}render(t){return Object.keys(t).reduce((e,o)=>{const i=t[o];return null==i?e:e+`${o=o.includes("-")?o:o.replace(/(?:^(webkit|moz|ms|o)|)(?=[A-Z])/g,"-$&").toLowerCase()}:${i};`},"")}update(t,[e]){const{style:o}=t.element;if(void 0===this.ft)return this.ft=new Set(Object.keys(e)),this.render(e);for(const t of this.ft)null==e[t]&&(this.ft.delete(t),t.includes("-")?o.removeProperty(t):o[t]=null);for(const t in e){const i=e[t];if(null!=i){this.ft.add(t);const e="string"==typeof i&&i.endsWith(yt);t.includes("-")||e?o.setProperty(t,e?i.slice(0,-11):i,e?bt:""):o[t]=i}}return U}}),xt="anyvac-card",wt="anyvac-card-editor",$t="1.1.0",kt=600,St={cleaning:["🧹 Cleaning","#52c41a"],segment_cleaning:["🧹 Cleaning rooms","#52c41a"],zoned_cleaning:["🧹 Zone cleaning","#52c41a"],spot_cleaning:["🎯 Spot cleaning","#52c41a"],starting:["▶️ Starting","#52c41a"],segment_mopping:["🫧 Mopping rooms","#40a9ff"],zoned_mopping:["🫧 Zone mopping","#40a9ff"],robot_status_mopping:["🫧 Mopping","#40a9ff"],clean_mop_cleaning:["🧹🫧 Vacuuming+mopping","#52c41a"],clean_mop_mopping:["🧹🫧 Vacuuming+mopping","#52c41a"],segment_clean_mop_cleaning:["🧹🫧 Rooms (vac)","#52c41a"],segment_clean_mop_mopping:["🧹🫧 Rooms (mop)","#52c41a"],zoned_clean_mop_cleaning:["🧹🫧 Zones (vac)","#52c41a"],zoned_clean_mop_mopping:["🧹🫧 Zones (mop)","#52c41a"],washing_the_mop:["🚿 Washing mop","#9254de"],washing_the_mop_2:["🚿 Washing mop","#9254de"],going_to_wash_the_mop:["🚿 Going to wash mop","#9254de"],air_drying_stopping:["💨 Drying mop","#9254de"],back_to_dock_washing_duster:["🏠 Dock + washing","#faad14"],returning_home:["🏠 Returning home","#faad14"],docking:["🏠 Docking","#faad14"],going_to_target:["🎯 Going to target","#40a9ff"],charging:["⚡ Charging","rgba(255,255,255,0.75)"],charging_complete:["✅ Fully charged","#52c41a"],docked:["✅ Docked","rgba(255,255,255,0.75)"],charger_disconnected:["🔌 Charger disconnected","#faad14"],emptying_the_bin:["🗑️ Emptying bin","#faad14"],idle:["💤 Idle","rgba(255,255,255,0.45)"],paused:["⏸️ Paused","#faad14"],mapping:["🗺️ Mapping","#40a9ff"],remote_control_active:["🕹️ Remote control","#40a9ff"],manual_mode:["🕹️ Manual mode","#40a9ff"],updating:["⬆️ Updating","#faad14"],in_call:["📞 In call","#faad14"],shutting_down:["⏹️ Shutting down","rgba(255,255,255,0.4)"],error:["❌ Error","#ff4d4f"],charging_problem:["⚠️ Charging problem","#ff4d4f"],locked:["🔒 Locked","#ff4d4f"],device_offline:["📴 Offline","#ff4d4f"]},Rt={green:"#52c41a",blue:"#2196F3",orange:"#faad14"},Mt=["#52c41a","#2196F3","#faad14","#eb2f96","#722ed1","#13c2c2","#fa541c","#a0d911"],At={green:"rgba(46,204,113,0.18)",blue:"rgba(33,150,243,0.18)",orange:"rgba(250,173,20,0.18)"},zt={green:"rgba(46,204,113,0.30)",blue:"rgba(33,150,243,0.30)",orange:"rgba(250,173,20,0.30)"};const Pt=new Set(["cleaning","segment_cleaning","zoned_cleaning","spot_cleaning","segment_mopping","zoned_mopping","robot_status_mopping","clean_mop_cleaning","clean_mop_mopping","segment_clean_mop_cleaning","segment_clean_mop_mopping","zoned_clean_mop_cleaning","zoned_clean_mop_mopping"]);function Ct(t){if(!t)return null;const e=t.scale??1;let o=(t.width??0)*e,i=(t.height??0)*e;const s=t.rotation??0;if(90===s||270===s){const t=o;o=i,i=t}return o>0&&i>0?{NW:o,NH:i}:null}const Et=Math.PI/180;function Tt(t,e,o,i,s,n,a){let r=Math.round(t/Et)%360;return r<0&&(r+=360),{rotation:r,scale:100*e,offset_x:100*o.x-50,offset_y:o.y*i*100-50,residual_pct:100*s,anchors:n,raw_rotation:Math.round(a/Et*10)/10}}function Ft(t,e){return(t.rooms?.length?t.rooms:e?.rooms)??[]}function Dt(t,e,o,i){const s=e?.map,n={rotation:s?.rotation??0,scale:s?.scale??100,offset_x:s?.offset_x??0,offset_y:s?.offset_y??0,auto:!1};if(!e||"manual"===s?.seat)return n;if(!function(t,e){const o="merged"===t.map_mode?t.image_base??(t.vacuums??[]).find(t=>t.image_base?.src)?.image_base:e?.image_base;return o?.src}(t,e))return n;if(!o)return n;const a=function(t,e){if(!(t.length&&e>0))return null;if(t.length>=2){const o=t.length,i={x:0,y:0},s={x:0,y:0};for(const e of t)i.x+=e.q.x,i.y+=e.q.y,s.x+=e.a.x,s.y+=e.a.y;i.x/=o,i.y/=o,s.x/=o,s.y/=o;let n=0,a=0,r=0;for(const e of t){const t=e.q.x-i.x,o=e.q.y-i.y,l=e.a.x-s.x,c=e.a.y-s.y;n+=t*l+o*c,a+=t*c-o*l,r+=t*t+o*o}if(r>1e-8){const l=Math.atan2(a,n),c=Math.round(l/(Math.PI/2))*(Math.PI/2),d=Math.cos(c),h=Math.sin(c);let p=0;for(const e of t){const t=e.q.x-i.x,o=e.q.y-i.y,n=h*t+d*o;p+=(d*t-h*o)*(e.a.x-s.x)+n*(e.a.y-s.y)}const m=p/r;if(m>1e-4){const n={x:s.x-m*(d*i.x-h*i.y),y:s.y-m*(h*i.x+d*i.y)};let a=0;for(const e of t){const t=n.x+m*(d*e.q.x-h*e.q.y)-e.a.x,o=n.y+m*(h*e.q.x+d*e.q.y)-e.a.y;a+=t*t+o*o}return Tt(c,m,n,e,Math.sqrt(a/o),o,l)}}}const o=t.find(t=>t.sizeQ&&t.sizeA)??null;if(!o||!o.sizeQ||!o.sizeA||o.sizeQ.w<1e-6||o.sizeQ.h<1e-6)return null;let i=null;for(const t of[0,1,2,3]){const e=t*(Math.PI/2),s=t%2==0?o.sizeQ.w:o.sizeQ.h,n=t%2==0?o.sizeQ.h:o.sizeQ.w,a=o.sizeA.w/s,r=o.sizeA.h/n;if(!(a>0&&r>0))continue;const l=Math.sqrt(a*r),c=Math.abs(Math.log(a/r));(!i||c<i.mism-1e-9)&&(i={theta:e,s:l,mism:c})}if(!i)return null;const s=Math.cos(i.theta),n=Math.sin(i.theta),a={x:o.a.x-i.s*(s*o.q.x-n*o.q.y),y:o.a.y-i.s*(n*o.q.x+s*o.q.y)};return Tt(i.theta,i.s,a,e,0,1,i.theta)}(function(t,e,o){if(!e)return[];const i=Ct(e.image_dims),s=Array.isArray(e.rooms)?e.rooms:[];if(!i||!s.length)return[];const{NW:n,NH:a}=i,r=[];for(const e of t){if(null==e.map_x||null==e.map_y)continue;const t=s.find(t=>t.name===e.key)??s.find(t=>t.name===e.name),i=t?.bbox_px;if(!i||[i.x0,i.y0,i.x1,i.y1].some(t=>null==t))continue;const l={q:{x:((i.x0+i.x1)/2-n/2)/n,y:((i.y0+i.y1)/2-a/2)/n},a:{x:e.map_x/100,y:e.map_y/100/o}};null!=e.map_w&&null!=e.map_h&&e.map_w>0&&e.map_h>0&&(l.sizeQ={w:(i.x1-i.x0)/n,h:(i.y1-i.y0)/n},l.sizeA={w:e.map_w/100,h:e.map_h/100/o}),r.push(l)}return r}(Ft(t,e),o,i),i);return a?{rotation:a.rotation,scale:a.scale,offset_x:a.offset_x,offset_y:a.offset_y,auto:!0,residual:a.residual_pct,anchorCount:a.anchors}:n}function Ot(t,e){const o=e.x1-e.x0,i=e.y1-e.y0;if(!(o>0&&i>0))return null;const s=(t.x0+t.x1)/2-e.x0,n=(t.y0+t.y1)/2-e.y0,a=t.x1-t.x0,r=t.y1-t.y0,l=(t,e,o)=>Math.min(o,Math.max(e,t));return{map_x:l(Math.round(s/o*1e3)/10,0,100),map_y:l(Math.round(n/i*1e3)/10,0,100),map_w:l(Math.round(a/o*1e3)/10,2,100),map_h:l(Math.round(r/i*1e3)/10,2,100)}}function It(t,e,o,i){const s=Ct(e?.image_dims),n=t?.bbox_px;if(!s||!n||[n.x0,n.y0,n.x1,n.y1].some(t=>null==t))return null;const{NW:a,NH:r}=s,l=((n.x0+n.x1)/2-a/2)/a,c=((n.y0+n.y1)/2-r/2)/a;let d=(n.x1-n.x0)/a,h=(n.y1-n.y0)/a;const p=o.scale/100,m=o.rotation*Et,u=Math.cos(m),_=Math.sin(m),g=(50+o.offset_x)/100+p*(u*l-_*c),f=(50+o.offset_y)/100/i+p*(_*l+u*c);if(Math.round(o.rotation/90)%2!=0){const t=d;d=h,h=t}const b=(t,e,o)=>Math.min(o,Math.max(e,t));return{map_x:b(Math.round(1e3*g)/10,0,100),map_y:b(Math.round(f*i*1e3)/10,0,100),map_w:b(Math.round(p*d*1e3)/10,2,100),map_h:b(Math.round(p*h*i*1e3)/10,2,100)}}const Vt={columns:[100],rows:["minmax(0, 1fr)","auto","auto"],place:{map:{row:1,col:1},dock:{row:2,col:1,overflow:"auto"},start:{row:3,col:1}}},Nt={landscape:{columns:["minmax(0, 1fr)","max-content"],rows:["auto","minmax(260px, 1fr)","auto","auto"],place:{badges:{row:1,col:"1/3"},map:{row:2,col:"1/3"},tools:{row:3,col:"1/3",align:"start"},status:{row:4,col:1,overflow:"auto"},dock:{row:4,col:2,overflow:"auto"}}},portrait:{columns:[72,28],rows:[90,10],place:{map:{row:1,col:1},dock:{row:1,col:2,overflow:"auto"},start:{row:2,col:"1/3"}}}};function Ht(t){return"number"==typeof t?t+"fr":t}function Bt(t){return t.map(Ht).join(" ")}function jt(t){const e=t.height??"viewport";return"viewport"===e?"calc(100svh - var(--header-height, 0px))":"container"===e?"100%":e}var Wt;const qt={main_brush_time_left:300,side_brush_time_left:200,filter_time_left:150,sensor_time_left:30};console.info(`%c ANYVAC-CARD %c v${$t} `,"background:#2196F3;color:#fff;font-weight:700;padding:2px 4px;border-radius:3px 0 0 3px","background:#1a1a1a;color:#fff;font-weight:400;padding:2px 4px;border-radius:0 3px 3px 0");let Lt=class extends ct{constructor(){super(...arguments),this.editMode=!1,this._shownSet=new Set([0]),this._holdId=null,this._mapMode="normal",this._inspectKey=null,this._dockSheetOpen=!1,this._dockSheetIdx=0,this._modeSheetOpen=!1,this._careResetPending=new Map,this._modeEntity=null,this._dbg="",this._zoneDrag=null,this._zoneRectShown=null,this._zonePending=null,this._zoneMulti=!1,this._zoneEdit=null,this._pinPending=null,this._layers={dry:!0,wet:!1},this._layerMenu=null,this._layerHoldTimer=null,this._layerHeld=!1,this._localRoomSel=new Map,this._activePresets=new Map,this._planMode="both",this._activeGlobalPreset=null,this._cardW=0,this._mapAR=3.636,this._profile="landscape",this._mapRegW=0,this._mapRegH=0,this._mapAvailW=0,this._mapAvailH=0,this._lastStack=!1,this._lastPortraitFitW=0,this._lastRotate=!0,this._flipLive=null,this._ro=null,this._onWinResize=null,this._measureRaf=0,this._measureTimer=null,this._settleTimer=null,this._panelViewMo=null,this._panelViewWarned=!1,this._panelViewNode=null,this._barMo=null,this._editBarRo=null,this._now=Date.now(),this._tickTimer=null,this._holdTimer=null,this._holdStartPos=null,this._initialized=!1,this._watched=null,this._intCache=new Map,this._mapCandCache=new Map,this._autoCache=new Map,this._careCache=new Map,this._roomsMemo=new Map,this._seatMemo=new Map,this._holdEnd=()=>{this._cancelHold()},this._holdMove=t=>{if(!this._holdStartPos||null===this._holdTimer)return;const e=t.clientX-this._holdStartPos.x,o=t.clientY-this._holdStartPos.y;e*e+o*o>144&&this._cancelHold()},this._planPreview=null,this._planFetchKey="",this._onFloorplanLoad=t=>{const e=t.target;if(e?.naturalWidth&&e.naturalHeight){const t=e.naturalWidth/e.naturalHeight;t>.1&&Math.abs(t-this._mapAR)>.01&&(this._mapAR=t)}}}static getConfigElement(){return document.createElement(wt)}static getStubConfig(t){const e=t?Object.keys(t.states).filter(t=>t.startsWith("vacuum.")):[],o=t?.entities,i=o?e.filter(t=>"matter"!==o[t]?.platform):e,s=i.length>0?i:e;return 0===s.length?{type:`custom:${xt}`,vacuums:[{entity:"vacuum.my_roborock",name:"Roborock",rooms:[],clean_action:{type:"native"}}]}:{type:`custom:${xt}`,vacuums:s.map(e=>({entity:e,name:t.states[e]?.attributes.friendly_name??e.replace(/^vacuum\./,""),rooms:[],clean_action:{type:"native"}}))}}setConfig(t){if(!t.vacuums||!Array.isArray(t.vacuums)||0===t.vacuums.length)throw new Error("[anyvac-card] 'vacuums' must be a non-empty array");if(this._config=t,this._watched=null,this._intCache.clear(),this._mapCandCache.clear(),this._autoCache.clear(),this._careCache.clear(),this._roomsMemo.clear(),this._seatMemo.clear(),this._initialized){const e=new Set;for(const o of this._shownSet)o<t.vacuums.length&&e.add(o);this._shownSet=e.size>0?e:new Set(t.vacuums.map((t,e)=>e))}else this._initialized=!0,this._shownSet=this._loadShown(),this._localRoomSel=this._loadRoomSel(),this._flipLive=this._loadFlipLive()}getCardSize(){return 6}connectedCallback(){super.connectedCallback(),this.style.setProperty("--hold-ms",kt+"ms"),this._ro||"undefined"==typeof ResizeObserver||(this._ro=new ResizeObserver(()=>this._scheduleMeasure()),this._ro.observe(this)),this._onWinResize||(this._onWinResize=()=>this._scheduleMeasure(),window.addEventListener("resize",this._onWinResize,{passive:!0}),window.addEventListener("orientationchange",this._onWinResize,{passive:!0})),this._setupPanelViewObserver(),this._scheduleMeasure(),this._tickTimer||(this._tickTimer=window.setInterval(()=>{this._config?.debug_room_progress&&(this._config.vacuums??[]).some(t=>this._isCleaning(t)||this._isPaused(t))&&(this._now=Date.now())},1e3))}_scheduleMeasure(){if(this._measureRaf||null!==this._measureTimer)return;const t=()=>{this._measureRaf=0,this._measureTimer=null,this._doMeasure()};"undefined"!=typeof document&&document.hidden?this._measureTimer=window.setTimeout(t,0):this._measureRaf=requestAnimationFrame(t)}_doMeasure(){const t=this.getBoundingClientRect(),e=Math.round(t.width);e&&Math.abs(e-this._cardW)>=2&&(this._cardW=e);const o=this._config?.layout;if(o){const i=function(t,e,o){const i=t?.orientation;return"portrait"===i||"landscape"===i?i:e&&o&&e/o<(t?.threshold??1)?"portrait":"landscape"}(o,this._cardW||e||window.innerWidth,this._availableHeight(o,t));i!==this._profile&&(this._profile=i),this._refineGridHeight()}}_availableHeight(t,e){if("container"===(t.height??"viewport"))return e.height>1?Math.round(e.height):window.innerHeight;const o=e.top;return o>=0&&o<window.innerHeight?Math.max(1,Math.round(window.innerHeight-o-this._editBarHeight())):window.innerHeight}_editBarHeight(){try{const t=this._findCardOptionsAncestor();if(!t?.shadowRoot)return 0;const e=t.shadowRoot.querySelector(".card-actions");if(!e)return 0;const o=e.getBoundingClientRect();if(!(o.height>0))return 0;const i=getComputedStyle(e);return Math.ceil(o.height+(parseFloat(i.marginTop)||0)+(parseFloat(i.marginBottom)||0))}catch{return 0}}_findPanelViewAncestor(){let t=this.parentElement??this.getRootNode().host??null,e=0;for(;t&&e++<20;){if(t instanceof Element&&("HUI-PANEL-VIEW"===t.tagName||"HUI-VIEW"===t.tagName))return t;const e=t;t=e.parentElement??e.getRootNode()?.host??null}return null}_findCardOptionsAncestor(){let t=this.parentElement??this.getRootNode().host??null,e=0;for(;t&&e++<12;){if(t instanceof Element&&"HUI-CARD-OPTIONS"===t.tagName)return t;const e=t;t=e.parentElement??e.getRootNode()?.host??null}return null}_setupPanelViewObserver(){if("undefined"==typeof MutationObserver)return;if(this._panelViewMo&&this._panelViewNode?.isConnected)return;this._panelViewMo&&(this._panelViewMo.disconnect(),this._panelViewMo=null,this._panelViewNode=null);const t=this._findPanelViewAncestor();if(!t){if(!this._panelViewWarned){this._panelViewWarned=!0;try{console.warn("[anyvac-card] hui-panel-view/hui-view ancestor not found (HA internal DOM may have changed) — edit-mode layout refresh via MutationObserver is disabled; resize-based refresh still works.")}catch{}}return}const e=new MutationObserver(()=>{this._scheduleMeasure(),this._watchEditBar();const t=this._findCardOptionsAncestor();if(t?.shadowRoot)try{e.observe(t.shadowRoot,{childList:!0,subtree:!0})}catch{}});try{e.observe(t,{childList:!0,subtree:!0})}catch{}if(t.shadowRoot)try{e.observe(t.shadowRoot,{childList:!0,subtree:!0})}catch{}const o=this._findCardOptionsAncestor();if(o?.shadowRoot)try{e.observe(o.shadowRoot,{childList:!0,subtree:!0})}catch{}this._panelViewMo=e,this._panelViewNode=t,this._watchEditBar()}_watchEditBar(){this._barMo&&(this._barMo.disconnect(),this._barMo=null);const t=this._findCardOptionsAncestor();if(!t?.shadowRoot)return;const e=t.shadowRoot.querySelector(".card-actions");if(e)return void this._observeEditBar(e);const o=t.shadowRoot,i=new MutationObserver(()=>{const t=o.querySelector(".card-actions");t&&(i.disconnect(),this._barMo=null,this._observeEditBar(t))});try{i.observe(o,{childList:!0,subtree:!0})}catch{return}this._barMo=i}_observeEditBar(t){if(this._scheduleMeasure(),"undefined"==typeof ResizeObserver)return;this._editBarRo&&(this._editBarRo.disconnect(),this._editBarRo=null);const e=new ResizeObserver(()=>this._scheduleMeasure());try{e.observe(t)}catch{return}this._editBarRo=e}_refineGridHeight(){const t=this._config?.layout;if(!t)return;const e=this.renderRoot?.querySelector(".avc-grid");if(!e)return;if("viewport"===(t.height??"viewport")){const t=e.getBoundingClientRect().top;if(t>=0&&t<window.innerHeight){const o=Math.round(window.innerHeight-t-this._editBarHeight());o>120&&(e.style.height=o+"px")}}const o=this.renderRoot?.querySelector(".avc-region--map");if(o){const t=Math.round(o.clientWidth),e=Math.round(o.clientHeight);t&&Math.abs(t-this._mapRegW)>=2&&(this._mapRegW=t),e&&Math.abs(e-this._mapRegH)>=2&&(this._mapRegH=e)}if("portrait"===this._profile){const t=this.renderRoot?.querySelector(".avc-region--start"),o=parseFloat(getComputedStyle(e).rowGap||getComputedStyle(e).gap||"0")||0,i=t?Math.round(t.getBoundingClientRect().height):0,s=Math.round(e.clientWidth),n=Math.round(e.clientHeight-i-(i?o:0));s&&Math.abs(s-this._mapAvailW)>=2&&(this._mapAvailW=s),n>0&&Math.abs(n-this._mapAvailH)>=2&&(this._mapAvailH=n)}}disconnectedCallback(){super.disconnectedCallback(),this._cancelHold(),this._measureRaf&&(cancelAnimationFrame(this._measureRaf),this._measureRaf=0),null!==this._measureTimer&&(clearTimeout(this._measureTimer),this._measureTimer=null),null!==this._settleTimer&&(clearTimeout(this._settleTimer),this._settleTimer=null),this._tickTimer&&(clearInterval(this._tickTimer),this._tickTimer=null),this._onWinResize&&(window.removeEventListener("resize",this._onWinResize),window.removeEventListener("orientationchange",this._onWinResize),this._onWinResize=null),this._ro&&(this._ro.disconnect(),this._ro=null),this._panelViewMo&&(this._panelViewMo.disconnect(),this._panelViewMo=null),this._panelViewNode=null,this._barMo&&(this._barMo.disconnect(),this._barMo=null),this._editBarRo&&(this._editBarRo.disconnect(),this._editBarRo=null)}firstUpdated(){const t=Math.round(this.getBoundingClientRect().width);t&&(this._cardW=t),this._scheduleMeasure()}updated(){if(this._careResetPending.size){let t=null;for(const[e,o]of this._careResetPending){const i=this.hass?.states[e],s=i?Date.parse(i.last_changed):NaN;Number.isFinite(s)&&s>o&&(t||(t=new Map(this._careResetPending)),t.delete(e))}t&&(this._careResetPending=t)}this._refineGridHeight(),this._refineGridColumns(),this._setupPanelViewObserver(),null!==this._settleTimer&&clearTimeout(this._settleTimer),this._settleTimer=window.setTimeout(()=>{this._settleTimer=null,this._scheduleMeasure()},250)}_refineGridColumns(){if("portrait"!==this._profile||!this._lastPortraitFitW)return;if(this._config.layout?.portrait?.columns?.length)return;if(this._stackTopology)return;const t=this.renderRoot?.querySelector(".avc-grid");if(!t)return;const e=t.clientWidth-(parseFloat(getComputedStyle(t).columnGap||"0")||0);let o=Math.round(this._lastPortraitFitW);e>0&&(o=Math.min(o,e));const i=Math.round(o)+"px 1fr";t.style.gridTemplateColumns!==i&&(t.style.gridTemplateColumns=i)}shouldUpdate(t){if(!t.has("hass")||t.size>1)return!0;const e=t.get("hass");if(!e||!this._config)return!0;for(const t of this._watchedEntities())if(e.states[t]!==this.hass.states[t])return!0;return!1}_watchedEntities(){if(this._registry(),this._watched)return this._watched;const t=new Set;for(const e of this._config?.vacuums??[]){for(const o of[e.entity,e.status_entity,e.battery_entity,e.last_clean_entity,e.progress_entity,e.current_room_entity,e.error_entity,this._mapEntityFor(e),this._intEntity(e),...Object.values(this._autoEntities(e))])o&&t.add(o);for(const o of this._roomsFor(e))o.last_clean_entity&&t.add(o.last_clean_entity),o.clean_time_entity&&t.add(o.clean_time_entity);for(const o of this._careItems(e))o.entity&&t.add(o.entity),o.reset&&t.add(o.reset),o.binary&&t.add(o.binary)}for(const e of this._config?.global_actions??[])for(const o of e.watch_entities??[])o&&t.add(o);return this.hass?.entities&&(this._watched=t),t}_resolveColor(t,e){const o=t??e;return Rt[o]??o}_resolveBg(t,e,o){return(o?zt:At)[t??e]??function(t,e){const o=/^#([0-9a-f]{3}|[0-9a-f]{6})$/i.exec(t);if(!o)return`rgba(255,255,255,${e})`;let i=o[1];return 3===i.length&&(i=i.split("").map(t=>t+t).join("")),`rgba(${parseInt(i.slice(0,2),16)},${parseInt(i.slice(2,4),16)},${parseInt(i.slice(4,6),16)},${e})`}(this._resolveColor(t,e),o?.3:.18)}_vacIndex(t){const e=this._config?.vacuums?.findIndex(e=>e.entity===t.entity)??-1;return e<0?0:e}_defaultColor(t){return Mt[this._vacIndex(t)%Mt.length]}_color(t){return this._resolveColor(t.color,this._defaultColor(t))}_colorBg(t){return this._resolveBg(t.color,this._defaultColor(t),!1)}_colorBgActive(t){return this._resolveBg(t.color,this._defaultColor(t),!0)}_registry(){const t=this.hass?.entities;return t!==this._regRef&&(this._regRef=t,this._intCache.clear(),this._mapCandCache.clear(),this._autoCache.clear(),this._careCache.clear(),this._watched=null),t}_intEntity(t){if(t.integration_entity)return t.integration_entity;const e=this._registry();if(!e||!t.entity)return;if(this._intCache.has(t.entity))return this._intCache.get(t.entity);const o=e[t.entity]?.device_id,i=o?Object.keys(e).find(t=>e[t]?.device_id===o&&"anyvac"===e[t]?.platform&&t.startsWith("sensor.")):void 0;return this._intCache.set(t.entity,i),i}_mapEntityFor(t){if(t.map?.entity)return t.map.entity;const e=this._registry();if(!e||!t.entity)return;let o=this._mapCandCache.get(t.entity);if(!o){const i=e[t.entity]?.device_id;if(!i)return;o=Object.keys(e).filter(t=>e[t]?.device_id===i&&t.startsWith("image.")),this._mapCandCache.set(t.entity,o)}if(1===o.length)return o[0];const i=o.filter(t=>{const e=this.hass.states[t];return!!e&&"unavailable"!==e.state&&"unknown"!==e.state&&!!e.attributes.entity_picture});return 1===i.length?i[0]:void 0}_intAttrs(t){const e=this._intEntity(t),o=e?this.hass.states[e]?.attributes:void 0;if(o)return(o.schema_version??0)>=2?o:void 0}_schemaWarning(){for(const t of this._config?.vacuums??[]){const e=this._intEntity(t),o=e?this.hass.states[e]?.attributes:void 0;if(o&&(o.schema_version??0)<2)return`AnyVac integration is too old for this card (schema ${o.schema_version??1} < 2). Update the anyvac integration to ≥ 0.18.0.`}return null}_autoEntities(t){const e=this._registry();if(!e||!t.entity)return{};const o=this._autoCache.get(t.entity);if(o)return o;const i=e[t.entity]?.device_id;if(!i)return{};const s=Object.keys(e).filter(t=>e[t]?.device_id===i),n=t=>s.find(o=>e[o]?.translation_key===t),a={status:n("status"),battery:(t=>s.find(e=>this.hass.states[e]?.attributes?.device_class===t))("battery"),last_clean:n("last_clean_end"),progress:n("clean_percent"),current_room:n("current_room"),error:n("vacuum_error")};return this._autoCache.set(t.entity,a),a}_ent(t,e){return t[e+"_entity"]??this._autoEntities(t)[e]}_statusInfo(t){const e=this.hass.states[this._ent(t,"status")??t.entity]?.state??"unknown";return St[e]??[e,"rgba(255,255,255,0.5)"]}_careItems(t){const e=this._registry(),o=this.hass?.devices;if(!e||!o||!t.entity)return[];const i=this._dockTier(t),s=t.entity+"|"+i;if(this._careCache.has(s))return this._careCache.get(s);const n=e[t.entity]?.device_id,a=n?o[n]:void 0,r=a?.identifiers?.find(([t])=>"roborock"===t)?.[1],l=r?Object.values(o).find(t=>t.identifiers?.some(([t,e])=>"roborock"===t&&e===`${r}_dock`)):void 0,c=l?.id,d=(t,o,i)=>t?Object.keys(e).find(s=>e[s]?.device_id===t&&e[s]?.translation_key===o&&s.startsWith(i+".")):void 0,h=[],p=(t,e,o,i)=>{const s=d(i,e,"sensor"),n=d(i,o,"button");(s||n)&&h.push({key:e,label:t,entity:s,reset:n,totalHours:qt[e]})};if(p("Main brush","main_brush_time_left","reset_main_brush_consumable",n),p("Side brush","side_brush_time_left","reset_side_brush_consumable",n),p("Filter","filter_time_left","reset_air_filter_consumable",n),p("Sensors","sensor_time_left","reset_sensor_consumable",n),"full"===i){p("Dock brush","cleaning_brush_time_left","reset_dock_cleaning_brush_consumable",c),p("Strainer","strainer_time_left","reset_dock_strainer_consumable",c);const t=(t,e)=>{const o=d(c,e,"binary_sensor");o&&h.push({key:e,label:t,binary:o})};t("Dirty water tank","dirty_box_full"),t("Clean water tank","clean_box_empty"),t("Cleaning fluid","clean_fluid_empty")}return this._careCache.set(s,h),h}_careValue(t){if(!t.entity)return"—";const e=this.hass.states[t.entity];if(!e||"unavailable"===e.state||"unknown"===e.state)return"—";const o=Number(e.state);if(Number.isNaN(o))return e.state;const i=e.attributes?.unit_of_measurement,s="s"===i?o/3600:"min"===i?o/60:o;if(t.totalHours){return`${Math.max(0,Math.min(100,Math.round(s/t.totalHours*100)))} %`}return`${Math.round(s)} h`}_isCleaning(t){return Pt.has(this.hass.states[t.entity]?.state??"")}_hasError(t){const e=this._ent(t,"error"),o=e?this.hass.states[e]?.state:null;return!!o&&"none"!==o&&"unknown"!==o&&"unavailable"!==o}_isPaused(t){return"paused"===this.hass.states[t.entity]?.state}_battery(t){const e=this._ent(t,"battery");if(!e)return null;const o=parseInt(this.hass.states[e]?.state??"");return isNaN(o)?null:o}_lastCleanStr(t){const e=this._ent(t,"last_clean"),o=e?this.hass.states[e]?.state:void 0;if(!o||"unavailable"===o||"unknown"===o)return"—";const i=new Date(o),s=Math.floor((Date.now()-i.getTime())/864e5),n=i.toLocaleTimeString([],{hour:"2-digit",minute:"2-digit"});return 0===s?"Today · "+n:1===s?"Yesterday · "+n:i.toLocaleDateString([],{day:"2-digit",month:"2-digit"})+" · "+n}_progress(t){const e=this._ent(t,"progress");if(!e)return null;const o=parseInt(this.hass.states[e]?.state??"");return isNaN(o)||0===o?null:o}_selSensor(){for(const t of this._config.vacuums){const e=this._intEntity(t);if(e&&Array.isArray(this.hass.states[e]?.attributes?.selected_rooms))return e}}_backendSel(){const t=this._selSensor();return t?new Set(this.hass.states[t]?.attributes?.selected_rooms??[]):null}_setBackendSel(t,e){this._call("anyvac","select_rooms",{rooms:t,mode:e})}_isRoomSelected(t,e){const o=this._backendSel();return o?o.has(t.key):this._localRoomSel.get(e.entity+":"+t.key)??!1}_layersEff(){const t=this._selSensor(),e=t?this.hass.states[t]?.attributes?.view_layers:void 0;return e&&"boolean"==typeof e.dry&&"boolean"==typeof e.wet?{dry:e.dry,wet:e.wet}:this._layers}_staticRoomsFor(t){return Ft(this._config,t)}_memoSync(){this.hass!==this._memoHass&&(this._memoHass=this.hass,this._roomsMemo.clear(),this._seatMemo.clear())}_roomsFor(t){this._memoSync();const e=this._roomsMemo.get(t.entity);if(e)return e;const o=this._computeRoomsFor(t);return this._roomsMemo.set(t.entity,o),o}_computeRoomsFor(t){const e=this._intAttrs(t),o=Array.isArray(e?.rooms)?e.rooms:[];if(!e||!o.length)return this._staticRoomsFor(t);const i=this._effectiveSeat(t),s=this._wrapAspect(this._baseHeightFor(t)),n=this._staticRoomsFor(t),a=new Map(n.filter(t=>t.key).map(t=>[t.key,t])),r=new Set,l=[];for(const t of o){const o=t?.name;if(!o)continue;r.add(o);const n=a.get(o);if(n&&null!=n.map_x&&null!=n.map_y){l.push(n);continue}const c=It(t,e,i,s);c?l.push({...n??{key:o,name:o,icon:"mdi:floor-plan"},...c}):n&&l.push(n)}for(const t of n)t.key&&!r.has(t.key)&&l.push(t);return l}_hasSelectedRooms(t){return this._roomsFor(t).some(e=>this._isRoomSelected(e,t))}_liveCleanType(t){if((t.presets?.length??0)>=2){const e=this._activePreset(t);return null!=e.mop_intensity&&""!==e.mop_intensity&&"off"!==e.mop_intensity||null!=e.mop_mode&&""!==e.mop_mode?"wet":"dry"}const e=this._intAttrs(t)?.clean_type;if("wet"===e||"dry"===e)return e;const o=this._vacCleanType(t);return o.wet&&!o.dry?"wet":"dry"}_backendEstimate(t,e,o){const i=this._intAttrs(t)?.rooms_estimate;if(!i)return null;const s=i[e.name??""]??i[e.key],n=s?s[o]:void 0;return"number"==typeof n&&n>0?n:null}_roomCleanMins(t,e){const o=this._vacCleanType(e),i=!(!o.wet||o.dry)||!(o.dry&&!o.wet)&&"wet"===this._liveCleanType(e),s=this._backendEstimate(e,t,i?"wet":"dry");if(null!=s)return s;const n=i?t.clean_time_wet:t.clean_time_dry;if(null!=n&&n>0)return n;const a=i?t.clean_time_dry:t.clean_time_wet;if(null!=a&&a>0)return a;if(t.clean_time_entity){const e=parseFloat(this.hass.states[t.clean_time_entity]?.state??"");if(!isNaN(e)&&e>0)return e}return t.clean_time_mins??0}_totalCleanMins(t){return this._roomsFor(t).reduce((e,o)=>this._isRoomSelected(o,t)?e+this._roomCleanMins(o,t):e,0)}_intRoomRec(t,e){const o=this._intAttrs(t)?.rooms_last_cleaned;return o?o[e.key]??o[e.name??""]??null:null}_roomCoverageRec(t,e){const o=this._intAttrs(t)?.rooms_coverage;return o?o[e.key]??o[e.name??""]??null:null}_ageDaysFromIso(t){if(!t)return null;const e=new Date(t).getTime();return isNaN(e)?null:(Date.now()-e)/864e5}_roomAgeDays(t,e){if(e){const o=this._intRoomRec(e,t);if(o){const t=this._ageDaysFromIso(o.dry),e=this._ageDaysFromIso(o.wet),i=this._ageDaysFromIso(o.any),s=this._layersEff(),n=s.dry,a=s.wet;let r;if(r=n&&a?Math.max(t??9999,e??9999):n?t:a?e:i,null!==r)return r}}if(!t.last_clean_entity)return null;const o=this.hass.states[t.last_clean_entity]?.state;return o&&"unavailable"!==o&&"unknown"!==o?(Date.now()-new Date(o).getTime())/864e5:null}_colorForAgeDays(t){if(null===t)return"rgba(255,77,77,0.85)";const e=[...this._config.room_thresholds??[{days:2,color:"rgba(46,204,113,0.85)"},{days:5,color:"rgba(250,173,20,0.85)"},{days:10,color:"rgba(255,152,0,0.85)"}]].sort((t,e)=>t.days-e.days);for(const o of e)if(t<=o.days)return o.color;return"rgba(255,77,77,0.85)"}_vacCleanType(t){if("dry"===t.clean_type)return{dry:!0,wet:!1};if("wet"===t.clean_type)return{dry:!1,wet:!0};if("both"===t.clean_type)return{dry:!0,wet:!0};const e=this._intAttrs(t)?.mop_signal;if(e){return{dry:!0,wet:null!=e.water_box_mode||!!e.water_mode_name}}const o=t.clean_action,i=!(!o||!(o.mop_mode||o.mop_mode_entity||o.mop_intensity||o.mop_intensity_entity));return{dry:!i||null!=o?.suction_level&&"off"!==o.suction_level,wet:i}}_roomProgress(t,e){const o=this._intAttrs(t)?.rooms_progress;return o?o[e.key]??o[e.name??""]??null:null}_roomProgForType(t,e,o){let i=null,s=null,n=!1;for(const a of e){const e=this._roomProgress(a,t);if(!e)continue;const r="dry"===o?e.dry_pct:e.wet_pct;null!=r&&(null===i||r>i)&&(i=r,s=a,n=!!("dry"===o?e.dry_calibrating:e.wet_calibrating))}return null!==i&&s?{pct:i,kind:"S",title:`${o} coverage ${i}%`,color:this._color(s),calibrating:n}:null}_progColor(t){return t>=90?"#52c41a":t>=50?"#faad14":"#40a9ff"}_renderRoomGauge(t,e){if(!this._config.debug_room_progress)return G;const o=this._roomProgForType(e,t,"dry"),i=this._roomProgForType(e,t,"wet");if(!o&&!i)return G;const s=(t,e,o,i)=>q`
+      <span class="room-gauge" title=${e}
+        style=${vt({background:`conic-gradient(${o} ${3.6*t}deg, rgba(255,255,255,0.12) 0)`})}>
+        <span>${t}${i?"~":""}</span>
+      </span>`;return q`<div class="room-gauges">
+      ${o?s(o.pct,"dry · "+o.title,o.color,o.calibrating):G}
+      ${i?s(i.pct,"wet · "+i.title,"#40a9ff",i.calibrating):G}
+    </div>`}_renderProgChip(t){return t?q`<span class="rl-prog" title=${t.title}
+      style=${vt({color:t.color??this._progColor(t.pct)})}>${t.pct}${t.calibrating?"~":""}%<small>${t.kind}</small></span>`:G}_batIcon(t){return t>80?"mdi:battery":t>50?"mdi:battery-60":t>20?"mdi:battery-30":"mdi:battery-10"}_batColor(t){return t>50?"#52c41a":t>20?"#faad14":"#ff4d4f"}_mapUrl(t){const e=this.hass.states[t];if(!e)return"";const o=e.attributes.entity_picture;if(!o)return"";const i=new Date(e.last_updated).getTime(),s=o.includes("?")?"&":"?";return this.hass.hassUrl(o+s+"_t="+i)}_timeStr(t){const e=Math.round(t);if(e<=0)return"";if(e>=60){const t=Math.floor(e/60),o=e%60;return o>0?"~"+t+" h "+o+" min":"~"+t+" h"}return"~"+e+" min"}_isGlobalActive(t){return(t.watch_entities??[]).some(t=>Pt.has(this.hass.states[t]?.state??""))}async _triggerGlobal(t){const e=t.action;try{if("script"===e.type)await this.hass.callService("script","turn_on",{entity_id:e.entity_id,variables:e.variables??{}});else{const[t,o]=e.service.split(".");await this.hass.callService(t,o,e.data??{})}}catch(t){console.error("[anyvac-card] global action failed:",t)}}_cancelHold(){null!==this._holdTimer&&(clearTimeout(this._holdTimer),this._holdTimer=null),this._holdId=null,this._holdStartPos=null}_holdStart(t,e){return o=>{o.preventDefault(),this._cancelHold(),this._holdId=t,this._holdStartPos={x:o.clientX,y:o.clientY},this._holdTimer=setTimeout(()=>{this._holdTimer=null,this._holdId=null,this._holdStartPos=null,e()},kt)}}_toggleShown(t){if(this._config.layout&&"portrait"===this._profile)return this._shownSet=new Set([t]),void this._saveShown();this._toggleShownMulti(t)}_toggleShownMulti(t){const e=new Set(this._shownSet);e.has(t)?e.size>1&&e.delete(t):e.add(t),this._shownSet=e,this._saveShown()}async _call(t,e,o){try{await this.hass.callService(t,e,o)}catch(o){console.error("[anyvac-card] "+t+"."+e+" failed:",o)}}_fireMoreInfo(t){this.dispatchEvent(new CustomEvent("hass-more-info",{bubbles:!0,composed:!0,detail:{entityId:t}}))}_storeKey(t){const e=(this._config?.vacuums??[]).map(t=>t.entity).join(",");return`anyvac-card:${t}:${e}`}_readStored(t,e){try{return localStorage.getItem(this._storeKey(t))??localStorage.getItem(e)}catch{return null}}_saveShown(){try{const t=[...this._shownSet].map(t=>this._config.vacuums[t]?.entity).filter(Boolean);localStorage.setItem(this._storeKey("shown"),JSON.stringify(t))}catch{}}_loadShown(){try{const t=this._readStored("shown","roborock-card:shown");if(t){const e=JSON.parse(t).map(t=>this._config.vacuums.findIndex(e=>e.entity===t)).filter(t=>t>=0);if(e.length>0)return new Set(e)}}catch{}return new Set(this._config.vacuums.map((t,e)=>e))}_saveFlipLive(){try{null===this._flipLive?localStorage.removeItem(this._storeKey("flip")):localStorage.setItem(this._storeKey("flip"),JSON.stringify(this._flipLive))}catch{}}_loadFlipLive(){const t=this._readStored("flip","roborock-card:flip");if(null===t)return null;try{return!0===JSON.parse(t)}catch{return null}}_saveRoomSel(t){try{const e=t+":",o={};for(const[t,i]of this._localRoomSel.entries())t.startsWith(e)&&(o[t.slice(e.length)]=i);localStorage.setItem(this._storeKey("sel:"+t),JSON.stringify(o))}catch{}}_loadRoomSel(){const t=new Map;try{for(const e of this._config.vacuums){const o=this._readStored("sel:"+e.entity,"roborock-card:sel:"+e.entity);if(o){const i=JSON.parse(o);for(const[o,s]of Object.entries(i))s&&t.set(e.entity+":"+o,!0)}}}catch{}return t}_pause(t){this._call("vacuum","pause",{entity_id:t.entity})}_resume(t){this._call("vacuum","start",{entity_id:t.entity})}_dock(t){this._call("vacuum","return_to_base",{entity_id:t.entity})}_toggleRoom(t,e){if(this._backendSel())return void this._setBackendSel([t.key],"toggle");const o=e.entity+":"+t.key,i=new Map(this._localRoomSel);i.set(o,!i.get(o)),this._localRoomSel=i,this._saveRoomSel(e.entity)}_isRoomSelectedAny(t,e){const o=this._backendSel();return o?o.has(t):e.some(e=>this._localRoomSel.get(e.entity+":"+t)??!1)}_toggleRoomAcross(t,e){if(this._isRoomSelectedAny(t,e)&&e.some(t=>this._intAttrs(t))&&this._call("anyvac","pin_room",{room:t}),this._backendSel())return void this._setBackendSel([t],"toggle");const o=!this._isRoomSelectedAny(t,e),i=new Map(this._localRoomSel);for(const s of e)this._roomsFor(s).some(e=>e.key===t)&&i.set(s.entity+":"+t,o);this._localRoomSel=i;for(const t of e)this._saveRoomSel(t.entity)}_allRoomKeys(){const t=new Set;for(const e of this._config.vacuums)for(const o of this._roomsFor(e))t.add(o.key);return[...t]}_v2Vacuums(){const t=[],e=[];for(const o of this._config.vacuums){const i=this._vacCleanType(o);i.dry&&t.push(o.entity),i.wet&&e.push(o.entity)}return{dry:t,wet:e}}_unassignedRooms(t,e,o){if(!o||0===t.length)return[];const i=this._planPreview;if(!i||i.key!==this._planKey(t,e))return[];const s="wet"!==e,n="dry"!==e,a=[];for(const e of t)(s&&!i.dry.has(e)||n&&!i.wet.has(e))&&a.push(e);return a}_v2Settings(){const t={};for(const e of["dry","wet"])for(const o of this._config.vacuums){const i=this._vacCleanType(o);if(!("dry"===e?i.dry:i.wet))continue;const s=this._activePreset(o),n={};s.suction_level&&(n.fan_speed=s.suction_level),"wet"===e&&s.mop_mode&&(n.mop_mode=s.mop_mode),"wet"===e&&s.mop_intensity&&(n.mop_intensity=s.mop_intensity),s.repeat&&s.repeat>1&&(n.repeat=s.repeat),Object.keys(n).length&&((t[e]??(t[e]={}))[o.entity]=n)}return Object.keys(t).length?t:void 0}_planKey(t,e){return JSON.stringify([t,e,this._v2Vacuums(),this._pinsAttr()])}_fetchPlan(t,e){const o=this._planKey(t,e);o!==this._planFetchKey&&(this._planFetchKey=o,(async()=>{try{const i=await this.hass.callService("anyvac","plan",{rooms:t,mode:e,vacuums:this._v2Vacuums()},void 0,!1,!0);if(this._planFetchKey!==o)return;const s=i?.response?.plan??{},n=t=>{const e=new Map;for(const[o,i]of Object.entries(t??{}))for(const t of i)e.set(t,o);return e};this._planPreview={key:o,dry:n(s.dry),wet:n(s.wet),eta:"number"==typeof s.eta_min?s.eta_min:null,unsequenced:Array.isArray(s.unsequenced)?s.unsequenced:[]}}catch(t){console.warn("[anyvac-card] anyvac.plan preview failed:",t),this._planFetchKey===o&&(this._planPreview={key:o,dry:new Map,wet:new Map,eta:null,unsequenced:[]})}})())}_etaFor(t,e,o){o&&t.length&&this._fetchPlan(t,e);const i=this._planPreview?.eta;return o&&null!=i?i:this._selEstMins(t)}async _runOrchestrated(t,e){t.length&&await this._call("anyvac","clean",{rooms:t,mode:e,vacuums:this._v2Vacuums(),...this._v2Settings()?{settings:this._v2Settings()}:{}})}_selectGlobalPreset(t){if(this._activeGlobalPreset=t.id,t.mode&&(this._planMode=t.mode),"all"===t.scope||Array.isArray(t.scope)){const e="all"===t.scope?this._allRoomKeys():t.scope;if(this._backendSel())return void this._setBackendSel(e,"set");const o=new Map(this._localRoomSel);for(const t of this._config.vacuums)for(const e of this._roomsFor(t))o.delete(t.entity+":"+e.key);for(const t of e)for(const e of this._config.vacuums)this._roomsFor(e).some(e=>e.key===t)&&o.set(e.entity+":"+t,!0);this._localRoomSel=o;for(const t of this._config.vacuums)this._saveRoomSel(t.entity)}}_vacAbbrev(t){return((t.name??t.entity.split(".")[1]??"").replace(/[^A-Za-z0-9]/g,"").slice(0,2)||"??").toUpperCase()}_renderPlanPreview(){if("auto"!==this._config.ui_mode)return G;const t=this._allRoomKeys().filter(t=>this._isRoomSelectedAny(t,this._config.vacuums));if(!t.length)return G;const e=this._planMode,o=(this._config.global_presets??[]).find(t=>t.id===this._activeGlobalPreset)?.label,i="dry"===e||"both"===e,s="wet"===e||"both"===e;this._fetchPlan(t,e);const n=this._planPreview?.dry??new Map,a=this._planPreview?.wet??new Map,r=t=>{for(const e of this._config.vacuums){const o=this._roomsFor(e).find(e=>e.key===t);if(o)return o}},l=t=>{const e=this._config.vacuums.find(e=>e.entity===t);if(!e)return q`<span style="font-size:11px;opacity:.25">—</span>`;const o=this._color(e);return q`<span style="display:inline-flex;align-items:center;justify-content:center;min-width:24px;height:17px;padding:0 5px;border-radius:9px;font-size:10px;font-weight:700;color:#fff;background:${o}30;border:1px solid ${o}">${this._vacAbbrev(e)}</span>`},c=(t,o)=>{const i=e===t;return q`<button @click=${e=>{e.stopPropagation(),this._planMode=t}}
+        style="padding:2px 8px;border-radius:8px;font-size:10px;font-weight:700;cursor:pointer;font-family:inherit;border:1px solid ${i?"rgba(255,255,255,0.5)":"rgba(255,255,255,0.15)"};background:${i?"rgba(255,255,255,0.12)":"transparent"};color:${i?"#fff":"rgba(255,255,255,0.5)"}">${o}</button>`},d="plan-run";return q`
       <div style="margin:0 4px 6px;padding:6px 8px;background:rgba(255,255,255,0.03);border:1px solid rgba(255,255,255,0.08);border-radius:12px;display:flex;flex-direction:column;gap:6px">
         <div style="display:flex;align-items:center;justify-content:space-between">
-          <span style="font-size:9px;font-weight:600;letter-spacing:.6px;color:rgba(255,255,255,.35)">CLEAN PLAN${apLabel ? " · " + apLabel.toUpperCase() : ""}</span>
-          <div style="display:flex;gap:4px">${modeBtn("dry", "Dry")}${modeBtn("wet", "Wet")}${modeBtn("both", "Both")}</div>
+          <span style="font-size:9px;font-weight:600;letter-spacing:.6px;color:rgba(255,255,255,.35)">CLEAN PLAN${o?" · "+o.toUpperCase():""}</span>
+          <div style="display:flex;gap:4px">${c("dry","Dry")}${c("wet","Wet")}${c("both","Both")}</div>
         </div>
         <div style="display:flex;gap:6px;overflow-x:auto;align-items:center">
           <div style="display:flex;flex-direction:column;gap:3px;align-items:center;flex-shrink:0;padding-right:2px">
             <span style="height:18px"></span>
-            ${showDry ? b `<ha-icon icon="mdi:broom" style="--mdc-icon-size:14px;color:rgba(255,255,255,.4)"></ha-icon>` : A}
-            ${showWet ? b `<ha-icon icon="mdi:water" style="--mdc-icon-size:14px;color:rgba(64,169,255,.7)"></ha-icon>` : A}
+            ${i?q`<ha-icon icon="mdi:broom" style="--mdc-icon-size:14px;color:rgba(255,255,255,.4)"></ha-icon>`:G}
+            ${s?q`<ha-icon icon="mdi:water" style="--mdc-icon-size:14px;color:rgba(64,169,255,.7)"></ha-icon>`:G}
           </div>
-          ${selKeys.map((k) => {
-            const r = roomDef(k);
-            return b `<div style="display:flex;flex-direction:column;align-items:center;gap:3px;min-width:32px;flex-shrink:0" title=${r?.name ?? k}>
-              <ha-icon icon=${r?.icon || "mdi:floor-plan"} style="--mdc-icon-size:18px;color:rgba(255,255,255,.7)"></ha-icon>
-              ${showDry ? cell(dryOf.get(k)) : A}
-              ${showWet ? cell(wetOf.get(k)) : A}
-            </div>`;
-        })}
+          ${t.map(t=>{const e=r(t);return q`<div style="display:flex;flex-direction:column;align-items:center;gap:3px;min-width:32px;flex-shrink:0" title=${e?.name??t}>
+              <ha-icon icon=${e?.icon||"mdi:floor-plan"} style="--mdc-icon-size:18px;color:rgba(255,255,255,.7)"></ha-icon>
+              ${i?l(n.get(t)):G}
+              ${s?l(a.get(t)):G}
+            </div>`})}
         </div>
-        <button class="action-btn ${this._holdId === runHid ? "action-btn--holding" : ""}"
+        <button class="action-btn ${this._holdId===d?"action-btn--holding":""}"
           style="flex:0 0 auto;align-self:flex-end;flex-direction:row;gap:6px;padding:7px 16px;background:rgba(82,196,26,0.14);border:1px solid rgba(82,196,26,0.55);color:#fff"
-          @pointerdown=${this._holdStart(runHid, () => this._runOrchestrated(selKeys, this._planMode))}
+          @pointerdown=${this._holdStart(d,()=>this._runOrchestrated(t,this._planMode))}
           @pointermove=${this._holdMove}
           @pointerup=${this._holdEnd}
           @pointerleave=${this._holdEnd}
@@ -2910,381 +86,103 @@ let AnyVacCard = class AnyVacCard extends i$2 {
           <span style="font-size:12px">Start · hold</span>
         </button>
       </div>
-    `;
-    }
-    _renderAutoBar() {
-        if (this._config.ui_mode !== "auto")
-            return A;
-        const gps = this._config.global_presets ?? [];
-        if (!gps.length)
-            return A;
-        return b `
+    `}_renderAutoBar(){if("auto"!==this._config.ui_mode)return G;const t=this._config.global_presets??[];return t.length?q`
       <div style="display:flex;flex-wrap:wrap;gap:8px;padding:2px 4px 4px">
-        ${gps.map((gp) => {
-            const active = this._activeGlobalPreset === gp.id;
-            return b `<button
-            @click=${() => this._selectGlobalPreset(gp)}
-            style="flex:0 1 auto;min-width:128px;display:flex;flex-direction:row;align-items:center;justify-content:flex-start;gap:10px;padding:9px 14px;border-radius:14px;cursor:pointer;font-family:inherit;color:white;background:${active ? "rgba(82,196,26,0.14)" : "rgba(255,255,255,0.05)"};border:1px solid ${active ? "rgba(82,196,26,0.6)" : "rgba(255,255,255,0.12)"}">
-            <ha-icon icon=${gp.icon || "mdi:robot-vacuum-variant"} style="--mdc-icon-size:24px"></ha-icon>
+        ${t.map(t=>{const e=this._activeGlobalPreset===t.id;return q`<button
+            @click=${()=>this._selectGlobalPreset(t)}
+            style="flex:0 1 auto;min-width:128px;display:flex;flex-direction:row;align-items:center;justify-content:flex-start;gap:10px;padding:9px 14px;border-radius:14px;cursor:pointer;font-family:inherit;color:white;background:${e?"rgba(82,196,26,0.14)":"rgba(255,255,255,0.05)"};border:1px solid ${e?"rgba(82,196,26,0.6)":"rgba(255,255,255,0.12)"}">
+            <ha-icon icon=${t.icon||"mdi:robot-vacuum-variant"} style="--mdc-icon-size:24px"></ha-icon>
             <div style="display:flex;flex-direction:column;align-items:flex-start;line-height:1.15">
-              <span style="font-size:13px;font-weight:700">${gp.label}</span>
-              <small style="font-size:9px;font-weight:600;letter-spacing:.4px;color:rgba(255,255,255,0.4)">${gp.scope === "all" ? "WHOLE HOME" : gp.scope === "select" ? "SELECTED" : "ROOMS"}${gp.mode ? " · " + (gp.mode === "dry" ? "DRY" : gp.mode === "wet" ? "WET" : "BOTH") : ""}</small>
+              <span style="font-size:13px;font-weight:700">${t.label}</span>
+              <small style="font-size:9px;font-weight:600;letter-spacing:.4px;color:rgba(255,255,255,0.4)">${"all"===t.scope?"WHOLE HOME":"select"===t.scope?"SELECTED":"ROOMS"}${t.mode?" · "+("dry"===t.mode?"DRY":"wet"===t.mode?"WET":"BOTH"):""}</small>
             </div>
-          </button>`;
-        })}
+          </button>`})}
       </div>
-    `;
-    }
-    // ── Dock & START regions (docs/18 Fáze B) ────────────────────────────────
-    /** Shared per-room, per-pass vacuum pins from the integration sensor
-     *  (anyvac.pin_room). Per-kind since 2026-07-25 — dry and wet are stored
-     *  independently, see `_cycleRoomPin`. Only consumed here as a plan-preview
-     *  cache-key input (any change must trigger a refetch), so its exact shape
-     *  doesn't otherwise matter to callers. */
-    _pinsAttr() {
-        const ent = this._selSensor();
-        const rp = ent ? this.hass.states[ent]?.attributes?.room_pins : undefined;
-        return rp && typeof rp === "object" ? rp : {};
-    }
-    /** Vacuums that could clean this room for the given pass (know the room key
-     *  AND are actually capable of that clean type). Field-caught 2026-07-25:
-     *  a fleet where no single vacuum can do both (dry-only S6/S7 + a wet-only
-     *  S8, this user's real setup) broke pin-cycling if candidates weren't
-     *  type-filtered — see `_cycleRoomPin` for the full failure mode. */
-    _pinCandidates(key, kind) {
-        return this._config.vacuums.filter((v) => this._roomsFor(v).some((r) => r.key === key) && this._vacCleanType(v)[kind]);
-    }
-    /** Cycle the room's DRY or WET assignment: vac1 → vac2 → … → vac1 (docs/18
-     *  §7e, simplified 2026-07-23 — field feedback: the old auto→vac1→vac2→auto
-     *  cycle's "pinned" indicator (a 1.5px ring + a 10px pin glyph inside a 17px
-     *  chip) was practically unreadable, and the auto/pinned distinction itself
-     *  wasn't a concept the user found useful — tap just reassigns to the next
-     *  candidate, full stop; a room with only one capable vacuum has nothing to
-     *  cycle to, so the tap handler isn't even attached (see `_pinCandidates`).
-     *  Still stored backend-side (anyvac.pin_room) so every browser sees the same
-     *  override, and the planner still auto-clears it after the room is cleaned
-     *  (docs/18 §7e) — only the manual "back to auto" UI step is gone, not the
-     *  automatic one.
-     *
-     *  `kind` (2026-07-25 fix): the dry chip and the wet chip must cycle
-     *  independently, each only among vacuums capable of THAT type — before
-     *  this fix both chips cycled through every vacuum that merely knows the
-     *  room, capability-blind. At the time, `room_pins` was also still a single
-     *  per-room override (one vacuum, not one per type), so cycling the dry
-     *  chip through a fleet that includes a wet-only vacuum could silently pin
-     *  the room to that wet-only vacuum: the dry display ignored it (can't
-     *  dry-clean) and kept showing the old assignee — no visible change —
-     *  while the wet chip's own display jumped to it unannounced. Worse, if
-     *  that wet-only vacuum was ALREADY the stored pin, cycling the dry chip
-     *  was a permanent fixed point: shown (dry-capable, one slot before the
-     *  wet-only one in candidate order) always resolved to the same "next" =
-     *  the wet-only vacuum = the pin's current value already, so nothing ever
-     *  changed no matter how many times you tapped (field report 2026-07-25,
-     *  reproduced live: dry-only-fleet room stuck on a wet-only pin for Living
-     *  room while other rooms merely looked flaky/needed a manual refresh —
-     *  same root cause, different coincidence of indices). Filtering
-     *  candidates by `kind` up front removed the cross-type write for THIS
-     *  chip's own tap.
-     *
-     *  Same-day follow-up: filtering candidates alone didn't stop the dry and
-     *  wet chip from clobbering EACH OTHER, since both still wrote the same
-     *  single `room_pins[room]` value — pinning dry then pinning wet (or vice
-     *  versa) silently discarded whichever was set first, and the planner's
-     *  automatic-fallback WARNING for the now-mismatched pass fired on every
-     *  plan/clean call for that room (visible in the HA log as "pin X -> Y not
-     *  applicable for Z pass"). `room_pins` and `anyvac.pin_room` are now
-     *  per-kind ({room: {dry, wet}}, backend `coordinator.set_room_pin`/
-     *  `planner._pin_for_kind`) — dry and wet are genuinely independent, no
-     *  fallback needed for a correctly-pinned fleet like this one.
-     *
-     *  `shown` is the vacuum the tapped chip is CURRENTLY displaying — i.e. the
-     *  planner's live assignment (auto or already-pinned), not the raw
-     *  `room_pins` store. Cycling from the stored pin instead of the displayed
-     *  value was the bug reported 2026-07-23: right after a room is selected
-     *  there's usually no stored pin yet, so the first tap resolved index -1 →
-     *  candidate 0 — which is a no-op whenever candidate 0 happens to already be
-     *  the auto-assigned (displayed) vacuum, making the cycle feel random
-     *  (S6→S7→S6→S6→S7). Cycling from what's actually shown always advances by
-     *  exactly one candidate on every tap. */
-    _cycleRoomPin(key, kind, shown) {
-        const cands = this._pinCandidates(key, kind);
-        if (cands.length < 2)
-            return; // nothing to switch to
-        const idx = cands.findIndex((v) => v.entity === shown);
-        const next = cands[(idx + 1) % cands.length];
-        void this._call("anyvac", "pin_room", { room: key, kind, vacuum: next.entity });
-    }
-    /** Small vacuum-abbrev chip showing who's assigned to clean this room/pass. */
-    _vacChip(entity, onTap) {
-        const v = this._config.vacuums.find((x) => x.entity === entity);
-        if (!v) {
-            return b `<span class="dock-chip dock-chip--empty" @click=${onTap ?? A}>—</span>`;
-        }
-        const c = this._color(v);
-        return b `<span class="dock-chip"
-      style="color:#fff;background:${c}30;border-color:${c}"
-      title=${(v.name ?? v.entity) + (onTap ? " · tap to assign a different vacuum" : "")}
-      @click=${onTap ?? A}>${this._vacAbbrev(v)}</span>`;
-    }
-    _batteryPct(vac) {
-        if (vac.battery_entity) {
-            const v = Number(this.hass.states[vac.battery_entity]?.state);
-            if (Number.isFinite(v))
-                return v;
-        }
-        const bl = Number(this.hass.states[vac.entity]?.attributes?.battery_level);
-        return Number.isFinite(bl) ? bl : null;
-    }
-    /** DEGRADED-MODE FALLBACK ONLY (no integration → no backend to ask): per room
-     *  the worst (max) estimate across vacuums, summed with no notion of sequence,
-     *  parallelism or dry→wet gating. With the integration present, `_etaFor` uses
-     *  the backend's sequence-aware `eta_min` instead (docs/19) — this function
-     *  assumes a simultaneous dry/wet start, which is wrong, but there is no
-     *  backend to compute the real timeline for in degraded mode. */
-    _selEstMins(selKeys) {
-        let sum = 0;
-        for (const k of selKeys) {
-            let best = 0;
-            for (const v of this._config.vacuums) {
-                const r = this._roomsFor(v).find((x) => x.key === k);
-                if (r)
-                    best = Math.max(best, this._roomCleanMins(r, v));
-            }
-            sum += best;
-        }
-        return Math.round(sum);
-    }
-    /** Glanceable stats trio (grid badges region): selected rooms · est time · min battery.
-     *  docs/25 §5: no explicit selection still shows the whole-home estimate (what
-     *  START will actually do), not a bare "0 rooms". */
-    _renderStatsTrio() {
-        const vacs = this._config.vacuums;
-        const selKeys = this._allRoomKeys().filter((k) => this._isRoomSelectedAny(k, vacs));
-        const runKeys = selKeys.length ? selKeys : this._allRoomKeys();
-        const hasInt = vacs.some((v) => this._intAttrs(v));
-        const est = this._etaFor(runKeys, this._planMode, hasInt);
-        const batts = vacs.map((v) => this._batteryPct(v)).filter((x) => x !== null);
-        const minB = batts.length ? Math.min(...batts) : null;
-        return b `
-      <div class="stats-trio">
-        <span class="stat"><ha-icon icon="mdi:floor-plan"></ha-icon><b>${runKeys.length}</b></span>
-        ${est > 0 ? b `<span class="stat"><ha-icon icon="mdi:clock-outline"></ha-icon><b>${est}</b><small>min</small></span>` : A}
-        ${minB !== null ? b `<span class="stat"><ha-icon icon="mdi:battery"></ha-icon><b>${Math.round(minB)}</b><small>%</small></span>` : A}
-      </div>
-    `;
-    }
-    /** Dock region (docs/12 §3 + docs/18 §3): selection, plan preview and pinning in
-     *  one block. Row = room (tap toggles selection); the avatar shows the BACKEND's
-     *  real assignment per pass; tapping the avatar cycles the room's vacuum pin.
-     *  `withRun` adds the orchestrated run footer (landscape — no `start` region). */
-    /** Emergency manual-control strip (portrait-only, docs/19 follow-up): small
-     *  icon-only vacuum buttons at the top of the dock column, spread across the
-     *  full width (one equal-width slot per vacuum, same idea as the mode
-     *  buttons in `.dock-head` right below). Tap opens that vacuum's more-info
-     *  dialog (glanceable status, not a pseudo-controller — docs/18 §10b field
-     *  note). Hold toggles it in/out of `_shownSet` — merged mode's map DOES
-     *  filter its overlaid map/path/room layers by `_shownSet` (`_renderMergedMap`),
-     *  so this is a real "hide this robot's clutter off the shared floorplan"
-     *  action (field feedback 2026-07-17: 3 overlaid maps in portrait is too
-     *  much to read at once), not just a focus switch — deliberately NOT routed
-     *  through `_toggleShown`, whose portrait branch collapses to a single
-     *  shown vacuum (that's for split mode's per-vacuum status-card focus,
-     *  docs/18 §7b, a different concern). Landscape keeps the full `picker`
-     *  region instead (name + live status, docs/19 A5). */
-    _renderVacuumIconStrip() {
-        if (this._profile !== "portrait")
-            return A;
-        const vacs = this._config.vacuums;
-        if (!vacs.length)
-            return A;
-        return b `
+    `:G}_pinsAttr(){const t=this._selSensor(),e=t?this.hass.states[t]?.attributes?.room_pins:void 0;return e&&"object"==typeof e?e:{}}_pinCandidates(t,e){return this._config.vacuums.filter(o=>this._roomsFor(o).some(e=>e.key===t)&&this._vacCleanType(o)[e])}_cycleRoomPin(t,e,o){const i=this._pinCandidates(t,e);if(i.length<2)return;const s=i.findIndex(t=>t.entity===o),n=i[(s+1)%i.length];this._call("anyvac","pin_room",{room:t,kind:e,vacuum:n.entity})}_vacChip(t,e){const o=this._config.vacuums.find(e=>e.entity===t);if(!o)return q`<span class="dock-chip dock-chip--empty" @click=${e??G}>—</span>`;const i=this._color(o);return q`<span class="dock-chip"
+      style="color:#fff;background:${i}30;border-color:${i}"
+      title=${(o.name??o.entity)+(e?" · tap to assign a different vacuum":"")}
+      @click=${e??G}>${this._vacAbbrev(o)}</span>`}_batteryPct(t){if(t.battery_entity){const e=Number(this.hass.states[t.battery_entity]?.state);if(Number.isFinite(e))return e}const e=Number(this.hass.states[t.entity]?.attributes?.battery_level);return Number.isFinite(e)?e:null}_selEstMins(t){let e=0;for(const o of t){let t=0;for(const e of this._config.vacuums){const i=this._roomsFor(e).find(t=>t.key===o);i&&(t=Math.max(t,this._roomCleanMins(i,e)))}e+=t}return Math.round(e)}_renderVacuumIconStrip(){if("portrait"!==this._profile)return G;const t=this._config.vacuums;return t.length?q`
       <div class="vac-icon-strip">
-        ${vacs.map((v, i) => {
-            const shown = this._shownSet.has(i);
-            const holdId = "vacicon-" + i;
-            const holding = this._holdId === holdId;
-            return b `
+        ${t.map((t,e)=>{const o=this._shownSet.has(e),i="vacicon-"+e,s=this._holdId===i;return q`
             <div class="vac-icon-slot">
-              <button class="vac-icon-btn ${holding ? "vac-icon-btn--holding" : ""} ${shown ? "" : "vac-icon-btn--hidden"}"
-                style=${o({ borderColor: this._statusInfo(v)[1] })}
-                @pointerdown=${(e) => {
-                e.preventDefault();
-                this._cancelHold();
-                this._holdId = holdId;
-                this._holdTimer = setTimeout(() => {
-                    this._holdTimer = null;
-                    this._holdId = null;
-                    this._toggleShownMulti(i);
-                }, HOLD_DURATION_MS);
-            }}
-                @pointerup=${() => {
-                if (this._holdTimer !== null) {
-                    this._cancelHold();
-                    this._fireMoreInfo(v.entity);
-                }
-                else {
-                    this._holdId = null;
-                }
-            }}
+              <button class="vac-icon-btn ${s?"vac-icon-btn--holding":""} ${o?"":"vac-icon-btn--hidden"}"
+                style=${vt({borderColor:this._statusInfo(t)[1]})}
+                @pointerdown=${t=>{t.preventDefault(),this._cancelHold(),this._holdId=i,this._holdTimer=setTimeout(()=>{this._holdTimer=null,this._holdId=null,this._toggleShownMulti(e)},kt)}}
+                @pointerup=${()=>{null!==this._holdTimer?(this._cancelHold(),this._fireMoreInfo(t.entity)):this._holdId=null}}
                 @pointerleave=${this._holdEnd}
                 @pointercancel=${this._holdEnd}
-                title=${v.name ?? v.entity} aria-label=${v.name ?? v.entity}
-                aria-pressed=${shown ? "true" : "false"}>
+                title=${t.name??t.entity} aria-label=${t.name??t.entity}
+                aria-pressed=${o?"true":"false"}>
                 <div class="hold-ring"></div>
-                ${v.image
-                ? b `<img src=${v.image} alt="" />`
-                : b `<ha-icon icon="mdi:robot-vacuum" style=${o({ color: this._color(v) })}></ha-icon>`}
+                ${t.image?q`<img src=${t.image} alt="" />`:q`<ha-icon icon="mdi:robot-vacuum" style=${vt({color:this._color(t)})}></ha-icon>`}
               </button>
             </div>
-          `;
-        })}
+          `})}
       </div>
-    `;
-    }
-    /** `withPicker` (v1.1.0 follow-up, docs/33): the landscape vacuum picker
-     *  used to be its own grid region, sitting in a SEPARATE row above dock —
-     *  `status` spanned both rows so its column height matched theirs
-     *  combined, but that span inflated the picker's row past its own short
-     *  content whenever status was taller, leaving a visible gap between the
-     *  picker pills and the room list below (field-caught 2026-08-03). Now
-     *  picker renders as the first thing INSIDE dock instead, so both are one
-     *  naturally-stacked flow with no cross-row sizing to create a gap.
-     *  Gated on the CALLER checking `!("picker" in prof.place)` — a manual
-     *  config that still explicitly places its own `picker` region keeps
-     *  getting that (unchanged), and doesn't also get a duplicate here. */
-    _renderDock(withRun, withPicker = false) {
-        const vacs = this._config.vacuums;
-        const rooms = this._mergedRoomDefs(vacs);
-        // Room-less configs (e.g. a fresh install before any rooms exist, docs/30)
-        // used to make the WHOLE picker region disappear too, back when picker
-        // was its own independent grid region — now that it renders from inside
-        // here (see `withPicker` doc above), bail out only on the room-list
-        // content, not on the picker/icon-strip above it, so it doesn't regress
-        // that case. Mirrors the main return's `withPicker` + icon-strip pair
-        // below (each self-gates to its own profile, so exactly one renders).
-        if (!rooms.length)
-            return b `${withPicker ? this._renderVacuumPicker() : A}${this._renderVacuumIconStrip()}`;
-        const hasInt = vacs.some((v) => this._intAttrs(v));
-        const mode = this._planMode;
-        const selKeys = this._allRoomKeys().filter((k) => this._isRoomSelectedAny(k, vacs));
-        // docs/25 §5: no explicit selection = whole home, not an empty plan. Feeds
-        // the footer run button/ETA below; per-row "selected" styling stays tied
-        // to explicit selKeys, so this doesn't make every row look hand-picked.
-        const runKeys = selKeys.length ? selKeys : this._allRoomKeys();
-        if (hasInt && runKeys.length)
-            this._fetchPlan(runKeys, mode);
-        const dryOf = this._planPreview?.dry ?? new Map();
-        const wetOf = this._planPreview?.wet ?? new Map();
-        // Sequence hint (docs/19 follow-up, TODO #2) — see _renderMetaBar for the
-        // same idea in the landscape meta bar; here it's per-row instead of a count.
-        const unsequenced = new Set(hasInt ? (this._planPreview?.unsequenced ?? []) : []);
-        const unassigned = new Set(this._unassignedRooms(runKeys, mode, hasInt));
-        const showDry = mode !== "wet";
-        const showWet = mode !== "dry";
-        const badge = (d) => (d === null ? "—" : d < 1 ? "<1d" : Math.round(d) + "d");
-        const modeBtn = (m, icon, label) => b `
-      <button class="dock-mode ${mode === m ? "on" : ""}"
-        @click=${(e) => { e.stopPropagation(); this._planMode = m; }}>
-        <ha-icon icon=${icon}></ha-icon><span>${label}</span>
-      </button>`;
-        const runHid = "dock-run";
-        // docs/25 §7c (field diskuze 2026-07-24): portrait cockpit minimalism drops
-        // the permanent room list — selection stays map-tap-only, per-room detail
-        // (age/pin) moves to hold-to-inspect on the room (§7b, not yet shipped).
-        // `debug_dense_dock` (§7e) is the escape hatch back to today's dense view.
-        // Deliberately a SEPARATE flag from `debug_room_progress` (field-caught
-        // 2026-07-24: a user who keeps `debug_room_progress` on for coverage-%
-        // debugging — the map gauges it draws, `_renderRoomGauge`, are dock-
-        // independent — would otherwise never see the new minimalist cockpit at
-        // all, defeating the point of shipping it). Landscape's dock/picker
-        // sidebar is a separate, established design (docs/18/19 A5) and keeps the
-        // room list unconditionally — this gate only ever hides it in portrait.
-        const showRoomList = this._profile !== "portrait" || !!this._config.debug_dense_dock;
-        return b `
+    `:G}_renderDock(t,e=!1){const o=this._config.vacuums,i=this._mergedRoomDefs(o);if(!i.length)return q`${e?this._renderVacuumPicker():G}${this._renderVacuumIconStrip()}`;const s=o.some(t=>this._intAttrs(t)),n=this._planMode,a=this._allRoomKeys().filter(t=>this._isRoomSelectedAny(t,o)),r=a.length?a:this._allRoomKeys();s&&r.length&&this._fetchPlan(r,n);const l=this._planPreview?.dry??new Map,c=this._planPreview?.wet??new Map,d=new Set(s?this._planPreview?.unsequenced??[]:[]),h=new Set(this._unassignedRooms(r,n,s)),p="wet"!==n,m="dry"!==n,u=t=>null===t?"—":t<1?"<1d":Math.round(t)+"d",_=(t,e,o)=>q`
+      <button class="dock-mode ${n===t?"on":""}"
+        @click=${e=>{e.stopPropagation(),this._planMode=t}}>
+        <ha-icon icon=${e}></ha-icon><span>${o}</span>
+      </button>`,g="dock-run",f="portrait"!==this._profile||!!this._config.debug_dense_dock;return q`
       <div class="dock">
-        ${withPicker ? this._renderVacuumPicker() : A}
+        ${e?this._renderVacuumPicker():G}
         ${this._renderVacuumIconStrip()}
-        ${ /* Dry/wet PATH visibility on the map (view_layers) — a different concern
-             from the dock-mode buttons below (which pick what to CLEAN). Landscape
-             already gets this from the meta bar's `tools` region (docs/19 A4), but
-             portrait has no `tools` region at all, so it silently had no way to
-             toggle path visibility (field feedback 2026-07-17). Reuses the same
-             compact toggle, just placed in the dock column instead of a meta bar. */this._profile === "portrait" ? b `
-            <div class="dock-layers">${this._renderLayerToggleCompact(vacs)}
-              ${this._config.layout ? b `<button class="mtbtn ${this._flipEff ? "on" : ""}"
+        ${"portrait"===this._profile?q`
+            <div class="dock-layers">${this._renderLayerToggleCompact(o)}
+              ${this._config.layout?q`<button class="mtbtn ${this._flipEff?"on":""}"
                   title="Flip map 180° for this screen (this session only)"
-                  @click=${() => this._toggleFlipLive()}>
+                  @click=${()=>this._toggleFlipLive()}>
                 <ha-icon icon="mdi:flip-vertical"></ha-icon>
-              </button>` : A}
+              </button>`:G}
             </div>
-          ` : A}
-        ${withRun ? b `
+          `:G}
+        ${t?q`
           <div class="dock-head">
-            ${modeBtn("dry", "mdi:broom", "Dry")}${modeBtn("wet", "mdi:water", "Wet")}${modeBtn("both", "mdi:water-plus", "Both")}
-            ${vacs.some((v) => this._dockTier(v) !== "none" || this._careItems(v).length > 0) ? b `
-              <button class="dock-mode dock-mode--dock ${this._dockSheetOpen ? "on" : ""}"
-                @click=${(e) => { e.stopPropagation(); this._dockSheetOpen = !this._dockSheetOpen; }}>
+            ${_("dry","mdi:broom","Dry")}${_("wet","mdi:water","Wet")}${_("both","mdi:water-plus","Both")}
+            ${o.some(t=>"none"!==this._dockTier(t)||this._careItems(t).length>0)?q`
+              <button class="dock-mode dock-mode--dock ${this._dockSheetOpen?"on":""}"
+                @click=${t=>{t.stopPropagation(),this._dockSheetOpen=!this._dockSheetOpen}}>
                 <ha-icon icon="mdi:home-outline"></ha-icon><span>Dock</span>
-                ${this._dockNeedsAttention() ? b `<span class="dock-mode-dot"></span>` : A}
-              </button>` : A}
-          </div>` : A}
+                ${this._dockNeedsAttention()?q`<span class="dock-mode-dot"></span>`:G}
+              </button>`:G}
+          </div>`:G}
         ${this._renderModeSheet()}
         ${this._renderDockSheet()}
-        ${!showRoomList ? A : b `<div class="dock-rows">
-          ${rooms.map(({ r, v }) => {
-            const rec = this._intRoomRec(v, r);
-            const dry = this._ageDaysFromIso(rec?.dry);
-            const wet = this._ageDaysFromIso(rec?.wet);
-            const cov = this._roomCoverageRec(v, r);
-            const covBadge = (pct) => (pct == null ? "—" : pct + "%");
-            const sel = this._isRoomSelectedAny(r.key, vacs);
-            // Cycle relative to what THIS chip currently shows (dry vs. wet
-            // can differ), not the raw pin store — see _cycleRoomPin. Each
-            // chip cycles only among vacuums capable of ITS OWN type
-            // (2026-07-25 fix) — a room with dry-only + wet-only vacuums
-            // must not let the dry chip's cycle land on the wet-only one.
-            const canCycleDry = this._pinCandidates(r.key, "dry").length > 1;
-            const canCycleWet = this._pinCandidates(r.key, "wet").length > 1;
-            const pinTap = (kind, shown) => (kind === "dry" ? canCycleDry : canCycleWet)
-                ? (e) => { e.stopPropagation(); this._cycleRoomPin(r.key, kind, shown); }
-                : undefined;
-            const locked = this._mapMode !== "normal";
-            return b `
-              <button class="dock-row ${sel ? "on" : ""} ${locked ? "room-overlay--locked" : ""}" ?disabled=${locked}
-                title=${locked ? "Room selection is off while placing a pin/zone" : ""}
-                @click=${() => { if (!locked)
-                this._toggleRoomAcross(r.key, vacs); }}>
-                <ha-icon class="dock-ric" icon=${r.icon ?? "mdi:square"}></ha-icon>
-                <span class="dock-name">${r.name ?? r.key}</span>
+        ${f?q`<div class="dock-rows">
+          ${i.map(({r:t,v:e})=>{const i=this._intRoomRec(e,t),a=this._ageDaysFromIso(i?.dry),r=this._ageDaysFromIso(i?.wet),_=this._roomCoverageRec(e,t),g=t=>null==t?"—":t+"%",f=this._isRoomSelectedAny(t.key,o),b=this._pinCandidates(t.key,"dry").length>1,y=this._pinCandidates(t.key,"wet").length>1,v=(e,o)=>("dry"===e?b:y)?i=>{i.stopPropagation(),this._cycleRoomPin(t.key,e,o)}:void 0,x="normal"!==this._mapMode;return q`
+              <button class="dock-row ${f?"on":""} ${x?"room-overlay--locked":""}" ?disabled=${x}
+                title=${x?"Room selection is off while placing a pin/zone":""}
+                @click=${()=>{x||this._toggleRoomAcross(t.key,o)}}>
+                <ha-icon class="dock-ric" icon=${t.icon??"mdi:square"}></ha-icon>
+                <span class="dock-name">${t.name??t.key}</span>
                 <span class="dock-info">
-                  ${sel && unassigned.has(r.key) ? b `<ha-icon class="dock-unassigned" icon="mdi:robot-off"
-                    title="No available robot for this room's ${mode} pass — check that a vacuum is configured with the right role and knows this room."></ha-icon>` : A}
-                  ${sel && unsequenced.has(r.key) ? b `<ha-icon class="dock-unseq" icon="mdi:sort-variant-off"
-                    title="No cleaning order set for this room — the time estimate may be off. Set the order in the card editor's Maps tab."></ha-icon>` : A}
+                  ${f&&h.has(t.key)?q`<ha-icon class="dock-unassigned" icon="mdi:robot-off"
+                    title="No available robot for this room's ${n} pass — check that a vacuum is configured with the right role and knows this room."></ha-icon>`:G}
+                  ${f&&d.has(t.key)?q`<ha-icon class="dock-unseq" icon="mdi:sort-variant-off"
+                    title="No cleaning order set for this room — the time estimate may be off. Set the order in the card editor's Maps tab."></ha-icon>`:G}
                   <span class="dock-ages">
-                    <span class="dock-age">${this._renderProgChip(this._roomProgForType(r, vacs, "dry"))}<ha-icon icon="mdi:broom"></ha-icon><b style=${o({ color: this._colorForAgeDays(dry) })}>${badge(dry)}</b><small class="dock-cov" title="Last completed dry clean's coverage">${covBadge(cov?.dry)}</small></span>
-                    <span class="dock-age">${this._renderProgChip(this._roomProgForType(r, vacs, "wet"))}<ha-icon icon="mdi:water"></ha-icon><b style=${o({ color: this._colorForAgeDays(wet) })}>${badge(wet)}</b><small class="dock-cov" title="Last completed wet clean's coverage">${covBadge(cov?.wet)}</small></span>
+                    <span class="dock-age">${this._renderProgChip(this._roomProgForType(t,o,"dry"))}<ha-icon icon="mdi:broom"></ha-icon><b style=${vt({color:this._colorForAgeDays(a)})}>${u(a)}</b><small class="dock-cov" title="Last completed dry clean's coverage">${g(_?.dry)}</small></span>
+                    <span class="dock-age">${this._renderProgChip(this._roomProgForType(t,o,"wet"))}<ha-icon icon="mdi:water"></ha-icon><b style=${vt({color:this._colorForAgeDays(r)})}>${u(r)}</b><small class="dock-cov" title="Last completed wet clean's coverage">${g(_?.wet)}</small></span>
                   </span>
-                  ${hasInt && sel ? b `
+                  ${s&&f?q`
                     <span class="dock-avatars">
-                      ${showDry ? this._vacChip(dryOf.get(r.key), pinTap("dry", dryOf.get(r.key))) : A}
-                      ${showWet ? this._vacChip(wetOf.get(r.key), pinTap("wet", wetOf.get(r.key))) : A}
-                    </span>` : A}
+                      ${p?this._vacChip(l.get(t.key),v("dry",l.get(t.key))):G}
+                      ${m?this._vacChip(c.get(t.key),v("wet",c.get(t.key))):G}
+                    </span>`:G}
                 </span>
-              </button>`;
-        })}
-        </div>`}
-        ${withRun && hasInt ? b `
+              </button>`})}
+        </div>`:G}
+        ${t&&s?q`
           <div class="dock-foot">
-            <span class="dock-est">${selKeys.length ? selKeys.length + " rooms · ~" + this._etaFor(runKeys, mode, hasInt) + " min" : "Whole home · ~" + this._etaFor(runKeys, mode, hasInt) + " min"}
-              ${unassigned.size ? b `<ha-icon class="dock-unassigned" icon="mdi:robot-off"
-                title="${unassigned.size} selected room${unassigned.size > 1 ? "s have" : " has"} no available robot for the ${mode} pass — it/they will be silently skipped. Check vacuum roles/config."></ha-icon>` : A}
-              ${unsequenced.size ? b `<ha-icon class="dock-unseq" icon="mdi:sort-variant-off"
-                title="${unsequenced.size} selected room${unsequenced.size > 1 ? "s have" : " has"} no cleaning order set — the time above may be off. Set the order in the card editor's Maps tab."></ha-icon>` : A}</span>
-            <button class="action-btn ${this._holdId === runHid ? "action-btn--holding" : ""}"
+            <span class="dock-est">${a.length?a.length+" rooms · ~"+this._etaFor(r,n,s)+" min":"Whole home · ~"+this._etaFor(r,n,s)+" min"}
+              ${h.size?q`<ha-icon class="dock-unassigned" icon="mdi:robot-off"
+                title="${h.size} selected room${h.size>1?"s have":" has"} no available robot for the ${n} pass — it/they will be silently skipped. Check vacuum roles/config."></ha-icon>`:G}
+              ${d.size?q`<ha-icon class="dock-unseq" icon="mdi:sort-variant-off"
+                title="${d.size} selected room${d.size>1?"s have":" has"} no cleaning order set — the time above may be off. Set the order in the card editor's Maps tab."></ha-icon>`:G}</span>
+            <button class="action-btn ${this._holdId===g?"action-btn--holding":""}"
               style="flex:0 0 auto;padding:7px 14px;background:rgba(111,191,115,0.24);border:1px solid rgba(111,191,115,0.65);color:#fff"
-              ?disabled=${!runKeys.length}
-              @pointerdown=${runKeys.length ? this._holdStart(runHid, () => this._runOrchestrated(runKeys, this._planMode)) : A}
+              ?disabled=${!r.length}
+              @pointerdown=${r.length?this._holdStart(g,()=>this._runOrchestrated(r,this._planMode)):G}
               @pointermove=${this._holdMove}
               @pointerup=${this._holdEnd}
               @pointerleave=${this._holdEnd}
@@ -3293,2250 +191,487 @@ let AnyVacCard = class AnyVacCard extends i$2 {
               <ha-icon icon="mdi:play" style="--mdc-icon-size:16px"></ha-icon>
               <span style="font-size:12px">Start · hold</span>
             </button>
-          </div>` : A}
+          </div>`:G}
       </div>
-    `;
-    }
-    /** docs/25 §7 field follow-up: true when ANY vacuum's dock reports a real
-     *  error (`dock_error_status`, docs/26 §1 vrstva A). Deliberately narrow —
-     *  `water_shortage_status`/`dust_collection_status`'s exact value meanings
-     *  aren't documented anywhere upstream (verified against python-roborock's
-     *  source and docs), so guessing thresholds for THOSE risks a false badge.
-     *  `dock_error_status` is the one field where "present, nonzero" is an
-     *  unambiguous problem regardless of the exact code. */
-    _dockNeedsAttention() {
-        return this._config.vacuums.some((v) => {
-            const dock = this._intAttrs(v)?.dock_status;
-            const err = dock?.dock_error_status;
-            return err !== null && err !== undefined && err !== 0 && err !== "0";
-        });
-    }
-    /** docs/25 §10 third follow-up (2026-07-24): dock hardware tier, read from
-     *  `dock_status.dock_type` (already flowing through the integration sensor,
-     *  zero new backend work). `dock_type` maps to `python-roborock`'s
-     *  `RoborockDockTypeCode` — live-verified against the user's real HA
-     *  (dock_type null/absent → S6, `1` → S7 MaxV, `10` → S8 MaxV Ultra):
-     *    null/undefined/0  → no dock at all (S6 — not even auto-empty)
-     *    1 (auto_empty_dock) / 5 (auto_empty_dock_pure) → empty-only dock
-     *    everything else (3 empty_wash_fill, 6 s7_max_ultra, 7 s8, 10
-     *      s8_maxv_ultra, ...) → full wash+dry(+plumbing) dock
-     *  "empty" tier gets ONLY the Empty action and none of the dock-mounted
-     *  consumables (dock brush/strainer) — those entities can technically
-     *  exist in HA's registry even on an empty-only unit (the integration
-     *  creates them per device *model*, not per physically-installed
-     *  accessory) but report "unavailable"; confirmed live on the user's S7
-     *  MaxV before this fix shipped. */
-    _dockTier(vac) {
-        const dt = this._intAttrs(vac)?.dock_status?.dock_type;
-        if (dt === null || dt === undefined || dt === 0)
-            return "none";
-        if (dt === 1 || dt === 5)
-            return "empty";
-        return "full";
-    }
-    /** docs/25 §7 field follow-up (2026-07-24): dock sheet — per-vacuum tabs +
-     *  Empty/Wash/Dry actions (`anyvac.dock_*`, confirmed commands per docs/26
-     *  §3, live-verified against the field-reporting user's real HW). Toggled
-     *  from `.dock-head`'s Dock button when it's rendered (landscape), or from
-     *  the START bar's right segment when it isn't (portrait, docs/25 §10
-     *  follow-up 2026-07-25) — either way `_dockSheetOpen` renders it here,
-     *  in-flow inside the `dock` region (which already has its own
-     *  `overflow:auto`, docs/18 `regionStyles()`) rather than as a floating
-     *  overlay — deliberately avoids `position:fixed`/absolute layering in a
-     *  region that's had real mobile-crash history (docs/21 §5b) tied to grid
-     *  ownership; an in-flow panel can't touch that class of bug. Raw
-     *  `dock_status` fields shown only behind `debug` (§7c precedent) — their
-     *  value encodings aren't documented upstream, so surfacing them as
-     *  polished UI would overclaim confidence we don't have. */
-    _renderDockSheet() {
-        if (!this._dockSheetOpen)
-            return A;
-        // A vacuum with no dock at all (tier "none", e.g. S6) still belongs in
-        // this sheet's tab list if it has its own body consumables to show
-        // (main/side brush, filter, sensor — these live on the vacuum's OWN
-        // device and have nothing to do with dock hardware). Dropped from the
-        // list entirely only when it has neither dock actions nor care rows.
-        const vacs = this._config.vacuums.filter((v) => this._dockTier(v) !== "none" || this._careItems(v).length > 0);
-        if (!vacs.length)
-            return A;
-        const idx = Math.min(this._dockSheetIdx, vacs.length - 1);
-        const vac = vacs[idx];
-        const tier = this._dockTier(vac);
-        const dock = this._intAttrs(vac)?.dock_status;
-        const act = (service) => () => void this._call("anyvac", service, { entity_id: vac.entity });
-        const care = this._careItems(vac);
-        // docs/25 §10 field-caught: `pendingKey` is the entity we actually WATCH
-        // for the reset to land (the sensor, when we have one — falls back to
-        // the button's own id for binary-only rows with no time-left sensor).
-        const reset = (row) => (e) => {
-            e.stopPropagation();
-            const pendingKey = row.entity ?? row.reset;
-            const next = new Map(this._careResetPending);
-            next.set(pendingKey, Date.now());
-            this._careResetPending = next;
-            // Hard fallback: clear the spinner even if the poll never lands
-            // (offline vacuum, entity removed, ...) — see `_careResetPending` doc.
-            setTimeout(() => {
-                if (this._careResetPending.get(pendingKey) === next.get(pendingKey)) {
-                    const cleared = new Map(this._careResetPending);
-                    cleared.delete(pendingKey);
-                    this._careResetPending = cleared;
-                }
-            }, 40000);
-            void this._call("button", "press", { entity_id: row.reset });
-        };
-        return b `
+    `}_dockNeedsAttention(){return this._config.vacuums.some(t=>{const e=this._intAttrs(t)?.dock_status,o=e?.dock_error_status;return null!=o&&0!==o&&"0"!==o})}_dockTier(t){const e=this._intAttrs(t)?.dock_status?.dock_type;return null==e||0===e?"none":1===e||5===e?"empty":"full"}_renderDockSheet(){if(!this._dockSheetOpen)return G;const t=this._config.vacuums.filter(t=>"none"!==this._dockTier(t)||this._careItems(t).length>0);if(!t.length)return G;const e=Math.min(this._dockSheetIdx,t.length-1),o=t[e],i=this._dockTier(o),s=this._intAttrs(o)?.dock_status,n=t=>()=>{this._call("anyvac",t,{entity_id:o.entity})},a=this._careItems(o),r=t=>e=>{e.stopPropagation();const o=t.entity??t.reset,i=new Map(this._careResetPending);i.set(o,Date.now()),this._careResetPending=i,setTimeout(()=>{if(this._careResetPending.get(o)===i.get(o)){const t=new Map(this._careResetPending);t.delete(o),this._careResetPending=t}},4e4),this._call("button","press",{entity_id:t.reset})};return q`
       <div class="dock-sheet">
-        ${vacs.length > 1 ? b `
+        ${t.length>1?q`
           <div class="dock-sheet-tabs">
-            ${vacs.map((v, i) => b `
-              <button class="dock-sheet-tab ${i === idx ? "on" : ""}"
-                style=${o({ borderColor: this._color(v) })}
-                title=${v.name ?? v.entity}
-                @click=${(e) => { e.stopPropagation(); this._dockSheetIdx = i; }}>
-                ${v.image ? b `<img src=${v.image} alt="" />` : b `<ha-icon icon="mdi:robot-vacuum" style=${o({ color: this._color(v) })}></ha-icon>`}
+            ${t.map((t,o)=>q`
+              <button class="dock-sheet-tab ${o===e?"on":""}"
+                style=${vt({borderColor:this._color(t)})}
+                title=${t.name??t.entity}
+                @click=${t=>{t.stopPropagation(),this._dockSheetIdx=o}}>
+                ${t.image?q`<img src=${t.image} alt="" />`:q`<ha-icon icon="mdi:robot-vacuum" style=${vt({color:this._color(t)})}></ha-icon>`}
               </button>`)}
-          </div>` : A}
-        ${this._config.debug && dock ? b `
+          </div>`:G}
+        ${this._config.debug&&s?q`
           <div class="dock-sheet-debug">
-            ${Object.entries(dock).filter(([, val]) => val !== null && val !== undefined)
-            .map(([k, val]) => b `<span>${k}: ${String(val)}</span>`)}
-          </div>` : A}
-        ${tier !== "none" ? b `
+            ${Object.entries(s).filter(([,t])=>null!=t).map(([t,e])=>q`<span>${t}: ${String(e)}</span>`)}
+          </div>`:G}
+        ${"none"!==i?q`
           <div class="dock-sheet-actions">
-            <button class="dock-sheet-action" @click=${act("dock_empty")}>
+            <button class="dock-sheet-action" @click=${n("dock_empty")}>
               <ha-icon icon="mdi:delete-empty"></ha-icon><span>Empty</span>
             </button>
-            ${tier === "full" ? b `
-              <button class="dock-sheet-action" @click=${act("dock_wash")}>
+            ${"full"===i?q`
+              <button class="dock-sheet-action" @click=${n("dock_wash")}>
                 <ha-icon icon="mdi:water"></ha-icon><span>Wash</span>
               </button>
-              <button class="dock-sheet-action" @click=${act("dock_dry")}>
+              <button class="dock-sheet-action" @click=${n("dock_dry")}>
                 <ha-icon icon="mdi:hair-dryer"></ha-icon><span>Dry</span>
               </button>
-              <button class="dock-sheet-action" @click=${act("dock_pump")}>
+              <button class="dock-sheet-action" @click=${n("dock_pump")}>
                 <ha-icon icon="mdi:water-pump"></ha-icon><span>Pump</span>
               </button>
-              <button class="dock-sheet-action" @click=${act("dock_self_clean")}>
+              <button class="dock-sheet-action" @click=${n("dock_self_clean")}>
                 <ha-icon icon="mdi:autorenew"></ha-icon><span>Self-clean</span>
-              </button>` : A}
-          </div>` : A}
-        ${care.length ? b `
+              </button>`:G}
+          </div>`:G}
+        ${a.length?q`
           <div class="dock-sheet-care">
-            ${care.map((row) => b `
+            ${a.map(t=>q`
               <div class="dock-sheet-care-row">
-                <span class="dock-sheet-care-label">${row.label}</span>
-                ${row.binary
-            ? b `<span class="dock-sheet-care-badge ${this.hass.states[row.binary]?.state === "on" ? "warn" : ""}">
-                      ${this.hass.states[row.binary]?.state === "on" ? "⚠" : "OK"}
-                    </span>`
-            : b `<span class="dock-sheet-care-value">${this._careValue(row)}</span>`}
-                ${row.reset ? (() => {
-            const pending = this._careResetPending.has(row.entity ?? row.reset);
-            return b `
-                    <button class="dock-sheet-care-reset ${pending ? "pending" : ""}"
-                      title="Reset" ?disabled=${pending} @click=${reset(row)}>
-                      <ha-icon icon=${pending ? "mdi:loading" : "mdi:refresh"}></ha-icon>
-                    </button>`;
-        })() : A}
+                <span class="dock-sheet-care-label">${t.label}</span>
+                ${t.binary?q`<span class="dock-sheet-care-badge ${"on"===this.hass.states[t.binary]?.state?"warn":""}">
+                      ${"on"===this.hass.states[t.binary]?.state?"⚠":"OK"}
+                    </span>`:q`<span class="dock-sheet-care-value">${this._careValue(t)}</span>`}
+                ${t.reset?(()=>{const e=this._careResetPending.has(t.entity??t.reset);return q`
+                    <button class="dock-sheet-care-reset ${e?"pending":""}"
+                      title="Reset" ?disabled=${e} @click=${r(t)}>
+                      <ha-icon icon=${e?"mdi:loading":"mdi:refresh"}></ha-icon>
+                    </button>`})():G}
               </div>`)}
-          </div>` : A}
+          </div>`:G}
       </div>
-    `;
-    }
-    /** docs/25 §10 follow-up (2026-07-25): mode picker sheet — the START bar's
-     *  left segment opens this (see `_renderStartBar`), same in-flow panel
-     *  pattern as `_renderDockSheet` and reusing the identical `.dock-mode`
-     *  button look (dry/wet/both), just three buttons instead of the dock
-     *  sheet's actions. Picking a mode closes the sheet immediately — there's
-     *  nothing else to configure here, unlike the dock sheet which stays open
-     *  for repeated care/action taps. */
-    _renderModeSheet() {
-        if (!this._modeSheetOpen)
-            return A;
-        const mode = this._planMode;
-        const pick = (m) => (e) => {
-            e.stopPropagation();
-            this._planMode = m;
-            this._modeSheetOpen = false;
-        };
-        const modeBtn = (m, icon, label) => b `
-      <button class="dock-mode ${mode === m ? "on" : ""}" @click=${pick(m)}>
-        <ha-icon icon=${icon}></ha-icon><span>${label}</span>
-      </button>`;
-        return b `
+    `}_renderModeSheet(){if(!this._modeSheetOpen)return G;const t=this._planMode,e=t=>e=>{e.stopPropagation(),this._planMode=t,this._modeSheetOpen=!1},o=(o,i,s)=>q`
+      <button class="dock-mode ${t===o?"on":""}" @click=${e(o)}>
+        <ha-icon icon=${i}></ha-icon><span>${s}</span>
+      </button>`;return q`
       <div class="dock-sheet">
         <div class="dock-head">
-          ${modeBtn("dry", "mdi:broom", "Dry")}${modeBtn("wet", "mdi:water", "Wet")}${modeBtn("both", "mdi:water-plus", "Both")}
+          ${o("dry","mdi:broom","Dry")}${o("wet","mdi:water","Wet")}${o("both","mdi:water-plus","Both")}
         </div>
       </div>
-    `;
-    }
-    /** START region (portrait bottom bar, docs/18 §7d): ALWAYS the orchestrated
-     *  intent (anyvac.clean); while anything runs it flips to a cancel bar.
-     *  docs/25 §5 (cockpit minimalism): no explicit room selection is NOT a dead
-     *  end — it means "whole home", and START stays immediately pressable from
-     *  the moment the card opens. Room selection / Dry-Wet-Both stay on screen
-     *  as refinement, not as a gate the user has to clear first.
-     *  docs/25 §10 follow-up (2026-07-25): three-segment bar, mirroring the
-     *  manufacturer app's bottom bar (mode / START / Dock, docs/25 §10) — the
-     *  mode buttons and Dock button that used to live in `.dock-head` above
-     *  the bar move down into the bar itself (`_renderDock` only still renders
-     *  `.dock-head` when there's no separate `start` region to host them,
-     *  i.e. landscape). Both side segments just toggle a sheet rendered back
-     *  in the `dock` region (`_renderModeSheet`/`_renderDockSheet`) — the
-     *  bar itself stays a fixed-height strip, not an expandable panel. */
-    _renderStartBar() {
-        const vacs = this._config.vacuums;
-        const hasInt = vacs.some((v) => this._intAttrs(v));
-        const selKeys = this._allRoomKeys().filter((k) => this._isRoomSelectedAny(k, vacs));
-        const runKeys = selKeys.length ? selKeys : this._allRoomKeys();
-        const anyCleaning = vacs.some((v) => this._isCleaning(v));
-        const hid = "startbar";
-        const modeIcon = { dry: "mdi:broom", wet: "mdi:water", both: "mdi:water-plus" }[this._planMode];
-        const modeLabel = { dry: "Dry", wet: "Wet", both: "Both" }[this._planMode];
-        const modeSeg = b `
-      <button class="start-seg start-seg--mode ${this._modeSheetOpen ? "on" : ""}"
+    `}_renderStartBar(){const t=this._config.vacuums,e=t.some(t=>this._intAttrs(t)),o=this._allRoomKeys().filter(e=>this._isRoomSelectedAny(e,t)),i=o.length?o:this._allRoomKeys(),s=t.some(t=>this._isCleaning(t)),n="startbar",a={dry:"mdi:broom",wet:"mdi:water",both:"mdi:water-plus"}[this._planMode],r={dry:"Dry",wet:"Wet",both:"Both"}[this._planMode],l=q`
+      <button class="start-seg start-seg--mode ${this._modeSheetOpen?"on":""}"
         title="Clean type — tap to change"
-        @click=${(e) => { e.stopPropagation(); this._dockSheetOpen = false; this._modeSheetOpen = !this._modeSheetOpen; }}>
-        <ha-icon icon=${modeIcon}></ha-icon>
-        <span>${modeLabel}</span>
-      </button>`;
-        const showDock = vacs.some((v) => this._dockTier(v) !== "none" || this._careItems(v).length > 0);
-        const dockSeg = showDock ? b `
-      <button class="start-seg start-seg--dock ${this._dockSheetOpen ? "on" : ""}"
+        @click=${t=>{t.stopPropagation(),this._dockSheetOpen=!1,this._modeSheetOpen=!this._modeSheetOpen}}>
+        <ha-icon icon=${a}></ha-icon>
+        <span>${r}</span>
+      </button>`,c=t.some(t=>"none"!==this._dockTier(t)||this._careItems(t).length>0),d=c?q`
+      <button class="start-seg start-seg--dock ${this._dockSheetOpen?"on":""}"
         title="Dock control"
-        @click=${(e) => { e.stopPropagation(); this._modeSheetOpen = false; this._dockSheetOpen = !this._dockSheetOpen; }}>
+        @click=${t=>{t.stopPropagation(),this._modeSheetOpen=!1,this._dockSheetOpen=!this._dockSheetOpen}}>
         <ha-icon icon="mdi:home-outline"></ha-icon>
-        ${this._dockNeedsAttention() ? b `<span class="dock-mode-dot"></span>` : A}
-      </button>` : A;
-        if (anyCleaning) {
-            return b `
+        ${this._dockNeedsAttention()?q`<span class="dock-mode-dot"></span>`:G}
+      </button>`:G;if(s)return q`
         <div class="start-row">
-          ${modeSeg}
-          <button class="start-bar start-bar--cancel ${this._holdId === hid ? "action-btn--holding" : ""}"
-            @pointerdown=${this._holdStart(hid, () => {
-                if (hasInt)
-                    void this._call("anyvac", "cancel", {});
-                else
-                    for (const v of vacs) {
-                        if (this._isCleaning(v))
-                            void this._pause(v);
-                    }
-            })}
+          ${l}
+          <button class="start-bar start-bar--cancel ${this._holdId===n?"action-btn--holding":""}"
+            @pointerdown=${this._holdStart(n,()=>{if(e)this._call("anyvac","cancel",{});else for(const e of t)this._isCleaning(e)&&this._pause(e)})}
             @pointermove=${this._holdMove}
             @pointerup=${this._holdEnd} @pointerleave=${this._holdEnd} @pointercancel=${this._holdEnd}>
             <div class="hold-ring"></div>
             <ha-icon icon="mdi:stop"></ha-icon>
             <span>CANCEL · hold</span>
           </button>
-          ${dockSeg}
-        </div>`;
-        }
-        const canStart = hasInt && runKeys.length > 0;
-        const est = this._etaFor(runKeys, this._planMode, hasInt);
-        const scopeLabel = selKeys.length ? selKeys.length + (selKeys.length === 1 ? " room" : " rooms") : "whole home";
-        return b `
+          ${d}
+        </div>`;const h=e&&i.length>0,p=this._etaFor(i,this._planMode,e),m=o.length?o.length+(1===o.length?" room":" rooms"):"whole home";return q`
       <div class="start-row">
-        ${modeSeg}
-        <button class="start-bar ${canStart && this._holdId === hid ? "action-btn--holding" : ""}"
-          ?disabled=${!canStart}
-          title=${hasInt ? "" : "Requires the AnyVac integration"}
-          @pointerdown=${canStart ? this._holdStart(hid, () => this._runOrchestrated(runKeys, this._planMode)) : A}
+        ${l}
+        <button class="start-bar ${h&&this._holdId===n?"action-btn--holding":""}"
+          ?disabled=${!h}
+          title=${e?"":"Requires the AnyVac integration"}
+          @pointerdown=${h?this._holdStart(n,()=>this._runOrchestrated(i,this._planMode)):G}
           @pointermove=${this._holdMove}
           @pointerup=${this._holdEnd} @pointerleave=${this._holdEnd} @pointercancel=${this._holdEnd}>
           <div class="hold-ring"></div>
           <ha-icon icon="mdi:play"></ha-icon>
-          <span>START · ${scopeLabel}${est ? " · ~" + est + " min" : ""}</span>
+          <span>START · ${m}${p?" · ~"+p+" min":""}</span>
         </button>
-        ${dockSeg}
-      </div>`;
-    }
-    /** Setting presets for a vacuum; falls back to a single default synthesized from clean_action. */
-    _settingPresets(vac) {
-        if (vac.presets && vac.presets.length)
-            return vac.presets;
-        const ca = vac.clean_action;
-        return [{
-                id: "default",
-                label: "Default",
-                suction_level: ca?.suction_level,
-                mop_mode: ca?.mop_mode,
-                mop_intensity: ca?.mop_intensity,
-                repeat: ca?.repeat,
-            }];
-    }
-    _activePresetId(vac) {
-        const presets = this._settingPresets(vac);
-        const sel = this._activePresets.get(vac.entity);
-        if (sel && presets.some((p) => p.id === sel))
-            return sel;
-        return presets[0]?.id ?? "default";
-    }
-    _activePreset(vac) {
-        const presets = this._settingPresets(vac);
-        const id = this._activePresetId(vac);
-        return presets.find((p) => p.id === id) ?? presets[0];
-    }
-    _setActivePreset(vac, id) {
-        const next = new Map(this._activePresets);
-        next.set(vac.entity, id);
-        this._activePresets = next;
-    }
-    /** v1.1.0 (2026-08-03): sits INLINE beside the START button now
-     *  (`.actions--idle`, `_renderActions`) instead of stacked above it as its
-     *  own full-width wrapping row — was the single caller (only used from
-     *  the idle branch of `_renderActions`), so repurposing its own layout in
-     *  place is safe. `overflow-x:auto` degrades gracefully for 3+ presets
-     *  (scrolls) instead of wrapping to a second row, which would reintroduce
-     *  the extra vertical row this redesign removes; `flex-shrink:0` on each
-     *  chip keeps them from being squashed illegibly narrow by the sibling
-     *  START button's own `flex:1`. */
-    _renderPresetChips(vac) {
-        const presets = this._settingPresets(vac);
-        if (presets.length < 2)
-            return A; // only when there is a real choice
-        const activeId = this._activePresetId(vac);
-        const color = this._color(vac);
-        return b `
+        ${d}
+      </div>`}_settingPresets(t){if(t.presets&&t.presets.length)return t.presets;const e=t.clean_action;return[{id:"default",label:"Default",suction_level:e?.suction_level,mop_mode:e?.mop_mode,mop_intensity:e?.mop_intensity,repeat:e?.repeat}]}_activePresetId(t){const e=this._settingPresets(t),o=this._activePresets.get(t.entity);return o&&e.some(t=>t.id===o)?o:e[0]?.id??"default"}_activePreset(t){const e=this._settingPresets(t),o=this._activePresetId(t);return e.find(t=>t.id===o)??e[0]}_setActivePreset(t,e){const o=new Map(this._activePresets);o.set(t.entity,e),this._activePresets=o}_renderPresetChips(t){const e=this._settingPresets(t);if(e.length<2)return G;const o=this._activePresetId(t),i=this._color(t);return q`
       <div class="preset-chip-row">
-        ${presets.map((p) => {
-            const active = p.id === activeId;
-            return b `<button
-            @click=${(e) => { e.stopPropagation(); this._setActivePreset(vac, p.id); }}
-            style=${o({
-                display: "inline-flex", alignItems: "center", gap: "4px", flexShrink: "0",
-                padding: "4px 10px", borderRadius: "14px", cursor: "pointer",
-                fontSize: "12px", lineHeight: "1",
-                border: "1px solid " + (active ? color : "rgba(255,255,255,0.15)"),
-                background: active ? this._colorBg(vac) : "rgba(255,255,255,0.04)",
-                color: active ? "white" : "rgba(255,255,255,0.55)",
-            })}
+        ${e.map(e=>{const s=e.id===o;return q`<button
+            @click=${o=>{o.stopPropagation(),this._setActivePreset(t,e.id)}}
+            style=${vt({display:"inline-flex",alignItems:"center",gap:"4px",flexShrink:"0",padding:"4px 10px",borderRadius:"14px",cursor:"pointer",fontSize:"12px",lineHeight:"1",border:"1px solid "+(s?i:"rgba(255,255,255,0.15)"),background:s?this._colorBg(t):"rgba(255,255,255,0.04)",color:s?"white":"rgba(255,255,255,0.55)"})}
           >
-            ${p.icon ? b `<ha-icon icon=${p.icon} style="--mdc-icon-size:14px"></ha-icon>` : A}
-            <span>${p.label}</span>
-          </button>`;
-        })}
+            ${e.icon?q`<ha-icon icon=${e.icon} style="--mdc-icon-size:14px"></ha-icon>`:G}
+            <span>${e.label}</span>
+          </button>`})}
       </div>
-    `;
-    }
-    async _startClean(vac) {
-        const selected = (this._roomsFor(vac)).filter((r) => this._isRoomSelected(r, vac));
-        if (selected.length === 0)
-            return;
-        // ── Kontrakt v2: with the integration present, the START button sends an
-        // INTENT restricted to THIS vacuum — segment resolve, settings application and
-        // session tracking are backend-side (anyvac.clean, docs/14 §3.7). No in-flight
-        // tracking, events or notifications here (docs/14 §3.1, §3.10).
-        if (this._intAttrs(vac)) {
-            const ap = this._activePreset(vac);
-            const mode = this._liveCleanType(vac);
-            const s = {};
-            if (ap.suction_level)
-                s.fan_speed = ap.suction_level;
-            if (mode === "wet" && ap.mop_mode)
-                s.mop_mode = ap.mop_mode;
-            if (mode === "wet" && ap.mop_intensity)
-                s.mop_intensity = ap.mop_intensity;
-            if (ap.repeat && ap.repeat > 1)
-                s.repeat = ap.repeat;
-            await this._call("anyvac", "clean", {
-                rooms: selected.map((r) => r.key),
-                mode,
-                vacuums: [vac.entity],
-                // Settings are per-vacuum since 2026-07-26 (backend now expects
-                // {kind: {vacuum_ref: {...}}}, not a flat {kind: {...}} shared object).
-                ...(Object.keys(s).length ? { settings: { [mode]: { [vac.entity]: s } } } : {}),
-            });
-            return;
-        }
-        // ── Degraded mode (no integration, docs/14 §8): dumb direct commands. ──
-        if (!vac.clean_action)
-            return;
-        // Script strategy
-        if (vac.clean_action.type === "script") {
-            const action = vac.clean_action;
-            const variables = {};
-            for (const [key, template] of Object.entries(action.variables ?? {})) {
-                variables[key] = template
-                    .replace("{{ entity }}", vac.entity)
-                    .replace("{{ selected_segments }}", JSON.stringify(selected.map((r) => r.segment_id).filter(Boolean)))
-                    .replace("{{ selected_room_keys }}", JSON.stringify(selected.map((r) => r.key)))
-                    .replace("{{ selected_area_ids }}", JSON.stringify(selected.map((r) => r.area_id).filter(Boolean)));
-            }
-            await this._call("script", "turn_on", { entity_id: action.entity_id, variables });
-            return;
-        }
-        // Native variants: pre-set fan / mop from the active setting preset (default
-        // preset = the values from clean_action, so behaviour is unchanged when no
-        // custom presets are defined), then call vacuum.
-        const nativeAction = vac.clean_action;
-        const ap = this._activePreset(vac);
-        const apMopMode = ap.mop_mode ?? nativeAction.mop_mode;
-        const apMopInt = ap.mop_intensity ?? nativeAction.mop_intensity;
-        const apSuction = ap.suction_level ?? nativeAction.suction_level;
-        if (nativeAction.mop_mode_entity && apMopMode) {
-            await this._call("select", "select_option", { entity_id: nativeAction.mop_mode_entity, option: apMopMode });
-        }
-        if (nativeAction.mop_intensity_entity && apMopInt) {
-            await this._call("select", "select_option", { entity_id: nativeAction.mop_intensity_entity, option: apMopInt });
-        }
-        if (apSuction) {
-            await this._call("vacuum", "set_fan_speed", { entity_id: vac.entity, fan_speed: apSuction });
-        }
-        if (vac.clean_action.type === "native-area") {
-            // Uses HA vacuum.clean_area — area_id resolved via area_mappings. No repeat
-            // (docs/13 A1); repeat lives server-side in anyvac.clean (docs/14 §3.8).
-            try {
-                await this.hass.callService("vacuum", "clean_area", { cleaning_area_id: selected.map((r) => r.area_id ?? this._config.area_mappings?.[r.key] ?? r.key) }, { entity_id: vac.entity });
-            }
-            catch (err) {
-                console.error("[anyvac-card] vacuum.clean_area failed:", err);
-            }
-        }
-        else {
-            // "native" / "native-auto" — segment IDs from the room config. The old
-            // native-auto dynamic resolve (roborock.get_maps) was DELETED with the plan
-            // builder (docs/14 §3.7): with an integration the backend resolves segments,
-            // without one the card only knows its configured segment_ids.
-            const action = vac.clean_action;
-            const segments = selected.map((r) => r.segment_id).filter((id) => id !== undefined);
-            if (!segments.length) {
-                console.error("[anyvac-card] no configured segment_ids for the selection; aborting");
-                return;
-            }
-            await this._call("vacuum", "send_command", {
-                entity_id: vac.entity,
-                command: "app_segment_clean",
-                params: [{ segments, repeat: action.repeat ?? 1 }],
-            });
-        }
-    }
-    // ── Render: badges ──────────────────────────────────────────────────────
-    _renderBadge(vac, index) {
-        const active = this._shownSet.has(index);
-        const cleaning = this._isCleaning(vac);
-        const color = this._color(vac);
-        const name = vac.name ?? vac.entity.split(".")[1] ?? vac.entity;
-        const holding = this._holdId === "badge-" + index;
-        // docs/25 §7a / docs/28 §5: ring + glow now read STATE ("what is it
-        // doing"), not identity — mirrors the portrait icon strip (0.69.0,
-        // `_renderVacuumIconStrip`'s `_statusInfo(v)[1]`). Only this landscape
-        // picker badge kept the identity ring until now (0.69.0's changelog
-        // explicitly left it alone). Background wash + the icon/photo still
-        // carry identity, unchanged — same split as the icon strip: one visual
-        // language for "what it's doing", a separate one for "which one is it".
-        // Not hex-alpha-suffixed like the old identity `color + "80"` trick was —
-        // several very common statuses (docked/idle/charging) are `rgba(...)`
-        // literals in STATUS_MAP (const.ts), not hex, so appending a hex alpha
-        // suffix to those would produce an invalid CSS value (silently dropped
-        // border). Border WIDTH and glow RADIUS carry the active/cleaning
-        // distinction instead — works identically for hex or rgba input.
-        const statusColor = this._statusInfo(vac)[1];
-        const bg = cleaning ? this._colorBgActive(vac) : active ? this._colorBg(vac) : "rgba(30,30,30,0.85)";
-        const border = cleaning
-            ? "3px solid " + statusColor
-            : active
-                ? "2px solid " + statusColor
-                : "2px solid rgba(255,255,255,0.18)";
-        const shadow = cleaning
-            ? "0 0 18px " + statusColor
-            : active
-                ? "0 0 6px " + statusColor
-                : "none";
-        return b `
+    `}async _startClean(t){const e=this._roomsFor(t).filter(e=>this._isRoomSelected(e,t));if(0===e.length)return;if(this._intAttrs(t)){const o=this._activePreset(t),i=this._liveCleanType(t),s={};return o.suction_level&&(s.fan_speed=o.suction_level),"wet"===i&&o.mop_mode&&(s.mop_mode=o.mop_mode),"wet"===i&&o.mop_intensity&&(s.mop_intensity=o.mop_intensity),o.repeat&&o.repeat>1&&(s.repeat=o.repeat),void await this._call("anyvac","clean",{rooms:e.map(t=>t.key),mode:i,vacuums:[t.entity],...Object.keys(s).length?{settings:{[i]:{[t.entity]:s}}}:{}})}if(!t.clean_action)return;if("script"===t.clean_action.type){const o=t.clean_action,i={};for(const[s,n]of Object.entries(o.variables??{}))i[s]=n.replace("{{ entity }}",t.entity).replace("{{ selected_segments }}",JSON.stringify(e.map(t=>t.segment_id).filter(Boolean))).replace("{{ selected_room_keys }}",JSON.stringify(e.map(t=>t.key))).replace("{{ selected_area_ids }}",JSON.stringify(e.map(t=>t.area_id).filter(Boolean)));return void await this._call("script","turn_on",{entity_id:o.entity_id,variables:i})}const o=t.clean_action,i=this._activePreset(t),s=i.mop_mode??o.mop_mode,n=i.mop_intensity??o.mop_intensity,a=i.suction_level??o.suction_level;if(o.mop_mode_entity&&s&&await this._call("select","select_option",{entity_id:o.mop_mode_entity,option:s}),o.mop_intensity_entity&&n&&await this._call("select","select_option",{entity_id:o.mop_intensity_entity,option:n}),a&&await this._call("vacuum","set_fan_speed",{entity_id:t.entity,fan_speed:a}),"native-area"===t.clean_action.type)try{await this.hass.callService("vacuum","clean_area",{cleaning_area_id:e.map(t=>t.area_id??this._config.area_mappings?.[t.key]??t.key)},{entity_id:t.entity})}catch(t){console.error("[anyvac-card] vacuum.clean_area failed:",t)}else{const o=t.clean_action,i=e.map(t=>t.segment_id).filter(t=>void 0!==t);if(!i.length)return void console.error("[anyvac-card] no configured segment_ids for the selection; aborting");await this._call("vacuum","send_command",{entity_id:t.entity,command:"app_segment_clean",params:[{segments:i,repeat:o.repeat??1}]})}}_renderBadge(t,e){const o=this._shownSet.has(e),i=this._isCleaning(t),s=this._color(t),n=t.name??t.entity.split(".")[1]??t.entity,a=this._holdId==="badge-"+e,r=this._statusInfo(t)[1],l=i?this._colorBgActive(t):o?this._colorBg(t):"rgba(30,30,30,0.85)";return q`
       <button
-        class="badge ${holding ? "badge--holding" : ""}"
-        style=${o({ background: bg, border, boxShadow: shadow })}
-        @pointerdown=${(e) => {
-            e.preventDefault();
-            this._cancelHold();
-            this._holdId = "badge-" + index;
-            this._holdTimer = setTimeout(() => {
-                this._holdTimer = null;
-                this._holdId = null;
-                this._toggleShown(index);
-            }, HOLD_DURATION_MS);
-        }}
-        @pointerup=${() => {
-            if (this._holdTimer !== null) {
-                this._cancelHold();
-                this._shownSet = new Set([index]);
-                this._saveShown();
-            }
-            else {
-                this._holdId = null;
-            }
-        }}
+        class="badge ${a?"badge--holding":""}"
+        style=${vt({background:l,border:i?"3px solid "+r:o?"2px solid "+r:"2px solid rgba(255,255,255,0.18)",boxShadow:i?"0 0 18px "+r:o?"0 0 6px "+r:"none"})}
+        @pointerdown=${t=>{t.preventDefault(),this._cancelHold(),this._holdId="badge-"+e,this._holdTimer=setTimeout(()=>{this._holdTimer=null,this._holdId=null,this._toggleShown(e)},kt)}}
+        @pointerup=${()=>{null!==this._holdTimer?(this._cancelHold(),this._shownSet=new Set([e]),this._saveShown()):this._holdId=null}}
         @pointerleave=${this._holdEnd}
         @pointercancel=${this._holdEnd}
-        aria-pressed=${active ? "true" : "false"}
-        aria-label=${name}
+        aria-pressed=${o?"true":"false"}
+        aria-label=${n}
       >
         <div class="hold-ring"></div>
-        ${vac.image
-            ? b `<img class="badge-img" src=${vac.image} alt=${name} />`
-            : b `<ha-icon class="badge-icon" icon="mdi:robot-vacuum" style=${o({ color })}></ha-icon>`}
-        <span class="badge-name" style=${o({ color: active ? "white" : "rgba(255,255,255,0.55)" })}>
-          ${name}
+        ${t.image?q`<img class="badge-img" src=${t.image} alt=${n} />`:q`<ha-icon class="badge-icon" icon="mdi:robot-vacuum" style=${vt({color:s})}></ha-icon>`}
+        <span class="badge-name" style=${vt({color:o?"white":"rgba(255,255,255,0.55)"})}>
+          ${n}
         </span>
       </button>
-    `;
-    }
-    /** Landscape-only `picker` region (docs/19 A5): slim vertical vacuum
-     *  selector, right column, directly above the room-list `dock`. Reuses
-     *  `_renderBadge` (same tap-to-focus / hold-to-multiselect behaviour as the
-     *  old horizontal badge-row tabs) just stacked vertically instead. */
-    _renderVacuumPicker() {
-        const vacs = this._config.vacuums;
-        if (!vacs.length)
-            return A;
-        return b `<div class="vac-picker">${vacs.map((v, i) => this._renderBadge(v, i))}</div>`;
-    }
-    _renderGlobalBadge(ga, idx) {
-        const active = this._isGlobalActive(ga);
-        const color = this._resolveColor(ga.color, "orange");
-        const holdId = "global-" + idx;
-        const holding = this._holdId === holdId;
-        const bg = active ? this._resolveBg(ga.color, "orange", true) : "rgba(30,30,30,0.85)";
-        const border = active ? "3px solid " + color : "2px solid rgba(255,255,255,0.18)";
-        const shadow = active ? "0 0 18px " + color + "B0" : "none";
-        return b `
+    `}_renderVacuumPicker(){const t=this._config.vacuums;return t.length?q`<div class="vac-picker">${t.map((t,e)=>this._renderBadge(t,e))}</div>`:G}_renderGlobalBadge(t,e){const o=this._isGlobalActive(t),i=this._resolveColor(t.color,"orange"),s="global-"+e,n=this._holdId===s,a=o?this._resolveBg(t.color,"orange",!0):"rgba(30,30,30,0.85)";return q`
       <button
-        class="badge badge--global ${holding ? "badge--holding" : ""}"
-        style=${o({ background: bg, border, boxShadow: shadow })}
-        @pointerdown=${this._holdStart(holdId, () => this._triggerGlobal(ga))}
+        class="badge badge--global ${n?"badge--holding":""}"
+        style=${vt({background:a,border:o?"3px solid "+i:"2px solid rgba(255,255,255,0.18)",boxShadow:o?"0 0 18px "+i+"B0":"none"})}
+        @pointerdown=${this._holdStart(s,()=>this._triggerGlobal(t))}
         @pointermove=${this._holdMove}
         @pointerup=${this._holdEnd}
         @pointerleave=${this._holdEnd}
         @pointercancel=${this._holdEnd}
-        aria-label=${ga.name}
-        title=${"Hold to trigger: " + ga.name}
+        aria-label=${t.name}
+        title=${"Hold to trigger: "+t.name}
       >
         <div class="hold-ring"></div>
-        ${ga.image
-            ? b `<img class="badge-img" src=${ga.image} alt=${ga.name} />`
-            : b `<ha-icon class="badge-icon" icon="mdi:home-floor-a" style=${o({ color })}></ha-icon>`}
-        <span class="badge-name" style=${o({ color: active ? "white" : "rgba(255,255,255,0.55)" })}>
-          ${ga.name}
+        ${t.image?q`<img class="badge-img" src=${t.image} alt=${t.name} />`:q`<ha-icon class="badge-icon" icon="mdi:home-floor-a" style=${vt({color:i})}></ha-icon>`}
+        <span class="badge-name" style=${vt({color:o?"white":"rgba(255,255,255,0.55)"})}>
+          ${t.name}
         </span>
       </button>
-    `;
-    }
-    // ── Render: map ─────────────────────────────────────────────────────────
-    // ── Pin & go / zone (integration-only; docs/14 §3.6, kontrakt v2) ────────────
-    // The card sends clicks as PERCENT of the map image to anyvac.goto /
-    // anyvac.zone_clean; the pct→px→mm conversion is backend-side. All client-side
-    // affine math (solve3 / _affine / _intMapToVac / _gotoMm) was deleted — mm no
-    // longer exist in the card.
-    _toggleMode(entity, mode) {
-        if (this._mapMode === mode && this._modeEntity === entity) {
-            this._mapMode = "normal";
-            this._modeEntity = null;
-        }
-        else {
-            this._mapMode = mode;
-            this._modeEntity = entity;
-        }
-    }
-    /** Arm Pin & Go / Zone from the consolidated meta bar (docs/19) — a "*" sentinel
-     *  instead of one hard-coded vacuum. In merged mode this defers the target choice:
-     *  the capture (click/drag) happens once on the shared map, then the user picks
-     *  which vacuum executes it on that vacuum's own status card (`_confirmPin`/
-     *  `_confirmZone`). In split mode each vacuum has its own separate map region, so
-     *  "*" just means "whichever map you click into" — unambiguous, same immediate
-     *  execution as the legacy per-vacuum tools. Distinct from `_toggleMode`, which
-     *  still drives the legacy single-target flow untouched. */
-    _armMode(mode) {
-        if (this._mapMode === mode && this._modeEntity === "*") {
-            this._mapMode = "normal";
-            this._modeEntity = null;
-        }
-        else {
-            this._mapMode = mode;
-            this._modeEntity = "*";
-            this._pinPending = null;
-            this._zonePending = null;
-            this._zoneRectShown = null;
-            this._zoneEdit = null;
-        }
-    }
-    /** Candidate vacuums for a merged-mode multi-candidate Pin & Go / Zone capture —
-     *  anything with the integration + its own map entity (each has its own
-     *  auto-seated transform, so one screen point/rectangle translates independently
-     *  per vacuum via `_clickToContent`). */
-    _modeCandidates() {
-        return this._config.vacuums.filter((v) => this._intAttrs(v) && this._mapEntityFor(v));
-    }
-    /** Whether this vacuum's map should render the click-catch / zone-rect layer:
-     *  either it's the legacy hard-coded single target, or mode is armed "*" (meta
-     *  bar) and this vacuum is a valid candidate. */
-    _isModeCandidate(v) {
-        return this._modeEntity === v.entity || (this._modeEntity === "*" && !!this._intAttrs(v) && !!this._mapEntityFor(v));
-    }
-    /** Whether `v` still has a stake in the current zone capture once arming has
-     *  already ended — i.e. it's awaiting confirm (`_zonePending`) or it's still
-     *  mid-draw (`_isModeCandidate`). Needed because move/resize editing of an
-     *  already-drawn box (below) must keep working after the merged multi-candidate
-     *  flow resets `_mapMode`/`_modeEntity` to normal/null on drop. */
-    _hasZoneEditTarget(v) {
-        return this._isModeCandidate(v) || !!this._zonePending?.[v.entity];
-    }
-    /** Hit-test a point (wrap-relative %) against a frozen zone box: a corner
-     *  (within `H` percent) wins for resize, otherwise inside the box means move,
-     *  otherwise null (click missed the box — caller should start a fresh draw). */
-    _zoneHit(box, x, y) {
-        const minX = Math.min(box.x0, box.x1), maxX = Math.max(box.x0, box.x1);
-        const minY = Math.min(box.y0, box.y1), maxY = Math.max(box.y0, box.y1);
-        const H = 4;
-        const corners = [
-            ["nw", minX, minY], ["ne", maxX, minY], ["sw", minX, maxY], ["se", maxX, maxY],
-        ];
-        for (const [name, cx, cy] of corners) {
-            if (Math.abs(x - cx) <= H && Math.abs(y - cy) <= H)
-                return name;
-        }
-        if (x >= minX && x <= maxX && y >= minY && y <= maxY)
-            return "move";
-        return null;
-    }
-    /** Purely visual corner squares on a drawn zone box — the actual drag/resize
-     *  hit-testing happens in `_onZoneDown` via `_zoneHit` against the overlaying
-     *  `.map-clickcatch`, so these carry no pointer handlers of their own
-     *  (`pointer-events: none`, same as `.zone-rect` itself). */
-    _renderZoneHandles() {
-        return b `
+    `}_toggleMode(t,e){this._mapMode===e&&this._modeEntity===t?(this._mapMode="normal",this._modeEntity=null):(this._mapMode=e,this._modeEntity=t)}_armMode(t){this._mapMode===t&&"*"===this._modeEntity?(this._mapMode="normal",this._modeEntity=null):(this._mapMode=t,this._modeEntity="*",this._pinPending=null,this._zonePending=null,this._zoneRectShown=null,this._zoneEdit=null)}_modeCandidates(){return this._config.vacuums.filter(t=>this._intAttrs(t)&&this._mapEntityFor(t))}_isModeCandidate(t){return this._modeEntity===t.entity||"*"===this._modeEntity&&!!this._intAttrs(t)&&!!this._mapEntityFor(t)}_hasZoneEditTarget(t){return this._isModeCandidate(t)||!!this._zonePending?.[t.entity]}_zoneHit(t,e,o){const i=Math.min(t.x0,t.x1),s=Math.max(t.x0,t.x1),n=Math.min(t.y0,t.y1),a=Math.max(t.y0,t.y1),r=[["nw",i,n],["ne",s,n],["sw",i,a],["se",s,a]];for(const[t,i,s]of r)if(Math.abs(e-i)<=4&&Math.abs(o-s)<=4)return t;return e>=i&&e<=s&&o>=n&&o<=a?"move":null}_renderZoneHandles(){return q`
       <div class="zone-handle zone-handle--nw"></div>
       <div class="zone-handle zone-handle--ne"></div>
       <div class="zone-handle zone-handle--sw"></div>
       <div class="zone-handle zone-handle--se"></div>
-    `;
-    }
-    /** The rectangle to draw for this vacuum's map: the live drag while dragging,
-     *  or the frozen box while a zone is pending confirm. Merged mode's multi
-     *  candidate capture resets `_mapMode`/`_modeEntity` the instant the drag ends
-     *  (§`_onZoneUp`), so the frozen box can't reuse `_isModeCandidate` — it's no
-     *  longer "armed", it's "awaiting confirm". All candidates share the exact
-     *  same on-screen rect there (that's the premise of merged mode), so it's
-     *  drawn once, on the first shown vacuum; split mode draws it on whichever
-     *  vacuum's own map it was actually dragged on. */
-    _zoneRectFor(v, isFirstShown) {
-        if (this._mapMode === "zone" && this._isModeCandidate(v) && this._zoneDrag)
-            return this._zoneDrag;
-        if (!this._zoneRectShown)
-            return null;
-        if (this._config.map_mode === "merged")
-            return isFirstShown ? this._zoneRectShown : null;
-        return this._zonePending?.[v.entity] ? this._zoneRectShown : null;
-    }
-    _refreshMap(vac) {
-        const ent = this._mapEntityFor(vac);
-        if (ent)
-            void this.hass.callService("homeassistant", "update_entity", { entity_id: ent });
-    }
-    _clampPct(v) {
-        return Math.min(100, Math.max(0, v));
-    }
-    _onMapClick(vac, e) {
-        if (this._mapMode !== "pin")
-            return;
-        if (!this._isModeCandidate(vac))
-            return;
-        if (this._modeEntity === "*" && this._config.map_mode === "merged") {
-            // Merged multi-candidate: capture the SAME screen point through every
-            // candidate vacuum's own map transform. Nothing is sent yet — the user picks
-            // who actually goes there next, on that vacuum's own status card.
-            const pts = {};
-            for (const cand of this._modeCandidates()) {
-                const c = this._clickToContent(cand, e.clientX, e.clientY);
-                if (c)
-                    pts[cand.entity] = { x: this._clampPct(c.x), y: this._clampPct(c.y) };
-            }
-            this._pinPending = Object.keys(pts).length ? pts : null;
-            this._mapMode = "normal";
-            this._modeEntity = null;
-            return;
-        }
-        // Legacy single-target immediate send (per-vacuum tools, and "*" in split mode
-        // where each map is its own on-screen region — clicking it IS the unambiguous
-        // choice of vacuum, so there's nothing to defer).
-        const content = this._clickToContent(vac, e.clientX, e.clientY);
-        this._dbg = content
-            ? "goto " + content.x.toFixed(1) + "%, " + content.y.toFixed(1) + "%"
-            : "(map element not found)";
-        if (content) {
-            void this._call("anyvac", "goto", {
-                entity_id: vac.entity,
-                x_pct: this._clampPct(content.x),
-                y_pct: this._clampPct(content.y),
-            });
-        }
-        this._mapMode = "normal";
-        this._modeEntity = null;
-    }
-    // Map a viewport click into THIS vacuum's map content space (undo its
-    // rotation/scale/offset) so pin&go / zones are seating-independent.
-    _clickToContent(vac, clientX, clientY) {
-        // The map is the coordinate authority (mm live there). Select this vacuum's own
-        // map element — with several vacuums shown there are several .map-img and the
-        // first one may belong to a different robot with different seating (docs/13 A4).
-        // The floorplan is NOT a valid fallback: its content space has no mm mapping.
-        const el = this._mapEntityFor(vac)
-            ? this.renderRoot?.querySelector(`.map-img[data-entity="${vac.entity.replace(/"/g, '\\"')}"]`)
-            : null;
-        if (!el)
-            return null;
-        const r = el.getBoundingClientRect();
-        const cx = (r.left + r.right) / 2, cy = (r.top + r.bottom) / 2;
-        const tr = getComputedStyle(el).transform;
-        const m = new DOMMatrix(tr === "none" ? undefined : tr);
-        const det = m.a * m.d - m.b * m.c;
-        if (Math.abs(det) < 1e-9)
-            return null;
-        const dx = clientX - cx, dy = clientY - cy;
-        const lx = (m.d * dx - m.c * dy) / det;
-        const ly = (-m.b * dx + m.a * dy) / det;
-        const w = el.offsetWidth || 1, h = el.offsetHeight || 1;
-        return { x: (lx / w + 0.5) * 100, y: (ly / h + 0.5) * 100 };
-    }
-    _onZoneDown(vac, e) {
-        const editing = !!this._zoneRectShown && this._hasZoneEditTarget(vac);
-        if (!editing && (this._mapMode !== "zone" || !this._isModeCandidate(vac)))
-            return;
-        const el = e.currentTarget;
-        el.setPointerCapture?.(e.pointerId);
-        const r = el.getBoundingClientRect();
-        const x = ((e.clientX - r.left) / r.width) * 100;
-        const y = ((e.clientY - r.top) / r.height) * 100;
-        if (this._zoneRectShown) {
-            const hit = this._zoneHit(this._zoneRectShown, x, y);
-            if (hit) {
-                const b = this._zoneRectShown;
-                const minX = Math.min(b.x0, b.x1), maxX = Math.max(b.x0, b.x1);
-                const minY = Math.min(b.y0, b.y1), maxY = Math.max(b.y0, b.y1);
-                // Normalize to x0<x1 / y0<y1 so resize below can address each corner
-                // as one fixed field instead of re-deriving min/max on every move.
-                this._zoneRectShown = { x0: minX, y0: minY, x1: maxX, y1: maxY };
-                this._zoneEdit = hit === "move"
-                    ? { type: "move", offsetX: x - minX, offsetY: y - minY, width: maxX - minX, height: maxY - minY }
-                    : { type: hit };
-                return;
-            }
-            // Missed the box. Once dropped and awaiting confirm, `_mapMode` may
-            // already be back to "normal" (merged multi-candidate flow) — a stray
-            // click there shouldn't silently discard the pending zone, Cancel is
-            // explicit for that. Only actively-armed drawing (`_mapMode === "zone"`)
-            // may start a fresh rectangle over an old one.
-            if (this._mapMode !== "zone")
-                return;
-        }
-        // Start a fresh rectangle, same as before move/resize existed.
-        this._zonePending = null;
-        this._zoneRectShown = null;
-        this._zoneEdit = null;
-        this._zoneMulti = this._modeEntity === "*" && this._config.map_mode === "merged";
-        this._zoneDrag = { x0: x, y0: y, x1: x, y1: y };
-    }
-    _onZoneMove(vac, e) {
-        if (this._zoneEdit && this._zoneRectShown) {
-            const el = e.currentTarget;
-            const r = el.getBoundingClientRect();
-            const x = ((e.clientX - r.left) / r.width) * 100;
-            const y = ((e.clientY - r.top) / r.height) * 100;
-            const MIN = 3; // smallest box side, in %, so a resize can't collapse to a point
-            const edit = this._zoneEdit;
-            if (edit.type === "move") {
-                const { offsetX, offsetY, width, height } = edit;
-                const nx0 = Math.min(100 - width, Math.max(0, x - offsetX));
-                const ny0 = Math.min(100 - height, Math.max(0, y - offsetY));
-                this._zoneRectShown = { x0: nx0, y0: ny0, x1: nx0 + width, y1: ny0 + height };
-            }
-            else {
-                let { x0, y0, x1, y1 } = this._zoneRectShown;
-                const cx = this._clampPct(x), cy = this._clampPct(y);
-                if (edit.type === "nw") {
-                    x0 = Math.min(cx, x1 - MIN);
-                    y0 = Math.min(cy, y1 - MIN);
-                }
-                else if (edit.type === "ne") {
-                    x1 = Math.max(cx, x0 + MIN);
-                    y0 = Math.min(cy, y1 - MIN);
-                }
-                else if (edit.type === "sw") {
-                    x0 = Math.min(cx, x1 - MIN);
-                    y1 = Math.max(cy, y0 + MIN);
-                }
-                else /* se */ {
-                    x1 = Math.max(cx, x0 + MIN);
-                    y1 = Math.max(cy, y0 + MIN);
-                }
-                this._zoneRectShown = { x0, y0, x1, y1 };
-            }
-            return;
-        }
-        if (!this._zoneDrag || this._mapMode !== "zone" || !this._isModeCandidate(vac))
-            return;
-        const el = e.currentTarget;
-        const r = el.getBoundingClientRect();
-        this._zoneDrag = { x0: this._zoneDrag.x0, y0: this._zoneDrag.y0,
-            x1: ((e.clientX - r.left) / r.width) * 100, y1: ((e.clientY - r.top) / r.height) * 100 };
-    }
-    _onZoneUp(vac, e) {
-        const el = e.currentTarget;
-        if (this._zoneEdit) {
-            this._zoneEdit = null;
-            this._commitZoneRect(vac, el);
-            return;
-        }
-        if (!this._zoneDrag || this._mapMode !== "zone" || !this._isModeCandidate(vac))
-            return;
-        const big = Math.abs(this._zoneDrag.x1 - this._zoneDrag.x0) > 2 || Math.abs(this._zoneDrag.y1 - this._zoneDrag.y0) > 2;
-        // Freeze the drawn box (so it stays visible while pending) before dropping
-        // the LIVE drag state — the live state is what used to only clear on cancel,
-        // so releasing the pointer left `_zoneDrag` set and `_onZoneMove` (which only
-        // gates on it being non-null, not on the button still being down) kept
-        // resizing the rectangle on every subsequent mouse move (bugfix, docs/19).
-        this._zoneRectShown = big ? this._zoneDrag : null;
-        this._zoneDrag = null;
-        if (!big)
-            return;
-        const multi = this._zoneMulti;
-        if (multi) {
-            this._mapMode = "normal";
-            this._modeEntity = null;
-        }
-        this._commitZoneRect(vac, el);
-    }
-    /** Convert the current `_zoneRectShown` (wrap-relative %) back to screen
-     *  coordinates via `el`'s rect, then project through each relevant vacuum's
-     *  own map transform (`_clickToContent`) into `_zonePending`. Shared by the
-     *  initial draw-drop and by every subsequent move/resize edit, so a box can
-     *  be nudged into place after the fact without redrawing it from scratch. */
-    _commitZoneRect(vac, el) {
-        const box = this._zoneRectShown;
-        if (!box)
-            return;
-        const r = el.getBoundingClientRect();
-        const ax = r.left + (Math.min(box.x0, box.x1) / 100) * r.width;
-        const ay = r.top + (Math.min(box.y0, box.y1) / 100) * r.height;
-        const bx = r.left + (Math.max(box.x0, box.x1) / 100) * r.width;
-        const by = r.top + (Math.max(box.y0, box.y1) / 100) * r.height;
-        if (this._zoneMulti) {
-            // Merged multi-candidate: same two screen corners, translated through every
-            // candidate vacuum's own map transform. Nothing sent yet — confirm per
-            // vacuum on its own status card.
-            const rects = {};
-            for (const cand of this._modeCandidates()) {
-                const ca = this._clickToContent(cand, ax, ay);
-                const cb = this._clickToContent(cand, bx, by);
-                if (ca && cb) {
-                    rects[cand.entity] = {
-                        x1: this._clampPct(Math.min(ca.x, cb.x)), y1: this._clampPct(Math.min(ca.y, cb.y)),
-                        x2: this._clampPct(Math.max(ca.x, cb.x)), y2: this._clampPct(Math.max(ca.y, cb.y)),
-                    };
-                }
-            }
-            this._zonePending = Object.keys(rects).length ? rects : null;
-            return;
-        }
-        // Legacy single-target (per-vacuum tools, and "*" in split mode — each map is
-        // its own on-screen region, so the vacuum that received the drag IS the
-        // unambiguous choice).
-        const ca = this._clickToContent(vac, ax, ay);
-        const cb = this._clickToContent(vac, bx, by);
-        if (ca && cb) {
-            this._zonePending = {
-                [vac.entity]: {
-                    x1: this._clampPct(Math.min(ca.x, cb.x)), y1: this._clampPct(Math.min(ca.y, cb.y)),
-                    x2: this._clampPct(Math.max(ca.x, cb.x)), y2: this._clampPct(Math.max(ca.y, cb.y)),
-                },
-            };
-        }
-    }
-    _confirmZone(vac) {
-        const z = this._zonePending?.[vac.entity];
-        if (!z)
-            return;
-        // Bugfix 2026-07-16 (field test): this hardcoded `repeat: 1`, silently
-        // ignoring the vacuum's own configured pass count (`clean_action.repeat`,
-        // e.g. 2) — a zone clean ran with only one pass regardless of what the
-        // user set up. Zone clean is a WHERE action (docs/07 UX canon), it should
-        // still run with the vacuum's normal HOW settings, same as room cleaning
-        // does via `_settingPresets`/`clean_action`.
-        const ca = vac.clean_action;
-        void this._call("anyvac", "zone_clean", {
-            entity_id: vac.entity,
-            x1_pct: z.x1, y1_pct: z.y1, x2_pct: z.x2, y2_pct: z.y2,
-            repeat: ca?.repeat ?? 1,
-        });
-        if (this._zonePending) {
-            const next = { ...this._zonePending };
-            delete next[vac.entity];
-            this._zonePending = Object.keys(next).length ? next : null;
-            if (!this._zonePending)
-                this._zoneRectShown = null;
-        }
-        this._zoneDrag = null;
-        this._zoneEdit = null;
-        this._mapMode = "normal";
-        this._modeEntity = null;
-    }
-    _confirmPin(vac) {
-        const p = this._pinPending?.[vac.entity];
-        if (!p)
-            return;
-        void this._call("anyvac", "goto", { entity_id: vac.entity, x_pct: p.x, y_pct: p.y });
-        if (this._pinPending) {
-            const next = { ...this._pinPending };
-            delete next[vac.entity];
-            this._pinPending = Object.keys(next).length ? next : null;
-        }
-    }
-    _cancelPin() { this._pinPending = null; }
-    _cancelZone() {
-        this._zonePending = null;
-        this._zoneDrag = null;
-        this._zoneRectShown = null;
-        this._zoneEdit = null;
-    }
-    /** Refresh-all button in the badges row (grid mode) — the map corner variant
-     *  floated in dead space (field feedback 2026-07-11). */
-    _renderBadgesRefresh() {
-        const withMap = this._config.vacuums.filter((v) => this._mapEntityFor(v));
-        if (!withMap.length)
-            return A;
-        return b `<button class="mtbtn badges-refresh" title="Refresh maps"
-      @click=${() => { for (const v of withMap)
-            this._refreshMap(v); }}>
-      <ha-icon icon="mdi:refresh"></ha-icon>
-    </button>`;
-    }
-    /** Grid mode's consolidated meta bar (docs/19 A4) — replaces the old per-vacuum
-     *  Refresh/Pin & Go/Zone header rows (one row × N vacuums) AND the badges
-     *  region's stats-trio + refresh button with ONE row: Pin & Go, Zone, dry/wet
-     *  layer visibility + oldest age, selected room count, ETA, refresh. Legacy
-     *  (no `layout:` block) is untouched — `_renderMapTools`/`_renderStatsTrio`/
-     *  `_renderBadgesRefresh` below still exist for it. */
-    _renderMetaBar(vacs) {
-        const withMap = vacs.filter((v) => this._mapEntityFor(v));
-        if (!withMap.length)
-            return A;
-        // Pin & Go / Zone here is armed for ALL candidates at once ("*", `_armMode`) —
-        // in merged mode the capture (click/drag) happens once on the shared map and
-        // the choice of WHICH vacuum executes it is made afterwards on that vacuum's
-        // own status card (`_confirmPin`/`_confirmZone`, docs/19). No single
-        // auto-picked target here anymore — that was the bug (immediate send with no
-        // way to choose the robot).
-        const candidates = this._modeCandidates();
-        const canCmd = candidates.length > 0 && !this._narrow;
-        const cmdTitle = this._narrow
-            ? "Not available while the map is rotated"
-            : !canCmd ? "Requires the AnyVac integration (≥ 0.18) + map entity" : "";
-        const mode = this._modeEntity === "*" ? this._mapMode : "normal";
-        // docs/28 §2: room count + ETA dropped from this bar — the dock footer right
-        // below already carries both (`_renderDock`'s `.dock-foot`), so this was a
-        // pure duplicate. `_fetchPlan` still runs here (cheap no-op once the dock's
-        // own call already populated `_planPreview` for the same key) purely so
-        // `unassigned`/`unsequenced` — genuine WARNINGS, not stats, kept here on
-        // purpose — don't flash empty on a render where dock hasn't fired yet.
-        const selKeys = this._allRoomKeys().filter((k) => this._isRoomSelectedAny(k, vacs));
-        const runKeys = selKeys.length ? selKeys : this._allRoomKeys();
-        const hasInt = vacs.some((v) => this._intAttrs(v));
-        if (hasInt && runKeys.length)
-            this._fetchPlan(runKeys, this._planMode);
-        // Sequence hint (docs/19 follow-up, TODO #2): the backend's ETA is only as
-        // good as `room_sequence` (the Roborock app's own room order, which the
-        // firmware follows regardless of what order HA sends). Rooms missing from
-        // it come back in `plan.unsequenced` — surface that instead of silently
-        // showing a number the user has no reason to trust.
-        const unsequenced = hasInt ? (this._planPreview?.unsequenced ?? []) : [];
-        // Unassigned-rooms warning (found live 2026-07-18): see `_unassignedRooms`'s
-        // doc comment — a "Both" run silently skipped wet cleaning with zero
-        // feedback when the config-restricted wet vacuum couldn't take the rooms.
-        const unassigned = this._unassignedRooms(runKeys, this._planMode, hasInt);
-        const pinCount = this._pinPending ? Object.keys(this._pinPending).length : 0;
-        const zoneCount = this._zonePending ? Object.keys(this._zonePending).length : 0;
-        // docs/28 §2: brief spin on tap as press feedback — refresh has no other
-        // observable completion signal (unlike the care-reset spinner, 0.79.1,
-        // which waits for a confirmed sensor change), so a pure "tap registered"
-        // acknowledgement is all it needs. Toggled imperatively on the actual DOM
-        // node rather than via `@state` — a one-shot cosmetic effect that doesn't
-        // need to survive/react to the next render.
-        const refreshTap = (e) => {
-            const btn = e.currentTarget;
-            btn.classList.remove("mtbtn--spin");
-            void btn.offsetWidth;
-            btn.classList.add("mtbtn--spin");
-            for (const v of withMap)
-                this._refreshMap(v);
-        };
-        return b `
+    `}_zoneRectFor(t,e){return"zone"===this._mapMode&&this._isModeCandidate(t)&&this._zoneDrag?this._zoneDrag:this._zoneRectShown?"merged"===this._config.map_mode?e?this._zoneRectShown:null:this._zonePending?.[t.entity]?this._zoneRectShown:null:null}_refreshMap(t){const e=this._mapEntityFor(t);e&&this.hass.callService("homeassistant","update_entity",{entity_id:e})}_clampPct(t){return Math.min(100,Math.max(0,t))}_onMapClick(t,e){if("pin"!==this._mapMode)return;if(!this._isModeCandidate(t))return;if("*"===this._modeEntity&&"merged"===this._config.map_mode){const t={};for(const o of this._modeCandidates()){const i=this._clickToContent(o,e.clientX,e.clientY);i&&(t[o.entity]={x:this._clampPct(i.x),y:this._clampPct(i.y)})}return this._pinPending=Object.keys(t).length?t:null,this._mapMode="normal",void(this._modeEntity=null)}const o=this._clickToContent(t,e.clientX,e.clientY);this._dbg=o?"goto "+o.x.toFixed(1)+"%, "+o.y.toFixed(1)+"%":"(map element not found)",o&&this._call("anyvac","goto",{entity_id:t.entity,x_pct:this._clampPct(o.x),y_pct:this._clampPct(o.y)}),this._mapMode="normal",this._modeEntity=null}_clickToContent(t,e,o){const i=this._mapEntityFor(t)?this.renderRoot?.querySelector(`.map-img[data-entity="${t.entity.replace(/"/g,'\\"')}"]`):null;if(!i)return null;const s=i.getBoundingClientRect(),n=(s.left+s.right)/2,a=(s.top+s.bottom)/2,r=getComputedStyle(i).transform,l=new DOMMatrix("none"===r?void 0:r),c=l.a*l.d-l.b*l.c;if(Math.abs(c)<1e-9)return null;const d=e-n,h=o-a,p=(l.d*d-l.c*h)/c,m=(-l.b*d+l.a*h)/c;return{x:100*(p/(i.offsetWidth||1)+.5),y:100*(m/(i.offsetHeight||1)+.5)}}_onZoneDown(t,e){if(!(!!this._zoneRectShown&&this._hasZoneEditTarget(t)||"zone"===this._mapMode&&this._isModeCandidate(t)))return;const o=e.currentTarget;o.setPointerCapture?.(e.pointerId);const i=o.getBoundingClientRect(),s=(e.clientX-i.left)/i.width*100,n=(e.clientY-i.top)/i.height*100;if(this._zoneRectShown){const t=this._zoneHit(this._zoneRectShown,s,n);if(t){const e=this._zoneRectShown,o=Math.min(e.x0,e.x1),i=Math.max(e.x0,e.x1),a=Math.min(e.y0,e.y1),r=Math.max(e.y0,e.y1);return this._zoneRectShown={x0:o,y0:a,x1:i,y1:r},void(this._zoneEdit="move"===t?{type:"move",offsetX:s-o,offsetY:n-a,width:i-o,height:r-a}:{type:t})}if("zone"!==this._mapMode)return}this._zonePending=null,this._zoneRectShown=null,this._zoneEdit=null,this._zoneMulti="*"===this._modeEntity&&"merged"===this._config.map_mode,this._zoneDrag={x0:s,y0:n,x1:s,y1:n}}_onZoneMove(t,e){if(this._zoneEdit&&this._zoneRectShown){const t=e.currentTarget.getBoundingClientRect(),o=(e.clientX-t.left)/t.width*100,i=(e.clientY-t.top)/t.height*100,s=3,n=this._zoneEdit;if("move"===n.type){const{offsetX:t,offsetY:e,width:s,height:a}=n,r=Math.min(100-s,Math.max(0,o-t)),l=Math.min(100-a,Math.max(0,i-e));this._zoneRectShown={x0:r,y0:l,x1:r+s,y1:l+a}}else{let{x0:t,y0:e,x1:a,y1:r}=this._zoneRectShown;const l=this._clampPct(o),c=this._clampPct(i);"nw"===n.type?(t=Math.min(l,a-s),e=Math.min(c,r-s)):"ne"===n.type?(a=Math.max(l,t+s),e=Math.min(c,r-s)):"sw"===n.type?(t=Math.min(l,a-s),r=Math.max(c,e+s)):(a=Math.max(l,t+s),r=Math.max(c,e+s)),this._zoneRectShown={x0:t,y0:e,x1:a,y1:r}}return}if(!this._zoneDrag||"zone"!==this._mapMode||!this._isModeCandidate(t))return;const o=e.currentTarget.getBoundingClientRect();this._zoneDrag={x0:this._zoneDrag.x0,y0:this._zoneDrag.y0,x1:(e.clientX-o.left)/o.width*100,y1:(e.clientY-o.top)/o.height*100}}_onZoneUp(t,e){const o=e.currentTarget;if(this._zoneEdit)return this._zoneEdit=null,void this._commitZoneRect(t,o);if(!this._zoneDrag||"zone"!==this._mapMode||!this._isModeCandidate(t))return;const i=Math.abs(this._zoneDrag.x1-this._zoneDrag.x0)>2||Math.abs(this._zoneDrag.y1-this._zoneDrag.y0)>2;if(this._zoneRectShown=i?this._zoneDrag:null,this._zoneDrag=null,!i)return;this._zoneMulti&&(this._mapMode="normal",this._modeEntity=null),this._commitZoneRect(t,o)}_commitZoneRect(t,e){const o=this._zoneRectShown;if(!o)return;const i=e.getBoundingClientRect(),s=i.left+Math.min(o.x0,o.x1)/100*i.width,n=i.top+Math.min(o.y0,o.y1)/100*i.height,a=i.left+Math.max(o.x0,o.x1)/100*i.width,r=i.top+Math.max(o.y0,o.y1)/100*i.height;if(this._zoneMulti){const t={};for(const e of this._modeCandidates()){const o=this._clickToContent(e,s,n),i=this._clickToContent(e,a,r);o&&i&&(t[e.entity]={x1:this._clampPct(Math.min(o.x,i.x)),y1:this._clampPct(Math.min(o.y,i.y)),x2:this._clampPct(Math.max(o.x,i.x)),y2:this._clampPct(Math.max(o.y,i.y))})}return void(this._zonePending=Object.keys(t).length?t:null)}const l=this._clickToContent(t,s,n),c=this._clickToContent(t,a,r);l&&c&&(this._zonePending={[t.entity]:{x1:this._clampPct(Math.min(l.x,c.x)),y1:this._clampPct(Math.min(l.y,c.y)),x2:this._clampPct(Math.max(l.x,c.x)),y2:this._clampPct(Math.max(l.y,c.y))}})}_confirmZone(t){const e=this._zonePending?.[t.entity];if(!e)return;const o=t.clean_action;if(this._call("anyvac","zone_clean",{entity_id:t.entity,x1_pct:e.x1,y1_pct:e.y1,x2_pct:e.x2,y2_pct:e.y2,repeat:o?.repeat??1}),this._zonePending){const e={...this._zonePending};delete e[t.entity],this._zonePending=Object.keys(e).length?e:null,this._zonePending||(this._zoneRectShown=null)}this._zoneDrag=null,this._zoneEdit=null,this._mapMode="normal",this._modeEntity=null}_confirmPin(t){const e=this._pinPending?.[t.entity];if(e&&(this._call("anyvac","goto",{entity_id:t.entity,x_pct:e.x,y_pct:e.y}),this._pinPending)){const e={...this._pinPending};delete e[t.entity],this._pinPending=Object.keys(e).length?e:null}}_cancelPin(){this._pinPending=null}_cancelZone(){this._zonePending=null,this._zoneDrag=null,this._zoneRectShown=null,this._zoneEdit=null}_renderMetaBar(t){const e=t.filter(t=>this._mapEntityFor(t));if(!e.length)return G;const o=this._modeCandidates().length>0&&!this._narrow,i=this._narrow?"Not available while the map is rotated":o?"":"Requires the AnyVac integration (≥ 0.18) + map entity",s="*"===this._modeEntity?this._mapMode:"normal",n=this._allRoomKeys().filter(e=>this._isRoomSelectedAny(e,t)),a=n.length?n:this._allRoomKeys(),r=t.some(t=>this._intAttrs(t));r&&a.length&&this._fetchPlan(a,this._planMode);const l=r?this._planPreview?.unsequenced??[]:[],c=this._unassignedRooms(a,this._planMode,r),d=this._pinPending?Object.keys(this._pinPending).length:0,h=this._zonePending?Object.keys(this._zonePending).length:0;return q`
       <div class="meta-bar">
         <div class="meta-bar-cluster">
-          <button class="mtbtn ${mode === "pin" ? "on" : ""}" ?disabled=${!canCmd}
-            @click=${() => this._armMode("pin")} title=${cmdTitle || "Pin & Go"}>
+          <button class="mtbtn ${"pin"===s?"on":""}" ?disabled=${!o}
+            @click=${()=>this._armMode("pin")} title=${i||"Pin & Go"}>
             <ha-icon icon="mdi:map-marker-radius"></ha-icon><span>Pin &amp; Go</span>
           </button>
-          <button class="mtbtn ${mode === "zone" ? "on" : ""}" ?disabled=${!canCmd}
-            @click=${() => this._armMode("zone")} title=${cmdTitle || "Zone clean"}>
+          <button class="mtbtn ${"zone"===s?"on":""}" ?disabled=${!o}
+            @click=${()=>this._armMode("zone")} title=${i||"Zone clean"}>
             <ha-icon icon="mdi:select-drag"></ha-icon><span>Zone</span>
           </button>
         </div>
         <div class="meta-bar-spacer"></div>
         <div class="meta-bar-cluster meta-bar-cluster--right">
-          ${unassigned.length ? b `<span class="mtbtn mtbtn--stat mtbtn--err"
-              title="${unassigned.length} selected room${unassigned.length > 1 ? "s have" : " has"} no available robot for the ${this._planMode} pass — it/they will be silently skipped. Check vacuum roles/config.">
-            <ha-icon icon="mdi:robot-off"></ha-icon><b>${unassigned.length}</b>
-          </span>` : A}
-          ${unsequenced.length ? b `<span class="mtbtn mtbtn--stat mtbtn--warn"
-              title="${unsequenced.length} selected room${unsequenced.length > 1 ? "s have" : " has"} no cleaning order set — the time may be off. Set the order in the card editor's Maps tab.">
-            <ha-icon icon="mdi:sort-variant-off"></ha-icon><b>${unsequenced.length}</b>
-          </span>` : A}
-          ${this._renderLayerToggleCompact(vacs)}
-          ${this._config.layout ? b `<button class="mtbtn ${this._flipEff ? "on" : ""}"
+          ${c.length?q`<span class="mtbtn mtbtn--stat mtbtn--err"
+              title="${c.length} selected room${c.length>1?"s have":" has"} no available robot for the ${this._planMode} pass — it/they will be silently skipped. Check vacuum roles/config.">
+            <ha-icon icon="mdi:robot-off"></ha-icon><b>${c.length}</b>
+          </span>`:G}
+          ${l.length?q`<span class="mtbtn mtbtn--stat mtbtn--warn"
+              title="${l.length} selected room${l.length>1?"s have":" has"} no cleaning order set — the time may be off. Set the order in the card editor's Maps tab.">
+            <ha-icon icon="mdi:sort-variant-off"></ha-icon><b>${l.length}</b>
+          </span>`:G}
+          ${this._renderLayerToggleCompact(t)}
+          ${this._config.layout?q`<button class="mtbtn ${this._flipEff?"on":""}"
               title="Flip map 180° for this screen (this session only — the card editor's Layout section sets a permanent default)"
-              @click=${() => this._toggleFlipLive()}>
+              @click=${()=>this._toggleFlipLive()}>
             <ha-icon icon="mdi:flip-vertical"></ha-icon>
-          </button>` : A}
+          </button>`:G}
           <div class="meta-bar-divider"></div>
-          <button class="mtbtn mtbtn--ghost" title="Refresh maps" @click=${refreshTap}>
+          <button class="mtbtn mtbtn--ghost" title="Refresh maps" @click=${t=>{const o=t.currentTarget;o.classList.remove("mtbtn--spin"),o.offsetWidth,o.classList.add("mtbtn--spin");for(const t of e)this._refreshMap(t)}}>
             <ha-icon icon="mdi:refresh"></ha-icon>
           </button>
         </div>
       </div>
-      ${ /* Capture finishes (and resets _mapMode to normal) the instant a click/drag
-             lands — so pending state, not the armed mode, drives this panel. Only the
-             "arm but haven't captured yet" hint depends on `mode`. */zoneCount ? b `<div class="calib-panel">
-          <div>Zone ready for ${zoneCount} vacuum${zoneCount > 1 ? "s" : ""} — drag the box or its corners to adjust, then pick one on its status card below.</div>
-          <div class="calib-actions"><button class="mtbtn" @click=${() => this._cancelZone()}>Cancel</button></div>
-        </div>` : mode === "zone" ? b `<div class="calib-panel">Drag a rectangle on the map to set a cleaning zone.</div>` : A}
-      ${pinCount ? b `<div class="calib-panel">
-          <div>Pin ready for ${pinCount} vacuum${pinCount > 1 ? "s" : ""} — pick one on its status card below.</div>
-          <div class="calib-actions"><button class="mtbtn" @click=${() => this._cancelPin()}>Cancel</button></div>
-        </div>` : mode === "pin" ? b `<div class="calib-panel">Tap the map to drop a pin.</div>` : A}
-    `;
-    }
-    _renderMapTools(vac) {
-        if (!vac.map && !vac.image_base && !this._mapEntityFor(vac))
-            return A;
-        // Map commands need the integration's calibration AND this vacuum's map element
-        // for the click geometry. Disabled whenever the map is rotated (any profile) —
-        // the click inversion does not account for the wrapper rotation yet (docs/13 A5).
-        const mapEnt = this._mapEntityFor(vac);
-        const canCmd = !!this._intAttrs(vac) && !!mapEnt && !this._narrow;
-        const cmdTitle = this._narrow
-            ? "Not available while the map is rotated"
-            : (!this._intAttrs(vac) || !mapEnt)
-                ? "Requires the AnyVac integration (≥ 0.18) + map entity"
-                : "";
-        const mode = this._modeEntity === vac.entity ? this._mapMode : "normal";
-        return b `
+      ${h?q`<div class="calib-panel">
+          <div>Zone ready for ${h} vacuum${h>1?"s":""} — drag the box or its corners to adjust, then pick one on its status card below.</div>
+          <div class="calib-actions"><button class="mtbtn" @click=${()=>this._cancelZone()}>Cancel</button></div>
+        </div>`:"zone"===s?q`<div class="calib-panel">Drag a rectangle on the map to set a cleaning zone.</div>`:G}
+      ${d?q`<div class="calib-panel">
+          <div>Pin ready for ${d} vacuum${d>1?"s":""} — pick one on its status card below.</div>
+          <div class="calib-actions"><button class="mtbtn" @click=${()=>this._cancelPin()}>Cancel</button></div>
+        </div>`:"pin"===s?q`<div class="calib-panel">Tap the map to drop a pin.</div>`:G}
+    `}_renderMapTools(t){if(!t.map&&!t.image_base&&!this._mapEntityFor(t))return G;const e=this._mapEntityFor(t),o=!!this._intAttrs(t)&&!!e&&!this._narrow,i=this._narrow?"Not available while the map is rotated":this._intAttrs(t)&&e?"":"Requires the AnyVac integration (≥ 0.18) + map entity",s=this._modeEntity===t.entity?this._mapMode:"normal";return q`
       <div class="map-tools">
-        ${this._config.layout && this._config.vacuums.length > 1
-            ? b `<span class="map-tools-label">${vac.name ?? vac.entity}</span>` : A}
-        ${mapEnt ? b `<button class="mtbtn" @click=${() => this._refreshMap(vac)} title="Refresh map">
+        ${this._config.layout&&this._config.vacuums.length>1?q`<span class="map-tools-label">${t.name??t.entity}</span>`:G}
+        ${e?q`<button class="mtbtn" @click=${()=>this._refreshMap(t)} title="Refresh map">
           <ha-icon icon="mdi:refresh"></ha-icon><span>Refresh</span>
-        </button>` : A}
-        <button class="mtbtn ${mode === "pin" ? "on" : ""}" ?disabled=${!canCmd}
-          @click=${() => this._toggleMode(vac.entity, "pin")} title=${cmdTitle || "Pin & Go"}>
+        </button>`:G}
+        <button class="mtbtn ${"pin"===s?"on":""}" ?disabled=${!o}
+          @click=${()=>this._toggleMode(t.entity,"pin")} title=${i||"Pin & Go"}>
           <ha-icon icon="mdi:map-marker-radius"></ha-icon><span>Pin &amp; Go</span>
         </button>
-        <button class="mtbtn ${mode === "zone" ? "on" : ""}" ?disabled=${!canCmd}
-          @click=${() => this._toggleMode(vac.entity, "zone")} title=${cmdTitle || "Zone clean"}>
+        <button class="mtbtn ${"zone"===s?"on":""}" ?disabled=${!o}
+          @click=${()=>this._toggleMode(t.entity,"zone")} title=${i||"Zone clean"}>
           <ha-icon icon="mdi:select-drag"></ha-icon><span>Zone</span>
         </button>
-        ${this._dbg && (this._config.debug || !this._config.layout) ? b `<span style="font-size:11px;opacity:0.65;align-self:center;font-family:monospace">${this._dbg}</span>` : A}
+        ${!this._dbg||!this._config.debug&&this._config.layout?G:q`<span style="font-size:11px;opacity:0.65;align-self:center;font-family:monospace">${this._dbg}</span>`}
       </div>
-      ${mode === "pin" ? b `<div class="calib-panel">Tap the map to send the robot there.</div>` : A}
-      ${mode === "zone" ? b `<div class="calib-panel">
-        ${this._zonePending?.[vac.entity]
-            ? b `<div>Clean this zone? Drag the box or its corners to adjust.</div>
+      ${"pin"===s?q`<div class="calib-panel">Tap the map to send the robot there.</div>`:G}
+      ${"zone"===s?q`<div class="calib-panel">
+        ${this._zonePending?.[t.entity]?q`<div>Clean this zone? Drag the box or its corners to adjust.</div>
               <div class="calib-actions">
-                <button class="mtbtn on" @click=${() => this._confirmZone(vac)}>Clean zone</button>
-                <button class="mtbtn" @click=${() => this._cancelZone()}>Cancel</button>
-              </div>`
-            : b `Drag a rectangle on the map to set a cleaning zone.`}
-      </div>` : A}
-    `;
-    }
-    // ── Auto-seating (docs/15) ──────────────────────────────────────────────
-    /** Configured base_height for a vacuum's map wrap (merged config wins, mirrors
-     *  every other merged/per-vacuum config fallback in this file). */
-    _baseHeightFor(vac) {
-        const merged = this._config.map_mode === "merged";
-        return merged
-            ? (this._config.base_height ?? this._config.vacuums.find((v) => v.base_height)?.base_height)
-            : vac.base_height;
-    }
-    /** Aspect ratio (W/H) of the map wrap, for the seat fit's unit conversions. */
-    _wrapAspect(baseHeight) {
-        if (typeof baseHeight === "number" && baseHeight > 0 && this._cardW > 0) {
-            return Math.max(0.2, (this._cardW - 16) / baseHeight);
-        }
-        return this._mapAR > 0.1 ? this._mapAR : 3.636;
-    }
-    /** Effective map seating: auto-fitted from room anchors (rooms drawn on the
-     *  floorplan matched by name against the integration's room bboxes) whenever
-     *  possible, else the manual slider values. Recomputed from live attributes,
-     *  so it self-heals when the robot remaps / the map trim changes. */
-    _effectiveSeat(vac) {
-        const m = vac.map;
-        const manual = {
-            rotation: m?.rotation ?? 0, scale: m?.scale ?? 100,
-            offset_x: m?.offset_x ?? 0, offset_y: m?.offset_y ?? 0, auto: false,
-        };
-        if (m?.seat === "manual")
-            return manual;
-        const merged = this._config.map_mode === "merged";
-        const ib = merged
-            ? (this._config.image_base ?? this._config.vacuums.find((v) => v.image_base?.src)?.image_base)
-            : vac.image_base;
-        // Auto-seat only makes sense against a floorplan reference; a map-only base
-        // IS the reference itself and keeps its manual (default) seat.
-        if (!ib?.src)
-            return manual;
-        // Kontrakt v2: anchors come from rooms[].bbox_px (integration ≥ 0.18).
-        const at = this._intAttrs(vac);
-        if (!at)
-            return manual;
-        const ar = this._wrapAspect(this._baseHeightFor(vac));
-        // Anchors MUST come from the static (pinned/override) rooms only, never from
-        // `_roomsFor()`'s live-merged view (docs/20 §5) — that view's un-pinned rooms
-        // are themselves computed FROM this fit, so feeding them back in would be
-        // circular (residual ~0 regardless of whether the fit is actually right).
-        const fit = computeSeatFit(assembleAnchors(this._staticRoomsFor(vac), at, ar), ar);
-        if (!fit)
-            return manual;
-        return {
-            rotation: fit.rotation, scale: fit.scale,
-            offset_x: fit.offset_x, offset_y: fit.offset_y,
-            auto: true, residual: fit.residual_pct, anchorCount: fit.anchors,
-        };
-    }
-    /** Integration mode: draw the robot + cleaning path as a vector overlay from the
-     *  px-space attributes (kontrakt v2: vacuum_position_px, path_dry_px, path_wet_px
-     *  — already in rendered-map pixels, no client-side mm math). */
-    /** `part` lets merged mode (multiple vacuums stacked in one map, docs/19)
-     *  z-order paths and markers as two separate GROUPS across ALL vacuums,
-     *  instead of interleaved per vacuum. Each vacuum's own <svg> already put
-     *  its robot marker after its own paths (top within itself), but merged
-     *  mode stacks a whole such <svg> per vacuum one after another in DOM
-     *  order — so vacuum #2's translucent wet-mop band (~28% opacity, wide)
-     *  still visually sat OVER vacuum #1's robot marker, since #1's entire
-     *  <svg> (marker included) is earlier in the DOM than #2's paths (field
-     *  report 2026-07-26: S6's marker disappearing under S8's wet trace).
-     *  Split mode's `_renderMap` renders one fully independent box per vacuum
-     *  (no shared stacking context), so it keeps using the default "both". */
-    _renderIntegrationOverlay(vac, m, part = "both") {
-        const at = this._intAttrs(vac);
-        if (!at)
-            return A;
-        const dims = at.image_dims;
-        if (!dims)
-            return A;
-        const sc = dims.scale ?? 1;
-        let NW = (dims.width ?? 0) * sc;
-        let NH = (dims.height ?? 0) * sc;
-        const rot = dims.rotation ?? 0;
-        if (rot === 90 || rot === 270) {
-            const tmp = NW;
-            NW = NH;
-            NH = tmp;
-        }
-        if (!NW || !NH)
-            return A;
-        const color = this._color(vac);
-        const rr = Math.max(NW, NH) / 55;
-        const toPts = (arr) => (Array.isArray(arr) ? arr : []).map((p) => p.x.toFixed(1) + "," + p.y.toFixed(1)).join(" ");
-        const ct = this._vacCleanType(vac);
-        // Dry layer draws the SEGMENTED dry trace (path_dry_px — cleaning-only points,
-        // no transit / mop-wash driving). Wet layer draws the mop trace as a wider
-        // translucent "wet sheen" band under the line.
-        const layersOn = this._layersEff();
-        const showDry = layersOn.dry && ct.dry;
-        const showWet = layersOn.wet && ct.wet;
-        // path_dry_px / path_wet_px are both lists of contiguous segments (docs/14 §3.9
-        // for dry; docs/27 extends the same shape to wet) — the backend never bridges an
-        // excluded gap (transit/mop-wash for dry, a dock trip between two dispatches of
-        // the same orchestrated job for wet) with a straight line, so the card must not
-        // either. One <polyline> per segment; a single flat polyline across all segments
-        // used to draw a spurious diagonal line at every gap, which is why a finished
-        // multi-room dry trace used to look like a scribble while the live in-progress
-        // trace (still one segment) looked clean (fixed 2026-07-15) — same class of bug
-        // docs/27 avoids for a multi-sortie wet trace by segmenting it the same way.
-        const drySegs = showDry && Array.isArray(at.path_dry_px)
-            ? at.path_dry_px.map((seg) => toPts(seg)).filter((s) => s.length > 0)
-            : [];
-        const wetSegs = showWet && Array.isArray(at.path_wet_px)
-            ? at.path_wet_px.map((seg) => toPts(seg)).filter((s) => s.length > 0)
-            : [];
-        const vp = at.vacuum_position_px;
-        const rob = vp ? { x: vp.x, y: vp.y } : null;
-        let head = null;
-        if (rob && vp.a != null) {
-            // Heading: the angle is reported in vacuum space; the mm→px transform flips
-            // the y axis, so the px-space direction is (cos a, −sin a).
-            const arad = (vp.a * Math.PI) / 180;
-            head = { x: rob.x + rr * 1.3 * Math.cos(arad), y: rob.y - rr * 1.3 * Math.sin(arad) };
-        }
-        const seat = {
-            left: (50 + (m?.offset_x ?? 0)) + "%",
-            top: (50 + (m?.offset_y ?? 0)) + "%",
-            width: (m?.scale ?? 100) + "%",
-            aspectRatio: NW + " / " + NH,
-            transform: "translate(-50%,-50%) rotate(" + (m?.rotation ?? 0) + "deg)",
-        };
-        const pw = rr * 0.35 * ((vac.path_width ?? 100) / 100);
-        const sw = pw.toFixed(2);
-        const bw = (pw * 2.6 * ((vac.mop_band_width ?? 100) / 100)).toFixed(2);
-        const bandOp = ((vac.mop_band_opacity ?? 28) / 100).toFixed(2);
-        const wetColor = vac.mop_path_color || "#40a9ff";
-        const mopBand = wetSegs.length
-            ? w `${wetSegs.map((s) => w `<polyline points=${s} fill="none" stroke=${wetColor} stroke-width=${bw} stroke-linejoin="round" stroke-linecap="round" opacity=${bandOp}></polyline>`)}`
-            : A;
-        // Thin centre line down the mop band, so the wet trace reads as a path inside the sheen.
-        const mopLine = wetSegs.length
-            ? w `${wetSegs.map((s) => w `<polyline points=${s} fill="none" stroke=${wetColor} stroke-width=${sw} stroke-linejoin="round" stroke-linecap="round" opacity="0.9"></polyline>`)}`
-            : A;
-        const traceT = drySegs.length
-            ? w `${drySegs.map((s) => w `<polyline points=${s} fill="none" stroke=${vac.path_color || color} stroke-width=${sw} stroke-linejoin="round" stroke-linecap="round" opacity="0.85"></polyline>`)}`
-            : A;
-        const useImg = !!(vac.robot_image_on_map && vac.image);
-        const robSize = rr * 2.6 * ((vac.robot_size ?? 100) / 100);
-        const robA = (vp && vp.a != null ? vp.a : 0) + (vac.robot_image_rotation ?? 0);
-        const robotT = rob
-            ? (useImg
-                ? w `<image href=${vac.image} x=${(rob.x - robSize / 2).toFixed(1)} y=${(rob.y - robSize / 2).toFixed(1)} width=${robSize.toFixed(1)} height=${robSize.toFixed(1)} preserveAspectRatio="xMidYMid meet" transform=${"rotate(" + robA + " " + rob.x.toFixed(1) + " " + rob.y.toFixed(1) + ")"}></image>`
-                : w `${head ? w `<line x1=${rob.x.toFixed(1)} y1=${rob.y.toFixed(1)} x2=${head.x.toFixed(1)} y2=${head.y.toFixed(1)} stroke="#ffffff" stroke-width=${(rr * 0.3).toFixed(2)} stroke-linecap="round"></line>` : A}<circle cx=${rob.x.toFixed(1)} cy=${rob.y.toFixed(1)} r=${rr.toFixed(1)} fill=${color} stroke="#ffffff" stroke-width=${(rr * 0.18).toFixed(2)}></circle>`)
-            : A;
-        // Robot-error halo: a soft pulsing red glow behind the robot marker, so an
-        // active error is visible directly on the map, not just in the status card.
-        // Filter id is per-vacuum-entity to avoid collisions between multiple <svg>
-        // overlays (merged mode renders one per vacuum, all in the same shadow root).
-        const hasErr = rob && this._hasError(vac);
-        const errFilterId = "avc-err-blur-" + vac.entity.replace(/[^a-zA-Z0-9]/g, "-");
-        const errHalo = hasErr
-            ? w `<defs><filter id=${errFilterId} x="-150%" y="-150%" width="400%" height="400%">
-              <feGaussianBlur stdDeviation=${(rr * 0.5).toFixed(2)}></feGaussianBlur>
+                <button class="mtbtn on" @click=${()=>this._confirmZone(t)}>Clean zone</button>
+                <button class="mtbtn" @click=${()=>this._cancelZone()}>Cancel</button>
+              </div>`:q`Drag a rectangle on the map to set a cleaning zone.`}
+      </div>`:G}
+    `}_baseHeightFor(t){return"merged"===this._config.map_mode?this._config.base_height??this._config.vacuums.find(t=>t.base_height)?.base_height:t.base_height}_wrapAspect(t){return"number"==typeof t&&t>0&&this._cardW>0?Math.max(.2,(this._cardW-16)/t):this._mapAR>.1?this._mapAR:3.636}_effectiveSeat(t){this._memoSync();const e=this._seatMemo.get(t.entity);if(e)return e;const o=Dt(this._config,t,this._intAttrs(t),this._wrapAspect(this._baseHeightFor(t)));return this._seatMemo.set(t.entity,o),o}_renderIntegrationOverlay(t,e,o="both"){const i=this._intAttrs(t);if(!i)return G;const s=i.image_dims;if(!s)return G;const n=s.scale??1;let a=(s.width??0)*n,r=(s.height??0)*n;const l=s.rotation??0;if(90===l||270===l){const t=a;a=r,r=t}if(!a||!r)return G;const c=this._color(t),d=Math.max(a,r)/55,h=t=>(Array.isArray(t)?t:[]).map(t=>t.x.toFixed(1)+","+t.y.toFixed(1)).join(" "),p=this._vacCleanType(t),m=this._layersEff(),u=m.dry&&p.dry,_=m.wet&&p.wet,g=u&&Array.isArray(i.path_dry_px)?i.path_dry_px.map(t=>h(t)).filter(t=>t.length>0):[],f=_&&Array.isArray(i.path_wet_px)?i.path_wet_px.map(t=>h(t)).filter(t=>t.length>0):[],b=i.vacuum_position_px,y=b?{x:b.x,y:b.y}:null;let v=null;if(y&&null!=b.a){const t=b.a*Math.PI/180;v={x:y.x+1.3*d*Math.cos(t),y:y.y-1.3*d*Math.sin(t)}}const x={left:50+(e?.offset_x??0)+"%",top:50+(e?.offset_y??0)+"%",width:(e?.scale??100)+"%",aspectRatio:a+" / "+r,transform:"translate(-50%,-50%) rotate("+(e?.rotation??0)+"deg)"},w=.35*d*((t.path_width??100)/100),$=w.toFixed(2),k=(2.6*w*((t.mop_band_width??100)/100)).toFixed(2),S=((t.mop_band_opacity??28)/100).toFixed(2),R=t.mop_path_color||"#40a9ff",M=f.length?L`${f.map(t=>L`<polyline points=${t} fill="none" stroke=${R} stroke-width=${k} stroke-linejoin="round" stroke-linecap="round" opacity=${S}></polyline>`)}`:G,A=f.length?L`${f.map(t=>L`<polyline points=${t} fill="none" stroke=${R} stroke-width=${$} stroke-linejoin="round" stroke-linecap="round" opacity="0.9"></polyline>`)}`:G,z=g.length?L`${g.map(e=>L`<polyline points=${e} fill="none" stroke=${t.path_color||c} stroke-width=${$} stroke-linejoin="round" stroke-linecap="round" opacity="0.85"></polyline>`)}`:G,P=!(!t.robot_image_on_map||!t.image),C=2.6*d*((t.robot_size??100)/100),E=(b&&null!=b.a?b.a:0)+(t.robot_image_rotation??0),T=y?P?L`<image href=${t.image} x=${(y.x-C/2).toFixed(1)} y=${(y.y-C/2).toFixed(1)} width=${C.toFixed(1)} height=${C.toFixed(1)} preserveAspectRatio="xMidYMid meet" transform=${"rotate("+E+" "+y.x.toFixed(1)+" "+y.y.toFixed(1)+")"}></image>`:L`${v?L`<line x1=${y.x.toFixed(1)} y1=${y.y.toFixed(1)} x2=${v.x.toFixed(1)} y2=${v.y.toFixed(1)} stroke="#ffffff" stroke-width=${(.3*d).toFixed(2)} stroke-linecap="round"></line>`:G}<circle cx=${y.x.toFixed(1)} cy=${y.y.toFixed(1)} r=${d.toFixed(1)} fill=${c} stroke="#ffffff" stroke-width=${(.18*d).toFixed(2)}></circle>`:G,F=y&&this._hasError(t),D="avc-err-blur-"+t.entity.replace(/[^a-zA-Z0-9]/g,"-"),O=F?L`<defs><filter id=${D} x="-150%" y="-150%" width="400%" height="400%">
+              <feGaussianBlur stdDeviation=${(.5*d).toFixed(2)}></feGaussianBlur>
             </filter></defs>
-            <circle class="avc-err-halo" cx=${rob.x.toFixed(1)} cy=${rob.y.toFixed(1)} r=${(rr * 2.2).toFixed(1)}
-              fill="#ff3b30" filter=${"url(#" + errFilterId + ")"}></circle>`
-            : A;
-        const pathsInner = w `${mopBand}${mopLine}${traceT}`;
-        const markerInner = w `${errHalo}${robotT}`;
-        const inner = part === "paths" ? pathsInner : part === "marker" ? markerInner : w `${pathsInner}${markerInner}`;
-        return b `<svg class="map-vector" viewBox="0 0 ${NW} ${NH}" preserveAspectRatio="none" style=${o(seat)}>${inner}</svg>`;
-    }
-    _onLayerDown(type) {
-        this._layerHeld = false;
-        this._layerHoldTimer = window.setTimeout(() => {
-            this._layerHeld = true;
-            this._layerMenu = this._layerMenu === type ? null : type;
-        }, 380);
-    }
-    _onLayerUp() {
-        if (this._layerHoldTimer !== null) {
-            window.clearTimeout(this._layerHoldTimer);
-            this._layerHoldTimer = null;
-        }
-    }
-    _onLayerClick(type) {
-        if (this._layerHeld) {
-            this._layerHeld = false;
-            return;
-        }
-        const cur = this._layersEff();
-        const next = { ...cur, [type]: !cur[type] };
-        const ent = this._selSensor();
-        if (ent && this.hass.states[ent]?.attributes?.view_layers) {
-            // Backend-shared view state — persists refreshes, syncs across devices.
-            this._call("anyvac", "set_layers", next);
-        }
-        else {
-            this._layers = next;
-        }
-        this._layerMenu = null;
-    }
-    /** Hold-expanded per-room ages for one layer (dry/wet). */
-    _renderLayerMenu(vacs, type) {
-        const rooms = this._mergedRoomDefs(vacs);
-        const badge = (d) => (d === null ? "\u2014" : d < 1 ? "<1d" : Math.round(d) + "d");
-        return b `
+            <circle class="avc-err-halo" cx=${y.x.toFixed(1)} cy=${y.y.toFixed(1)} r=${(2.2*d).toFixed(1)}
+              fill="#ff3b30" filter=${"url(#"+D+")"}></circle>`:G,I=L`${M}${A}${z}`,V=L`${O}${T}`,N="paths"===o?I:"marker"===o?V:L`${I}${V}`;return q`<svg class="map-vector" viewBox="0 0 ${a} ${r}" preserveAspectRatio="none" style=${vt(x)}>${N}</svg>`}_onLayerDown(t){this._layerHeld=!1,this._layerHoldTimer=window.setTimeout(()=>{this._layerHeld=!0,this._layerMenu=this._layerMenu===t?null:t},380)}_onLayerUp(){null!==this._layerHoldTimer&&(window.clearTimeout(this._layerHoldTimer),this._layerHoldTimer=null)}_onLayerClick(t){if(this._layerHeld)return void(this._layerHeld=!1);const e=this._layersEff(),o={...e,[t]:!e[t]},i=this._selSensor();i&&this.hass.states[i]?.attributes?.view_layers?this._call("anyvac","set_layers",o):this._layers=o,this._layerMenu=null}_renderLayerMenu(t,e){const o=this._mergedRoomDefs(t);return q`
       <div class="layer-menu">
         <div class="layer-menu-head">
-          <ha-icon icon=${type === "dry" ? "mdi:broom" : "mdi:water"}></ha-icon>
-          <span>${type === "dry" ? "Dry" : "Wet"} \u00b7 last cleaned</span>
+          <ha-icon icon=${"dry"===e?"mdi:broom":"mdi:water"}></ha-icon>
+          <span>${"dry"===e?"Dry":"Wet"} \u00b7 last cleaned</span>
         </div>
-        ${rooms.map(({ r, v }) => {
-            const rec = this._intRoomRec(v, r);
-            const d = this._ageDaysFromIso(rec?.[type]);
-            const sel = this._isRoomSelectedAny(r.key, vacs);
-            return b `
-            <button class="layer-menu-row ${sel ? "on" : ""}" @click=${() => this._toggleRoomAcross(r.key, vacs)}>
-              <ha-icon icon=${r.icon ?? "mdi:square"}></ha-icon>
-              <span class="lm-name">${r.name ?? r.key}</span>
-              ${this._renderProgChip(this._roomProgForType(r, vacs, type))}
-              <b style=${o({ color: this._colorForAgeDays(d) })}>${badge(d)}</b>
+        ${o.map(({r:o,v:i})=>{const s=this._intRoomRec(i,o),n=this._ageDaysFromIso(s?.[e]),a=this._isRoomSelectedAny(o.key,t);return q`
+            <button class="layer-menu-row ${a?"on":""}" @click=${()=>this._toggleRoomAcross(o.key,t)}>
+              <ha-icon icon=${o.icon??"mdi:square"}></ha-icon>
+              <span class="lm-name">${o.name??o.key}</span>
+              ${this._renderProgChip(this._roomProgForType(o,t,e))}
+              <b style=${vt({color:this._colorForAgeDays(n)})}>${(t=>null===t?"—":t<1?"<1d":Math.round(t)+"d")(n)}</b>
             </button>
-          `;
-        })}
+          `})}
       </div>
-    `;
-    }
-    /** Oldest per-type (dry/wet) last-cleaned age across a set of vacuums \u2014 shared
-     *  by the legacy floating pill and the grid meta bar's compact toggle. */
-    _oldestAgeDays(vacs, type) {
-        let max = null;
-        for (const v of vacs) {
-            if (!this._intAttrs(v))
-                continue;
-            const rlc = this._intAttrs(v)?.rooms_last_cleaned;
-            if (!rlc)
-                continue;
-            for (const rec of Object.values(rlc)) {
-                const d = this._ageDaysFromIso(rec?.[type]);
-                if (d !== null && (max === null || d > max))
-                    max = d;
-            }
-        }
-        return max;
-    }
-    _ageBadgeStr(d) {
-        return d === null ? "\u2014" : d < 1 ? "<1d" : Math.round(d) + "d";
-    }
-    /** Compact dry/wet visibility toggle for the grid meta bar (docs/19 A4) \u2014 a
-     *  plain click-to-toggle icon+age chip, no hold-to-open per-room menu: that
-     *  menu duplicated the always-visible dock room list in landscape. The
-     *  legacy floating `_renderLayerToggles` (below) keeps its hold-menu \u2014 the
-     *  canon commitment is that render without a `layout:` block never changes. */
-    _renderLayerToggleCompact(vacs) {
-        const withInt = vacs.filter((v) => this._intAttrs(v));
-        if (!withInt.length)
-            return A;
-        const L = this._layersEff();
-        return b `
-      <button class="mtbtn ${L.dry ? "on" : ""}" title="Dry layer visibility \u2014 tap to toggle"
-        @click=${() => this._onLayerClick("dry")}>
-        <ha-icon icon="mdi:broom"></ha-icon><span>${this._ageBadgeStr(this._oldestAgeDays(withInt, "dry"))}</span>
+    `}_oldestAgeDays(t,e){let o=null;for(const i of t){if(!this._intAttrs(i))continue;const t=this._intAttrs(i)?.rooms_last_cleaned;if(t)for(const i of Object.values(t)){const t=this._ageDaysFromIso(i?.[e]);null!==t&&(null===o||t>o)&&(o=t)}}return o}_ageBadgeStr(t){return null===t?"—":t<1?"<1d":Math.round(t)+"d"}_renderLayerToggleCompact(t){const e=t.filter(t=>this._intAttrs(t));if(!e.length)return G;const o=this._layersEff();return q`
+      <button class="mtbtn ${o.dry?"on":""}" title="Dry layer visibility \u2014 tap to toggle"
+        @click=${()=>this._onLayerClick("dry")}>
+        <ha-icon icon="mdi:broom"></ha-icon><span>${this._ageBadgeStr(this._oldestAgeDays(e,"dry"))}</span>
       </button>
-      <button class="mtbtn ${L.wet ? "on" : ""}" title="Wet layer visibility \u2014 tap to toggle"
-        @click=${() => this._onLayerClick("wet")}>
-        <ha-icon icon="mdi:water"></ha-icon><span>${this._ageBadgeStr(this._oldestAgeDays(withInt, "wet"))}</span>
+      <button class="mtbtn ${o.wet?"on":""}" title="Wet layer visibility \u2014 tap to toggle"
+        @click=${()=>this._onLayerClick("wet")}>
+        <ha-icon icon="mdi:water"></ha-icon><span>${this._ageBadgeStr(this._oldestAgeDays(e,"wet"))}</span>
       </button>
-    `;
-    }
-    _renderLayerToggles(vacs) {
-        const withInt = vacs.filter((v) => this._intAttrs(v));
-        if (!withInt.length)
-            return A;
-        const oldest = (type) => this._oldestAgeDays(withInt, type);
-        const badge = (d) => this._ageBadgeStr(d);
-        const L = this._layersEff();
-        return b `
+    `}_renderLayerToggles(t){const e=t.filter(t=>this._intAttrs(t));if(!e.length)return G;const o=t=>this._oldestAgeDays(e,t),i=t=>this._ageBadgeStr(t),s=this._layersEff();return q`
       <div class="layer-toggles">
-        <button class="layer-btn ${L.dry ? "on" : ""}" title="Dry \u2014 tap to toggle, hold for rooms"
-          @pointerdown=${() => this._onLayerDown("dry")} @pointerup=${() => this._onLayerUp()} @pointerleave=${() => this._onLayerUp()}
-          @click=${() => this._onLayerClick("dry")}>
-          <ha-icon icon="mdi:broom"></ha-icon><span>${badge(oldest("dry"))}</span>
+        <button class="layer-btn ${s.dry?"on":""}" title="Dry \u2014 tap to toggle, hold for rooms"
+          @pointerdown=${()=>this._onLayerDown("dry")} @pointerup=${()=>this._onLayerUp()} @pointerleave=${()=>this._onLayerUp()}
+          @click=${()=>this._onLayerClick("dry")}>
+          <ha-icon icon="mdi:broom"></ha-icon><span>${i(o("dry"))}</span>
         </button>
-        <button class="layer-btn ${L.wet ? "on" : ""}" title="Wet \u2014 tap to toggle, hold for rooms"
-          @pointerdown=${() => this._onLayerDown("wet")} @pointerup=${() => this._onLayerUp()} @pointerleave=${() => this._onLayerUp()}
-          @click=${() => this._onLayerClick("wet")}>
-          <ha-icon icon="mdi:water"></ha-icon><span>${badge(oldest("wet"))}</span>
+        <button class="layer-btn ${s.wet?"on":""}" title="Wet \u2014 tap to toggle, hold for rooms"
+          @pointerdown=${()=>this._onLayerDown("wet")} @pointerup=${()=>this._onLayerUp()} @pointerleave=${()=>this._onLayerUp()}
+          @click=${()=>this._onLayerClick("wet")}>
+          <ha-icon icon="mdi:water"></ha-icon><span>${i(o("wet"))}</span>
         </button>
-        ${this._layerMenu ? this._renderLayerMenu(withInt, this._layerMenu) : A}
+        ${this._layerMenu?this._renderLayerMenu(e,this._layerMenu):G}
       </div>
-    `;
-    }
-    /** Per-room status list (dry + wet age), deduped across vacuums; click selects across all. */
-    _renderRoomList(shown) {
-        if (!shown.some((v) => this._intAttrs(v)))
-            return A;
-        const seen = new Set();
-        const rooms = [];
-        for (const v of shown)
-            for (const r of this._roomsFor(v)) {
-                if (r.key && !seen.has(r.key)) {
-                    seen.add(r.key);
-                    rooms.push({ r, v });
-                }
-            }
-        if (!rooms.length)
-            return A;
-        const badge = (d) => (d === null ? "\u2014" : d < 1 ? "<1d" : Math.round(d) + "d");
-        return b `
-      <div class="room-list">
-        ${rooms.map(({ r, v }) => {
-            const rec = this._intRoomRec(v, r);
-            const dry = this._ageDaysFromIso(rec?.dry);
-            const wet = this._ageDaysFromIso(rec?.wet);
-            const sel = this._isRoomSelectedAny(r.key, shown);
-            const locked = this._mapMode !== "normal";
-            return b `
-            <button class="room-row ${sel ? "on" : ""} ${locked ? "room-overlay--locked" : ""}" ?disabled=${locked}
-              title=${locked ? "Room selection is off while placing a pin/zone" : ""}
-              @click=${() => { if (!locked)
-                this._toggleRoomAcross(r.key, shown); }}>
-              <ha-icon class="rl-icon" icon=${r.icon ?? "mdi:square"}></ha-icon>
-              <span class="rl-name">${r.name ?? r.key}</span>
-              <span class="rl-age">${this._renderProgChip(this._roomProgForType(r, shown, "dry"))}<ha-icon icon="mdi:broom"></ha-icon><b style=${o({ color: this._colorForAgeDays(dry) })}>${badge(dry)}</b></span>
-              <span class="rl-age">${this._renderProgChip(this._roomProgForType(r, shown, "wet"))}<ha-icon icon="mdi:water"></ha-icon><b style=${o({ color: this._colorForAgeDays(wet) })}>${badge(wet)}</b></span>
-            </button>
-          `;
-        })}
-      </div>
-    `;
-    }
-    /** Merged mode rooms: one rectangle per room key (deduped across vacuums); click selects across all. */
-    /** Deduped room defs for merged mode: card-level rooms (rep = first vacuum) or per-vacuum dedup by key. */
-    _mergedRoomDefs(shown) {
-        const rep = shown[0];
-        if (this._config.rooms?.length && rep)
-            return this._roomsFor(rep).map((r) => ({ r, v: rep }));
-        const seen = new Set();
-        const out = [];
-        for (const v of shown)
-            for (const r of this._roomsFor(v)) {
-                if (r.key && !seen.has(r.key)) {
-                    seen.add(r.key);
-                    out.push({ r, v });
-                }
-            }
-        return out;
-    }
-    _renderMergedRooms(shown) {
-        const defs = this._mergedRoomDefs(shown);
-        const wholeHome = !defs.some(({ r }) => this._isRoomSelectedAny(r.key, shown));
-        return defs.map(({ r, v }) => this._renderRoomOverlay(r, v, { vacs: shown, wholeHome }));
-    }
-    /** Narrow → rotate the map 90° (auto, unless disabled). With a `layout:`
-     *  block this is a COMPUTED choice (docs/25 §4) in BOTH profiles —
-     *  whichever orientation (upright vs. rotated) fits the floorplan bigger
-     *  inside the measured map region — not just portrait. A very tall/narrow
-     *  floorplan on a wide landscape box benefits from this exactly the same
-     *  way a wide floorplan on a portrait phone does (field report 2026-07-27:
-     *  a new tall floorplan rendered as a thin letterboxed strip in landscape
-     *  because rotation was hard-gated to portrait only). `layout.portrait
-     *  .crop.mapOrientation` / `layout.landscape.crop.mapOrientation` override
-     *  the computed choice manually, per profile. Without a `layout:` block
-     *  the legacy card-width heuristic applies, completely unchanged (that
-     *  path never rotated in landscape either, and still doesn't). NOTE: Pin
-     *  & Go / Zone are disabled whenever this is true (`_renderMetaBar`,
-     *  `_renderMapTools`, docs/13 A5 — the click-coordinate inversion doesn't
-     *  account for the rotation wrapper yet) — extending rotation to
-     *  landscape extends that same limitation to landscape. */
-    get _narrow() {
-        const mr = this._config.mobile_rotate;
-        if (mr === "off")
-            return false;
-        if (mr === "always" || mr === "on")
-            return true; // force (good for testing)
-        if (this._config.layout) {
-            const profileCfg = this._profile === "portrait" ? this._config.layout.portrait : this._config.layout.landscape;
-            const override = profileCfg?.crop?.mapOrientation;
-            if (override === "normal")
-                return false;
-            if (override === "rotated")
-                return true;
-            const computed = shouldRotateMap(this._mapAR, this._mapRegW, this._mapRegH);
-            if (computed !== undefined) {
-                this._lastRotate = computed;
-                return computed;
-            }
-            return this._lastRotate; // region not measured yet — keep the previous answer
-        }
-        return this._cardW > 0 && this._cardW < 500; // auto: by card width
-    }
-    /** docs/32 follow-up: effective flip for the CURRENT profile — `_flipLive`
-     *  override if set this session, otherwise the persisted config default.
-     *  Only meaningful with a `layout:` block (legacy render never flips). */
-    get _flipEff() {
-        if (this._flipLive !== null)
-            return this._flipLive;
-        if (!this._config.layout)
-            return false;
-        const profileCfg = this._profile === "portrait" ? this._config.layout.portrait : this._config.layout.landscape;
-        return profileCfg?.crop?.flip === true;
-    }
-    /** Meta bar / dock-layers "Flip map" button handler — toggles `_flipLive`
-     *  off the CURRENTLY DISPLAYED orientation (not the raw config value), so
-     *  one tap always visibly flips regardless of whether a config default or
-     *  an earlier tap this session set the current state. Purely local — never
-     *  touches the dashboard config or backend, resets on reload (docs/32). */
-    _toggleFlipLive() {
-        this._flipLive = !this._flipEff;
-        this._saveFlipLive();
-    }
-    /** docs/25 §7c: split (today's default) vs. stack portrait topology, computed
-     *  from `shouldStackLayout()` — mirrors `_narrow`'s structure (manual override
-     *  → computed → settle-on-previous-answer while unmeasured). Only active with
-     *  a `layout:` config block; only meaningful in portrait. A manual `topology`
-     *  override, or any explicit `columns`/`rows`/`place` on `layout.portrait`
-     *  (the user has already hand-tuned the split), opts out of the computed
-     *  choice entirely — same "manual config wins" rule `resolveProfile` already
-     *  applies to columns/rows/place individually. */
-    get _stackTopology() {
-        if (this._profile !== "portrait" || !this._config.layout)
-            return false;
-        const p = this._config.layout.portrait;
-        if (p?.topology === "split")
-            return false;
-        if (p?.topology === "stack")
-            return true;
-        if (p?.columns?.length || p?.rows?.length || (p?.place && Object.keys(p.place).length))
-            return false;
-        const ar = this._mapAR > 0.1 ? this._mapAR : 3.636;
-        // Effective floorplan AR honoring the current rotation state (`_narrow`) —
-        // shouldStackLayout wants "whatever will actually get rendered", not the
-        // raw un-rotated floorplan. Same bootstrapping approximation as `_narrow`
-        // itself: on the very first render this reads last render's decision, not
-        // this one's, and converges within a render or two, same as elsewhere in
-        // this settle-based system.
-        const effAr = this._narrow ? 1 / ar : ar;
-        const computed = shouldStackLayout(effAr, this._mapAvailW, this._mapAvailH);
-        if (computed !== undefined) {
-            this._lastStack = computed;
-            return computed;
-        }
-        return this._lastStack;
-    }
-    /** Wrap a map render in a 90° portrait rotation when the card is narrow. The map
-     *  fills the card width and goes tall (capped), so the floorplan is readable on a
-     *  phone instead of a thin letterbox. Controls outside the map-wrap stay upright.
-     *  In grid mode (docs/18 §7) the rotated map is fitted EXACTLY into the measured
-     *  map-region box instead of the legacy width × cap heuristic — no scroll, no cap. */
-    _renderResponsive(mapHtml) {
-        if (!this._config.layout) {
-            // Legacy (no `layout:` block) — completely unchanged, width×cap heuristic.
-            if (!this._narrow)
-                return mapHtml;
-            const ar = this._mapAR > 0.1 ? this._mapAR : 3.636;
-            const W = this._cardW || this.clientWidth || 360;
-            const capH = (typeof window !== "undefined" ? window.innerHeight : 800) * 1.4;
-            const visH = W * ar;
-            const scale = visH > capH ? capH / visH : 1;
-            const rW = Math.round(W * scale);
-            const rH = Math.round(visH * scale);
-            return b `
-        <div class="avc-rot" style="position:relative;width:${rW}px;height:${rH}px;margin:0 auto;overflow:hidden;--map-rot:90deg">
-          <div style="position:absolute;top:0;left:0;width:${rH}px;height:${rW}px;transform-origin:top left;transform:translateX(${rW}px) rotate(90deg)">
-            ${mapHtml}
+    `}_mergedRoomDefs(t){const e=t[0];if(this._config.rooms?.length&&e)return this._roomsFor(e).map(t=>({r:t,v:e}));const o=new Set,i=[];for(const e of t)for(const t of this._roomsFor(e))t.key&&!o.has(t.key)&&(o.add(t.key),i.push({r:t,v:e}));return i}_renderMergedRooms(t){const e=this._mergedRoomDefs(t),o=!e.some(({r:e})=>this._isRoomSelectedAny(e.key,t));return e.map(({r:e,v:i})=>this._renderRoomOverlay(e,i,{vacs:t,wholeHome:o}))}get _narrow(){const t=this._config.mobile_rotate;if("off"===t)return!1;if("always"===t||"on"===t)return!0;if(this._config.layout){const t="portrait"===this._profile?this._config.layout.portrait:this._config.layout.landscape,e=t?.crop?.mapOrientation;if("normal"===e)return!1;if("rotated"===e)return!0;const o=function(t,e,o){if(e<=4||o<=4||t<=0)return;const i=Math.min(e/t,o);return Math.min(e,o/t)>i}(this._mapAR,this._mapRegW,this._mapRegH);return void 0!==o?(this._lastRotate=o,o):this._lastRotate}return this._cardW>0&&this._cardW<500}get _flipEff(){if(null!==this._flipLive)return this._flipLive;if(!this._config.layout)return!1;const t="portrait"===this._profile?this._config.layout.portrait:this._config.layout.landscape;return!0===t?.crop?.flip}_toggleFlipLive(){this._flipLive=!this._flipEff,this._saveFlipLive()}get _stackTopology(){if("portrait"!==this._profile||!this._config.layout)return!1;const t=this._config.layout.portrait;if("split"===t?.topology)return!1;if("stack"===t?.topology)return!0;if(t?.columns?.length||t?.rows?.length||t?.place&&Object.keys(t.place).length)return!1;const e=this._mapAR>.1?this._mapAR:3.636,o=function(t,e,o,i={}){const{dockWidthFrac:s=.28,dockHeightPx:n=150,stackBias:a=1.5}=i;if(e<=4||o<=4||t<=0)return;const r=e*(1-s),l=Math.min(r/t,o),c=Math.max(o-n,0);return!(l>Math.min(e/t,c)*a)}(this._narrow?1/e:e,this._mapAvailW,this._mapAvailH);return void 0!==o?(this._lastStack=o,o):this._lastStack}_renderResponsive(t){if(!this._config.layout){if(!this._narrow)return t;const e=this._mapAR>.1?this._mapAR:3.636,o=this._cardW||this.clientWidth||360,i=1.4*("undefined"!=typeof window?window.innerHeight:800),s=o*e,n=s>i?i/s:1,a=Math.round(o*n),r=Math.round(s*n);return q`
+        <div class="avc-rot" style="position:relative;width:${a}px;height:${r}px;margin:0 auto;overflow:hidden;--map-rot:90deg">
+          <div style="position:absolute;top:0;left:0;width:${r}px;height:${a}px;transform-origin:top left;transform:translateX(${a}px) rotate(90deg)">
+            ${t}
           </div>
         </div>
-      `;
-        }
-        // Grid mode (docs/19 follow-up): fit the map into the measured region box —
-        // exact, since the box is whatever the grid ACTUALLY allocated, not a guess
-        // (this is what fixes landscape cropping content that didn't fit the "auto"
-        // row's real height). Either profile rotates 90° first when `_narrow`
-        // computes it fits better that way (docs/25 §4, extended to landscape
-        // 2026-07-27) — `rotate` below already carries the right answer either way.
-        if (this._mapRegW <= 4 || this._mapRegH <= 4)
-            return mapHtml; // not measured yet
-        const ar = this._mapAR > 0.1 ? this._mapAR : 3.636;
-        const rotate = this._narrow;
-        // Content aspect AS IT SITS IN THE BOX: rotating a wide (ar > 1) floorplan
-        // makes it tall, i.e. 1/ar. General contain/cover formula below is the same
-        // shape either way with this one term swapped (verified against the
-        // previously-shipped rotated-only version, which is the ar_eff = 1/ar case).
-        const arEff = rotate ? 1 / ar : ar;
-        // "contain" (default) sizes the content to exactly fit the box — no
-        // cropping, but a mismatched aspect ratio leaves empty bars on whichever
-        // axis isn't the constraining one. "cover" makes the content the box's
-        // size or BIGGER in both axes so it always fills the region; offset_x/
-        // offset_y then pick what gets cropped (0 = centered) — note this can
-        // ONLY move the crop, not remove it: filling the previously-short axis
-        // necessarily overflows the other one when the aspect ratios don't match
-        // (uniform scaling can't do otherwise without distorting the image).
-        const crop = this._config.layout[this._profile]?.crop;
-        const cover = crop?.fit === "cover";
-        const boxW = this._mapRegW, boxH = this._mapRegH;
-        let rW, rH;
-        if (cover) {
-            rW = Math.max(boxW, boxH * arEff);
-            rH = Math.max(boxH, rW / arEff);
-        }
-        else {
-            rW = Math.min(boxW, boxH * arEff);
-            rH = Math.min(boxH, rW / arEff);
-        }
-        rW = Math.floor(rW);
-        rH = Math.floor(rH);
-        // The content (rW×rH on screen) may now be bigger than the clipping box
-        // (boxW×boxH) in one axis — center it there by default, offset by the
-        // configured pan. When rW===boxW and rH===boxH (the default contain case,
-        // whichever axis is the constraining one) this is exactly 0, so nothing
-        // shifts.
-        const panX = -(rW - boxW) / 2 + ((crop?.offset_x ?? 0) / 100) * ((rW - boxW) / 2);
-        const panY = -(rH - boxH) / 2 + ((crop?.offset_y ?? 0) / 100) * ((rH - boxH) / 2);
-        // docs/32 — `rotate` (90°-for-fit, above) and `flip` (180°, manual "this
-        // is upside down for me") are independent and compose into one of the
-        // four right angles. `.avc-rot`'s counter-rotation CSS reads the total
-        // back off `--map-rot` (single computed source, not per-angle classes).
-        const flip = this._flipEff;
-        const totalRotationDeg = (rotate ? 90 : 0) + (flip ? 180 : 0);
-        if (totalRotationDeg !== 0) {
-            if (rotate) {
-                // Stashed for `_refineGridColumns` (portrait's map/dock column
-                // split) — only meaningful when the axes actually swap (90°/270°);
-                // a flip-only 180° keeps native width/height and already fits the
-                // static grid template on its own, same as the unrotated 0° case.
-                this._lastPortraitFitW = rW;
-            }
-            // Content div dimensions: swapped (rH×rW) for a quarter turn (90°/
-            // 270°, same as the original 90°-only code), native (rW×rH) for a
-            // flip-only 180° (no axis swap — rotating 180° maps a box onto
-            // itself, centered rotation needs no translate at all).
-            const innerW = rotate ? rH : rW;
-            const innerH = rotate ? rW : rH;
-            let rotTransform;
-            if (totalRotationDeg === 90) {
-                rotTransform = "transform-origin:top left;transform:translateX(" + rW + "px) rotate(90deg)";
-            }
-            else if (totalRotationDeg === 180) {
-                rotTransform = "transform-origin:center;transform:rotate(180deg)";
-            }
-            else {
-                // 270° = 90° (rotate) + 180° (flip) combined — derived by symmetry
-                // with the field-proven 90° formula (translateX↔translateY mirrors
-                // the clockwise↔counter-clockwise direction); not yet field-verified
-                // on its own, unlike 90°/180° individually.
-                rotTransform = "transform-origin:top left;transform:translateY(" + rH + "px) rotate(270deg)";
-            }
-            // .avc-rot lets CSS counter-rotate small on-map chips (gauges, prog
-            // chips, room icons) so their text stays upright while the map itself
-            // is rotated — `--map-rot` feeds the same counter-rotation to all
-            // four angles from one place (anyvac-card.ts CSS block).
-            return b `
-        <div class="avc-rot" style="position:relative;width:${boxW}px;height:${boxH}px;margin:0 auto;overflow:hidden;--map-rot:${totalRotationDeg}deg">
-          <div style="position:absolute;top:0;left:0;width:100%;height:100%;transform:translate(${panX}px,${panY}px)">
-            <div style="position:absolute;top:0;left:0;width:${innerW}px;height:${innerH}px;${rotTransform}">
-              ${mapHtml}
+      `}if(this._mapRegW<=4||this._mapRegH<=4)return t;const e=this._mapAR>.1?this._mapAR:3.636,o=this._narrow,i=o?1/e:e,s=this._config.layout[this._profile]?.crop,n="cover"===s?.fit,a=this._mapRegW,r=this._mapRegH;let l,c;n?(l=Math.max(a,r*i),c=Math.max(r,l/i)):(l=Math.min(a,r*i),c=Math.min(r,l/i)),l=Math.floor(l),c=Math.floor(c);const d=-(l-a)/2+(s?.offset_x??0)/100*((l-a)/2),h=-(c-r)/2+(s?.offset_y??0)/100*((c-r)/2),p=(o?90:0)+(this._flipEff?180:0);if(0!==p){o&&(this._lastPortraitFitW=l);let e;return e=90===p?"transform-origin:top left;transform:translateX("+l+"px) rotate(90deg)":180===p?"transform-origin:center;transform:rotate(180deg)":"transform-origin:top left;transform:translateY("+c+"px) rotate(270deg)",q`
+        <div class="avc-rot" style="position:relative;width:${a}px;height:${r}px;margin:0 auto;overflow:hidden;--map-rot:${p}deg">
+          <div style="position:absolute;top:0;left:0;width:100%;height:100%;transform:translate(${d}px,${h}px)">
+            <div style="position:absolute;top:0;left:0;width:${o?c:l}px;height:${o?l:c}px;${e}">
+              ${t}
             </div>
           </div>
         </div>
-      `;
-        }
-        return b `
-      <div style="position:relative;width:${boxW}px;height:${boxH}px;margin:0 auto;overflow:hidden">
-        <div style="position:absolute;top:0;left:0;width:${rW}px;height:${rH}px;transform:translate(${panX}px,${panY}px)">
-          ${mapHtml}
+      `}return q`
+      <div style="position:relative;width:${a}px;height:${r}px;margin:0 auto;overflow:hidden">
+        <div style="position:absolute;top:0;left:0;width:${l}px;height:${c}px;transform:translate(${d}px,${h}px)">
+          ${t}
         </div>
       </div>
-    `;
-    }
-    _renderMergedMap() {
-        const shown = this._shownOrdered().map((i) => this._config.vacuums[i]);
-        if (!shown.length)
-            return A;
-        const primary = shown.find((v) => v.image_base?.src) ?? shown[0];
-        const ib = this._config.image_base ?? primary.image_base;
-        const hasImage = !!ib?.src;
-        const bh = this._config.base_height ?? primary.base_height;
-        const fixedH = typeof bh === "number" && bh > 0;
-        const wrapClass = fixedH ? "map-wrap--fixed" : (hasImage ? "map-wrap--image" : "");
-        const wrapStyle = o(fixedH ? { height: (bh ?? 0) + "px" } : {});
-        const imgClass = "image-base-img" + (fixedH ? " image-base-img--fit" : "");
-        return b `
-      <div class="map-wrap ${wrapClass}" style=${wrapStyle}>
-        ${hasImage ? b `
-          <img class="${imgClass}" src=${ib.src} alt="Floorplan" @load=${this._onFloorplanLoad}
-            style=${o({
-            transform: "translate(" + (ib?.offset_x ?? 0) + "%," + (ib?.offset_y ?? 0) + "%) rotate(" + (ib?.rotation ?? 0) + "deg) scale(" + ((ib?.scale ?? 100) / 100) + ")",
-        })} />
-        ` : A}
-        ${shown.map((v, idx) => {
-            const mapEnt = this._mapEntityFor(v);
-            const mUrl = mapEnt ? this._mapUrl(mapEnt) : null;
-            if (!mUrl)
-                return A;
-            const seat = this._effectiveSeat(v);
-            const overlay = hasImage || idx > 0;
-            // hide_map renders the element at opacity 0 instead of skipping it — the
-            // element IS the click-geometry anchor for pin&go / zones (docs/13 A4).
-            return b `<img class="map-img ${overlay ? "map-img--overlay" : ""}" src=${mUrl} alt="Vacuum map"
-            data-entity=${v.entity}
-            style=${o({
-                left: (50 + seat.offset_x) + "%",
-                top: (50 + seat.offset_y) + "%",
-                width: seat.scale + "%",
-                transform: "translate(-50%,-50%) rotate(" + seat.rotation + "deg)",
-                opacity: v.hide_map ? "0" : String((v.overlay_opacity ?? (overlay ? 55 : 100)) / 100),
-                mixBlendMode: v.overlay_blend ?? "normal",
-            })} />`;
-        })}
-        ${shown.map((v) => (this._intAttrs(v) ? this._renderIntegrationOverlay(v, this._effectiveSeat(v), "paths") : A))}
-        ${ /* Markers in their OWN pass, after every vacuum's paths (not one
-           interleaved pass per vacuum) — a vacuum's wide translucent wet-mop
-           band can no longer sit on top of ANOTHER vacuum's robot marker
-           regardless of shown/DOM order (field report 2026-07-26). */shown.map((v) => (this._intAttrs(v) ? this._renderIntegrationOverlay(v, this._effectiveSeat(v), "marker") : A))}
-        ${this._config.layout ? A : this._renderLayerToggles(shown)}
-        ${this._renderMergedRooms(shown)}
-        ${ /* Pin & Go / Zone interaction layer — merged mode used to render NONE of
-           this (only split-mode _renderMap had it), so clicks fell straight through
-           to room-select regardless of the active mode (bugfix, docs/19). Mirrors
-           _renderMap 1:1, just scoped per shown vacuum since merged mode overlays
-           several .map-img elements in one wrapper. Also stays mounted once a zone
-           box exists and is still awaiting confirm (`_hasZoneEditTarget`), even
-           after mode resets to normal, so the box can still be dragged/resized. */shown.map((v) => (this._mapMode !== "normal" && this._isModeCandidate(v)) || (this._zoneRectShown && this._hasZoneEditTarget(v))
-            ? b `<div class="map-clickcatch" style="touch-action:none"
-              @click=${(e) => this._onMapClick(v, e)}
-              @pointerdown=${(e) => this._onZoneDown(v, e)}
-              @pointermove=${(e) => this._onZoneMove(v, e)}
-              @pointerup=${(e) => this._onZoneUp(v, e)}></div>`
-            : A)}
-        ${shown.map((v, idx) => {
-            const box = this._zoneRectFor(v, idx === 0);
-            return box ? b `<div class="zone-rect" style=${o({
-                left: Math.min(box.x0, box.x1) + "%",
-                top: Math.min(box.y0, box.y1) + "%",
-                width: Math.abs(box.x1 - box.x0) + "%",
-                height: Math.abs(box.y1 - box.y0) + "%",
-            })}>${this._renderZoneHandles()}</div>` : A;
-        })}
+    `}_renderMergedMap(){const t=this._shownOrdered().map(t=>this._config.vacuums[t]);if(!t.length)return G;const e=t.find(t=>t.image_base?.src)??t[0],o=this._config.image_base??e.image_base,i=!!o?.src,s=this._config.base_height??e.base_height,n="number"==typeof s&&s>0,a=n?"map-wrap--fixed":i?"map-wrap--image":"",r=vt(n?{height:(s??0)+"px"}:{});return q`
+      <div class="map-wrap ${a}" style=${r}>
+        ${i?q`
+          <img class="${"image-base-img"+(n?" image-base-img--fit":"")}" src=${o.src} alt="Floorplan" @load=${this._onFloorplanLoad}
+            style=${vt({transform:"translate("+(o?.offset_x??0)+"%,"+(o?.offset_y??0)+"%) rotate("+(o?.rotation??0)+"deg) scale("+(o?.scale??100)/100+")"})} />
+        `:G}
+        ${t.map((t,e)=>{const o=this._mapEntityFor(t),s=o?this._mapUrl(o):null;if(!s)return G;const n=this._effectiveSeat(t),a=i||e>0;return q`<img class="map-img ${a?"map-img--overlay":""}" src=${s} alt="Vacuum map"
+            data-entity=${t.entity}
+            style=${vt({left:50+n.offset_x+"%",top:50+n.offset_y+"%",width:n.scale+"%",transform:"translate(-50%,-50%) rotate("+n.rotation+"deg)",opacity:t.hide_map?"0":String((t.overlay_opacity??(a?55:100))/100),mixBlendMode:t.overlay_blend??"normal"})} />`})}
+        ${t.map(t=>this._intAttrs(t)?this._renderIntegrationOverlay(t,this._effectiveSeat(t),"paths"):G)}
+        ${t.map(t=>this._intAttrs(t)?this._renderIntegrationOverlay(t,this._effectiveSeat(t),"marker"):G)}
+        ${this._config.layout?G:this._renderLayerToggles(t)}
+        ${this._renderMergedRooms(t)}
+        ${t.map(t=>"normal"!==this._mapMode&&this._isModeCandidate(t)||this._zoneRectShown&&this._hasZoneEditTarget(t)?q`<div class="map-clickcatch" style="touch-action:none"
+              @click=${e=>this._onMapClick(t,e)}
+              @pointerdown=${e=>this._onZoneDown(t,e)}
+              @pointermove=${e=>this._onZoneMove(t,e)}
+              @pointerup=${e=>this._onZoneUp(t,e)}></div>`:G)}
+        ${t.map((t,e)=>{const o=this._zoneRectFor(t,0===e);return o?q`<div class="zone-rect" style=${vt({left:Math.min(o.x0,o.x1)+"%",top:Math.min(o.y0,o.y1)+"%",width:Math.abs(o.x1-o.x0)+"%",height:Math.abs(o.y1-o.y0)+"%"})}>${this._renderZoneHandles()}</div>`:G})}
       </div>
-    `;
-    }
-    _renderMap(vac) {
-        // Deliberately the RAW config value here (not the auto-resolved one below) —
-        // this infers intent when `base` itself is unset: "configured a floorplan but
-        // never mentioned a map entity" should still default to showing just the
-        // floorplan, even though `_mapEntityFor` would now likely find one anyway.
-        const base = vac.base ?? (vac.image_base?.src && !vac.map?.entity ? "image" : "map");
-        const ib = vac.image_base;
-        const imgSrc = ib?.src;
-        const mapEntity = this._mapEntityFor(vac);
-        const mapUrl = mapEntity ? this._mapUrl(mapEntity) : null;
-        const showImage = (base === "image" || base === "combined") && !!imgSrc;
-        const showMap = (base === "map" || base === "combined") && !!mapUrl;
-        if (!showImage && !showMap)
-            return A;
-        const seat = this._effectiveSeat(vac);
-        const fixedH = typeof vac.base_height === "number" && vac.base_height > 0;
-        const wrapClass = fixedH ? "map-wrap--fixed" : (showImage ? "map-wrap--image" : "");
-        const wrapStyle = o(fixedH ? { height: (vac.base_height ?? 0) + "px" } : {});
-        const imgClass = "image-base-img" + (fixedH ? " image-base-img--fit" : "");
-        return b `
-      <div class="map-wrap ${wrapClass}" style=${wrapStyle}>
-        ${showImage ? b `
-          <img class="${imgClass}" src=${imgSrc} alt="Floorplan" @load=${this._onFloorplanLoad}
-            style=${o({
-            transform: "translate(" + (ib?.offset_x ?? 0) + "%," + (ib?.offset_y ?? 0) + "%) rotate(" + (ib?.rotation ?? 0) + "deg) scale(" + ((ib?.scale ?? 100) / 100) + ")",
-        })} />
-        ` : A}
-        ${showMap ? b `
-          <img class="map-img ${showImage ? "map-img--overlay" : ""}" src=${mapUrl} alt="Vacuum map"
-            data-entity=${vac.entity}
-            style=${o({
-            left: (50 + seat.offset_x) + "%",
-            top: (50 + seat.offset_y) + "%",
-            width: seat.scale + "%",
-            transform: "translate(-50%,-50%) rotate(" + seat.rotation + "deg)",
-            ...(vac.hide_map ? { opacity: "0" } : (showImage ? { opacity: String((vac.overlay_opacity ?? 55) / 100), mixBlendMode: vac.overlay_blend ?? "normal" } : {})),
-        })} />
-        ` : A}
-        ${showMap ? this._renderIntegrationOverlay(vac, seat) : A}
-        ${this._config.layout ? A : this._renderLayerToggles([vac])}
-        ${(() => {
-            const rooms = this._roomsFor(vac);
-            const wholeHome = !rooms.some((r) => this._isRoomSelected(r, vac));
-            return rooms.map((r) => this._renderRoomOverlay(r, vac, { wholeHome }));
-        })()}
-        ${(this._mapMode !== "normal" && this._isModeCandidate(vac)) || (this._zoneRectShown && this._hasZoneEditTarget(vac))
-            ? b `<div class="map-clickcatch" style="touch-action:none"
-              @click=${(e) => this._onMapClick(vac, e)}
-              @pointerdown=${(e) => this._onZoneDown(vac, e)}
-              @pointermove=${(e) => this._onZoneMove(vac, e)}
-              @pointerup=${(e) => this._onZoneUp(vac, e)}></div>`
-            : A}
-        ${(() => {
-            const box = this._zoneRectFor(vac, true);
-            return box ? b `<div class="zone-rect" style=${o({
-                left: Math.min(box.x0, box.x1) + "%",
-                top: Math.min(box.y0, box.y1) + "%",
-                width: Math.abs(box.x1 - box.x0) + "%",
-                height: Math.abs(box.y1 - box.y0) + "%",
-            })}>${this._renderZoneHandles()}</div>` : A;
-        })()}
+    `}_renderMap(t){const e=t.base??(t.image_base?.src&&!t.map?.entity?"image":"map"),o=t.image_base,i=o?.src,s=this._mapEntityFor(t),n=s?this._mapUrl(s):null,a=("image"===e||"combined"===e)&&!!i,r=("map"===e||"combined"===e)&&!!n;if(!a&&!r)return G;const l=this._effectiveSeat(t),c="number"==typeof t.base_height&&t.base_height>0,d=c?"map-wrap--fixed":a?"map-wrap--image":"",h=vt(c?{height:(t.base_height??0)+"px"}:{});return q`
+      <div class="map-wrap ${d}" style=${h}>
+        ${a?q`
+          <img class="${"image-base-img"+(c?" image-base-img--fit":"")}" src=${i} alt="Floorplan" @load=${this._onFloorplanLoad}
+            style=${vt({transform:"translate("+(o?.offset_x??0)+"%,"+(o?.offset_y??0)+"%) rotate("+(o?.rotation??0)+"deg) scale("+(o?.scale??100)/100+")"})} />
+        `:G}
+        ${r?q`
+          <img class="map-img ${a?"map-img--overlay":""}" src=${n} alt="Vacuum map"
+            data-entity=${t.entity}
+            style=${vt({left:50+l.offset_x+"%",top:50+l.offset_y+"%",width:l.scale+"%",transform:"translate(-50%,-50%) rotate("+l.rotation+"deg)",...t.hide_map?{opacity:"0"}:a?{opacity:String((t.overlay_opacity??55)/100),mixBlendMode:t.overlay_blend??"normal"}:{}})} />
+        `:G}
+        ${r?this._renderIntegrationOverlay(t,l):G}
+        ${this._config.layout?G:this._renderLayerToggles([t])}
+        ${(()=>{const e=this._roomsFor(t),o=!e.some(e=>this._isRoomSelected(e,t));return e.map(e=>this._renderRoomOverlay(e,t,{wholeHome:o}))})()}
+        ${"normal"!==this._mapMode&&this._isModeCandidate(t)||this._zoneRectShown&&this._hasZoneEditTarget(t)?q`<div class="map-clickcatch" style="touch-action:none"
+              @click=${e=>this._onMapClick(t,e)}
+              @pointerdown=${e=>this._onZoneDown(t,e)}
+              @pointermove=${e=>this._onZoneMove(t,e)}
+              @pointerup=${e=>this._onZoneUp(t,e)}></div>`:G}
+        ${(()=>{const e=this._zoneRectFor(t,!0);return e?q`<div class="zone-rect" style=${vt({left:Math.min(e.x0,e.x1)+"%",top:Math.min(e.y0,e.y1)+"%",width:Math.abs(e.x1-e.x0)+"%",height:Math.abs(e.y1-e.y0)+"%"})}>${this._renderZoneHandles()}</div>`:G})()}
       </div>
-    `;
-    }
-    /** docs/25 §7d: per-room dry/wet age as two small corner dots, replacing
-     *  the old age-colored border/icon. Dry always left, wet always right —
-     *  same order as everywhere else in the card. Gated on the representative
-     *  vacuum's clean-type capability, not on whether a timestamp happens to
-     *  exist yet, so a dry-only vacuum's rooms don't grow a permanent "never
-     *  wet cleaned" red dot they can never clear.
-     *
-     *  KNOWN ISSUE (field-reported 2026-07-23, deferred — not root-caused
-     *  yet): in merged mode, `vac` here is `_mergedRoomDefs`'s representative
-     *  owner of the room definition, not necessarily every vacuum that can
-     *  actually clean it (same class of gap already noted elsewhere in this
-     *  file re: identity color). If the representative happens to be
-     *  dry-only, `_vacCleanType` gates off the wet dot even when another
-     *  configured vacuum does mop the room — user saw one dot where two were
-     *  expected. Likely fix: gate on capability across `opts.vacs`, not just
-     *  `vac` — needs its own pass, not bundled into this one. */
-    _renderRoomAgeDots(room, vac) {
-        const rec = this._intRoomRec(vac, room);
-        if (rec) {
-            const ct = this._vacCleanType(vac);
-            if (!ct.dry && !ct.wet)
-                return A;
-            const dry = this._ageDaysFromIso(rec.dry);
-            const wet = this._ageDaysFromIso(rec.wet);
-            return b `
+    `}_renderRoomAgeDots(t,e){const o=this._intRoomRec(e,t);if(o){const t=this._vacCleanType(e);if(!t.dry&&!t.wet)return G;const i=this._ageDaysFromIso(o.dry),s=this._ageDaysFromIso(o.wet);return q`
         <span class="room-age-dots">
-          ${ct.dry ? b `<span class="room-age-dot" style=${o({ background: this._colorForAgeDays(dry) })}></span>` : A}
-          ${ct.wet ? b `<span class="room-age-dot" style=${o({ background: this._colorForAgeDays(wet) })}></span>` : A}
+          ${t.dry?q`<span class="room-age-dot" style=${vt({background:this._colorForAgeDays(i)})}></span>`:G}
+          ${t.wet?q`<span class="room-age-dot" style=${vt({background:this._colorForAgeDays(s)})}></span>`:G}
         </span>
-      `;
-        }
-        // Degraded mode (no integration rec, docs/14 §8 — card still works
-        // without the companion integration, just loses the dry/wet split):
-        // a single dot from the legacy `last_clean_entity` helper, if configured.
-        if (!room.last_clean_entity)
-            return A;
-        return b `
+      `}return t.last_clean_entity?q`
       <span class="room-age-dots">
-        <span class="room-age-dot" style=${o({ background: this._colorForAgeDays(this._roomAgeDays(room)) })}></span>
+        <span class="room-age-dot" style=${vt({background:this._colorForAgeDays(this._roomAgeDays(t))})}></span>
       </span>
-    `;
-    }
-    /** docs/25 §7b: pointerdown for hold-to-inspect on a room overlay — raw
-     *  pointer events (not `_holdStart`), same reason as the vac-icon-strip
-     *  hold gesture: tap and hold drive genuinely different actions, and
-     *  mixing `_holdStart`'s `preventDefault()` with a separate `@click`
-     *  handler is unreliable across browsers. */
-    _onRoomPointerDown(room, locked) {
-        return (e) => {
-            if (locked)
-                return;
-            e.preventDefault();
-            this._cancelHold();
-            this._holdId = "room-" + room.key;
-            this._holdTimer = setTimeout(() => {
-                this._holdTimer = null;
-                this._holdId = null;
-                this._inspectKey = this._inspectKey === room.key ? null : room.key;
-            }, HOLD_DURATION_MS);
-        };
-    }
-    /** Released before the hold fired → tap. If an inspect popup is open
-     *  (for this room or another), the tap just dismisses it instead of
-     *  toggling selection — avoids an accidental selection change on the
-     *  same tap that closes the popup. Released after the hold already fired
-     *  (popup just opened by the timer above) → swallow it, nothing to do. */
-    _onRoomPointerUp(room, vac, vacs, locked) {
-        return () => {
-            if (locked)
-                return;
-            if (this._holdTimer !== null) {
-                this._cancelHold();
-                if (this._inspectKey !== null) {
-                    this._inspectKey = null;
-                    return;
-                }
-                if (vacs)
-                    this._toggleRoomAcross(room.key, vacs);
-                else
-                    this._toggleRoom(room, vac);
-            }
-            else {
-                this._holdId = null;
-            }
-        };
-    }
-    /** docs/25 §7b: the per-room detail (age, assigned vacuum) that used to
-     *  live permanently in the portrait dock room list, which the minimalist
-     *  cockpit now hides by default (§7c/§7e). `stopPropagation` on the popup
-     *  itself so a tap inside it (e.g. the pin-cycle chip) doesn't also reach
-     *  the room button underneath and re-toggle/dismiss.
-     *
-     *  Field-caught (2026-07-24, third round): rendered as a SIBLING of the
-     *  room's `<button>`, not a child — earlier attempts nested it inside the
-     *  button and fought the selected room's own border-image/box-shadow
-     *  (glow visibly bleeding through even at 99% opaque background +
-     *  `isolation: isolate`, see 0.72.4's doc comment for the failed
-     *  theory). Positioning it as an independent sibling at the room's own
-     *  `map_x`/`map_y` point (same coordinates the button itself uses)
-     *  sidesteps the whole question — there is no parent/child relationship
-     *  left for the button's paint to interact with, by construction, not by
-     *  fighting z-index/stacking-context edge cases.
-     *  KNOWN LIMITATION (v1): not edge-aware on the horizontal axis, and the
-     *  map region still clips overflow — a room very close to the left/right
-     *  edge can get its popup partly cut off. Revisit after field feedback. */
-    _renderRoomInspect(room, vac, selected, opts) {
-        const rec = this._intRoomRec(vac, room);
-        const dry = this._ageDaysFromIso(rec?.dry);
-        const wet = this._ageDaysFromIso(rec?.wet);
-        const badge = (d) => (d === null ? "—" : d < 1 ? "<1d" : Math.round(d) + "d");
-        const dryEnt = selected ? this._planPreview?.dry.get(room.key) : undefined;
-        const wetEnt = selected ? this._planPreview?.wet.get(room.key) : undefined;
-        // Each chip cycles only among vacuums capable of ITS OWN type — see the
-        // 2026-07-25 fix note on `_cycleRoomPin`.
-        const canCycleDry = this._pinCandidates(room.key, "dry").length > 1;
-        const canCycleWet = this._pinCandidates(room.key, "wet").length > 1;
-        const pinTap = (kind, shown) => (kind === "dry" ? canCycleDry : canCycleWet)
-            ? (e) => { e.stopPropagation(); this._cycleRoomPin(room.key, kind, shown); }
-            : undefined;
-        // Same point the room's own <button> is anchored at (see the doc comment
-        // above) — centering here, rather than below/above the room, is ALSO
-        // still correct for size/rotation reasons (0.72.3): a rotation's center
-        // point never moves under that rotation, so this lands on the same
-        // screen spot regardless of room size or map orientation.
-        return b `
-      <div class="room-inspect" style=${o({ left: (room.map_x ?? 0) + "%", top: (room.map_y ?? 0) + "%" })}
-        @click=${(e) => e.stopPropagation()}>
+    `:G}_onRoomPointerDown(t,e){return o=>{e||(o.preventDefault(),this._cancelHold(),this._holdId="room-"+t.key,this._holdTimer=setTimeout(()=>{this._holdTimer=null,this._holdId=null,this._inspectKey=this._inspectKey===t.key?null:t.key},kt))}}_onRoomPointerUp(t,e,o,i){return()=>{if(!i)if(null!==this._holdTimer){if(this._cancelHold(),null!==this._inspectKey)return void(this._inspectKey=null);o?this._toggleRoomAcross(t.key,o):this._toggleRoom(t,e)}else this._holdId=null}}_renderRoomInspect(t,e,o,i){const s=this._intRoomRec(e,t),n=this._ageDaysFromIso(s?.dry),a=this._ageDaysFromIso(s?.wet),r=t=>null===t?"—":t<1?"<1d":Math.round(t)+"d",l=o?this._planPreview?.dry.get(t.key):void 0,c=o?this._planPreview?.wet.get(t.key):void 0,d=this._pinCandidates(t.key,"dry").length>1,h=this._pinCandidates(t.key,"wet").length>1,p=(e,o)=>("dry"===e?d:h)?i=>{i.stopPropagation(),this._cycleRoomPin(t.key,e,o)}:void 0;return q`
+      <div class="room-inspect" style=${vt({left:(t.map_x??0)+"%",top:(t.map_y??0)+"%"})}
+        @click=${t=>t.stopPropagation()}>
         <div class="room-inspect-inner">
-          <div class="room-inspect-name">${room.name ?? room.key}</div>
+          <div class="room-inspect-name">${t.name??t.key}</div>
           <div class="room-inspect-ages">
-            <span class="dock-age"><ha-icon icon="mdi:broom"></ha-icon><b style=${o({ color: this._colorForAgeDays(dry) })}>${badge(dry)}</b></span>
-            <span class="dock-age"><ha-icon icon="mdi:water"></ha-icon><b style=${o({ color: this._colorForAgeDays(wet) })}>${badge(wet)}</b></span>
+            <span class="dock-age"><ha-icon icon="mdi:broom"></ha-icon><b style=${vt({color:this._colorForAgeDays(n)})}>${r(n)}</b></span>
+            <span class="dock-age"><ha-icon icon="mdi:water"></ha-icon><b style=${vt({color:this._colorForAgeDays(a)})}>${r(a)}</b></span>
           </div>
-          ${dryEnt || wetEnt ? b `
+          ${l||c?q`
             <div class="dock-avatars">
-              ${dryEnt ? this._vacChip(dryEnt, pinTap("dry", dryEnt)) : A}
-              ${wetEnt ? this._vacChip(wetEnt, pinTap("wet", wetEnt)) : A}
-            </div>` : A}
+              ${l?this._vacChip(l,p("dry",l)):G}
+              ${c?this._vacChip(c,p("wet",c)):G}
+            </div>`:G}
         </div>
       </div>
-    `;
-    }
-    _renderRoomOverlay(room, vac, opts) {
-        const selected = opts?.vacs ? this._isRoomSelectedAny(room.key, opts.vacs) : this._isRoomSelected(room, vac);
-        // docs/25 §5: nothing explicitly selected = whole home is the implicit
-        // plan (START is already meaningful, see _renderDock/_renderStartBar).
-        // The map should say so too, but *gently* — this is a glanceable "this is
-        // what will run", one weight class below an actual selected room (no
-        // gradient border, no glow, no white icon — those stay reserved for
-        // explicit picks so "who's assigned" info isn't implied here).
-        const wholeHome = !selected && !!opts?.wholeHome;
-        // docs/25 §7d: border/icon color is reserved for interaction state only
-        // (normal/whole-home/selected, one white-family channel) — age used to
-        // share this channel (`_colorForAgeDays` painting the border/icon) and
-        // fought both the selection highlight and the room icon's own stable
-        // identity (an icon painted a different color every day by how stale
-        // the room is isn't actually recognizable at a glance). Age moved to
-        // `_renderRoomAgeDots` below.
-        const NEUTRAL_BORDER = "rgba(255,255,255,0.22)";
-        const NEUTRAL_ICON = "rgba(255,255,255,0.55)";
-        const anchor = room.icon_anchor ?? "c";
-        // Mutual exclusion (docs/19 A3): while Pin & Go / Zone is active, room
-        // selection is a different, contradictory intent (targeting a point/zone,
-        // not a whole room) — disable it entirely rather than let both interpret
-        // the same click.
-        const locked = this._mapMode !== "normal";
-        // Selection = a neutral highlight, never a vacuum's identity color (docs/19
-        // A1): the old `this._color(vac)` fill collided with the age-gradient (S6's
-        // green == "cleaned <2 days ago" green) and, in merged mode, was arbitrary
-        // anyway — `vac` here is whichever vacuum's room list happened to define
-        // this room, not necessarily who actually cleans it. Who's assigned is now
-        // shown via avatar chips (reused from the dock) instead of area tinting.
-        const SEL = "#ffffff";
-        // Selected border as white with a crisp light-blue accent right in the
-        // middle (user's revived idea, refined: a thin bright seam reads better at
-        // this size than a broad 50% blend) — via `border-image` (needs a real
-        // border shorthand for width/style first; unselected rooms keep a flat colour).
-        const SEL_GRADIENT = "linear-gradient(135deg, #ffffff 0%, #ffffff 46%, #8ecbff 50%, #ffffff 54%, #ffffff 100%) 1";
-        if (room.map_w !== undefined && room.map_h !== undefined) {
-            // ── Rectangle mód ──────────────────────────────────────────
-            const ANCHOR = {
-                tl: ["flex-start", "flex-start"], t: ["center", "flex-start"], tr: ["flex-end", "flex-start"],
-                l: ["flex-start", "center"], c: ["center", "center"], r: ["flex-end", "center"],
-                bl: ["flex-start", "flex-end"], b: ["center", "flex-end"], br: ["flex-end", "flex-end"],
-            };
-            const [jc, ai] = ANCHOR[anchor] ?? ["center", "center"];
-            const borderW = (selected
-                ? (this._config.room_border_selected ?? 4)
-                : wholeHome ? Math.max(3, this._config.room_border_normal ?? 2)
-                    : (this._config.room_border_normal ?? 2)) + "px";
-            // First pass at this (0.68.2) was too subtle to read at a glance on a
-            // real floorplan image (field feedback 2026-07-23: "if I didn't know
-            // about it, I wouldn't see it at all") — bumped border/bg opacity and
-            // added a soft glow so whole-home clearly reads as "highlighted",
-            // while still staying a visible notch below `selected`'s crisp
-            // gradient border + strong glow.
-            const borderC = selected ? SEL + "E0" : wholeHome ? "rgba(255,255,255,0.75)" : NEUTRAL_BORDER;
-            const bg = selected ? SEL + "22" : wholeHome ? "rgba(255,255,255,0.16)" : "rgba(0,0,0,0.06)";
-            const shadow = selected ? "0 0 18px rgba(255,255,255,0.7)" : wholeHome ? "0 0 10px rgba(255,255,255,0.4)" : "none";
-            // Who's assigned (dry/wet), from the backend plan preview — only known
-            // once selected (the preview is computed for the current selection).
-            const dryEnt = selected ? this._planPreview?.dry.get(room.key) : undefined;
-            const wetEnt = selected ? this._planPreview?.wet.get(room.key) : undefined;
-            const holdId = "room-" + room.key;
-            return b `
+    `}_renderRoomOverlay(t,e,o){const i=o?.vacs?this._isRoomSelectedAny(t.key,o.vacs):this._isRoomSelected(t,e),s=!i&&!!o?.wholeHome,n="rgba(255,255,255,0.22)",a=t.icon_anchor??"c",r="normal"!==this._mapMode,l="#ffffff",c="linear-gradient(135deg, #ffffff 0%, #ffffff 46%, #8ecbff 50%, #ffffff 54%, #ffffff 100%) 1";if(void 0!==t.map_w&&void 0!==t.map_h){const d={tl:["flex-start","flex-start"],t:["center","flex-start"],tr:["flex-end","flex-start"],l:["flex-start","center"],c:["center","center"],r:["flex-end","center"],bl:["flex-start","flex-end"],b:["center","flex-end"],br:["flex-end","flex-end"]},[h,p]=d[a]??["center","center"],m=(i?this._config.room_border_selected??4:s?Math.max(3,this._config.room_border_normal??2):this._config.room_border_normal??2)+"px",u=i?l+"E0":s?"rgba(255,255,255,0.75)":n,_=i?l+"22":s?"rgba(255,255,255,0.16)":"rgba(0,0,0,0.06)",g=i?"0 0 18px rgba(255,255,255,0.7)":s?"0 0 10px rgba(255,255,255,0.4)":"none",f=i?this._planPreview?.dry.get(t.key):void 0,b=i?this._planPreview?.wet.get(t.key):void 0,y="room-"+t.key;return q`
         <button
-          class="room-overlay ${locked ? "room-overlay--locked" : ""} ${this._holdId === holdId ? "room-overlay--holding" : ""}"
-          ?disabled=${locked}
-          style=${o({
-                left: (room.map_x ?? 0) + "%", top: (room.map_y ?? 0) + "%",
-                width: room.map_w + "%", height: room.map_h + "%",
-                border: borderW + " solid " + borderC,
-                borderImage: selected ? SEL_GRADIENT : "none",
-                background: bg, boxShadow: shadow,
-                justifyContent: jc, alignItems: ai,
-            })}
-          @pointerdown=${this._onRoomPointerDown(room, locked)}
-          @pointerup=${this._onRoomPointerUp(room, vac, opts?.vacs, locked)}
+          class="room-overlay ${r?"room-overlay--locked":""} ${this._holdId===y?"room-overlay--holding":""}"
+          ?disabled=${r}
+          style=${vt({left:(t.map_x??0)+"%",top:(t.map_y??0)+"%",width:t.map_w+"%",height:t.map_h+"%",border:m+" solid "+u,borderImage:i?c:"none",background:_,boxShadow:g,justifyContent:h,alignItems:p})}
+          @pointerdown=${this._onRoomPointerDown(t,r)}
+          @pointerup=${this._onRoomPointerUp(t,e,o?.vacs,r)}
           @pointerleave=${this._holdEnd}
           @pointercancel=${this._holdEnd}
-          title=${locked ? "Room selection is off while placing a pin/zone" : room.name} aria-label=${room.name}
-          aria-pressed=${selected ? "true" : "false"}
+          title=${r?"Room selection is off while placing a pin/zone":t.name} aria-label=${t.name}
+          aria-pressed=${i?"true":"false"}
         >
           <div class="hold-ring"></div>
-          ${!this._config.room_icon_hidden && anchor !== "none" && room.icon ? b `
-            <ha-icon icon=${room.icon}
-              style=${o({ color: selected ? "white" : NEUTRAL_ICON, "--mdc-icon-size": "16px" })}>
+          ${!this._config.room_icon_hidden&&"none"!==a&&t.icon?q`
+            <ha-icon icon=${t.icon}
+              style=${vt({color:i?"white":"rgba(255,255,255,0.55)","--mdc-icon-size":"16px"})}>
             </ha-icon>
-          ` : A}
-          ${this._renderRoomAgeDots(room, vac)}
-          ${ /* Field fixes same day (2026-08-03), full history in CHANGELOG
-                 1.0.1-1.0.6: the edge-anchored approach (CSS top/bottom/left/
-                 right, counter-rotated via .avc-rot's --map-rot rule) picked
-                 the CORRECT local room corner for all four right angles
-                 (verified by matrix simulation, see below — that part was
-                 never wrong) but was still off for 90°/270° specifically:
-                 those two ALSO apply a ±90° SELF-rotation to the chip itself
-                 (to cancel the ambient rotation and keep its text upright),
-                 and a ±90° self-rotation SWAPS the chip's own effective
-                 width/height before the ambient rotation carries it further —
-                 a "2px from local top/right" edge inset doesn't account for
-                 that swap, so the chip landed roughly chip-height px off from
-                 the intended corner (matches the field-reported "overflows
-                 past the top/right of the map" symptom exactly: ~21px
-                 overshoot ≈ 2px inset + 19px chip height). 0°/180° never had
-                 this problem (a 0° or 180° self-rotation never swaps width/
-                 height), which is why 1.0.4/1.0.5 field-tested fine for those
-                 two despite the same root gap existing latently for 90/270.
-                 Fix: a rotation-proof anchoring trick instead of edge insets.
-                 A zero-size OUTER anchor point sits at the local room corner
-                 that maps to visual bottom-right (same corner table as
-                 before, just expressed as a point instead of a CSS edge).
-                 The INNER chip pins to that point via its OWN bottom-right
-                 corner as transform-origin (100% 100%) — the pivot a
-                 rotation turns around is invariant under that SAME rotation
-                 regardless of angle, sidestepping the width/height-swap
-                 problem entirely — plus a small translate for the 2px visual
-                 inset, pre-solved per angle so it always reads as "2px up-
-                 and-left of the room's true corner" in FINAL screen space.
-                 Verified by simulating the full CSS transform chain as 2D
-                 affine matrices (Python), checked against the live-measured
-                 DOM geometry from the actual bug report, for all four angles
-                 and multiple room/chip sizes — not just reasoned by hand, since
-                 the earlier hand-derived fixes (1.0.4/1.0.5) had already gone
-                 wrong twice. Dropped 1.0.6's max-width/wrap-reverse narrow-room
-                 guard: the live measurement that motivated it (~21px overflow
-                 on rooms of very different widths, including a 990px-wide one)
-                 turned out to be fully explained by this same rotation bug,
-                 not a real content-width problem — simplifying back out rather
-                 than keep an untested fix for an invalidated hypothesis. */(dryEnt || wetEnt) ? (() => {
-                const totalRot = (this._narrow ? 90 : 0) + (this._flipEff ? 180 : 0);
-                // Local room corner that maps to visual bottom-right — same
-                // table as 1.0.5, now a point instead of an edge inset.
-                const outerPos = totalRot === 90 ? { top: "0%", left: "100%" } // local TR
-                    : totalRot === 180 ? { top: "0%", left: "0%" } // local TL
-                        : totalRot === 270 ? { top: "100%", left: "0%" } // local BL
-                            : { top: "100%", left: "100%" }; // local BR (0°)
-                const rad = (totalRot * Math.PI) / 180;
-                const dx = (-2 * (Math.cos(rad) + Math.sin(rad))).toFixed(2);
-                const dy = (-2 * (Math.cos(rad) - Math.sin(rad))).toFixed(2);
-                return b `
-                <span class="room-overlay-assign-anchor" style=${o(outerPos)}>
+          `:G}
+          ${this._renderRoomAgeDots(t,e)}
+          ${f||b?(()=>{const t=(this._narrow?90:0)+(this._flipEff?180:0),e=90===t?{top:"0%",left:"100%"}:180===t?{top:"0%",left:"0%"}:270===t?{top:"100%",left:"0%"}:{top:"100%",left:"100%"},o=t*Math.PI/180,i=(-2*(Math.cos(o)+Math.sin(o))).toFixed(2),s=(-2*(Math.cos(o)-Math.sin(o))).toFixed(2);return q`
+                <span class="room-overlay-assign-anchor" style=${vt(e)}>
                   <span class="room-overlay-assign"
-                    style=${o({ transform: `translate(${dx}px, ${dy}px) rotate(calc(-1 * var(--map-rot)))` })}>
-                    ${dryEnt ? this._vacChip(dryEnt) : A}
-                    ${wetEnt ? this._vacChip(wetEnt) : A}
+                    style=${vt({transform:`translate(${i}px, ${s}px) rotate(calc(-1 * var(--map-rot)))`})}>
+                    ${f?this._vacChip(f):G}
+                    ${b?this._vacChip(b):G}
                   </span>
                 </span>
-              `;
-            })() : A}
-          ${this._renderRoomGauge(opts?.vacs ?? [vac], room)}
+              `})():G}
+          ${this._renderRoomGauge(o?.vacs??[e],t)}
         </button>
-        ${this._inspectKey === room.key ? this._renderRoomInspect(room, vac, selected, opts) : A}
-      `;
-        }
-        // ── Point mód (legacy) ──────────────────────────────────────
-        const bg = selected ? SEL + "A8" : wholeHome ? "rgba(255,255,255,0.32)" : "rgba(0,0,0,0.55)";
-        const shadow = selected ? "0 0 12px rgba(255,255,255,0.8)" : wholeHome ? "0 0 8px rgba(255,255,255,0.45)" : "none";
-        const holdIdPt = "room-" + room.key;
-        return b `
+        ${this._inspectKey===t.key?this._renderRoomInspect(t,e,i,o):G}
+      `}const d=i?l+"A8":s?"rgba(255,255,255,0.32)":"rgba(0,0,0,0.55)",h=i?"0 0 12px rgba(255,255,255,0.8)":s?"0 0 8px rgba(255,255,255,0.45)":"none",p="room-"+t.key;return q`
       <button
-        class="room-btn ${locked ? "room-overlay--locked" : ""} ${this._holdId === holdIdPt ? "room-overlay--holding" : ""}"
-        ?disabled=${locked}
-        style=${o({
-            left: (room.map_x ?? 0) + "%", top: (room.map_y ?? 0) + "%",
-            background: bg,
-            border: "4px solid " + (selected ? SEL : wholeHome ? "rgba(255,255,255,0.7)" : NEUTRAL_BORDER),
-            borderImage: selected ? SEL_GRADIENT : "none",
-            boxShadow: shadow,
-        })}
-        @pointerdown=${this._onRoomPointerDown(room, locked)}
-        @pointerup=${this._onRoomPointerUp(room, vac, opts?.vacs, locked)}
+        class="room-btn ${r?"room-overlay--locked":""} ${this._holdId===p?"room-overlay--holding":""}"
+        ?disabled=${r}
+        style=${vt({left:(t.map_x??0)+"%",top:(t.map_y??0)+"%",background:d,border:"4px solid "+(i?l:s?"rgba(255,255,255,0.7)":n),borderImage:i?c:"none",boxShadow:h})}
+        @pointerdown=${this._onRoomPointerDown(t,r)}
+        @pointerup=${this._onRoomPointerUp(t,e,o?.vacs,r)}
         @pointerleave=${this._holdEnd}
         @pointercancel=${this._holdEnd}
-        title=${locked ? "Room selection is off while placing a pin/zone" : room.name} aria-label=${room.name}
-        aria-pressed=${selected ? "true" : "false"}
+        title=${r?"Room selection is off while placing a pin/zone":t.name} aria-label=${t.name}
+        aria-pressed=${i?"true":"false"}
       >
         <div class="hold-ring"></div>
-        ${!this._config.room_icon_hidden ? b `
-          <ha-icon icon=${room.icon || "mdi:square"}
-            style=${o({ color: selected ? "white" : "rgba(255,255,255,0.5)" })}>
+        ${this._config.room_icon_hidden?G:q`
+          <ha-icon icon=${t.icon||"mdi:square"}
+            style=${vt({color:i?"white":"rgba(255,255,255,0.5)"})}>
           </ha-icon>
-        ` : A}
-        ${this._renderRoomAgeDots(room, vac)}
-        ${this._renderRoomGauge(opts?.vacs ?? [vac], room)}
+        `}
+        ${this._renderRoomAgeDots(t,e)}
+        ${this._renderRoomGauge(o?.vacs??[e],t)}
       </button>
-      ${this._inspectKey === room.key ? this._renderRoomInspect(room, vac, selected, opts) : A}
-    `;
-    }
-    // ── Render: status card ─────────────────────────────────────────────────
-    /** v1.1.0 (2026-08-03, user-approved mockup): condensed two-line info block
-     *  that sits BESIDE the small circular avatar (`.status-avatar`,
-     *  `_renderStatusCard`) instead of the old wide `.status-left`/`.status-right`
-     *  split — name+status on line 1, room+battery+last-clean on line 2. The
-     *  live cleaning percentage folds into line 1 next to the status label
-     *  (`_renderProgress` below still renders the actual bar; this is just the
-     *  number, so it's visible even where the bar's thin track is easy to miss). */
-    _renderStatusRow(vac) {
-        const [label, labelColor] = this._statusInfo(vac);
-        const bat = this._battery(vac);
-        const lastClean = this._lastCleanStr(vac);
-        const name = vac.name ?? vac.entity.split(".")[1] ?? vac.entity;
-        const prog = this._progress(vac);
-        // Current room
-        const crid = this._ent(vac, "current_room");
-        const roomState = crid ? this.hass.states[crid]?.state : null;
-        const currentRoom = roomState && roomState !== "unknown" && roomState !== "unavailable"
-            ? roomState : null;
-        // Error
-        const erid = this._ent(vac, "error");
-        const errState = erid ? this.hass.states[erid]?.state : null;
-        const hasError = this._hasError(vac);
-        return b `
-      ${hasError ? b `
+      ${this._inspectKey===t.key?this._renderRoomInspect(t,e,i,o):G}
+    `}_renderStatusRow(t){const[e,o]=this._statusInfo(t),i=this._battery(t),s=this._lastCleanStr(t),n=t.name??t.entity.split(".")[1]??t.entity,a=this._progress(t),r=this._ent(t,"current_room"),l=r?this.hass.states[r]?.state:null,c=l&&"unknown"!==l&&"unavailable"!==l?l:null,d=this._ent(t,"error"),h=d?this.hass.states[d]?.state:null,p=this._hasError(t);return q`
+      ${p?q`
         <div class="error-row">
           <ha-icon icon="mdi:alert-circle" style="color:#ff4d4f"></ha-icon>
-          <span style="color:#ff4d4f;font-size:11px;font-weight:600">${errState}</span>
+          <span style="color:#ff4d4f;font-size:11px;font-weight:600">${h}</span>
         </div>
-      ` : A}
+      `:G}
       <div class="status-line1">
-        <span class="model-label">${name}</span>
-        <span class="status-label" style=${o({ color: labelColor })}>
-          ${label}${prog !== null ? b ` &middot; ${prog}&thinsp;%` : A}
+        <span class="model-label">${n}</span>
+        <span class="status-label" style=${vt({color:o})}>
+          ${e}${null!==a?q` &middot; ${a}&thinsp;%`:G}
         </span>
       </div>
       <div class="status-line2">
-        ${currentRoom ? b `
+        ${c?q`
           <span class="current-room">
             <ha-icon icon="mdi:map-marker" style="--mdc-icon-size:12px;color:rgba(255,255,255,0.4)"></ha-icon>
-            ${currentRoom}
+            ${c}
           </span>
-        ` : b `<span></span>`}
+        `:q`<span></span>`}
         <span class="status-meta">
-          ${bat !== null ? b `
+          ${null!==i?q`
             <span class="battery">
-              <ha-icon icon=${this._batIcon(bat)} style=${o({ color: this._batColor(bat) })}></ha-icon>
-              <span style=${o({ color: this._batColor(bat) })}>${bat}&thinsp;%</span>
+              <ha-icon icon=${this._batIcon(i)} style=${vt({color:this._batColor(i)})}></ha-icon>
+              <span style=${vt({color:this._batColor(i)})}>${i}&thinsp;%</span>
             </span>
-          ` : A}
+          `:G}
           <span class="last-clean">
             <ha-icon icon="mdi:history"></ha-icon>
-            <span>${lastClean}</span>
+            <span>${s}</span>
           </span>
         </span>
       </div>
-    `;
-    }
-    _renderProgress(vac) {
-        const prog = this._progress(vac);
-        if (prog === null)
-            return A;
-        const color = this._color(vac);
-        return b `
+    `}_renderProgress(t){const e=this._progress(t);if(null===e)return G;const o=this._color(t);return q`
       <div class="progress">
         <div class="progress-track">
-          <div class="progress-fill" style=${o({ width: prog + "%", background: color })}></div>
+          <div class="progress-fill" style=${vt({width:e+"%",background:o})}></div>
         </div>
-        <span class="progress-label" style=${o({ color })}>${prog}&thinsp;%</span>
+        <span class="progress-label" style=${vt({color:o})}>${e}&thinsp;%</span>
       </div>
-    `;
-    }
-    _renderActions(vac, vacIdx) {
-        const color = this._color(vac);
-        // Pending Pin & Go / Zone for THIS vacuum (docs/19 meta bar fix): the START
-        // slot itself becomes the mode-aware action — "send here" / "clean zone
-        // here" — instead of a separate banner stacked above the controller. Takes
-        // priority over the normal start/pause/resume states: picking a vacuum for
-        // a pin/zone is itself the intent, and in practice the vacuum is idle
-        // whenever this is relevant.
-        const pin = this._pinPending?.[vac.entity];
-        const zone = this._zonePending?.[vac.entity];
-        if (pin || zone) {
-            const hId = "modeaction-" + vacIdx;
-            const label = zone ? "Clean zone" : "Send here";
-            const icon = zone ? "mdi:select-drag" : "mdi:map-marker-radius";
-            const action = () => { if (zone)
-                this._confirmZone(vac);
-            else
-                this._confirmPin(vac); };
-            return b `
+    `}_renderActions(t,e){const o=this._color(t),i=this._pinPending?.[t.entity],s=this._zonePending?.[t.entity];if(i||s){const i="modeaction-"+e,n=s?"Clean zone":"Send here",a=s?"mdi:select-drag":"mdi:map-marker-radius",r=()=>{s?this._confirmZone(t):this._confirmPin(t)};return q`
         <div class="actions">
           <button
-            class="action-btn ${this._holdId === hId ? "action-btn--holding" : ""}"
-            style=${o({ background: this._colorBg(vac), border: "1px solid " + color + "80" })}
-            @pointerdown=${this._holdStart(hId, action)}
+            class="action-btn ${this._holdId===i?"action-btn--holding":""}"
+            style=${vt({background:this._colorBg(t),border:"1px solid "+o+"80"})}
+            @pointerdown=${this._holdStart(i,r)}
             @pointermove=${this._holdMove}
             @pointerup=${this._holdEnd}
             @pointerleave=${this._holdEnd}
             @pointercancel=${this._holdEnd}
           >
             <div class="hold-ring"></div>
-            <ha-icon icon=${icon} style=${o({ color })}></ha-icon>
-            <span>${label}</span>
+            <ha-icon icon=${a} style=${vt({color:o})}></ha-icon>
+            <span>${n}</span>
           </button>
         </div>
-      `;
-        }
-        const cleaning = this._isCleaning(vac);
-        const paused = this._isPaused(vac);
-        const hasRooms = this._hasSelectedRooms(vac);
-        const mins = this._totalCleanMins(vac);
-        const timeStr = this._timeStr(mins);
-        if (paused) {
-            const hId = "resume-" + vacIdx;
-            return b `
+      `}const n=this._isCleaning(t),a=this._isPaused(t),r=this._hasSelectedRooms(t),l=this._totalCleanMins(t),c=this._timeStr(l);if(a){const i="resume-"+e;return q`
         <div class="actions">
           <button
-            class="action-btn ${this._holdId === hId ? "action-btn--holding" : ""}"
-            style=${o({ background: this._colorBg(vac), border: "1px solid " + color + "80" })}
-            @pointerdown=${this._holdStart(hId, () => this._resume(vac))}
+            class="action-btn ${this._holdId===i?"action-btn--holding":""}"
+            style=${vt({background:this._colorBg(t),border:"1px solid "+o+"80"})}
+            @pointerdown=${this._holdStart(i,()=>this._resume(t))}
             @pointermove=${this._holdMove}
             @pointerup=${this._holdEnd}
             @pointerleave=${this._holdEnd}
             @pointercancel=${this._holdEnd}
           >
             <div class="hold-ring"></div>
-            <ha-icon icon="mdi:play" style=${o({ color })}></ha-icon>
+            <ha-icon icon="mdi:play" style=${vt({color:o})}></ha-icon>
             <span>Resume</span>
           </button>
           <button
             class="action-btn action-btn--secondary"
-            @click=${() => this._dock(vac)}
+            @click=${()=>this._dock(t)}
           >
             <ha-icon icon="mdi:home" style="color:rgba(64,169,255,0.6)"></ha-icon>
             <span>Dock</span>
           </button>
         </div>
-      `;
-        }
-        if (cleaning) {
-            const hId = "pause-" + vacIdx;
-            return b `
+      `}if(n){const o="pause-"+e;return q`
         <div class="actions">
           <button
-            class="action-btn action-btn--warn ${this._holdId === hId ? "action-btn--holding" : ""}"
-            @pointerdown=${this._holdStart(hId, () => this._pause(vac))}
+            class="action-btn action-btn--warn ${this._holdId===o?"action-btn--holding":""}"
+            @pointerdown=${this._holdStart(o,()=>this._pause(t))}
             @pointermove=${this._holdMove}
             @pointerup=${this._holdEnd}
             @pointerleave=${this._holdEnd}
@@ -5547,304 +682,111 @@ let AnyVacCard = class AnyVacCard extends i$2 {
             <span>Pause</span>
           </button>
         </div>
-      `;
-        }
-        const hId = "start-" + vacIdx;
-        const startBg = hasRooms ? this._colorBg(vac) : "rgba(60,60,60,0.4)";
-        const startBorder = hasRooms ? "1px solid " + color + "80" : "1px solid rgba(255,255,255,0.1)";
-        const startIconColor = hasRooms ? color : "rgba(255,255,255,0.2)";
-        const startTextColor = hasRooms ? "white" : "rgba(255,255,255,0.25)";
-        // v1.1.0 (2026-08-03, user-approved mockup): the old per-room icon strip
-        // (every configured room as its own tiny icon, colored if selected) was
-        // read-only display, not a control — replaced with a plain "N/M rooms"
-        // count. Selection itself still happens on the map / via the room list,
-        // unchanged; this just stopped being the tallest thing in the idle state.
-        const rooms = this._roomsFor(vac);
-        const selCount = rooms.filter((r) => this._isRoomSelected(r, vac)).length;
-        const roomsStr = rooms.length > 0 ? `${selCount}/${rooms.length} rooms` : "";
-        const metaStr = [roomsStr, timeStr].filter(Boolean).join(" · ");
-        return b `
+      `}const d="start-"+e,h=r?this._colorBg(t):"rgba(60,60,60,0.4)",p=r?"1px solid "+o+"80":"1px solid rgba(255,255,255,0.1)",m=r?o:"rgba(255,255,255,0.2)",u=r?"white":"rgba(255,255,255,0.25)",_=this._roomsFor(t),g=_.filter(e=>this._isRoomSelected(e,t)).length,f=[_.length>0?`${g}/${_.length} rooms`:"",c].filter(Boolean).join(" · ");return q`
       <div class="actions actions--idle">
-        ${this._renderPresetChips(vac)}
+        ${this._renderPresetChips(t)}
         <button
-          class="action-btn ${hasRooms && this._holdId === hId ? "action-btn--holding" : ""}"
-          style=${o({ background: startBg, border: startBorder, flex: "1" })}
-          ?disabled=${!hasRooms}
-          @pointerdown=${hasRooms ? this._holdStart(hId, () => this._startClean(vac)) : A}
+          class="action-btn ${r&&this._holdId===d?"action-btn--holding":""}"
+          style=${vt({background:h,border:p,flex:"1"})}
+          ?disabled=${!r}
+          @pointerdown=${r?this._holdStart(d,()=>this._startClean(t)):G}
           @pointermove=${this._holdMove}
           @pointerup=${this._holdEnd}
           @pointerleave=${this._holdEnd}
           @pointercancel=${this._holdEnd}
         >
           <div class="hold-ring"></div>
-          <ha-icon icon="mdi:play" style=${o({ color: startIconColor })}></ha-icon>
+          <ha-icon icon="mdi:play" style=${vt({color:m})}></ha-icon>
           <div class="start-body">
-            <span style=${o({ color: startTextColor })}>${hasRooms ? "START" : "Select rooms"}</span>
-            ${metaStr ? b `<small style="color:rgba(255,255,255,0.4)">${metaStr}</small>` : A}
+            <span style=${vt({color:u})}>${r?"START":"Select rooms"}</span>
+            ${f?q`<small style="color:rgba(255,255,255,0.4)">${f}</small>`:G}
           </div>
         </button>
       </div>
-    `;
-    }
-    /** v1.1.0 (2026-08-03): compact header replaces the old 150px-image /
-     *  1fr-info grid split — a small circular avatar (mirrors `.vac-icon-btn`'s
-     *  established look, docs/25 §7) beside the condensed two-line info block
-     *  (`_renderStatusRow`). The avatar keeps the SAME click target as before
-     *  (`_fireMoreInfo`, opens HA's stock more-info dialog) — user-requested
-     *  "rescue control" for whatever this card's own actions don't cover — but
-     *  a small `.avatar-info-badge` now marks it visually so shrinking the
-     *  avatar doesn't also make that escape hatch less discoverable. */
-    _renderStatusCard(vac, vacIdx) {
-        const cleaning = this._isCleaning(vac);
-        const color = this._color(vac);
-        const name = vac.name ?? vac.entity.split(".")[1] ?? vac.entity;
-        const cardBorder = cleaning ? "2px solid " + color : "1px solid rgba(255,255,255,0.08)";
-        const cardShadow = cleaning ? "0 0 22px " + color + "40" : "none";
-        const imgFilter = cleaning
-            ? "drop-shadow(0 0 8px " + color + "D8)"
-            : "drop-shadow(0 2px 5px " + color + "33)";
-        return b `
-      <div class="status-card" style=${o({ border: cardBorder, boxShadow: cardShadow })}>
+    `}_renderStatusCard(t,e){const o=this._isCleaning(t),i=this._color(t),s=t.name??t.entity.split(".")[1]??t.entity,n=o?"drop-shadow(0 0 8px "+i+"D8)":"drop-shadow(0 2px 5px "+i+"33)";return q`
+      <div class="status-card" style=${vt({border:o?"2px solid "+i:"1px solid rgba(255,255,255,0.08)",boxShadow:o?"0 0 22px "+i+"40":"none"})}>
         <div class="status-header">
-          <div class="status-avatar" style=${o({ borderColor: color })}
-            @click=${() => this._fireMoreInfo(vac.entity)}
-            title="Open ${name} info — native controls, in case this card can't do something">
-            ${vac.image ? b `
-              <img src=${vac.image} alt=${name}
-                style=${o({ opacity: cleaning ? "0.9" : "0.6", filter: imgFilter })}
+          <div class="status-avatar" style=${vt({borderColor:i})}
+            @click=${()=>this._fireMoreInfo(t.entity)}
+            title="Open ${s} info — native controls, in case this card can't do something">
+            ${t.image?q`
+              <img src=${t.image} alt=${s}
+                style=${vt({opacity:o?"0.9":"0.6",filter:n})}
               />
-            ` : b `
+            `:q`
               <ha-icon icon="mdi:robot-vacuum"
-                style=${o({ color, fontSize: "22px", opacity: cleaning ? "0.9" : "0.5" })}
+                style=${vt({color:i,fontSize:"22px",opacity:o?"0.9":"0.5"})}
               ></ha-icon>
             `}
             <span class="avatar-info-badge"><ha-icon icon="mdi:information-outline"></ha-icon></span>
           </div>
           <div class="status-info">
-            ${this._renderStatusRow(vac)}
+            ${this._renderStatusRow(t)}
           </div>
         </div>
-        ${this._renderProgress(vac)}
-        ${this._renderActions(vac, vacIdx)}
-        ${this._renderDebugProgress(vac)}
+        ${this._renderProgress(t)}
+        ${this._renderActions(t,e)}
+        ${this._renderDebugProgress(t)}
       </div>
-    `;
-    }
-    /** Small circular gauge for the debug strip (dry / wet coverage). `calibrating` adds a
-     *  ~ to mark that it is still the raw bbox % (no learned baseline yet). */
-    _renderMiniGauge(pct, color, icon, calibrating) {
-        return b `
+    `}_renderMiniGauge(t,e,o,i){return q`
       <span class="mini-gauge-wrap">
-        <ha-icon class="mini-gauge-ico" icon=${icon} style=${o({ color })}></ha-icon>
-        <span class="mini-gauge" style=${o({ background: `conic-gradient(${color} ${pct * 3.6}deg, rgba(255,255,255,0.12) 0)` })}>
-          <span>${pct}${calibrating ? "~" : ""}</span>
+        <ha-icon class="mini-gauge-ico" icon=${o} style=${vt({color:e})}></ha-icon>
+        <span class="mini-gauge" style=${vt({background:`conic-gradient(${e} ${3.6*t}deg, rgba(255,255,255,0.12) 0)`})}>
+          <span>${t}${i?"~":""}</span>
         </span>
-      </span>`;
-    }
-    /** Room the vacuum is currently in, per the integration (for live-ticking its timer). */
-    _currentRoomName(vac) {
-        return this._intAttrs(vac)?.vacuum_room_name;
-    }
-    _mmss(sec) {
-        const s = Math.max(0, Math.round(sec));
-        return `${Math.floor(s / 60)}:${String(s % 60).padStart(2, "0")}`;
-    }
-    /** Debug strip inside the status card: per-room dry + wet coverage gauges and the live
-     *  time spent (mm:ss / mm:ss estimate). Shown whenever debug_room_progress is on. */
-    _renderDebugProgress(vac) {
-        if (!this._config.debug_room_progress)
-            return A;
-        const rows = (this._roomsFor(vac))
-            .map((r) => ({ r, p: this._roomProgress(vac, r) }))
-            .filter((x) => x.p && (x.p.dry_pct != null || x.p.wet_pct != null || x.p.elapsed_s != null));
-        if (!rows.length)
-            return A;
-        const color = this._color(vac);
-        const ent = this._intEntity(vac);
-        const sensorTs = ent ? Date.parse(this.hass.states[ent]?.last_updated ?? "") : NaN;
-        const curRoom = this._currentRoomName(vac);
-        const cleaning = this._isCleaning(vac);
-        const paused = this._isPaused(vac);
-        // Seconds since the sensor last updated — while cleaning this is live cleaning time;
-        // while paused the sensor is frozen so it measures the pause length.
-        const since = (cleaning || paused) && !isNaN(sensorTs) ? Math.max(0, (this._now - sensorTs) / 1000) : 0;
-        return b `
+      </span>`}_currentRoomName(t){return this._intAttrs(t)?.vacuum_room_name}_mmss(t){const e=Math.max(0,Math.round(t));return`${Math.floor(e/60)}:${String(e%60).padStart(2,"0")}`}_renderDebugProgress(t){if(!this._config.debug_room_progress)return G;const e=this._roomsFor(t).map(e=>({r:e,p:this._roomProgress(t,e)})).filter(t=>t.p&&(null!=t.p.dry_pct||null!=t.p.wet_pct||null!=t.p.elapsed_s));if(!e.length)return G;const o=this._color(t),i=this._intEntity(t),s=i?Date.parse(this.hass.states[i]?.last_updated??""):NaN,n=this._currentRoomName(t),a=this._isCleaning(t),r=this._isPaused(t),l=!a&&!r||isNaN(s)?0:Math.max(0,(this._now-s)/1e3);return q`
       <div class="dbg-prog">
-        ${rows.map(({ r, p }) => {
-            const isCur = (r.key === curRoom || r.name === curRoom) && (cleaning || paused);
-            // Elapsed ticks every second for the active room (and keeps moving while paused);
-            // the estimate grows equally during a pause so "remaining" stays put.
-            const elapsed = (p.elapsed_s ?? 0) + (isCur ? since : 0);
-            let est = p.est_s ?? null;
-            if (isCur && paused && est != null)
-                est = est + since;
-            const timeStr = est != null ? `${this._mmss(elapsed)}/${this._mmss(est)}` : this._mmss(elapsed);
-            return b `
-            <span class="dbg-prog-item" title=${`dry ${p.dry_pct ?? "—"}% · wet ${p.wet_pct ?? "—"}%`}>
-              ${r.icon ? b `<ha-icon icon=${r.icon}></ha-icon>` : A}
-              <span class="dbg-prog-name">${r.name ?? r.key}</span>
-              ${p.dry_pct != null ? this._renderMiniGauge(p.dry_pct, color, "mdi:broom", !!p.dry_calibrating) : A}
-              ${p.wet_pct != null ? this._renderMiniGauge(p.wet_pct, "#40a9ff", "mdi:water", !!p.wet_calibrating) : A}
-              ${p.elapsed_s != null ? b `<small>${timeStr}</small>` : A}
+        ${e.map(({r:t,p:e})=>{const i=(t.key===n||t.name===n)&&(a||r),s=(e.elapsed_s??0)+(i?l:0);let c=e.est_s??null;i&&r&&null!=c&&(c+=l);const d=null!=c?`${this._mmss(s)}/${this._mmss(c)}`:this._mmss(s);return q`
+            <span class="dbg-prog-item" title=${`dry ${e.dry_pct??"—"}% · wet ${e.wet_pct??"—"}%`}>
+              ${t.icon?q`<ha-icon icon=${t.icon}></ha-icon>`:G}
+              <span class="dbg-prog-name">${t.name??t.key}</span>
+              ${null!=e.dry_pct?this._renderMiniGauge(e.dry_pct,o,"mdi:broom",!!e.dry_calibrating):G}
+              ${null!=e.wet_pct?this._renderMiniGauge(e.wet_pct,"#40a9ff","mdi:water",!!e.wet_calibrating):G}
+              ${null!=e.elapsed_s?q`<small>${d}</small>`:G}
             </span>
-          `;
-        })}
+          `})}
       </div>
-    `;
-    }
-    // ── Main render ─────────────────────────────────────────────────────────
-    /** Ordered, deduped snapshot of `_shownSet` as configured-array indices.
-     *  `Set` preserves INSERTION order, not numeric order — `_toggleShownMulti`
-     *  deletes then later re-`add`s an index when a vacuum is hidden and shown
-     *  again, which moves it to the END of the set's iteration order (field
-     *  feedback 2026-08-03: "S7 hidden then shown again jumps to last place").
-     *  Every place that turns `_shownSet` into a displayed list should go
-     *  through this instead of spreading the Set directly, so the vacuums
-     *  always render in their configured order regardless of show/hide
-     *  history. */
-    _shownOrdered() {
-        return [...this._shownSet].filter((i) => i < this._config.vacuums.length).sort((a, b) => a - b);
-    }
-    /** Vacuum indexes shown in the grid. Portrait split = single-vacuum focus
-     *  (docs/18 §7b): only the first of the shown set renders; badges switch it. */
-    _gridShown() {
-        const shown = this._shownOrdered();
-        if (this._profile === "portrait" && this._config.map_mode !== "merged" && shown.length > 1) {
-            return shown.slice(0, 1);
-        }
-        return shown;
-    }
-    /** Named region template (docs/18 §3), built on demand — a region not placed
-     *  in the active profile is never even computed. */
-    _regionTemplate(name, prof) {
-        const shown = this._gridShown();
-        const merged = this._config.map_mode === "merged";
-        const vacsOf = (idxs) => idxs.map((i) => this._config.vacuums[i]);
-        switch (name) {
-            case "badges":
-                // Stats/refresh/layer-toggles moved into the consolidated meta bar
-                // (docs/19 A4, `tools` region). Landscape also moves vacuum picking
-                // into the vertical `picker` region (docs/19 A5) — badges there is
-                // global actions only; portrait keeps vacuum badges as its
-                // single-focus switcher (no `picker` region placed there).
-                return b `<div class="badges-row badges-row--grid">
-          ${this._profile === "landscape" ? A : this._config.vacuums.map((v, i) => this._renderBadge(v, i))}
-          ${(this._config.global_actions ?? []).map((ga, i) => this._renderGlobalBadge(ga, i))}
-        </div>`;
-            case "autobar":
-                return this._renderAutoBar();
-            case "plan":
-                return this._renderPlanPreview();
-            case "picker":
-                return this._renderVacuumPicker();
-            case "map": {
-                // Layer toggles + refresh + Pin&go/zone all moved into the `tools`
-                // region's consolidated meta bar (docs/19 A4) — the map region is
-                // just the map(s) now.
-                return merged
-                    ? this._renderResponsive(this._renderMergedMap())
-                    : b `${shown.map((i) => this._renderResponsive(this._renderMap(this._config.vacuums[i])))}`;
-            }
-            case "tools":
-                return this._renderMetaBar(vacsOf(shown));
-            case "dock":
-                // The dock carries the orchestrated run footer when no `start` region is
-                // placed in this profile (landscape, docs/18 §7d). `withPicker`:
-                // fold the vacuum picker into dock's own flow (docs/33 follow-up)
-                // UNLESS this profile still explicitly places its own `picker`
-                // region (manual config, kept working unchanged).
-                // Field-caught 2026-08-04: `!("picker" in prof.place)` alone is also
-                // true for BOTH portrait profiles (`DEFAULT_PROFILES.portrait` and
-                // `STACK_PORTRAIT_PROFILE`) — neither has ever placed a `picker`
-                // region, because portrait deliberately uses the vacuum ICON STRIP
-                // instead (0.69.0, docs/25 §7a) as its single "show/hide vacuums"
-                // control. Without the `_profile === "landscape"` guard, portrait
-                // rendered the pill-list picker AND the icon strip at once — two
-                // redundant controls for the same thing, stacked on top of each
-                // other. Only landscape (and a manual profile that structurally
-                // mirrors it) gets the auto-folded picker; portrait keeps relying
-                // on the icon strip alone, same as before docs/33.
-                return this._renderDock(!("start" in prof.place), this._profile === "landscape" && !("picker" in prof.place));
-            case "start":
-                return this._renderStartBar();
-            case "status":
-                return b `${shown.map((i) => this._renderStatusCard(this._config.vacuums[i], i))}`;
-            default:
-                return null;
-        }
-    }
-    /** Grid render path (docs/18): active only with a `layout:` config block. */
-    _renderGrid(lay) {
-        // docs/25 §7c: stack topology substitutes the whole resolved profile —
-        // `_stackTopology` already refuses to fire when the user has hand-set
-        // columns/rows/place, so this never overrides a manual layout.
-        const stack = this._profile === "portrait" && this._stackTopology;
-        const prof = stack ? STACK_PORTRAIT_PROFILE : resolveProfile(lay, this._profile);
-        const schemaWarn = this._schemaWarning();
-        // TEMP debug (2026-07-24, field diagnosis of the split/stack decision —
-        // remove once the topology model is confirmed correct in the field):
-        // exposes the exact numbers `_stackTopology`/`shouldStackLayout` are
-        // computing from, since screenshot-based pixel estimates weren't
-        // reliable enough to debug the 0.73.1/0.73.2 fixes further.
-        const dbgAr = (this._narrow ? 1 / (this._mapAR > 0.1 ? this._mapAR : 3.636) : (this._mapAR > 0.1 ? this._mapAR : 3.636)).toFixed(3);
-        return b `
+    `}_shownOrdered(){return[...this._shownSet].filter(t=>t<this._config.vacuums.length).sort((t,e)=>t-e)}_gridShown(){const t=this._shownOrdered();return"portrait"===this._profile&&"merged"!==this._config.map_mode&&t.length>1?t.slice(0,1):t}_regionTemplate(t,e){const o=this._gridShown(),i="merged"===this._config.map_mode,s=t=>t.map(t=>this._config.vacuums[t]);switch(t){case"badges":return q`<div class="badges-row badges-row--grid">
+          ${"landscape"===this._profile?G:this._config.vacuums.map((t,e)=>this._renderBadge(t,e))}
+          ${(this._config.global_actions??[]).map((t,e)=>this._renderGlobalBadge(t,e))}
+        </div>`;case"autobar":return this._renderAutoBar();case"plan":return this._renderPlanPreview();case"picker":return this._renderVacuumPicker();case"map":return i?this._renderResponsive(this._renderMergedMap()):q`${o.map(t=>this._renderResponsive(this._renderMap(this._config.vacuums[t])))}`;case"tools":return this._renderMetaBar(s(o));case"dock":return this._renderDock(!("start"in e.place),"landscape"===this._profile&&!("picker"in e.place));case"start":return this._renderStartBar();case"status":return q`${o.map(t=>this._renderStatusCard(this._config.vacuums[t],t))}`;default:return null}}_renderGrid(t){const e="portrait"===this._profile&&this._stackTopology,o=e?Vt:function(t,e){const o=t[e]??{},i=Nt[e];return{columns:o.columns?.length?o.columns:i.columns,rows:o.rows?.length?o.rows:i.rows,place:o.place&&Object.keys(o.place).length?o.place:i.place}}(t,this._profile),i=this._schemaWarning();return q`
       <ha-card style="padding:0;display:block">
-        ${this.editMode ? b `<div class="version-chip">
-          <div>v${CARD_VERSION} · ${Math.round(this._cardW)}w · ${this._profile}</div>
-          <div>${stack ? "stack" : "split"} · box:${Math.round(this._mapAvailW)}x${Math.round(this._mapAvailH)} · ar:${dbgAr}</div>
-        </div>` : A}
-        <div class="avc-grid avc-grid--${this._profile}" style=${o(gridRootStyles(lay, prof))}>
-          ${schemaWarn ? b `<div class="avc-schemawarn">
-            <ha-icon icon="mdi:alert" style="--mdc-icon-size:18px"></ha-icon><span>${schemaWarn}</span>
-          </div>` : A}
-          ${Object.entries(prof.place).map(([name, pl]) => {
-            const tpl = this._regionTemplate(name, prof);
-            if (tpl == null || tpl === A)
-                return A;
-            return b `<div class="avc-region avc-region--${name}" style=${o(regionStyles(pl))}>${tpl}</div>`;
-        })}
+        ${this.editMode?q`<div class="version-chip">
+          <div>v${$t} · ${Math.round(this._cardW)}w · ${this._profile}</div>
+          ${this._config.debug?q`<div>${e?"stack":"split"} · box:${Math.round(this._mapAvailW)}x${Math.round(this._mapAvailH)}</div>`:G}
+        </div>`:G}
+        <div class="avc-grid avc-grid--${this._profile}" style=${vt(function(t,e){return{display:"grid",width:"100%",height:jt(t),alignContent:"start",gridTemplateColumns:Bt(e.columns),gridTemplateRows:Bt(e.rows),gap:t.gap??"6px",boxSizing:"border-box"}}(t,o))}>
+          ${i?q`<div class="avc-schemawarn">
+            <ha-icon icon="mdi:alert" style="--mdc-icon-size:18px"></ha-icon><span>${i}</span>
+          </div>`:G}
+          ${Object.entries(o.place).map(([t,e])=>{const i=this._regionTemplate(t,o);return null==i||i===G?G:q`<div class="avc-region avc-region--${t}" style=${vt(function(t){const e={gridRow:String(t.row??"auto"),gridColumn:String(t.col??"1"),overflow:t.overflow??"hidden",position:"relative",minWidth:"0",minHeight:"0"};return t.align&&"stretch"!==t.align&&(e.alignSelf=t.align),e}(e))}>${i}</div>`})}
         </div>
       </ha-card>
-    `;
-    }
-    render() {
-        if (!this._config || !this.hass)
-            return A;
-        if (this._config.layout)
-            return this._renderGrid(this._config.layout);
-        const schemaWarn = this._schemaWarning();
-        return b `
+    `}render(){if(!this._config||!this.hass)return G;if(this._config.layout)return this._renderGrid(this._config.layout);const t=this._schemaWarning();return q`
       <ha-card>
-        ${this.editMode ? b `<div class="version-chip">v${CARD_VERSION} · ${Math.round(this._cardW)}w</div>` : A}
-        ${schemaWarn ? b `<div style="margin:0 4px;padding:8px 12px;border-radius:12px;border:1px solid rgba(250,173,20,0.55);background:rgba(250,173,20,0.12);color:#faad14;font-size:12px;display:flex;align-items:center;gap:8px">
-          <ha-icon icon="mdi:alert" style="--mdc-icon-size:18px"></ha-icon><span>${schemaWarn}</span>
-        </div>` : A}
+        ${this.editMode?q`<div class="version-chip">v${$t} · ${Math.round(this._cardW)}w</div>`:G}
+        ${t?q`<div style="margin:0 4px;padding:8px 12px;border-radius:12px;border:1px solid rgba(250,173,20,0.55);background:rgba(250,173,20,0.12);color:#faad14;font-size:12px;display:flex;align-items:center;gap:8px">
+          <ha-icon icon="mdi:alert" style="--mdc-icon-size:18px"></ha-icon><span>${t}</span>
+        </div>`:G}
         <div class="badges-row">
-          ${this._config.vacuums.map((v, i) => this._renderBadge(v, i))}
-          ${(this._config.global_actions ?? []).map((ga, i) => this._renderGlobalBadge(ga, i))}
+          ${this._config.vacuums.map((t,e)=>this._renderBadge(t,e))}
+          ${(this._config.global_actions??[]).map((t,e)=>this._renderGlobalBadge(t,e))}
         </div>
         ${this._renderAutoBar()}
         ${this._renderPlanPreview()}
-        ${this._config.map_mode === "merged"
-            ? b `
+        ${"merged"===this._config.map_mode?q`
               ${this._renderResponsive(this._renderMergedMap())}
-              ${this._shownOrdered().map(i => b `
-                ${this._renderMapTools(this._config.vacuums[i])}
-                ${this._renderStatusCard(this._config.vacuums[i], i)}
+              ${this._shownOrdered().map(t=>q`
+                ${this._renderMapTools(this._config.vacuums[t])}
+                ${this._renderStatusCard(this._config.vacuums[t],t)}
               `)}
-            `
-            : this._shownOrdered()
-                .map(i => b `
-                ${this._renderResponsive(this._renderMap(this._config.vacuums[i]))}
-                ${this._renderMapTools(this._config.vacuums[i])}
-                ${this._renderStatusCard(this._config.vacuums[i], i)}
+            `:this._shownOrdered().map(t=>q`
+                ${this._renderResponsive(this._renderMap(this._config.vacuums[t]))}
+                ${this._renderMapTools(this._config.vacuums[t])}
+                ${this._renderStatusCard(this._config.vacuums[t],t)}
               `)}
       </ha-card>
-    `;
-    }
-};
-// ── Styles ──────────────────────────────────────────────────────────────
-AnyVacCard.styles = i$5 `
+    `}};Lt.styles=a`
     :host {
       display: block;
       width: 100%;
@@ -5883,24 +825,6 @@ AnyVacCard.styles = i$5 `
       align-items: center;
       padding: 4px 6px;
     }
-
-    .stats-trio {
-      display: flex;
-      gap: 10px;
-      margin-left: auto;
-      align-items: center;
-      padding-right: 4px;
-    }
-    .stat {
-      display: inline-flex;
-      align-items: center;
-      gap: 3px;
-      font-size: 12px;
-      color: rgba(255, 255, 255, 0.75);
-    }
-    .stat ha-icon { --mdc-icon-size: 15px; color: rgba(255, 255, 255, 0.4); }
-    .stat b { font-weight: 700; }
-    .stat small { font-size: 10px; color: rgba(255, 255, 255, 0.4); }
 
     /* Emergency manual-control icon strip (docs/19 follow-up, portrait only).
        Full-width, one flex slot per vacuum (mirrors .dock-head/.dock-mode
@@ -6299,9 +1223,6 @@ AnyVacCard.styles = i$5 `
     }
     .start-seg--dock { position: relative; }
 
-    /* Grid badges-row extras */
-    .badges-refresh { margin-left: auto; flex-shrink: 0; padding: 8px; }
-    .stats-trio + .badges-refresh { margin-left: 6px; }
     .map-tools-label {
       font-size: 11px;
       font-weight: 700;
@@ -6498,13 +1419,9 @@ AnyVacCard.styles = i$5 `
     .layer-menu-row.on { background: rgba(255,255,255,0.12); border-color: rgba(255,255,255,0.4); }
     .lm-name { flex: 1; text-align: left; }
     .layer-menu-row b { font-weight: 700; }
-    .room-list { display: flex; flex-direction: column; gap: 4px; }
-    .room-row { display: flex; align-items: center; gap: 8px; padding: 6px 10px; border-radius: 10px; border: 1px solid rgba(255,255,255,0.08); background: rgba(255,255,255,0.03); color: rgba(255,255,255,0.85); cursor: pointer; --mdc-icon-size: 18px; }
-    .room-row.on { border-color: rgba(255,255,255,0.5); background: rgba(255,255,255,0.1); }
-    .rl-icon { color: rgba(255,255,255,0.6); }
-    .rl-name { flex: 1; text-align: left; font-size: 13px; }
-    .rl-age { display: flex; align-items: center; gap: 3px; font-size: 12px; --mdc-icon-size: 14px; color: rgba(255,255,255,0.45); }
-    .rl-age b { font-weight: 700; }
+    /* .rl-prog is the live coverage chip (_renderProgChip) and is still used —
+       the rest of the old .room-list/.rl-* set went with _renderRoomList
+       (dead since docs/19 A4, deleted 2026-08-08). */
     .rl-prog { font-size: 12px; font-weight: 700; display: flex; align-items: baseline; gap: 1px; }
     .rl-prog small { font-size: 8px; opacity: 0.55; }
     .map-wrap--fixed { padding-top: 0; }
@@ -6877,1672 +1794,540 @@ AnyVacCard.styles = i$5 `
     .calib-panel { margin-top: 4px; font-size: 12px; opacity: 0.9; padding: 6px 8px; background: rgba(59,130,246,0.12); border-radius: 8px; }
     .calib-panel > div { margin-bottom: 4px; }
     .calib-actions { display: flex; gap: 6px; flex-wrap: wrap; }
-  `;
-__decorate([
-    n$1({ attribute: false })
-], AnyVacCard.prototype, "hass", void 0);
-__decorate([
-    n$1({ attribute: false })
-], AnyVacCard.prototype, "editMode", void 0);
-__decorate([
-    r()
-], AnyVacCard.prototype, "_config", void 0);
-__decorate([
-    r()
-], AnyVacCard.prototype, "_shownSet", void 0);
-__decorate([
-    r()
-], AnyVacCard.prototype, "_holdId", void 0);
-__decorate([
-    r()
-], AnyVacCard.prototype, "_mapMode", void 0);
-__decorate([
-    r()
-], AnyVacCard.prototype, "_inspectKey", void 0);
-__decorate([
-    r()
-], AnyVacCard.prototype, "_dockSheetOpen", void 0);
-__decorate([
-    r()
-], AnyVacCard.prototype, "_dockSheetIdx", void 0);
-__decorate([
-    r()
-], AnyVacCard.prototype, "_modeSheetOpen", void 0);
-__decorate([
-    r()
-], AnyVacCard.prototype, "_careResetPending", void 0);
-__decorate([
-    r()
-], AnyVacCard.prototype, "_modeEntity", void 0);
-__decorate([
-    r()
-], AnyVacCard.prototype, "_dbg", void 0);
-__decorate([
-    r()
-], AnyVacCard.prototype, "_zoneDrag", void 0);
-__decorate([
-    r()
-], AnyVacCard.prototype, "_zoneRectShown", void 0);
-__decorate([
-    r()
-], AnyVacCard.prototype, "_zonePending", void 0);
-__decorate([
-    r()
-], AnyVacCard.prototype, "_zoneEdit", void 0);
-__decorate([
-    r()
-], AnyVacCard.prototype, "_pinPending", void 0);
-__decorate([
-    r()
-], AnyVacCard.prototype, "_layers", void 0);
-__decorate([
-    r()
-], AnyVacCard.prototype, "_layerMenu", void 0);
-__decorate([
-    r()
-], AnyVacCard.prototype, "_localRoomSel", void 0);
-__decorate([
-    r()
-], AnyVacCard.prototype, "_activePresets", void 0);
-__decorate([
-    r()
-], AnyVacCard.prototype, "_planMode", void 0);
-__decorate([
-    r()
-], AnyVacCard.prototype, "_activeGlobalPreset", void 0);
-__decorate([
-    r()
-], AnyVacCard.prototype, "_cardW", void 0);
-__decorate([
-    r()
-], AnyVacCard.prototype, "_mapAR", void 0);
-__decorate([
-    r()
-], AnyVacCard.prototype, "_profile", void 0);
-__decorate([
-    r()
-], AnyVacCard.prototype, "_mapRegW", void 0);
-__decorate([
-    r()
-], AnyVacCard.prototype, "_mapRegH", void 0);
-__decorate([
-    r()
-], AnyVacCard.prototype, "_mapAvailW", void 0);
-__decorate([
-    r()
-], AnyVacCard.prototype, "_mapAvailH", void 0);
-__decorate([
-    r()
-], AnyVacCard.prototype, "_flipLive", void 0);
-__decorate([
-    r()
-], AnyVacCard.prototype, "_now", void 0);
-__decorate([
-    r()
-], AnyVacCard.prototype, "_planPreview", void 0);
-AnyVacCard = __decorate([
-    t$1(CARD_NAME)
-], AnyVacCard);
-const customCards = ((_a = window).customCards ?? (_a.customCards = []));
-if (!customCards.some((c) => c["type"] === CARD_NAME)) {
-    customCards.push({
-        type: CARD_NAME,
-        name: "AnyVac Card",
-        description: "Feature-rich card for Roborock vacuums — map, room selection, multi-vacuum tabs, global actions.",
-        preview: false,
-        documentationURL: "https://github.com/Michailjovic/anyvac-card",
-    });
-}
-
-// ── Defaults ─────────────────────────────────────────────────────────────────
-const DEFAULT_VACUUM = {
-    entity: "", name: "", color: "green", rooms: [],
-    clean_action: { type: "native" },
-};
-const DEFAULT_ROOM = {
-    key: "", name: "", icon: "mdi:square", map_x: 50, map_y: 50,
-};
-/** Distinct default icons cycled across newly added/imported rooms (field
- *  report 2026-07-30: every room defaulted to the SAME icon — `mdi:square`
- *  manually, `mdi:floor-plan` on import — making adjacent/overlapping room
- *  rectangles impossible to tell apart while anchoring them on the
- *  floorplan). Numbered rather than thematic (sofa/bed/etc.): there's no
- *  reliable way to guess a room's real type from its name alone, and a
- *  wrong guess (e.g. "bed" on what's actually the kitchen) would confuse
- *  more than a neutral number does. Purely a starting point — `_hexColorField`-
- *  style, the user can still pick any icon per room afterwards. */
-const ROOM_ICON_PALETTE = [
-    "mdi:numeric-1-circle", "mdi:numeric-2-circle", "mdi:numeric-3-circle",
-    "mdi:numeric-4-circle", "mdi:numeric-5-circle", "mdi:numeric-6-circle",
-    "mdi:numeric-7-circle", "mdi:numeric-8-circle", "mdi:numeric-9-circle",
-    "mdi:numeric-9-plus-circle",
-];
-function _roomIconFor(index) {
-    return ROOM_ICON_PALETTE[Math.min(index, ROOM_ICON_PALETTE.length - 1)];
-}
-const DEFAULT_MAP = {
-    entity: "", rotation: 0, scale: 100, offset_x: 0, offset_y: 0,
-};
-const DEFAULT_GLOBAL = {
-    name: "Whole flat", color: "orange",
-    watch_entities: [],
-    action: { type: "script", entity_id: "" },
-};
-/** Must match the card's built-in defaults in _roomBorderColor() */
-const DEFAULT_THRESHOLDS = [
-    { days: 2, color: "#2ecc71" },
-    { days: 5, color: "#faad14" },
-    { days: 10, color: "#ff9800" },
-];
-/** Clamps a room-rectangle percentage coordinate to the preview's 0–100 bounds. */
-function clampPct(v) {
-    return Math.min(100, Math.max(0, v));
-}
-// ── Editor ───────────────────────────────────────────────────────────────────
-let AnyVacCardEditor = class AnyVacCardEditor extends i$2 {
-    constructor() {
-        super(...arguments);
-        // ── Navigation state ──────────────────────────────────────────────────────
-        this._tab = "vacuums";
-        this._dragRoom = null;
-        // Cleaning-sequence reorder drag state (docs/19) — separate from _dragRoom
-        // since this list is keyed by position in the backend-owned room_sequence,
-        // not by index into a vacuum's own `rooms` config array.
-        this._dragSeq = null;
-        // Accordion open state — always create new instances to trigger Lit reactivity
-        this._openVac = new Set();
-        this._openSensors = new Set();
-        this._openPresets = new Set();
-        this._openAction = new Set();
-        this._openGlobal = new Set();
-        // Per-vacuum: which roomIdx is open (null = none)
-        this._openRoom = new Map();
-        // Maps tab state
-        this._mapVac = 0;
-        this._mapRoom = null;
-        /** Floorplan natural aspect ratio (W/H) learned from the preview image — used by
-         *  the auto-seat fit and to give the preview the correct proportions. */
-        this._pvAR = 0;
-        /** Snapshot of the selected vacuum's live map `entity_picture` (2026-07-26 field
-         *  report — flashing risk). Home Assistant rotates this URL on essentially every
-         *  entity update, and `hass` itself is a reactive property that re-renders this
-         *  editor on every dashboard-wide state change, not just this vacuum's — binding
-         *  an `<img src>` straight to the live value made the map preview / reference
-         *  overlay reload (visibly flash) constantly while editing, unrelated to what the
-         *  user was actually doing. Captured explicitly (tab/vacuum switch, or the
-         *  "Refresh reference map" button) instead of read fresh on every render —
-         *  see `_snapshotRefMap`. */
-        this._refMapUrl = "";
-        this._refMapVac = -1;
-        /** "Use this vacuum's current map as floorplan" (docs/30 §4a field follow-up,
-         *  2026-07-30) — merged mode's per-vacuum auto-seat fit needs a shared
-         *  floorplan image, which today meant manually saving a map picture out of
-         *  HA and re-uploading it into config/www/. Calls the backend's
-         *  `anyvac.snapshot_map_as_floorplan` (integration ≥ 0.88.0) instead. */
-        this._floorplanSnapshotBusy = false;
-        this._floorplanSnapshotError = "";
-        /** Active drag on a room's position dot / rectangle (2026-07-26 — was
-         *  sliders-only, no way to see or drag the actual rectangle extent on the
-         *  floorplan preview). `orig` is the room's state at drag START (not updated
-         *  mid-drag) so a resize always computes from the anchor corner, not from an
-         *  already-moved intermediate value. */
-        this._rectDrag = null;
-        this._initialized = false;
-    }
-    setConfig(config) {
-        this._config = config;
-        if (!this._initialized) {
-            this._initialized = true;
-            this._openVac = new Set((config.vacuums ?? []).map((_, i) => i));
-        }
-    }
-    updated(changed) {
-        if (changed.has("hass") && this.hass) {
-            const dl = this.shadowRoot?.getElementById("ha-entities");
-            if (dl && !dl.options.length) {
-                dl.innerHTML = Object.keys(this.hass.states).sort()
-                    .map(id => "<option value=\"" + id + "\">")
-                    .join("");
-            }
-        }
-        // Deliberately keyed off _tab/_mapVac only, NEVER _config or hass — this is
-        // what stops the reference map from reloading/flashing on every edit (see
-        // `_refMapUrl` docstring). Also covers the very first time the Maps tab is
-        // opened (nothing to snapshot yet).
-        if (this._tab === "maps" && (changed.has("_tab") || changed.has("_mapVac"))) {
-            this._snapshotRefMap();
-        }
-    }
-    /** Explicitly (re-)captures the selected vacuum's live map preview URL — see
-     *  `_refMapUrl`. Called on Maps-tab/vacuum-selection changes and from the
-     *  "Refresh reference map" button; never from a plain re-render. */
-    _snapshotRefMap() {
-        const vacuums = this._config.vacuums;
-        if (!vacuums.length) {
-            this._refMapUrl = "";
-            this._refMapVac = -1;
-            return;
-        }
-        const mapVac = Math.min(this._mapVac, vacuums.length - 1);
-        const entity = this._mapEntityFor(vacuums[mapVac]);
-        this._refMapUrl = entity
-            ? (this.hass.states[entity]?.attributes["entity_picture"] ?? "") : "";
-        this._refMapVac = mapVac;
-    }
-    /** Snapshots `vac`'s currently-resolved map image entity to a static file via
-     *  the backend and sets it as the shared floorplan (`image_base.src`) — see
-     *  `_floorplanSnapshotBusy` above for why this exists. Uses the SAME entity
-     *  the preview above is already showing (`_mapEntityFor`), so what gets
-     *  saved always matches what the user was just looking at. */
-    async _snapshotFloorplan(vac) {
-        const entity = this._mapEntityFor(vac);
-        if (!entity)
-            return;
-        this._floorplanSnapshotBusy = true;
-        this._floorplanSnapshotError = "";
-        try {
-            const res = (await this.hass.callService("anyvac", "snapshot_map_as_floorplan", { image_entity: entity, name: vac.name || vac.entity }, undefined, false, true));
-            const path = res?.response?.path;
-            if (!path)
-                throw new Error("no path in service response");
-            this._setEditedImageBase({ src: path });
-            // A floorplan photo + everyone's raw map blended on top at once is a
-            // wall of noise for a first-time result (field report 2026-07-30) —
-            // once a floorplan exists there's nothing the raw map overlay adds
-            // that the robot position/path don't already show on their own, so
-            // hide it for whoever now shares this floorplan. One-shot side effect
-            // of this explicit button click only; never touches existing configs.
-            if (this._mergedEdit) {
-                const vacuums = this._config.vacuums.map((v) => ({ ...v, hide_map: true }));
-                this._setConfig({ vacuums });
-            }
-            else {
-                const idx = this._config.vacuums.findIndex((v) => v.entity === vac.entity);
-                if (idx >= 0)
-                    this._setVacuum(idx, { hide_map: true });
-            }
-            // docs/30 §8: place this vacuum's OWN rooms exactly onto the crop we
-            // just got back — no dragging needed, and it hands every other vacuum
-            // sharing this floorplan real anchors to auto-fit against (by name).
-            const crop = res?.response?.crop;
-            if (crop) {
-                const idx = this._config.vacuums.findIndex((v) => v.entity === vac.entity);
-                if (idx >= 0)
-                    this._autoPlaceOwnRooms(idx, crop);
-            }
-        }
-        catch (err) {
-            this._floorplanSnapshotError =
-                "Couldn't snapshot this vacuum's map — make sure the anyvac integration " +
-                    "is updated to at least 0.88.0, then try again.";
-            // eslint-disable-next-line no-console
-            console.error("[anyvac-card] snapshot_map_as_floorplan failed:", err);
-        }
-        finally {
-            this._floorplanSnapshotBusy = false;
-        }
-    }
-    // ── Config helpers ────────────────────────────────────────────────────────
-    _fire(config) {
-        this.dispatchEvent(new CustomEvent("config-changed", {
-            detail: { config }, bubbles: true, composed: true,
-        }));
-    }
-    _setConfig(updates) {
-        const next = { ...this._config, ...updates };
-        this._config = next;
-        this._fire(next);
-    }
-    _setVacuum(idx, updates) {
-        const vacuums = [...this._config.vacuums];
-        vacuums[idx] = { ...vacuums[idx], ...updates };
-        const next = { ...this._config, vacuums };
-        this._config = next;
-        this._fire(next);
-    }
-    _setMap(vacIdx, updates) {
-        const existing = this._config.vacuums[vacIdx].map ?? { ...DEFAULT_MAP };
-        this._setVacuum(vacIdx, { map: { ...existing, ...updates } });
-    }
-    _setImageBase(vacIdx, updates) {
-        const existing = this._config.vacuums[vacIdx].image_base ?? { src: "" };
-        this._setVacuum(vacIdx, { image_base: { ...existing, ...updates } });
-    }
-    get _mergedEdit() { return this._config.map_mode === "merged"; }
-    _editRooms() {
-        if (this._mergedEdit)
-            return this._config.rooms ?? [];
-        const vac = this._config.vacuums[Math.min(this._mapVac, this._config.vacuums.length - 1)];
-        return vac?.rooms ?? [];
-    }
-    _setEditedRoom(roomIdx, updates) {
-        if (this._mergedEdit) {
-            const rooms = [...(this._config.rooms ?? [])];
-            rooms[roomIdx] = { ...rooms[roomIdx], ...updates };
-            this._setConfig({ rooms });
-        }
-        else {
-            this._setRoom(Math.min(this._mapVac, this._config.vacuums.length - 1), roomIdx, updates);
-        }
-    }
-    /** Pointer down on a room's dot/rectangle on the map preview (2026-07-26 —
-     *  was slider-only, no way to see OR drag the actual rectangle extent).
-     *  Selects the room immediately (so a plain tap still works like the old
-     *  click-to-select) and arms a potential drag; `pointermove`/`pointerup`
-     *  (below) decide whether it turns into an actual move/resize or stays a
-     *  tap. Pointer capture on the element itself means drags that leave its
-     *  bounds keep being tracked, without needing a full-container overlay. */
-    _onRoomPointerDown(ri, mode, room, e) {
-        e.stopPropagation();
-        const container = e.currentTarget.closest(".map-pos-container");
-        if (!container)
-            return;
-        const containerRect = container.getBoundingClientRect();
-        const wasSelected = this._mapRoom === ri;
-        this._mapRoom = ri;
-        // The corner-handle dots (`.room-rect-handle`) only render once a room is
-        // already selected/"active" — kept that way so the preview doesn't grow
-        // four extra dots on every room at once. That means a user's very FIRST
-        // press near a corner of a not-yet-selected room always landed on the
-        // room BODY (mode "move"), since there was no handle there yet to
-        // actually grab — reported field confusion 2026-07-30 ("grabbing a
-        // corner moves the whole thing, not just that corner"). Fix: detect a
-        // near-corner press on the body itself (same ~16px radius as the real
-        // handle dot) and treat it as a resize of that corner instead, so the
-        // very first press already behaves correctly.
-        let effectiveMode = mode;
-        if (mode === "move" && room.map_w != null) {
-            const px = ((e.clientX - containerRect.left) / containerRect.width) * 100;
-            const py = ((e.clientY - containerRect.top) / containerRect.height) * 100;
-            const cx = room.map_x ?? 50, cy = room.map_y ?? 50;
-            const halfW = room.map_w / 2, halfH = (room.map_h ?? 15) / 2;
-            const rX = (16 / containerRect.width) * 100, rY = (16 / containerRect.height) * 100;
-            const nearLeft = Math.abs(px - (cx - halfW)) <= rX;
-            const nearRight = Math.abs(px - (cx + halfW)) <= rX;
-            const nearTop = Math.abs(py - (cy - halfH)) <= rY;
-            const nearBottom = Math.abs(py - (cy + halfH)) <= rY;
-            if (nearLeft && nearTop)
-                effectiveMode = "resize-nw";
-            else if (nearRight && nearTop)
-                effectiveMode = "resize-ne";
-            else if (nearLeft && nearBottom)
-                effectiveMode = "resize-sw";
-            else if (nearRight && nearBottom)
-                effectiveMode = "resize-se";
-        }
-        this._rectDrag = {
-            ri, mode: effectiveMode,
-            container: containerRect,
-            orig: { x: room.map_x ?? 50, y: room.map_y ?? 50, w: room.map_w ?? 0, h: room.map_h ?? 0 },
-            startClientX: e.clientX, startClientY: e.clientY,
-            moved: false, wasSelected,
-        };
-        e.currentTarget.setPointerCapture(e.pointerId);
-    }
-    _onRoomPointerMove(e) {
-        const d = this._rectDrag;
-        if (!d)
-            return;
-        if (!d.moved) {
-            // A few px of slop before committing to "this is a drag, not a tap" —
-            // avoids the pointerdown's small inevitable jitter re-writing config
-            // (and re-rendering) on every single click.
-            if (Math.hypot(e.clientX - d.startClientX, e.clientY - d.startClientY) < 3)
-                return;
-            d.moved = true;
-        }
-        const rect = d.container;
-        const px = clampPct(((e.clientX - rect.left) / rect.width) * 100);
-        const py = clampPct(((e.clientY - rect.top) / rect.height) * 100);
-        if (d.mode === "move") {
-            this._setEditedRoom(d.ri, { map_x: Math.round(px), map_y: Math.round(py) });
-            return;
-        }
-        // Resize: the OPPOSITE corner from the one being dragged stays anchored
-        // (standard resize-handle behaviour), computed from the room's state at
-        // drag START — never from an already-moved intermediate value, or the
-        // anchor corner would itself drift as the drag progresses.
-        const halfW = d.orig.w / 2, halfH = d.orig.h / 2;
-        const anchor = {
-            "resize-nw": { ox: d.orig.x + halfW, oy: d.orig.y + halfH },
-            "resize-ne": { ox: d.orig.x - halfW, oy: d.orig.y + halfH },
-            "resize-sw": { ox: d.orig.x + halfW, oy: d.orig.y - halfH },
-            "resize-se": { ox: d.orig.x - halfW, oy: d.orig.y - halfH },
-        }[d.mode];
-        const newW = Math.max(2, Math.min(100, Math.abs(px - anchor.ox)));
-        const newH = Math.max(2, Math.min(100, Math.abs(py - anchor.oy)));
-        this._setEditedRoom(d.ri, {
-            map_x: Math.round(clampPct((px + anchor.ox) / 2)),
-            map_y: Math.round(clampPct((py + anchor.oy) / 2)),
-            map_w: Math.round(newW),
-            map_h: Math.round(newH),
-        });
-    }
-    _onRoomPointerUp() {
-        const d = this._rectDrag;
-        if (d && !d.moved && d.wasSelected) {
-            // A genuine tap (no drag) on an already-selected room deselects it —
-            // matches the old dot's click-to-toggle behaviour.
-            this._mapRoom = null;
-        }
-        this._rectDrag = null;
-    }
-    _addEditedRoom() {
-        if (this._mergedEdit) {
-            const existing = this._config.rooms ?? [];
-            const rooms = [...existing, { ...DEFAULT_ROOM, icon: _roomIconFor(existing.length) }];
-            this._setConfig({ rooms });
-            this._mapRoom = rooms.length - 1;
-        }
-        else {
-            this._addRoom(Math.min(this._mapVac, this._config.vacuums.length - 1));
-            this._mapRoom = (this._config.vacuums[this._mapVac]?.rooms?.length ?? 1) - 1;
-        }
-    }
-    _deleteEditedRoom(roomIdx) {
-        if (this._mergedEdit) {
-            const rooms = (this._config.rooms ?? []).filter((_, i) => i !== roomIdx);
-            this._setConfig({ rooms });
-            if (this._mapRoom === roomIdx)
-                this._mapRoom = null;
-        }
-        else {
-            this._deleteRoom(Math.min(this._mapVac, this._config.vacuums.length - 1), roomIdx);
-        }
-    }
-    /** docs/32 follow-up: GUI toggle for the persisted `layout.<profile>.crop.flip`
-     *  default — merges rather than replacing, so it never clobbers other crop
-     *  fields (`fit`/`offset_x`/`offset_y`/`mapOrientation`) that only YAML sets
-     *  today. `flip: false` is written as `undefined` to keep the config clean
-     *  (matches the field's own `=== true` default-off semantics). */
-    _setLayoutFlip(profile, flip) {
-        const layout = this._config.layout ?? {};
-        const profileCfg = layout[profile] ?? {};
-        const crop = { ...(profileCfg.crop ?? {}), flip: flip ? true : undefined };
-        this._setConfig({ layout: { ...layout, [profile]: { ...profileCfg, crop } } });
-    }
-    _setEditedImageBase(updates) {
-        if (this._mergedEdit) {
-            this._setConfig({ image_base: { ...(this._config.image_base ?? { src: "" }), ...updates } });
-        }
-        else {
-            this._setImageBase(Math.min(this._mapVac, this._config.vacuums.length - 1), updates);
-        }
-    }
-    // ── Auto-seating (docs/15) ────────────────────────────────────────────────
-    // NOTE: the old 3-point align tool (v0.17) was removed — it was orphaned code
-    // (never wired into the UI, which is why it "never worked"). Its similarity-fit
-    // maths lives on in seatfit.ts, now fed automatically by room anchors.
-    _editorAR() {
-        return this._pvAR > 0.1 ? this._pvAR : 3.636;
-    }
-    /** Integration sensor for a vacuum: explicit config, else auto-resolved from the
-     *  entity registry — the AnyVac map sensor sits on the same device as the vacuum
-     *  entity (platform "anyvac"; same rule as the card, docs/14 Fáze 3). */
-    _intEntityFor(vac) {
-        if (!vac)
-            return undefined;
-        if (vac.integration_entity)
-            return vac.integration_entity;
-        const reg = this.hass?.entities;
-        const dev = reg?.[vac.entity]?.device_id;
-        return dev
-            ? Object.keys(reg).find((id) => reg[id]?.device_id === dev && reg[id]?.platform === "anyvac" && id.startsWith("sensor."))
-            : undefined;
-    }
-    /** Mirrors the card's `_mapEntityFor` (2026-07-30 onboarding audit, docs/30 §2.1)
-     *  so the Maps tab preview/hints reflect the same auto-resolved entity the card
-     *  will actually use, not just what's explicitly typed into the picker below. */
-    _mapEntityFor(vac) {
-        if (!vac)
-            return undefined;
-        if (vac.map?.entity)
-            return vac.map.entity;
-        const reg = this.hass?.entities;
-        const dev = reg?.[vac.entity]?.device_id;
-        if (!dev)
-            return undefined;
-        const candidates = Object.keys(reg).filter((id) => reg[id]?.device_id === dev && id.startsWith("image."));
-        const live = candidates.filter((id) => {
-            const st = this.hass.states[id];
-            return !!st && st.state !== "unavailable" && st.state !== "unknown" && !!st.attributes["entity_picture"];
-        });
-        return live.length === 1 ? live[0] : (candidates.length === 1 ? candidates[0] : undefined);
-    }
-    /** Backend-owned room cleaning sequence (docs/19): {room_key: 1-based position},
-     *  read from the AnyVac sensor. It's coordinator-wide (same value on every
-     *  vacuum's sensor), so any vacuum with the integration works as the source. */
-    _roomSequence(vac) {
-        const ie = this._intEntityFor(vac);
-        const at = ie ? this.hass?.states?.[ie]?.attributes : undefined;
-        return at?.room_sequence ?? {};
-    }
-    /** Rooms ordered for display in the sequence list: sequenced ones first (by
-     *  position), then anything not yet sequenced in its existing config order. */
-    _roomsInSequenceOrder(rooms, seqMap) {
-        return rooms
-            .map((r, i) => ({ r, i, s: r.key ? seqMap[r.key] ?? Infinity : Infinity }))
-            .sort((a, b) => (a.s !== b.s ? a.s - b.s : a.i - b.i))
-            .map((x) => x.r);
-    }
-    /** Reorder the sequence list and push the whole new order to the backend
-     *  (anyvac.set_room_sequence) — it's coordinator state, not card config, so
-     *  there's nothing to write to `_config` here (docs/19, mirrors room_pins). */
-    _moveSequence(vac, ordered, from, to) {
-        if (from === to)
-            return;
-        const keys = ordered.map((r) => r.key).filter((k) => !!k);
-        if (from < 0 || from >= keys.length || to < 0 || to >= keys.length)
-            return;
-        const [moved] = keys.splice(from, 1);
-        keys.splice(to, 0, moved);
-        void this.hass.callService("anyvac", "set_room_sequence", { rooms: keys });
-    }
-    /** Editor-side view of the effective seat (mirrors the card's _effectiveSeat). */
-    _editorSeat(vacIdx) {
-        const vac = this._config.vacuums[vacIdx];
-        const m = vac?.map;
-        const manual = {
-            rotation: m?.rotation ?? 0, scale: m?.scale ?? 100,
-            offset_x: m?.offset_x ?? 0, offset_y: m?.offset_y ?? 0, auto: false,
-        };
-        if (!vac || m?.seat === "manual")
-            return manual;
-        const merged = this._config.map_mode === "merged";
-        const ib = merged ? this._config.image_base : vac.image_base;
-        if (!ib?.src)
-            return manual;
-        const ie = this._intEntityFor(vac);
-        const at = ie ? this.hass?.states?.[ie]?.attributes : undefined;
-        // Kontrakt v2: anchors need rooms[].bbox_px (integration ≥ 0.18).
-        if (!at || (at.schema_version ?? 0) < 2)
-            return manual;
-        const ar = this._editorAR();
-        const rooms = merged ? (this._config.rooms ?? []) : (vac.rooms ?? []);
-        const fit = computeSeatFit(assembleAnchors(rooms, at, ar), ar);
-        if (!fit)
-            return manual;
-        return {
-            rotation: fit.rotation, scale: fit.scale,
-            offset_x: fit.offset_x, offset_y: fit.offset_y,
-            auto: true, residual: fit.residual_pct, anchorCount: fit.anchors,
-        };
-    }
-    /** Import rooms this vacuum's map knows that are missing on the floorplan —
-     *  placed through the vacuum's current (auto or manual) seat. Works both for the
-     *  initial import from the reference robot and for supplementing rooms only
-     *  another robot has (its seat must exist: shared rooms or manual seating). */
-    _importRooms(vacIdx) {
-        const vac = this._config.vacuums[vacIdx];
-        const ie = this._intEntityFor(vac);
-        const at = ie ? this.hass.states[ie]?.attributes : undefined;
-        const intRooms = Array.isArray(at?.rooms) ? at.rooms : [];
-        // Kontrakt v2: the import places rooms via bbox_px (integration ≥ 0.18).
-        if (!at || (at.schema_version ?? 0) < 2 || !intRooms.length)
-            return;
-        const ar = this._editorAR();
-        const seat = this._editorSeat(vacIdx);
-        const target = this._mergedEdit ? [...(this._config.rooms ?? [])] : [...(vac.rooms ?? [])];
-        const have = new Set(target.map((r) => r.key));
-        let added = 0;
-        for (const ir of intRooms) {
-            const nm = ir?.name;
-            if (!nm || have.has(nm))
-                continue;
-            const rect = roomBboxToRect(ir, at, seat, ar);
-            if (!rect)
-                continue;
-            target.push({ key: nm, name: nm, icon: _roomIconFor(target.length), ...rect });
-            have.add(nm);
-            added++;
-        }
-        if (!added)
-            return;
-        if (this._mergedEdit)
-            this._setConfig({ rooms: target });
-        else
-            this._setVacuum(vacIdx, { rooms: target });
-    }
-    /** docs/30 §8 "big seating rework": places THIS vacuum's own rooms exactly
-     *  onto a floorplan crop just produced by `anyvac.snapshot_map_as_floorplan`
-     *  — no seat, no dragging, no ambiguity, since the crop box is in the same
-     *  bbox_px pixel space this vacuum's own rooms already report and the
-     *  saved file IS that crop (`placeRoomInCrop`). Once these carry real
-     *  map_x/map_y they act as anchors for every OTHER vacuum sharing this
-     *  floorplan whose own room names match (existing `assembleAnchors`/
-     *  `computeSeatFit` auto-fit, unaffected by this) — so this one call is
-     *  usually the entire multi-vacuum seating step, not just this vacuum's. */
-    _autoPlaceOwnRooms(vacIdx, crop) {
-        const vac = this._config.vacuums[vacIdx];
-        const ie = this._intEntityFor(vac);
-        const at = ie ? this.hass.states[ie]?.attributes : undefined;
-        const intRooms = Array.isArray(at?.rooms) ? at.rooms : [];
-        if (!intRooms.length)
-            return;
-        const target = this._mergedEdit ? [...(this._config.rooms ?? [])] : [...(vac.rooms ?? [])];
-        const have = new Set(target.map((r) => r.key));
-        let added = 0;
-        for (const ir of intRooms) {
-            const nm = ir?.name;
-            const bp = ir?.bbox_px;
-            if (!nm || have.has(nm) || !bp)
-                continue;
-            const rect = placeRoomInCrop(bp, crop);
-            if (!rect)
-                continue;
-            target.push({ key: nm, name: nm, icon: _roomIconFor(target.length), ...rect });
-            have.add(nm);
-            added++;
-        }
-        if (!added)
-            return;
-        if (this._mergedEdit)
-            this._setConfig({ rooms: target });
-        else
-            this._setVacuum(vacIdx, { rooms: target });
-    }
-    /** docs/30 §4b: room pairing across vacuums is by NAME, and a mismatch
-     *  (e.g. "Living room" on one robot's app vs. "Living Room" on another's)
-     *  fails silently — the room just never gets an anchor/auto-fit and there's
-     *  no error anywhere. Lists this vacuum's own room names that don't match
-     *  any room already on the shared floorplan, so the editor can surface it
-     *  instead of the user having to notice a missing/misplaced room. A name
-     *  showing up here isn't necessarily wrong — it may just be a room only
-     *  this vacuum covers (the normal case Import is for) — so this is a
-     *  pointer to go check the Roborock app, not an error state. */
-    _unmatchedOwnRoomNames(vacIdx) {
-        const vac = this._config.vacuums[vacIdx];
-        const ie = this._intEntityFor(vac);
-        const at = ie ? this.hass.states[ie]?.attributes : undefined;
-        const intRooms = Array.isArray(at?.rooms) ? at.rooms : [];
-        if (!intRooms.length)
-            return [];
-        const known = new Set(this._editRooms().map((r) => r.key));
-        const out = [];
-        for (const ir of intRooms) {
-            const nm = ir?.name;
-            if (nm && !known.has(nm))
-                out.push(nm);
-        }
-        return out;
-    }
-    _setRoom(vacIdx, roomIdx, updates) {
-        const rooms = [...(this._config.vacuums[vacIdx].rooms ?? [])];
-        rooms[roomIdx] = { ...rooms[roomIdx], ...updates };
-        this._setVacuum(vacIdx, { rooms });
-    }
-    _setCleanAction(vacIdx, updates) {
-        const existing = this._config.vacuums[vacIdx].clean_action ?? { type: "native" };
-        this._setVacuum(vacIdx, { clean_action: { ...existing, ...updates } });
-    }
-    _togglePresets(vacIdx) {
-        const s = new Set(this._openPresets);
-        if (s.has(vacIdx))
-            s.delete(vacIdx);
-        else
-            s.add(vacIdx);
-        this._openPresets = s;
-    }
-    _setPreset(vacIdx, presetIdx, updates) {
-        const presets = [...(this._config.vacuums[vacIdx].presets ?? [])];
-        presets[presetIdx] = { ...presets[presetIdx], ...updates };
-        this._setVacuum(vacIdx, { presets });
-    }
-    _addPreset(vacIdx) {
-        const existing = this._config.vacuums[vacIdx].presets ?? [];
-        const presets = [...existing, { id: "preset" + (existing.length + 1), label: "New preset" }];
-        this._setVacuum(vacIdx, { presets });
-        this._openPresets = new Set([...this._openPresets, vacIdx]);
-    }
-    _deletePreset(vacIdx, presetIdx) {
-        const presets = (this._config.vacuums[vacIdx].presets ?? []).filter((_, i) => i !== presetIdx);
-        this._setVacuum(vacIdx, { presets });
-    }
-    _setGlobal(idx, updates) {
-        const global_actions = [...(this._config.global_actions ?? [])];
-        global_actions[idx] = { ...global_actions[idx], ...updates };
-        const next = { ...this._config, global_actions };
-        this._config = next;
-        this._fire(next);
-    }
-    _setGlobalAction(idx, updates) {
-        const existing = this._config.global_actions?.[idx]?.action ?? { type: "script", entity_id: "" };
-        this._setGlobal(idx, { action: { ...existing, ...updates } });
-    }
-    // ── List mutations ────────────────────────────────────────────────────────
-    _moveVacuum(idx, dir) {
-        const target = idx + dir;
-        const vacuums = [...this._config.vacuums];
-        if (target < 0 || target >= vacuums.length)
-            return;
-        [vacuums[idx], vacuums[target]] = [vacuums[target], vacuums[idx]];
-        const next = { ...this._config, vacuums };
-        this._config = next;
-        this._fire(next);
-    }
-    _addVacuum() {
-        const vacuums = [...this._config.vacuums, { ...DEFAULT_VACUUM }];
-        const next = { ...this._config, vacuums };
-        this._config = next;
-        this._fire(next);
-        const newIdx = vacuums.length - 1;
-        this._openVac = new Set([...this._openVac, newIdx]);
-    }
-    _deleteVacuum(idx) {
-        const vacuums = this._config.vacuums.filter((_, i) => i !== idx);
-        const next = { ...this._config, vacuums };
-        this._config = next;
-        this._fire(next);
-        const s = new Set(this._openVac);
-        s.delete(idx);
-        this._openVac = s;
-    }
-    _addRoom(vacIdx) {
-        const existing = this._config.vacuums[vacIdx].rooms ?? [];
-        const rooms = [...existing, { ...DEFAULT_ROOM, icon: _roomIconFor(existing.length) }];
-        this._setVacuum(vacIdx, { rooms });
-        const m = new Map(this._openRoom);
-        m.set(vacIdx, rooms.length - 1);
-        this._openRoom = m;
-    }
-    _moveRoom(vacIdx, from, to) {
-        if (from === to)
-            return;
-        const rooms = [...(this._config.vacuums[vacIdx].rooms ?? [])];
-        if (from < 0 || from >= rooms.length || to < 0 || to >= rooms.length)
-            return;
-        const [moved] = rooms.splice(from, 1);
-        rooms.splice(to, 0, moved);
-        this._setVacuum(vacIdx, { rooms });
-    }
-    _deleteRoom(vacIdx, roomIdx) {
-        const rooms = (this._config.vacuums[vacIdx].rooms ?? []).filter((_, i) => i !== roomIdx);
-        this._setVacuum(vacIdx, { rooms });
-        const openIdx = this._openRoom.get(vacIdx);
-        if (openIdx === roomIdx) {
-            const m = new Map(this._openRoom);
-            m.set(vacIdx, null);
-            this._openRoom = m;
-        }
-        if (this._mapRoom === roomIdx)
-            this._mapRoom = null;
-    }
-    _setGlobalPreset(idx, updates) {
-        const global_presets = [...(this._config.global_presets ?? [])];
-        global_presets[idx] = { ...global_presets[idx], ...updates };
-        this._setConfig({ global_presets });
-    }
-    _addGlobalPreset() {
-        const existing = this._config.global_presets ?? [];
-        const global_presets = [...existing, { id: "gp" + (existing.length + 1), label: "New clean", scope: "select" }];
-        this._setConfig({ global_presets });
-    }
-    _deleteGlobalPreset(idx) {
-        const global_presets = (this._config.global_presets ?? []).filter((_, i) => i !== idx);
-        this._setConfig({ global_presets });
-    }
-    _addGlobal() {
-        const global_actions = [...(this._config.global_actions ?? []), { ...DEFAULT_GLOBAL }];
-        const next = { ...this._config, global_actions };
-        this._config = next;
-        this._fire(next);
-        const newIdx = global_actions.length - 1;
-        this._openGlobal = new Set([...this._openGlobal, newIdx]);
-    }
-    _deleteGlobal(idx) {
-        const global_actions = (this._config.global_actions ?? []).filter((_, i) => i !== idx);
-        const next = { ...this._config, global_actions };
-        this._config = next;
-        this._fire(next);
-        const s = new Set(this._openGlobal);
-        s.delete(idx);
-        this._openGlobal = s;
-    }
-    // ── Accordion toggle helpers ──────────────────────────────────────────────
-    _toggleVac(idx) {
-        const s = new Set(this._openVac);
-        if (s.has(idx))
-            s.delete(idx);
-        else
-            s.add(idx);
-        this._openVac = s;
-    }
-    _toggleRoom(vacIdx, roomIdx) {
-        const m = new Map(this._openRoom);
-        const cur = m.get(vacIdx) ?? null;
-        m.set(vacIdx, cur === roomIdx ? null : roomIdx);
-        this._openRoom = m;
-    }
-    _toggleSensors(vacIdx) {
-        const s = new Set(this._openSensors);
-        if (s.has(vacIdx))
-            s.delete(vacIdx);
-        else
-            s.add(vacIdx);
-        this._openSensors = s;
-    }
-    _toggleAction(vacIdx) {
-        const s = new Set(this._openAction);
-        if (s.has(vacIdx))
-            s.delete(vacIdx);
-        else
-            s.add(vacIdx);
-        this._openAction = s;
-    }
-    _toggleGlobal(idx) {
-        const s = new Set(this._openGlobal);
-        if (s.has(idx))
-            s.delete(idx);
-        else
-            s.add(idx);
-        this._openGlobal = s;
-    }
-    // ── Shared field helpers ──────────────────────────────────────────────────
-    _entityPicker(label, value, domains, onChange, required = false) {
-        const ph = domains.length ? domains.join(" / ") : "entity_id";
-        const isSingle = domains.length === 1;
-        const listId = isSingle ? "ha-ents-" + domains[0] : "ha-entities";
-        const filtered = isSingle
-            ? Object.keys(this.hass?.states ?? {}).filter(id => id.startsWith(domains[0] + ".")).sort()
-            : null;
-        return b `
-      ${filtered ? b `<datalist id=${listId}>${filtered.map(id => b `<option value=${id}>`)}</datalist>` : A}
+  `,t([ut({attribute:!1})],Lt.prototype,"hass",void 0),t([ut({attribute:!1})],Lt.prototype,"editMode",void 0),t([_t()],Lt.prototype,"_config",void 0),t([_t()],Lt.prototype,"_shownSet",void 0),t([_t()],Lt.prototype,"_holdId",void 0),t([_t()],Lt.prototype,"_mapMode",void 0),t([_t()],Lt.prototype,"_inspectKey",void 0),t([_t()],Lt.prototype,"_dockSheetOpen",void 0),t([_t()],Lt.prototype,"_dockSheetIdx",void 0),t([_t()],Lt.prototype,"_modeSheetOpen",void 0),t([_t()],Lt.prototype,"_careResetPending",void 0),t([_t()],Lt.prototype,"_modeEntity",void 0),t([_t()],Lt.prototype,"_dbg",void 0),t([_t()],Lt.prototype,"_zoneDrag",void 0),t([_t()],Lt.prototype,"_zoneRectShown",void 0),t([_t()],Lt.prototype,"_zonePending",void 0),t([_t()],Lt.prototype,"_zoneEdit",void 0),t([_t()],Lt.prototype,"_pinPending",void 0),t([_t()],Lt.prototype,"_layers",void 0),t([_t()],Lt.prototype,"_layerMenu",void 0),t([_t()],Lt.prototype,"_localRoomSel",void 0),t([_t()],Lt.prototype,"_activePresets",void 0),t([_t()],Lt.prototype,"_planMode",void 0),t([_t()],Lt.prototype,"_activeGlobalPreset",void 0),t([_t()],Lt.prototype,"_cardW",void 0),t([_t()],Lt.prototype,"_mapAR",void 0),t([_t()],Lt.prototype,"_profile",void 0),t([_t()],Lt.prototype,"_mapRegW",void 0),t([_t()],Lt.prototype,"_mapRegH",void 0),t([_t()],Lt.prototype,"_mapAvailW",void 0),t([_t()],Lt.prototype,"_mapAvailH",void 0),t([_t()],Lt.prototype,"_flipLive",void 0),t([_t()],Lt.prototype,"_now",void 0),t([_t()],Lt.prototype,"_planPreview",void 0),Lt=t([ht(xt)],Lt);const Ut=(Wt=window).customCards??(Wt.customCards=[]);Ut.some(t=>t.type===xt)||Ut.push({type:xt,name:"AnyVac Card",description:"Feature-rich card for Roborock vacuums — map, room selection, multi-vacuum tabs, global actions.",preview:!1,documentationURL:"https://github.com/Michailjovic/anyvac-card"});const Gt={entity:"",name:"",color:"green",rooms:[],clean_action:{type:"native"}},Zt={key:"",name:"",icon:"mdi:square",map_x:50,map_y:50},Kt=["mdi:numeric-1-circle","mdi:numeric-2-circle","mdi:numeric-3-circle","mdi:numeric-4-circle","mdi:numeric-5-circle","mdi:numeric-6-circle","mdi:numeric-7-circle","mdi:numeric-8-circle","mdi:numeric-9-circle","mdi:numeric-9-plus-circle"];function Yt(t){return Kt[Math.min(t,Kt.length-1)]}const Xt={entity:"",rotation:0,scale:100,offset_x:0,offset_y:0},Jt={name:"Whole flat",color:"orange",watch_entities:[],action:{type:"script",entity_id:""}},Qt=[{days:2,color:"#2ecc71"},{days:5,color:"#faad14"},{days:10,color:"#ff9800"}];function te(t){return Math.min(100,Math.max(0,t))}let ee=class extends ct{constructor(){super(...arguments),this._tab="vacuums",this._dragRoom=null,this._dragSeq=null,this._openVac=new Set,this._openSensors=new Set,this._openPresets=new Set,this._openAction=new Set,this._openGlobal=new Set,this._openRoom=new Map,this._mapVac=0,this._mapRoom=null,this._pvAR=0,this._refMapUrl="",this._refMapVac=-1,this._floorplanSnapshotBusy=!1,this._floorplanSnapshotError="",this._rectDrag=null,this._initialized=!1}setConfig(t){this._config=t,this._initialized||(this._initialized=!0,this._openVac=new Set((t.vacuums??[]).map((t,e)=>e)))}updated(t){if(t.has("hass")&&this.hass){const t=this.shadowRoot?.getElementById("ha-entities");t&&!t.options.length&&(t.innerHTML=Object.keys(this.hass.states).sort().map(t=>'<option value="'+t+'">').join(""))}"maps"===this._tab&&(t.has("_tab")||t.has("_mapVac"))&&this._snapshotRefMap()}_snapshotRefMap(){const t=this._config.vacuums;if(!t.length)return this._refMapUrl="",void(this._refMapVac=-1);const e=Math.min(this._mapVac,t.length-1),o=this._mapEntityFor(t[e]);this._refMapUrl=o?this.hass.states[o]?.attributes.entity_picture??"":"",this._refMapVac=e}async _snapshotFloorplan(t){const e=this._mapEntityFor(t);if(e){this._floorplanSnapshotBusy=!0,this._floorplanSnapshotError="";try{const o=await this.hass.callService("anyvac","snapshot_map_as_floorplan",{image_entity:e,name:t.name||t.entity},void 0,!1,!0),i=o?.response?.path;if(!i)throw new Error("no path in service response");if(this._setEditedImageBase({src:i}),this._mergedEdit){const t=this._config.vacuums.map(t=>({...t,hide_map:!0}));this._setConfig({vacuums:t})}else{const e=this._config.vacuums.findIndex(e=>e.entity===t.entity);e>=0&&this._setVacuum(e,{hide_map:!0})}const s=o?.response?.crop;if(s){const e=this._config.vacuums.findIndex(e=>e.entity===t.entity);e>=0&&this._autoPlaceOwnRooms(e,s)}}catch(t){this._floorplanSnapshotError="Couldn't snapshot this vacuum's map — make sure the anyvac integration is updated to at least 0.88.0, then try again.",console.error("[anyvac-card] snapshot_map_as_floorplan failed:",t)}finally{this._floorplanSnapshotBusy=!1}}}_fire(t){this.dispatchEvent(new CustomEvent("config-changed",{detail:{config:t},bubbles:!0,composed:!0}))}_setConfig(t){const e={...this._config,...t};this._config=e,this._fire(e)}_setVacuum(t,e){const o=[...this._config.vacuums];o[t]={...o[t],...e};const i={...this._config,vacuums:o};this._config=i,this._fire(i)}_setMap(t,e){const o=this._config.vacuums[t].map??{...Xt};this._setVacuum(t,{map:{...o,...e}})}_setImageBase(t,e){const o=this._config.vacuums[t].image_base??{src:""};this._setVacuum(t,{image_base:{...o,...e}})}get _mergedEdit(){return"merged"===this._config.map_mode}_editRooms(){if(this._mergedEdit)return this._config.rooms??[];const t=this._config.vacuums[Math.min(this._mapVac,this._config.vacuums.length-1)];return t?.rooms??[]}_setEditedRoom(t,e){if(this._mergedEdit){const o=[...this._config.rooms??[]];o[t]={...o[t],...e},this._setConfig({rooms:o})}else this._setRoom(Math.min(this._mapVac,this._config.vacuums.length-1),t,e)}_onRoomPointerDown(t,e,o,i){i.stopPropagation();const s=i.currentTarget.closest(".map-pos-container");if(!s)return;const n=s.getBoundingClientRect(),a=this._mapRoom===t;this._mapRoom=t;let r=e;if("move"===e&&null!=o.map_w){const t=(i.clientX-n.left)/n.width*100,e=(i.clientY-n.top)/n.height*100,s=o.map_x??50,a=o.map_y??50,l=o.map_w/2,c=(o.map_h??15)/2,d=16/n.width*100,h=16/n.height*100,p=Math.abs(t-(s-l))<=d,m=Math.abs(t-(s+l))<=d,u=Math.abs(e-(a-c))<=h,_=Math.abs(e-(a+c))<=h;p&&u?r="resize-nw":m&&u?r="resize-ne":p&&_?r="resize-sw":m&&_&&(r="resize-se")}this._rectDrag={ri:t,mode:r,container:n,orig:{x:o.map_x??50,y:o.map_y??50,w:o.map_w??0,h:o.map_h??0},startClientX:i.clientX,startClientY:i.clientY,moved:!1,wasSelected:a},i.currentTarget.setPointerCapture(i.pointerId)}_onRoomPointerMove(t){const e=this._rectDrag;if(!e)return;if(!e.moved){if(Math.hypot(t.clientX-e.startClientX,t.clientY-e.startClientY)<3)return;e.moved=!0}const o=e.container,i=te((t.clientX-o.left)/o.width*100),s=te((t.clientY-o.top)/o.height*100);if("move"===e.mode)return void this._setEditedRoom(e.ri,{map_x:Math.round(i),map_y:Math.round(s)});const n=e.orig.w/2,a=e.orig.h/2,r={"resize-nw":{ox:e.orig.x+n,oy:e.orig.y+a},"resize-ne":{ox:e.orig.x-n,oy:e.orig.y+a},"resize-sw":{ox:e.orig.x+n,oy:e.orig.y-a},"resize-se":{ox:e.orig.x-n,oy:e.orig.y-a}}[e.mode],l=Math.max(2,Math.min(100,Math.abs(i-r.ox))),c=Math.max(2,Math.min(100,Math.abs(s-r.oy)));this._setEditedRoom(e.ri,{map_x:Math.round(te((i+r.ox)/2)),map_y:Math.round(te((s+r.oy)/2)),map_w:Math.round(l),map_h:Math.round(c)})}_onRoomPointerUp(){const t=this._rectDrag;t&&!t.moved&&t.wasSelected&&(this._mapRoom=null),this._rectDrag=null}_addEditedRoom(){if(this._mergedEdit){const t=this._config.rooms??[],e=[...t,{...Zt,icon:Yt(t.length)}];this._setConfig({rooms:e}),this._mapRoom=e.length-1}else this._addRoom(Math.min(this._mapVac,this._config.vacuums.length-1)),this._mapRoom=(this._config.vacuums[this._mapVac]?.rooms?.length??1)-1}_deleteEditedRoom(t){if(this._mergedEdit){const e=(this._config.rooms??[]).filter((e,o)=>o!==t);this._setConfig({rooms:e}),this._mapRoom===t&&(this._mapRoom=null)}else this._deleteRoom(Math.min(this._mapVac,this._config.vacuums.length-1),t)}_setLayoutFlip(t,e){const o=this._config.layout??{},i=o[t]??{},s={...i.crop??{},flip:!!e||void 0};this._setConfig({layout:{...o,[t]:{...i,crop:s}}})}_setEditedImageBase(t){this._mergedEdit?this._setConfig({image_base:{...this._config.image_base??{src:""},...t}}):this._setImageBase(Math.min(this._mapVac,this._config.vacuums.length-1),t)}_editorAR(){return this._pvAR>.1?this._pvAR:3.636}_intEntityFor(t){if(!t)return;if(t.integration_entity)return t.integration_entity;const e=this.hass?.entities,o=e?.[t.entity]?.device_id;return o?Object.keys(e).find(t=>e[t]?.device_id===o&&"anyvac"===e[t]?.platform&&t.startsWith("sensor.")):void 0}_mapEntityFor(t){if(!t)return;if(t.map?.entity)return t.map.entity;const e=this.hass?.entities,o=e?.[t.entity]?.device_id;if(!o)return;const i=Object.keys(e).filter(t=>e[t]?.device_id===o&&t.startsWith("image.")),s=i.filter(t=>{const e=this.hass.states[t];return!!e&&"unavailable"!==e.state&&"unknown"!==e.state&&!!e.attributes.entity_picture});return 1===s.length?s[0]:1===i.length?i[0]:void 0}_roomSequence(t){const e=this._intEntityFor(t),o=e?this.hass?.states?.[e]?.attributes:void 0;return o?.room_sequence??{}}_roomsInSequenceOrder(t,e){return t.map((t,o)=>({r:t,i:o,s:t.key?e[t.key]??1/0:1/0})).sort((t,e)=>t.s!==e.s?t.s-e.s:t.i-e.i).map(t=>t.r)}_moveSequence(t,e,o,i){if(o===i)return;const s=e.map(t=>t.key).filter(t=>!!t);if(o<0||o>=s.length||i<0||i>=s.length)return;const[n]=s.splice(o,1);s.splice(i,0,n),this.hass.callService("anyvac","set_room_sequence",{rooms:s})}_editorSeat(t){const e=this._config.vacuums[t],o=this._intEntityFor(e),i=o?this.hass?.states?.[o]?.attributes:void 0,s=i&&(i.schema_version??0)>=2?i:void 0;return Dt(this._config,e,s,this._editorAR())}_importRooms(t){const e=this._config.vacuums[t],o=this._intEntityFor(e),i=o?this.hass.states[o]?.attributes:void 0,s=Array.isArray(i?.rooms)?i.rooms:[];if(!i||(i.schema_version??0)<2||!s.length)return;const n=this._editorAR(),a=this._editorSeat(t),r=this._mergedEdit?[...this._config.rooms??[]]:[...e.rooms??[]],l=new Set(r.map(t=>t.key));let c=0;for(const t of s){const e=t?.name;if(!e||l.has(e))continue;const o=It(t,i,a,n);o&&(r.push({key:e,name:e,icon:Yt(r.length),...o}),l.add(e),c++)}c&&(this._mergedEdit?this._setConfig({rooms:r}):this._setVacuum(t,{rooms:r}))}_autoPlaceOwnRooms(t,e){const o=this._config.vacuums[t],i=this._intEntityFor(o),s=i?this.hass.states[i]?.attributes:void 0,n=Array.isArray(s?.rooms)?s.rooms:[];if(!n.length)return;const a=this._mergedEdit?[...this._config.rooms??[]]:[...o.rooms??[]],r=new Set(a.map(t=>t.key));let l=0;for(const t of n){const o=t?.name,i=t?.bbox_px;if(!o||r.has(o)||!i)continue;const s=Ot(i,e);s&&(a.push({key:o,name:o,icon:Yt(a.length),...s}),r.add(o),l++)}l&&(this._mergedEdit?this._setConfig({rooms:a}):this._setVacuum(t,{rooms:a}))}_unmatchedOwnRoomNames(t){const e=this._config.vacuums[t],o=this._intEntityFor(e),i=o?this.hass.states[o]?.attributes:void 0,s=Array.isArray(i?.rooms)?i.rooms:[];if(!s.length)return[];const n=new Set(this._editRooms().map(t=>t.key)),a=[];for(const t of s){const e=t?.name;e&&!n.has(e)&&a.push(e)}return a}_setRoom(t,e,o){const i=[...this._config.vacuums[t].rooms??[]];i[e]={...i[e],...o},this._setVacuum(t,{rooms:i})}_setCleanAction(t,e){const o=this._config.vacuums[t].clean_action??{type:"native"};this._setVacuum(t,{clean_action:{...o,...e}})}_togglePresets(t){const e=new Set(this._openPresets);e.has(t)?e.delete(t):e.add(t),this._openPresets=e}_setPreset(t,e,o){const i=[...this._config.vacuums[t].presets??[]];i[e]={...i[e],...o},this._setVacuum(t,{presets:i})}_addPreset(t){const e=this._config.vacuums[t].presets??[],o=[...e,{id:"preset"+(e.length+1),label:"New preset"}];this._setVacuum(t,{presets:o}),this._openPresets=new Set([...this._openPresets,t])}_deletePreset(t,e){const o=(this._config.vacuums[t].presets??[]).filter((t,o)=>o!==e);this._setVacuum(t,{presets:o})}_setGlobal(t,e){const o=[...this._config.global_actions??[]];o[t]={...o[t],...e};const i={...this._config,global_actions:o};this._config=i,this._fire(i)}_setGlobalAction(t,e){const o=this._config.global_actions?.[t]?.action??{type:"script",entity_id:""};this._setGlobal(t,{action:{...o,...e}})}_moveVacuum(t,e){const o=t+e,i=[...this._config.vacuums];if(o<0||o>=i.length)return;[i[t],i[o]]=[i[o],i[t]];const s={...this._config,vacuums:i};this._config=s,this._fire(s)}_addVacuum(){const t=[...this._config.vacuums,{...Gt}],e={...this._config,vacuums:t};this._config=e,this._fire(e);const o=t.length-1;this._openVac=new Set([...this._openVac,o])}_deleteVacuum(t){const e=this._config.vacuums.filter((e,o)=>o!==t),o={...this._config,vacuums:e};this._config=o,this._fire(o);const i=new Set(this._openVac);i.delete(t),this._openVac=i}_addRoom(t){const e=this._config.vacuums[t].rooms??[],o=[...e,{...Zt,icon:Yt(e.length)}];this._setVacuum(t,{rooms:o});const i=new Map(this._openRoom);i.set(t,o.length-1),this._openRoom=i}_moveRoom(t,e,o){if(e===o)return;const i=[...this._config.vacuums[t].rooms??[]];if(e<0||e>=i.length||o<0||o>=i.length)return;const[s]=i.splice(e,1);i.splice(o,0,s),this._setVacuum(t,{rooms:i})}_deleteRoom(t,e){const o=(this._config.vacuums[t].rooms??[]).filter((t,o)=>o!==e);this._setVacuum(t,{rooms:o});if(this._openRoom.get(t)===e){const e=new Map(this._openRoom);e.set(t,null),this._openRoom=e}this._mapRoom===e&&(this._mapRoom=null)}_setGlobalPreset(t,e){const o=[...this._config.global_presets??[]];o[t]={...o[t],...e},this._setConfig({global_presets:o})}_addGlobalPreset(){const t=this._config.global_presets??[],e=[...t,{id:"gp"+(t.length+1),label:"New clean",scope:"select"}];this._setConfig({global_presets:e})}_deleteGlobalPreset(t){const e=(this._config.global_presets??[]).filter((e,o)=>o!==t);this._setConfig({global_presets:e})}_addGlobal(){const t=[...this._config.global_actions??[],{...Jt}],e={...this._config,global_actions:t};this._config=e,this._fire(e);const o=t.length-1;this._openGlobal=new Set([...this._openGlobal,o])}_deleteGlobal(t){const e=(this._config.global_actions??[]).filter((e,o)=>o!==t),o={...this._config,global_actions:e};this._config=o,this._fire(o);const i=new Set(this._openGlobal);i.delete(t),this._openGlobal=i}_toggleVac(t){const e=new Set(this._openVac);e.has(t)?e.delete(t):e.add(t),this._openVac=e}_toggleRoom(t,e){const o=new Map(this._openRoom),i=o.get(t)??null;o.set(t,i===e?null:e),this._openRoom=o}_toggleSensors(t){const e=new Set(this._openSensors);e.has(t)?e.delete(t):e.add(t),this._openSensors=e}_toggleAction(t){const e=new Set(this._openAction);e.has(t)?e.delete(t):e.add(t),this._openAction=e}_toggleGlobal(t){const e=new Set(this._openGlobal);e.has(t)?e.delete(t):e.add(t),this._openGlobal=e}_entityPicker(t,e,o,i,s=!1){const n=o.length?o.join(" / "):"entity_id",a=1===o.length,r=a?"ha-ents-"+o[0]:"ha-entities",l=a?Object.keys(this.hass?.states??{}).filter(t=>t.startsWith(o[0]+".")).sort():null;return q`
+      ${l?q`<datalist id=${r}>${l.map(t=>q`<option value=${t}>`)}</datalist>`:G}
       <div class="field">
-        <label>${label}${required ? b `<span class="required"> *</span>` : A}</label>
-        <input class="text-input" type="text" list=${listId}
-          .value=${value ?? ""} placeholder=${ph}
-          @input=${(e) => {
-            const v = e.target.value;
-            if (v === "" || this.hass.states[v])
-                onChange(v);
-        }}
-          @change=${(e) => onChange(e.target.value)} />
-      </div>`;
-    }
-    _textField(label, value, onChange, placeholder = "") {
-        return b `
+        <label>${t}${s?q`<span class="required"> *</span>`:G}</label>
+        <input class="text-input" type="text" list=${r}
+          .value=${e??""} placeholder=${n}
+          @input=${t=>{const e=t.target.value;(""===e||this.hass.states[e])&&i(e)}}
+          @change=${t=>i(t.target.value)} />
+      </div>`}_textField(t,e,o,i=""){return q`
       <div class="field">
-        <label>${label}</label>
-        <input class="text-input" type="text" .value=${value ?? ""} placeholder=${placeholder}
-          @change=${(e) => onChange(e.target.value)} />
-      </div>`;
-    }
-    /** Resolves a VacuumColor (legacy preset name or custom hex) to a CSS colour
-     *  string — mirrors `_resolveColor` in anyvac-card.ts. Used for accordion
-     *  accent borders and to seed the hex swatch with the right colour even
-     *  when the stored value is still one of the three legacy names. */
-    _resolveColor(raw, fallback) {
-        const c = raw ?? fallback;
-        return COLOR_HEX[c] ?? c;
-    }
-    /** Hex colour field with a native colour-picker swatch alongside the text input —
-     *  the swatch writes back as a hex string, so both stay interchangeable. Falls
-     *  back to the placeholder colour for the swatch when the current value isn't a
-     *  valid #rrggbb (empty, or a CSS variable/name some configs still use). */
-    _hexColorField(label, value, onChange, placeholder) {
-        const swatch = /^#[0-9a-fA-F]{6}$/.test(value ?? "") ? value : placeholder;
-        return b `
+        <label>${t}</label>
+        <input class="text-input" type="text" .value=${e??""} placeholder=${i}
+          @change=${t=>o(t.target.value)} />
+      </div>`}_resolveColor(t,e){const o=t??e;return Rt[o]??o}_hexColorField(t,e,o,i){const s=/^#[0-9a-fA-F]{6}$/.test(e??"")?e:i;return q`
       <div class="field">
-        <label>${label} (hex)</label>
+        <label>${t} (hex)</label>
         <div class="hex-color-row">
-          <input type="color" class="threshold-color" .value=${swatch}
-            @input=${(e) => onChange(e.target.value)} />
-          <input class="text-input" type="text" .value=${value ?? ""} placeholder=${placeholder}
-            @change=${(e) => onChange(e.target.value)} />
+          <input type="color" class="threshold-color" .value=${s}
+            @input=${t=>o(t.target.value)} />
+          <input class="text-input" type="text" .value=${e??""} placeholder=${i}
+            @change=${t=>o(t.target.value)} />
         </div>
-      </div>`;
-    }
-    _numberSlider(label, value, min, max, step, onChange, suffix = "") {
-        const cur = value ?? 0;
-        return b `
+      </div>`}_numberSlider(t,e,o,i,s,n,a=""){const r=e??0;return q`
       <div class="field field--row">
-        <label>${label}</label>
+        <label>${t}</label>
         <div class="slider-wrap">
-          <input type="range" class="slider" min=${min} max=${max} step=${step} .value=${String(cur)}
-            @input=${(e) => onChange(Number(e.target.value))} />
-          <span class="slider-val">${cur}${suffix}</span>
+          <input type="range" class="slider" min=${o} max=${i} step=${s} .value=${String(r)}
+            @input=${t=>n(Number(t.target.value))} />
+          <span class="slider-val">${r}${a}</span>
         </div>
-      </div>`;
-    }
-    _selectField(label, value, options, onChange) {
-        return b `
+      </div>`}_selectField(t,e,o,i){return q`
       <div class="field field--row">
-        <label>${label}</label>
-        <select class="select-input" @change=${(e) => onChange(e.target.value)}>
-          ${options.map(o => b `<option value=${o.value} ?selected=${o.value === value}>${o.label}</option>`)}
+        <label>${t}</label>
+        <select class="select-input" @change=${t=>i(t.target.value)}>
+          ${o.map(t=>q`<option value=${t.value} ?selected=${t.value===e}>${t.label}</option>`)}
         </select>
-      </div>`;
-    }
-    _optionSelectFromList(label, opts, value, onChange) {
-        return b `
+      </div>`}_optionSelectFromList(t,e,o,i){return q`
       <div class="field field--row">
-        <label>${label}</label>
+        <label>${t}</label>
         <select class="select-input"
-          @change=${(e) => onChange(e.target.value)}>
+          @change=${t=>i(t.target.value)}>
           <option value="">— none —</option>
-          ${opts.map(o => b `<option value=${o} ?selected=${o === value}>${o}</option>`)}
+          ${e.map(t=>q`<option value=${t} ?selected=${t===o}>${t}</option>`)}
         </select>
-      </div>`;
-    }
-    _optionSelect(label, entity, value, onChange) {
-        const opts = entity
-            ? (this.hass.states[entity]?.attributes["options"] ?? [])
-            : [];
-        if (!opts.length)
-            return this._textField(label, value, onChange, "e.g. balanced");
-        return b `
+      </div>`}_optionSelect(t,e,o,i){const s=e?this.hass.states[e]?.attributes.options??[]:[];return s.length?q`
       <div class="field field--row">
-        <label>${label}</label>
+        <label>${t}</label>
         <select class="select-input"
-          @change=${(e) => onChange(e.target.value)}>
+          @change=${t=>i(t.target.value)}>
           <option value="">— none —</option>
-          ${opts.map(o => b `<option value=${o} ?selected=${o === value}>${o}</option>`)}
+          ${s.map(t=>q`<option value=${t} ?selected=${t===o}>${t}</option>`)}
         </select>
-      </div>`;
-    }
-    _iconPickerField(value, onChange) {
-        return b `
+      </div>`:this._textField(t,o,i,"e.g. balanced")}_iconPickerField(t,e){return q`
       <div class="field">
         <label>Icon</label>
-        <ha-icon-picker .value=${value ?? "mdi:square"}
-          @value-changed=${(e) => onChange(e.detail.value)}
+        <ha-icon-picker .value=${t??"mdi:square"}
+          @value-changed=${t=>e(t.detail.value)}
         ></ha-icon-picker>
-      </div>`;
-    }
-    _areaPicker(label, value, onChange) {
-        const areas = Object.values(this.hass?.areas ?? {});
-        if (!areas.length)
-            return this._textField(label, value, onChange, "e.g. living_room");
-        return b `
+      </div>`}_areaPicker(t,e,o){const i=Object.values(this.hass?.areas??{});return i.length?q`
       <div class="field field--row">
-        <label>${label}</label>
+        <label>${t}</label>
         <select class="select-input"
-          @change=${(e) => onChange(e.target.value)}>
+          @change=${t=>o(t.target.value)}>
           <option value="">— not mapped —</option>
-          ${[...areas].sort((a, b) => a.name.localeCompare(b.name)).map(a => b `<option value=${a.area_id} ?selected=${a.area_id === value}>${a.name}</option>`)}
+          ${[...i].sort((t,e)=>t.name.localeCompare(e.name)).map(t=>q`<option value=${t.area_id} ?selected=${t.area_id===e}>${t.name}</option>`)}
         </select>
-      </div>`;
-    }
-    // ── Tab: Vacuums ──────────────────────────────────────────────────────────
-    _renderVacuumsTab() {
-        return b `
+      </div>`:this._textField(t,e,o,"e.g. living_room")}_renderVacuumsTab(){return q`
       <div class="tab-body">
-        ${this._config.vacuums.length === 0
-            ? b `<p class="hint">No vacuums yet. Add one below.</p>`
-            : this._config.vacuums.map((vac, i) => this._renderVacuumAccordion(vac, i))}
-        <button class="btn btn--add" @click=${() => this._addVacuum()}>
+        ${0===this._config.vacuums.length?q`<p class="hint">No vacuums yet. Add one below.</p>`:this._config.vacuums.map((t,e)=>this._renderVacuumAccordion(t,e))}
+        <button class="btn btn--add" @click=${()=>this._addVacuum()}>
           <ha-icon icon="mdi:plus"></ha-icon> Add vacuum
         </button>
-      </div>`;
-    }
-    _renderVacuumAccordion(vac, idx) {
-        const color = this._resolveColor(vac.color, "green");
-        const isOpen = this._openVac.has(idx);
-        return b `
-      <div class="acc-row" style=${o({ borderLeft: "3px solid " + color })}>
-        <div class="acc-header" @click=${() => this._toggleVac(idx)}>
-          ${vac.image
-            ? b `<img class="acc-img" src=${vac.image} alt=${vac.name ?? ""} />`
-            : b `<ha-icon icon="mdi:robot-vacuum" style=${o({ color, width: "36px", height: "36px" })}></ha-icon>`}
+      </div>`}_renderVacuumAccordion(t,e){const o=this._resolveColor(t.color,"green"),i=this._openVac.has(e);return q`
+      <div class="acc-row" style=${vt({borderLeft:"3px solid "+o})}>
+        <div class="acc-header" @click=${()=>this._toggleVac(e)}>
+          ${t.image?q`<img class="acc-img" src=${t.image} alt=${t.name??""} />`:q`<ha-icon icon="mdi:robot-vacuum" style=${vt({color:o,width:"36px",height:"36px"})}></ha-icon>`}
           <div class="acc-info">
-            <span class="acc-name">${vac.name || vac.entity || "Unnamed vacuum"}</span>
-            <span class="acc-sub">${vac.entity}</span>
+            <span class="acc-name">${t.name||t.entity||"Unnamed vacuum"}</span>
+            <span class="acc-sub">${t.entity}</span>
           </div>
-          <button class="icon-btn" ?disabled=${idx === 0}
-            @click=${(e) => { e.stopPropagation(); this._moveVacuum(idx, -1); }}>
+          <button class="icon-btn" ?disabled=${0===e}
+            @click=${t=>{t.stopPropagation(),this._moveVacuum(e,-1)}}>
             <ha-icon icon="mdi:arrow-up"></ha-icon>
           </button>
-          <button class="icon-btn" ?disabled=${idx === this._config.vacuums.length - 1}
-            @click=${(e) => { e.stopPropagation(); this._moveVacuum(idx, 1); }}>
+          <button class="icon-btn" ?disabled=${e===this._config.vacuums.length-1}
+            @click=${t=>{t.stopPropagation(),this._moveVacuum(e,1)}}>
             <ha-icon icon="mdi:arrow-down"></ha-icon>
           </button>
           <button class="icon-btn icon-btn--danger"
-            @click=${(e) => { e.stopPropagation(); this._deleteVacuum(idx); }}>
+            @click=${t=>{t.stopPropagation(),this._deleteVacuum(e)}}>
             <ha-icon icon="mdi:delete"></ha-icon>
           </button>
-          <ha-icon icon=${isOpen ? "mdi:chevron-up" : "mdi:chevron-down"} class="acc-chevron"></ha-icon>
+          <ha-icon icon=${i?"mdi:chevron-up":"mdi:chevron-down"} class="acc-chevron"></ha-icon>
         </div>
 
-        ${isOpen ? b `
+        ${i?q`
           <div class="acc-body">
 
             <div class="section-title">Basic</div>
-            ${this._entityPicker("Vacuum entity", vac.entity, ["vacuum"], v => this._setVacuum(idx, { entity: v }), true)}
-            ${this._textField("Display name", vac.name, v => this._setVacuum(idx, { name: v }), "e.g. S8")}
-            ${this._textField("Image path", vac.image, v => this._setVacuum(idx, { image: v }), "/local/...")}
-            ${this._hexColorField("Accent colour", vac.color ? this._resolveColor(vac.color, "green") : undefined, v => this._setVacuum(idx, { color: v || undefined }), DEFAULT_VACUUM_PALETTE[idx % DEFAULT_VACUUM_PALETTE.length])}
-            ${this._selectField("Role", vac.clean_type ?? "auto", [{ value: "auto", label: "Auto-detect from clean action" },
-            { value: "dry", label: "Dry only" },
-            { value: "wet", label: "Wet only" },
-            { value: "both", label: "Both — follow live mode" }], v => this._setVacuum(idx, { clean_type: v === "auto" ? undefined : v }))}
+            ${this._entityPicker("Vacuum entity",t.entity,["vacuum"],t=>this._setVacuum(e,{entity:t}),!0)}
+            ${this._textField("Display name",t.name,t=>this._setVacuum(e,{name:t}),"e.g. S8")}
+            ${this._textField("Image path",t.image,t=>this._setVacuum(e,{image:t}),"/local/...")}
+            ${this._hexColorField("Accent colour",t.color?this._resolveColor(t.color,"green"):void 0,t=>this._setVacuum(e,{color:t||void 0}),Mt[e%Mt.length])}
+            ${this._selectField("Role",t.clean_type??"auto",[{value:"auto",label:"Auto-detect from clean action"},{value:"dry",label:"Dry only"},{value:"wet",label:"Wet only"},{value:"both",label:"Both — follow live mode"}],t=>this._setVacuum(e,{clean_type:"auto"===t?void 0:t}))}
             <p class="hint">This vacuum's capability — controls which time estimate and which dry/wet layer it uses. Not the run-time Dry/Wet/Both choice (that's made on the controller). "Both" follows the live water mode (needs the integration sensor).</p>
 
-            ${this._renderSensorsSection(idx, vac)}
-            ${this._renderCleanActionSection(idx, vac)}
-            ${this._renderPresetsSection(idx, vac)}
+            ${this._renderSensorsSection(e,t)}
+            ${this._renderCleanActionSection(e,t)}
+            ${this._renderPresetsSection(e,t)}
 
-            <div class="section-title">Rooms (${(vac.rooms ?? []).length})</div>
-            ${this._intEntityFor(vac)
-            ? b `<p class="hint">With the AnyVac integration, rooms appear automatically from
+            <div class="section-title">Rooms (${(t.rooms??[]).length})</div>
+            ${this._intEntityFor(t)?q`<p class="hint">With the AnyVac integration, rooms appear automatically from
                   this vacuum's own map — you don't need to add them here. Add a room below only to
-                  override its icon/display name, or to position it on a custom floorplan (Maps tab).</p>`
-            : b `<p class="hint">Add one entry per room this vacuum can clean.</p>`}
-            ${(vac.rooms ?? []).map((r, ri) => this._renderRoomAccordion(r, idx, ri))}
-            <button class="btn btn--add" @click=${() => this._addRoom(idx)}>
+                  override its icon/display name, or to position it on a custom floorplan (Maps tab).</p>`:q`<p class="hint">Add one entry per room this vacuum can clean.</p>`}
+            ${(t.rooms??[]).map((t,o)=>this._renderRoomAccordion(t,e,o))}
+            <button class="btn btn--add" @click=${()=>this._addRoom(e)}>
               <ha-icon icon="mdi:plus"></ha-icon> Add room
             </button>
 
           </div>
-        ` : A}
-      </div>`;
-    }
-    _renderSensorsSection(vacIdx, vac) {
-        const isOpen = this._openSensors.has(vacIdx);
-        const configured = [vac.status_entity, vac.battery_entity, vac.last_clean_entity,
-            vac.progress_entity, vac.current_room_entity, vac.error_entity].filter(Boolean).length;
-        return b `
+        `:G}
+      </div>`}_renderSensorsSection(t,e){const o=this._openSensors.has(t),i=[e.status_entity,e.battery_entity,e.last_clean_entity,e.progress_entity,e.current_room_entity,e.error_entity].filter(Boolean).length;return q`
       <div class="collapsible">
-        <div class="collapsible-header" @click=${() => this._toggleSensors(vacIdx)}>
+        <div class="collapsible-header" @click=${()=>this._toggleSensors(t)}>
           <span class="collapsible-title">Sensors</span>
-          ${configured ? b `<span class="badge">${configured} configured</span>` : A}
-          <ha-icon icon=${isOpen ? "mdi:chevron-up" : "mdi:chevron-down"} class="acc-chevron"></ha-icon>
+          ${i?q`<span class="badge">${i} configured</span>`:G}
+          <ha-icon icon=${o?"mdi:chevron-up":"mdi:chevron-down"} class="acc-chevron"></ha-icon>
         </div>
-        ${isOpen ? b `
+        ${o?q`
           <div class="collapsible-body">
             <p class="hint">Leave the sensors below blank to auto-fill them from the vacuum's device (battery, status, last clean, progress, current room, error).</p>
-            ${this._entityPicker("Status", vac.status_entity, ["sensor"], v => this._setVacuum(vacIdx, { status_entity: v || undefined }))}
-            ${this._entityPicker("Battery", vac.battery_entity, ["sensor"], v => this._setVacuum(vacIdx, { battery_entity: v || undefined }))}
-            ${this._entityPicker("Last clean end", vac.last_clean_entity, ["sensor"], v => this._setVacuum(vacIdx, { last_clean_entity: v || undefined }))}
-            ${this._entityPicker("Progress", vac.progress_entity, ["sensor"], v => this._setVacuum(vacIdx, { progress_entity: v || undefined }))}
-            ${this._entityPicker("Current room", vac.current_room_entity, ["sensor"], v => this._setVacuum(vacIdx, { current_room_entity: v || undefined }))}
-            ${this._entityPicker("Error", vac.error_entity, ["sensor"], v => this._setVacuum(vacIdx, { error_entity: v || undefined }))}
+            ${this._entityPicker("Status",e.status_entity,["sensor"],e=>this._setVacuum(t,{status_entity:e||void 0}))}
+            ${this._entityPicker("Battery",e.battery_entity,["sensor"],e=>this._setVacuum(t,{battery_entity:e||void 0}))}
+            ${this._entityPicker("Last clean end",e.last_clean_entity,["sensor"],e=>this._setVacuum(t,{last_clean_entity:e||void 0}))}
+            ${this._entityPicker("Progress",e.progress_entity,["sensor"],e=>this._setVacuum(t,{progress_entity:e||void 0}))}
+            ${this._entityPicker("Current room",e.current_room_entity,["sensor"],e=>this._setVacuum(t,{current_room_entity:e||void 0}))}
+            ${this._entityPicker("Error",e.error_entity,["sensor"],e=>this._setVacuum(t,{error_entity:e||void 0}))}
           </div>
-        ` : A}
-      </div>`;
-    }
-    _renderPresetsSection(vacIdx, vac) {
-        const isOpen = this._openPresets.has(vacIdx);
-        const presets = vac.presets ?? [];
-        const speeds = this.hass.states[vac.entity]?.attributes["fan_speed_list"] ?? [];
-        const ca = vac.clean_action;
-        const mopModeEnt = ca?.mop_mode_entity;
-        const mopIntEnt = ca?.mop_intensity_entity;
-        return b `
+        `:G}
+      </div>`}_renderPresetsSection(t,e){const o=this._openPresets.has(t),i=e.presets??[],s=this.hass.states[e.entity]?.attributes.fan_speed_list??[],n=e.clean_action,a=n?.mop_mode_entity,r=n?.mop_intensity_entity;return q`
       <div class="collapsible">
-        <div class="collapsible-header" @click=${() => this._togglePresets(vacIdx)}>
+        <div class="collapsible-header" @click=${()=>this._togglePresets(t)}>
           <span class="collapsible-title">Setting presets</span>
-          ${presets.length ? b `<span class="badge">${presets.length}</span>` : A}
-          <ha-icon icon=${isOpen ? "mdi:chevron-up" : "mdi:chevron-down"} class="acc-chevron"></ha-icon>
+          ${i.length?q`<span class="badge">${i.length}</span>`:G}
+          <ha-icon icon=${o?"mdi:chevron-up":"mdi:chevron-down"} class="acc-chevron"></ha-icon>
         </div>
-        ${isOpen ? b `
+        ${o?q`
           <div class="collapsible-body">
             <p class="hint">Named "how" bundles for Manual mode — the user picks one on the controller, then picks rooms. Mop entities come from Clean action above; presets only set the values. With fewer than 2 presets the controller shows no chips (a default from Clean action is used).</p>
-            ${presets.map((p, pi) => b `
+            ${i.map((e,o)=>q`
               <div class="sub-section">
                 <div class="sub-title" style="display:flex;align-items:center;justify-content:space-between">
-                  <span>${p.label || p.id}</span>
+                  <span>${e.label||e.id}</span>
                   <button class="icon-btn icon-btn--danger" title="Delete preset"
-                    @click=${() => this._deletePreset(vacIdx, pi)}>
+                    @click=${()=>this._deletePreset(t,o)}>
                     <ha-icon icon="mdi:delete"></ha-icon>
                   </button>
                 </div>
-                ${this._textField("Label", p.label, v => this._setPreset(vacIdx, pi, { label: v }), "e.g. Dry")}
-                ${this._textField("Icon", p.icon, v => this._setPreset(vacIdx, pi, { icon: v || undefined }), "mdi:broom")}
-                ${speeds.length
-            ? this._optionSelectFromList("Suction", speeds, p.suction_level, v => this._setPreset(vacIdx, pi, { suction_level: v || undefined }))
-            : this._textField("Suction", p.suction_level, v => this._setPreset(vacIdx, pi, { suction_level: v || undefined }), "e.g. max")}
-                ${mopModeEnt ? this._optionSelect("Mop mode", mopModeEnt, p.mop_mode, v => this._setPreset(vacIdx, pi, { mop_mode: v || undefined })) : A}
-                ${mopIntEnt ? this._optionSelect("Mop intensity", mopIntEnt, p.mop_intensity, v => this._setPreset(vacIdx, pi, { mop_intensity: v || undefined })) : A}
-                ${this._numberSlider("Repeat passes", p.repeat ?? 1, 1, 3, 1, v => this._setPreset(vacIdx, pi, { repeat: v }))}
+                ${this._textField("Label",e.label,e=>this._setPreset(t,o,{label:e}),"e.g. Dry")}
+                ${this._textField("Icon",e.icon,e=>this._setPreset(t,o,{icon:e||void 0}),"mdi:broom")}
+                ${s.length?this._optionSelectFromList("Suction",s,e.suction_level,e=>this._setPreset(t,o,{suction_level:e||void 0})):this._textField("Suction",e.suction_level,e=>this._setPreset(t,o,{suction_level:e||void 0}),"e.g. max")}
+                ${a?this._optionSelect("Mop mode",a,e.mop_mode,e=>this._setPreset(t,o,{mop_mode:e||void 0})):G}
+                ${r?this._optionSelect("Mop intensity",r,e.mop_intensity,e=>this._setPreset(t,o,{mop_intensity:e||void 0})):G}
+                ${this._numberSlider("Repeat passes",e.repeat??1,1,3,1,e=>this._setPreset(t,o,{repeat:e}))}
               </div>
             `)}
-            <button class="btn btn--add" @click=${() => this._addPreset(vacIdx)}>
+            <button class="btn btn--add" @click=${()=>this._addPreset(t)}>
               <ha-icon icon="mdi:plus"></ha-icon> Add preset
             </button>
           </div>
-        ` : A}
-      </div>`;
-    }
-    _renderCleanActionSection(vacIdx, vac) {
-        const isOpen = this._openAction.has(vacIdx);
-        const action = vac.clean_action ?? { type: "native" };
-        return b `
+        `:G}
+      </div>`}_renderCleanActionSection(t,e){const o=this._openAction.has(t),i=e.clean_action??{type:"native"};return q`
       <div class="collapsible">
-        <div class="collapsible-header" @click=${() => this._toggleAction(vacIdx)}>
+        <div class="collapsible-header" @click=${()=>this._toggleAction(t)}>
           <span class="collapsible-title">Clean action</span>
-          <span class="badge">${action.type}</span>
-          <ha-icon icon=${isOpen ? "mdi:chevron-up" : "mdi:chevron-down"} class="acc-chevron"></ha-icon>
+          <span class="badge">${i.type}</span>
+          <ha-icon icon=${o?"mdi:chevron-up":"mdi:chevron-down"} class="acc-chevron"></ha-icon>
         </div>
-        ${isOpen ? b `
+        ${o?q`
           <div class="collapsible-body">
-            ${this._renderCleanActionEditor(vacIdx, vac)}
+            ${this._renderCleanActionEditor(t,e)}
           </div>
-        ` : A}
-      </div>`;
-    }
-    _renderCleanActionEditor(vacIdx, vac) {
-        const action = vac.clean_action ?? { type: "native" };
-        return b `
-      ${this._selectField("Strategy", action.type === "native-auto" ? "native" : action.type, [{ value: "native", label: "Native (vacuum.send_command + segment IDs)" },
-            { value: "native-area", label: "Native area (vacuum.clean_area)" },
-            { value: "script", label: "Custom script" }], v => {
-            if (v === "script") {
-                this._setVacuum(vacIdx, { clean_action: { type: "script", entity_id: "" } });
-                return;
-            }
-            // Carry shared settings over when switching between native variants
-            const prev = this._config.vacuums[vacIdx]?.clean_action;
-            const carry = {};
-            if (prev && prev.type !== "script") {
-                for (const k of ["repeat", "suction_level", "mop_mode_entity", "mop_mode",
-                    "mop_intensity_entity", "mop_intensity"]) {
-                    const val = prev[k];
-                    if (val !== undefined)
-                        carry[k] = val;
-                }
-            }
-            this._setVacuum(vacIdx, { clean_action: { type: v, ...carry } });
-        })}
-      ${action.type === "script"
-            ? this._renderScriptAction(vacIdx, action)
-            : this._renderNativeOptions(vacIdx, action)}`;
-    }
-    /** Shared editor for all three native strategies — only the hint differs */
-    _renderNativeOptions(vacIdx, action) {
-        const hint = action.type === "native-area"
-            ? b `<p class="hint">Calls <code>vacuum.clean_area</code> (degraded mode only — with the AnyVac integration the START button sends <code>anyvac.clean</code> instead). No repeat; repeat lives server-side in <code>anyvac.clean</code>.</p>`
-            : action.type === "native-auto"
-                ? b `<p class="hint">Legacy value, no longer offered above — behaves identically to <strong>Native</strong> (segment-based) both with and without the integration. Safe to leave as-is; re-selecting "Native" above rewrites it.</p>`
-                : b `<p class="hint">Degraded mode only — with the AnyVac integration the START button always sends <code>anyvac.clean</code> instead, which resolves segments server-side.</p>`;
-        return b `
+        `:G}
+      </div>`}_renderCleanActionEditor(t,e){const o=e.clean_action??{type:"native"};return q`
+      ${this._selectField("Strategy","native-auto"===o.type?"native":o.type,[{value:"native",label:"Native (vacuum.send_command + segment IDs)"},{value:"native-area",label:"Native area (vacuum.clean_area)"},{value:"script",label:"Custom script"}],e=>{if("script"===e)return void this._setVacuum(t,{clean_action:{type:"script",entity_id:""}});const o=this._config.vacuums[t]?.clean_action,i={};if(o&&"script"!==o.type)for(const t of["repeat","suction_level","mop_mode_entity","mop_mode","mop_intensity_entity","mop_intensity"]){const e=o[t];void 0!==e&&(i[t]=e)}this._setVacuum(t,{clean_action:{type:e,...i}})})}
+      ${"script"===o.type?this._renderScriptAction(t,o):this._renderNativeOptions(t,o)}`}_renderNativeOptions(t,e){const o="native-area"===e.type?q`<p class="hint">Calls <code>vacuum.clean_area</code> (degraded mode only — with the AnyVac integration the START button sends <code>anyvac.clean</code> instead). No repeat; repeat lives server-side in <code>anyvac.clean</code>.</p>`:"native-auto"===e.type?q`<p class="hint">Legacy value, no longer offered above — behaves identically to <strong>Native</strong> (segment-based) both with and without the integration. Safe to leave as-is; re-selecting "Native" above rewrites it.</p>`:q`<p class="hint">Degraded mode only — with the AnyVac integration the START button always sends <code>anyvac.clean</code> instead, which resolves segments server-side.</p>`;return q`
       <div class="sub-section">
-        ${hint}
-        ${this._numberSlider("Repeat passes", action.repeat ?? 1, 1, 3, 1, v => this._setCleanAction(vacIdx, { repeat: v }))}
+        ${o}
+        ${this._numberSlider("Repeat passes",e.repeat??1,1,3,1,e=>this._setCleanAction(t,{repeat:e}))}
         <div class="sub-title">Suction level (optional)</div>
-        ${(() => {
-            const speeds = this.hass.states[this._config.vacuums[vacIdx]?.entity]
-                ?.attributes["fan_speed_list"] ?? [];
-            return speeds.length
-                ? this._optionSelectFromList("Suction option", speeds, action.suction_level, v => this._setCleanAction(vacIdx, { suction_level: v || undefined }))
-                : this._textField("Suction option", action.suction_level, v => this._setCleanAction(vacIdx, { suction_level: v || undefined }), "e.g. balanced");
-        })()}
+        ${(()=>{const o=this.hass.states[this._config.vacuums[t]?.entity]?.attributes.fan_speed_list??[];return o.length?this._optionSelectFromList("Suction option",o,e.suction_level,e=>this._setCleanAction(t,{suction_level:e||void 0})):this._textField("Suction option",e.suction_level,e=>this._setCleanAction(t,{suction_level:e||void 0}),"e.g. balanced")})()}
         <div class="sub-title">Mop mode (optional)</div>
-        ${this._entityPicker("Mop mode entity", action.mop_mode_entity, ["select"], v => this._setCleanAction(vacIdx, { mop_mode_entity: v || undefined }))}
-        ${action.mop_mode_entity ? this._optionSelect("Mop mode option", action.mop_mode_entity, action.mop_mode, v => this._setCleanAction(vacIdx, { mop_mode: v || undefined })) : A}
+        ${this._entityPicker("Mop mode entity",e.mop_mode_entity,["select"],e=>this._setCleanAction(t,{mop_mode_entity:e||void 0}))}
+        ${e.mop_mode_entity?this._optionSelect("Mop mode option",e.mop_mode_entity,e.mop_mode,e=>this._setCleanAction(t,{mop_mode:e||void 0})):G}
         <div class="sub-title">Mop intensity (optional)</div>
-        ${this._entityPicker("Mop intensity entity", action.mop_intensity_entity, ["select"], v => this._setCleanAction(vacIdx, { mop_intensity_entity: v || undefined }))}
-        ${action.mop_intensity_entity ? this._optionSelect("Mop intensity option", action.mop_intensity_entity, action.mop_intensity, v => this._setCleanAction(vacIdx, { mop_intensity: v || undefined })) : A}
-      </div>`;
-    }
-    _renderScriptAction(vacIdx, action) {
-        const vars = action.variables ?? {};
-        const entries = Object.entries(vars);
-        return b `
+        ${this._entityPicker("Mop intensity entity",e.mop_intensity_entity,["select"],e=>this._setCleanAction(t,{mop_intensity_entity:e||void 0}))}
+        ${e.mop_intensity_entity?this._optionSelect("Mop intensity option",e.mop_intensity_entity,e.mop_intensity,e=>this._setCleanAction(t,{mop_intensity:e||void 0})):G}
+      </div>`}_renderScriptAction(t,e){const o=e.variables??{},i=Object.entries(o);return q`
       <div class="sub-section">
-        ${this._entityPicker("Script entity", action.entity_id, ["script"], v => this._setCleanAction(vacIdx, { entity_id: v }))}
+        ${this._entityPicker("Script entity",e.entity_id,["script"],e=>this._setCleanAction(t,{entity_id:e}))}
         <p class="hint">Tokens: {{ entity }}, {{ selected_segments }}, {{ selected_room_keys }}, {{ selected_area_ids }}</p>
-        ${entries.map(([key, val], vi) => b `
+        ${i.map(([e,s],n)=>q`
           <div class="var-row">
-            <input class="text-input text-input--half" .value=${key} placeholder="name"
-              @change=${(e) => {
-            const newKey = e.target.value;
-            const newVars = Object.fromEntries(entries.map(([k, v], i) => [i === vi ? newKey : k, v]));
-            this._setCleanAction(vacIdx, { variables: newVars });
-        }} />
+            <input class="text-input text-input--half" .value=${e} placeholder="name"
+              @change=${e=>{const o=e.target.value,s=Object.fromEntries(i.map(([t,e],i)=>[i===n?o:t,e]));this._setCleanAction(t,{variables:s})}} />
             <span class="var-sep">&#8594;</span>
-            <input class="text-input text-input--half" .value=${val} placeholder="{{ entity }}"
-              @change=${(e) => {
-            const newVars = { ...vars, [key]: e.target.value };
-            this._setCleanAction(vacIdx, { variables: newVars });
-        }} />
+            <input class="text-input text-input--half" .value=${s} placeholder="{{ entity }}"
+              @change=${i=>{const s={...o,[e]:i.target.value};this._setCleanAction(t,{variables:s})}} />
             <button class="icon-btn icon-btn--danger icon-btn--sm"
-              @click=${() => {
-            const newVars = Object.fromEntries(entries.filter((_, i) => i !== vi));
-            this._setCleanAction(vacIdx, { variables: newVars });
-        }}>
+              @click=${()=>{const e=Object.fromEntries(i.filter((t,e)=>e!==n));this._setCleanAction(t,{variables:e})}}>
               <ha-icon icon="mdi:close"></ha-icon>
             </button>
           </div>`)}
         <button class="btn btn--add btn--sm"
-          @click=${() => this._setCleanAction(vacIdx, { variables: { ...vars, "": "" } })}>
+          @click=${()=>this._setCleanAction(t,{variables:{...o,"":""}})}>
           <ha-icon icon="mdi:plus"></ha-icon> Add variable
         </button>
-      </div>`;
-    }
-    _renderRoomAccordion(room, vacIdx, roomIdx) {
-        const isOpen = (this._openRoom.get(vacIdx) ?? null) === roomIdx;
-        return b `
+      </div>`}_renderRoomAccordion(t,e,o){const i=(this._openRoom.get(e)??null)===o;return q`
       <div class="room-acc"
-        style=${this._dragRoom && this._dragRoom.vac === vacIdx && this._dragRoom.idx !== roomIdx
-            ? o({ outline: "2px dashed var(--primary-color,#3b82f6)", outlineOffset: "-2px" }) : A}
-        @dragover=${(e) => { if (this._dragRoom && this._dragRoom.vac === vacIdx)
-            e.preventDefault(); }}
-        @drop=${(e) => { e.preventDefault(); if (this._dragRoom && this._dragRoom.vac === vacIdx)
-            this._moveRoom(vacIdx, this._dragRoom.idx, roomIdx); this._dragRoom = null; }}>
-        <div class="room-acc-header" @click=${() => this._toggleRoom(vacIdx, roomIdx)}>
+        style=${this._dragRoom&&this._dragRoom.vac===e&&this._dragRoom.idx!==o?vt({outline:"2px dashed var(--primary-color,#3b82f6)",outlineOffset:"-2px"}):G}
+        @dragover=${t=>{this._dragRoom&&this._dragRoom.vac===e&&t.preventDefault()}}
+        @drop=${t=>{t.preventDefault(),this._dragRoom&&this._dragRoom.vac===e&&this._moveRoom(e,this._dragRoom.idx,o),this._dragRoom=null}}>
+        <div class="room-acc-header" @click=${()=>this._toggleRoom(e,o)}>
           <ha-icon icon="mdi:drag-horizontal-variant" title="Drag to reorder"
             draggable="true" style="cursor:grab;opacity:0.5;--mdc-icon-size:18px;flex-shrink:0"
-            @click=${(e) => e.stopPropagation()}
-            @dragstart=${(e) => { this._dragRoom = { vac: vacIdx, idx: roomIdx }; if (e.dataTransfer)
-            e.dataTransfer.effectAllowed = "move"; }}
-            @dragend=${() => { this._dragRoom = null; }}></ha-icon>
-          <ha-icon class="room-acc-icon" icon=${room.icon || "mdi:square"}></ha-icon>
+            @click=${t=>t.stopPropagation()}
+            @dragstart=${t=>{this._dragRoom={vac:e,idx:o},t.dataTransfer&&(t.dataTransfer.effectAllowed="move")}}
+            @dragend=${()=>{this._dragRoom=null}}></ha-icon>
+          <ha-icon class="room-acc-icon" icon=${t.icon||"mdi:square"}></ha-icon>
           <div class="room-acc-info">
-            <span class="room-acc-name">${room.name || room.key || "Unnamed room"}</span>
-            ${room.segment_id !== undefined && !this._intEntityFor(this._config.vacuums[vacIdx])
-            ? b `<span class="room-acc-meta">seg ${room.segment_id}</span>` : A}
+            <span class="room-acc-name">${t.name||t.key||"Unnamed room"}</span>
+            ${void 0===t.segment_id||this._intEntityFor(this._config.vacuums[e])?G:q`<span class="room-acc-meta">seg ${t.segment_id}</span>`}
           </div>
           <button class="icon-btn icon-btn--danger icon-btn--sm"
-            @click=${(e) => { e.stopPropagation(); this._deleteRoom(vacIdx, roomIdx); }}>
+            @click=${t=>{t.stopPropagation(),this._deleteRoom(e,o)}}>
             <ha-icon icon="mdi:delete"></ha-icon>
           </button>
-          <ha-icon icon=${isOpen ? "mdi:chevron-up" : "mdi:chevron-down"} class="acc-chevron"></ha-icon>
+          <ha-icon icon=${i?"mdi:chevron-up":"mdi:chevron-down"} class="acc-chevron"></ha-icon>
         </div>
-        ${isOpen ? b `
+        ${i?q`
           <div class="room-acc-body">
-            ${this._textField("Key (unique ID)", room.key, v => this._setRoom(vacIdx, roomIdx, { key: v }), "e.g. bedroom")}
+            ${this._textField("Key (unique ID)",t.key,t=>this._setRoom(e,o,{key:t}),"e.g. bedroom")}
             <p class="hint">Tip: keep this identical to the room's name in the Roborock app — the AnyVac integration matches rooms by this name (auto-seating, live positions from the integration, room pinning).</p>
-            ${this._textField("Display name", room.name, v => this._setRoom(vacIdx, roomIdx, { name: v }), "e.g. Bedroom")}
+            ${this._textField("Display name",t.name,t=>this._setRoom(e,o,{name:t}),"e.g. Bedroom")}
             <p class="hint">Cleaning sequence moved to a shared, backend-owned reorderable
               list — see the <strong>Maps tab</strong> (requires the AnyVac integration + merged mode).</p>
-            ${this._intEntityFor(this._config.vacuums[vacIdx])
-            ? b `<p class="hint">Segment resolution, timing and clean history are handled
-                  server-side by the AnyVac integration for this vacuum — nothing to set here.</p>`
-            : this._config.vacuums[vacIdx]?.clean_action?.type === "native-area"
-                ? b `
+            ${this._intEntityFor(this._config.vacuums[e])?q`<p class="hint">Segment resolution, timing and clean history are handled
+                  server-side by the AnyVac integration for this vacuum — nothing to set here.</p>`:"native-area"===this._config.vacuums[e]?.clean_action?.type?q`
                   <div class="field field--row">
                     <label>Effective area</label>
-                    <strong style="font-size:13px">${
-                /* must mirror the card's resolution order */
-                room.area_id ?? this._config.area_mappings?.[room.key] ?? room.key}</strong>
+                    <strong style="font-size:13px">${t.area_id??this._config.area_mappings?.[t.key]??t.key}</strong>
                   </div>
-                  <p class="hint map-hint" @click=${() => { this._tab = "global"; }}>
+                  <p class="hint map-hint" @click=${()=>{this._tab="global"}}>
                     Set in <strong>Global tab → Area mappings</strong> →
-                  </p>`
-                : b `
+                  </p>`:q`
                   <div class="field field--row">
                     <label>Segment ID</label>
                     <input class="text-input text-input--sm" type="number"
-                      .value=${String(room.segment_id ?? "")} placeholder="e.g. 16"
-                      @change=${(e) => {
-                    const v = parseInt(e.target.value);
-                    this._setRoom(vacIdx, roomIdx, { segment_id: isNaN(v) ? undefined : v });
-                }} />
+                      .value=${String(t.segment_id??"")} placeholder="e.g. 16"
+                      @change=${t=>{const i=parseInt(t.target.value);this._setRoom(e,o,{segment_id:isNaN(i)?void 0:i})}} />
                   </div>
                   <p class="hint">Find IDs: Developer Tools → Actions → roborock.get_maps</p>
-                  ${this._numberSlider("Est. clean time (fallback)", room.clean_time_mins ?? 0, 0, 120, 1, v => this._setRoom(vacIdx, roomIdx, { clean_time_mins: v > 0 ? v : undefined }), " min")}
-                  ${this._entityPicker("Clean time fallback (input_number, legacy)", room.clean_time_entity, ["input_number"], v => this._setRoom(vacIdx, roomIdx, { clean_time_entity: v || undefined }))}
-                  ${this._entityPicker("Last clean fallback (input_datetime, legacy)", room.last_clean_entity, ["input_datetime"], v => this._setRoom(vacIdx, roomIdx, { last_clean_entity: v || undefined }))}
+                  ${this._numberSlider("Est. clean time (fallback)",t.clean_time_mins??0,0,120,1,t=>this._setRoom(e,o,{clean_time_mins:t>0?t:void 0})," min")}
+                  ${this._entityPicker("Clean time fallback (input_number, legacy)",t.clean_time_entity,["input_number"],t=>this._setRoom(e,o,{clean_time_entity:t||void 0}))}
+                  ${this._entityPicker("Last clean fallback (input_datetime, legacy)",t.last_clean_entity,["input_datetime"],t=>this._setRoom(e,o,{last_clean_entity:t||void 0}))}
                   <p class="hint">Legacy read-only fallbacks for setups without the AnyVac
                     integration — the card never writes these helpers.</p>`}
-            <p class="hint map-hint" @click=${() => { this._tab = "maps"; this._mapVac = vacIdx; this._mapRoom = roomIdx; }}>
+            <p class="hint map-hint" @click=${()=>{this._tab="maps",this._mapVac=e,this._mapRoom=o}}>
               📍 Set position &amp; icon in the <strong>Maps tab</strong> →
             </p>
           </div>
-        ` : A}
-      </div>`;
-    }
-    // ── Tab: Maps ─────────────────────────────────────────────────────────────
-    _renderMapsTab() {
-        const vacuums = this._config.vacuums;
-        if (!vacuums.length) {
-            return b `<div class="tab-body"><p class="hint">No vacuums configured. Add one in the Vacuums tab.</p></div>`;
-        }
-        const mapVac = Math.min(this._mapVac, vacuums.length - 1);
-        const vac = vacuums[mapVac];
-        const map = vac.map ?? { ...DEFAULT_MAP };
-        // Snapshotted, not live (see `_refMapUrl`) — this is what stops the flash.
-        // Populated by `updated()` right after the first render of this tab/vacuum
-        // (a one-time empty frame, not a reload loop — deliberately NOT captured
-        // here mid-render).
-        const mapUrl = this._refMapVac === mapVac ? this._refMapUrl : "";
-        const base = vac.base ?? "map";
-        const ib = this._config.map_mode === "merged" ? this._config.image_base : vac.image_base;
-        const useImg = this._config.map_mode === "merged" ? !!ib?.src : ((base === "image" || base === "combined") && !!ib?.src);
-        const previewUrl = useImg ? (ib.src) : mapUrl;
-        const pvRot = useImg ? (ib.rotation ?? 0) : (map.rotation ?? 0);
-        const pvScale = useImg ? (ib.scale ?? 100) : (map.scale ?? 100);
-        const pvOx = useImg ? (ib.offset_x ?? 0) : (map.offset_x ?? 0);
-        const pvOy = useImg ? (ib.offset_y ?? 0) : (map.offset_y ?? 0);
-        const rooms = this._editRooms();
-        const es = this._editorSeat(mapVac);
-        return b `
+        `:G}
+      </div>`}_renderMapsTab(){const t=this._config.vacuums;if(!t.length)return q`<div class="tab-body"><p class="hint">No vacuums configured. Add one in the Vacuums tab.</p></div>`;const e=Math.min(this._mapVac,t.length-1),o=t[e],i=o.map??{...Xt},s=this._refMapVac===e?this._refMapUrl:"",n=o.base??"map",a="merged"===this._config.map_mode?this._config.image_base:o.image_base,r=("merged"===this._config.map_mode||"image"===n||"combined"===n)&&!!a?.src,l=r?a.src:s,c=r?a.rotation??0:i.rotation??0,d=r?a.scale??100:i.scale??100,h=r?a.offset_x??0:i.offset_x??0,p=r?a.offset_y??0:i.offset_y??0,m=this._editRooms(),u=this._editorSeat(e);return q`
       <div class="tab-body">
 
-        ${vacuums.length > 1 ? b `
+        ${t.length>1?q`
           <div class="pill-row">
-            ${vacuums.map((v, i) => b `
-              <button class="vac-pill ${i === mapVac ? "vac-pill--active" : ""}"
-                @click=${() => { this._mapVac = i; this._mapRoom = null; }}>
-                ${v.name || v.entity || "Vacuum " + (i + 1)}
+            ${t.map((t,o)=>q`
+              <button class="vac-pill ${o===e?"vac-pill--active":""}"
+                @click=${()=>{this._mapVac=o,this._mapRoom=null}}>
+                ${t.name||t.entity||"Vacuum "+(o+1)}
               </button>`)}
           </div>
-        ` : A}
+        `:G}
 
-        ${this._selectField("Map mode (all vacuums)", this._config.map_mode ?? "split", [{ value: "split", label: "Split — one map per vacuum" }, { value: "merged", label: "Merged — all in one map" }], v => this._setConfig({ map_mode: v === "merged" ? "merged" : undefined }))}
+        ${this._selectField("Map mode (all vacuums)",this._config.map_mode??"split",[{value:"split",label:"Split — one map per vacuum"},{value:"merged",label:"Merged — all in one map"}],t=>this._setConfig({map_mode:"merged"===t?"merged":void 0}))}
 
-        ${this._mergedEdit && !this._config.image_base?.src ? b `
+        ${this._mergedEdit&&!this._config.image_base?.src?q`
           <p class="hint">Merged needs a shared floorplan below or vacuums' raw maps just get laid on top of
             each other unaligned. No photo of your own? Pick a vacuum, scroll to "Shared floorplan" and use
             "Use this vacuum's current map as floorplan" — its own rooms place themselves automatically; every
             other vacuum whose room names match then auto-fits too, with nothing else to set.</p>
-        ` : A}
+        `:G}
 
-        ${this._mergedEdit ? A : this._selectField("Base layer", (vac.base ?? "map"), [{ value: "map", label: "Vacuum map" }, { value: "combined", label: "Image + map" }], v => this._setVacuum(mapVac, { base: v }))}
+        ${this._mergedEdit?G:this._selectField("Base layer",o.base??"map",[{value:"map",label:"Vacuum map"},{value:"combined",label:"Image + map"}],t=>this._setVacuum(e,{base:t}))}
 
-        ${this._entityPicker("AnyVac integration sensor", vac.integration_entity, ["sensor"], v => this._setVacuum(mapVac, { integration_entity: v }))}
+        ${this._entityPicker("AnyVac integration sensor",o.integration_entity,["sensor"],t=>this._setVacuum(e,{integration_entity:t}))}
 
-        ${(this._intEntityFor(vac) || this._config.map_mode === "merged") ? this._selectField("Hide vacuum map (show only floorplan + robot/path)", vac.hide_map ? "yes" : "no", [{ value: "no", label: "no" }, { value: "yes", label: "yes" }], v => this._setVacuum(mapVac, { hide_map: v === "yes" })) : A}
+        ${this._intEntityFor(o)||"merged"===this._config.map_mode?this._selectField("Hide vacuum map (show only floorplan + robot/path)",o.hide_map?"yes":"no",[{value:"no",label:"no"},{value:"yes",label:"yes"}],t=>this._setVacuum(e,{hide_map:"yes"===t})):G}
 
-        ${(vac.base === "combined" || this._config.map_mode === "merged") ? b `
-          ${this._numberSlider("Overlay opacity", vac.overlay_opacity ?? 55, 0, 100, 5, v => this._setVacuum(mapVac, { overlay_opacity: v }), "%")}
-          ${this._selectField("Overlay blend", (vac.overlay_blend ?? "normal"), [{ value: "normal", label: "normal" }, { value: "lighten", label: "lighten (isolate path)" }, { value: "screen", label: "screen" }, { value: "plus-lighter", label: "plus-lighter" }], v => this._setVacuum(mapVac, { overlay_blend: v }))}
-        ` : A}
+        ${"combined"===o.base||"merged"===this._config.map_mode?q`
+          ${this._numberSlider("Overlay opacity",o.overlay_opacity??55,0,100,5,t=>this._setVacuum(e,{overlay_opacity:t}),"%")}
+          ${this._selectField("Overlay blend",o.overlay_blend??"normal",[{value:"normal",label:"normal"},{value:"lighten",label:"lighten (isolate path)"},{value:"screen",label:"screen"},{value:"plus-lighter",label:"plus-lighter"}],t=>this._setVacuum(e,{overlay_blend:t}))}
+        `:G}
 
-        ${vac.base === "image" || vac.base === "combined" || this._config.map_mode === "merged" ? b `
-          ${this._config.map_mode === "merged" ? b `<div class="section-title">Shared floorplan (all vacuums)</div>` : A}
-          ${this._mapEntityFor(vac) ? b `
+        ${"image"===o.base||"combined"===o.base||"merged"===this._config.map_mode?q`
+          ${"merged"===this._config.map_mode?q`<div class="section-title">Shared floorplan (all vacuums)</div>`:G}
+          ${this._mapEntityFor(o)?q`
             <button class="btn btn--sm" style="align-self:flex-start"
               ?disabled=${this._floorplanSnapshotBusy}
-              @click=${() => this._snapshotFloorplan(vac)}>
+              @click=${()=>this._snapshotFloorplan(o)}>
               <ha-icon icon="mdi:camera"></ha-icon>
-              ${this._floorplanSnapshotBusy ? "Snapshotting…" : "Use this vacuum's current map as floorplan"}
+              ${this._floorplanSnapshotBusy?"Snapshotting…":"Use this vacuum's current map as floorplan"}
             </button>
-            <p class="hint">No floor plan photo of your own? This saves ${vac.name || vac.entity}'s
+            <p class="hint">No floor plan photo of your own? This saves ${o.name||o.entity}'s
               current map as a static image and sets it as the floorplan below — the easiest way to
-              get auto-fit working across multiple vacuums. Also places ${vac.name || vac.entity}'s own
+              get auto-fit working across multiple vacuums. Also places ${o.name||o.entity}'s own
               rooms on it automatically (no dragging needed) and turns "Hide vacuum map" on for
-              ${this._config.map_mode === "merged" ? "every vacuum sharing this floorplan" : "this vacuum"}.
+              ${"merged"===this._config.map_mode?"every vacuum sharing this floorplan":"this vacuum"}.
               Pick your fullest-coverage vacuum for this step, then switch to each other vacuum below —
               any of its rooms whose name matches one already placed auto-fits with nothing else to do;
               use "Import" only for rooms exclusive to that vacuum. Requires anyvac integration ≥ 0.88.0.</p>
-            ${this._floorplanSnapshotError ? b `<p class="hint" style="color:#ff6b6b">${this._floorplanSnapshotError}</p>` : A}
-          ` : A}
-          ${this._textField("Image src (URL)", ib?.src, v => this._setEditedImageBase({ src: v }), "/local/anyvac/flat.svg")}
-          ${this._numberSlider("Image rotation", ib?.rotation ?? 0, 0, 360, 90, v => this._setEditedImageBase({ rotation: v }), "°")}
-          ${this._numberSlider("Image scale", ib?.scale ?? 100, 50, 200, 5, v => this._setEditedImageBase({ scale: v }), "%")}
-          ${this._numberSlider("Image offset X", ib?.offset_x ?? 0, -50, 50, 1, v => this._setEditedImageBase({ offset_x: v }), "%")}
-          ${this._numberSlider("Image offset Y", ib?.offset_y ?? 0, -50, 50, 1, v => this._setEditedImageBase({ offset_y: v }), "%")}
-        ` : A}
+            ${this._floorplanSnapshotError?q`<p class="hint" style="color:#ff6b6b">${this._floorplanSnapshotError}</p>`:G}
+          `:G}
+          ${this._textField("Image src (URL)",a?.src,t=>this._setEditedImageBase({src:t}),"/local/anyvac/flat.svg")}
+          ${this._numberSlider("Image rotation",a?.rotation??0,0,360,90,t=>this._setEditedImageBase({rotation:t}),"°")}
+          ${this._numberSlider("Image scale",a?.scale??100,50,200,5,t=>this._setEditedImageBase({scale:t}),"%")}
+          ${this._numberSlider("Image offset X",a?.offset_x??0,-50,50,1,t=>this._setEditedImageBase({offset_x:t}),"%")}
+          ${this._numberSlider("Image offset Y",a?.offset_y??0,-50,50,1,t=>this._setEditedImageBase({offset_y:t}),"%")}
+        `:G}
 
-        ${this._entityPicker("Map image entity", map.entity, ["image"], v => this._setMap(mapVac, { entity: v }))}
-        ${!map.entity && this._mapEntityFor(vac) ? b `
-          <p class="hint">Leave blank to auto-use <code>${this._mapEntityFor(vac)}</code> —
+        ${this._entityPicker("Map image entity",i.entity,["image"],t=>this._setMap(e,{entity:t}))}
+        ${!i.entity&&this._mapEntityFor(o)?q`
+          <p class="hint">Leave blank to auto-use <code>${this._mapEntityFor(o)}</code> —
             found automatically on this vacuum's device. Set it explicitly only to
             override (e.g. a multi-map vacuum where the wrong floor's image was picked).</p>
-        ` : A}
-        ${this._mapEntityFor(vac) ? b `
+        `:G}
+        ${this._mapEntityFor(o)?q`
           <button class="btn btn--sm" style="align-self:flex-start"
-            @click=${() => this._snapshotRefMap()}>
+            @click=${()=>this._snapshotRefMap()}>
             <ha-icon icon="mdi:refresh"></ha-icon> Refresh reference map
           </button>
           <p class="hint">The preview below is a frozen snapshot, not live — it used to
             reload (and visibly flash) on every edit, since Home Assistant refreshes this
             image's URL on nearly every state update. Use this button after the robot
             explores/remaps to update it.</p>
-        ` : A}
+        `:G}
 
-        ${previewUrl ? b `
-          <div class="map-pos-container ${this._mapRoom !== null ? "map-pos-container--active" : ""}"
-            @click=${(e) => {
-            if (this._mapRoom === null)
-                return;
-            const rect = e.currentTarget.getBoundingClientRect();
-            const x = Math.round(((e.clientX - rect.left) / rect.width) * 100);
-            const y = Math.round(((e.clientY - rect.top) / rect.height) * 100);
-            this._setEditedRoom(this._mapRoom, { map_x: x, map_y: y });
-        }}>
+        ${l?q`
+          <div class="map-pos-container ${null!==this._mapRoom?"map-pos-container--active":""}"
+            @click=${t=>{if(null===this._mapRoom)return;const e=t.currentTarget.getBoundingClientRect(),o=Math.round((t.clientX-e.left)/e.width*100),i=Math.round((t.clientY-e.top)/e.height*100);this._setEditedRoom(this._mapRoom,{map_x:o,map_y:i})}}>
             <div class="map-preview-wrap"
-              style=${o(this._pvAR > 0.1 ? { paddingTop: (100 / this._pvAR).toFixed(2) + "%" } : {})}>
-              <img class="map-preview-img" src=${previewUrl} alt="Map preview"
-                @load=${(e) => {
-            const im = e.target;
-            if (useImg && im.naturalWidth && im.naturalHeight) {
-                const arv = im.naturalWidth / im.naturalHeight;
-                if (Math.abs(arv - this._pvAR) > 0.01)
-                    this._pvAR = arv;
-            }
-        }}
-                style=${o({
-            left: (50 + pvOx) + "%",
-            top: (50 + pvOy) + "%",
-            width: pvScale + "%",
-            transform: "translate(-50%,-50%) rotate(" + pvRot + "deg)",
-        })} />
-              ${this._mergedEdit && useImg && mapUrl ? b `<img class="map-preview-img" src=${mapUrl} alt="Native map"
-                style=${o({
-            left: (50 + es.offset_x) + "%",
-            top: (50 + es.offset_y) + "%",
-            width: es.scale + "%",
-            transform: "translate(-50%,-50%) rotate(" + es.rotation + "deg)",
-            opacity: "0.5",
-        })} />` : A}
-              ${rooms.map((r, ri) => {
-            const active = ri === this._mapRoom;
-            const cx = r.map_x ?? 50, cy = r.map_y ?? 50;
-            // Rectangle overlay mode (map_w/map_h set, §"Enable rectangle overlay"
-            // below): draw the ACTUAL box instead of just a centre dot, so its
-            // extent is visible while dragging/resizing — the whole point of this
-            // fix (2026-07-26 field report: sliders moved a box nobody could see).
-            if (r.map_w != null) {
-                const w = r.map_w, h = r.map_h ?? 15;
-                return b `
-                    <div class="room-rect ${active ? "room-rect--active" : ""}"
-                      style=${o({ left: cx + "%", top: cy + "%", width: w + "%", height: h + "%" })}
-                      @pointerdown=${(e) => this._onRoomPointerDown(ri, "move", r, e)}
-                      @pointermove=${(e) => this._onRoomPointerMove(e)}
-                      @pointerup=${() => this._onRoomPointerUp()}
-                      @click=${(e) => e.stopPropagation()}>
-                      <ha-icon icon=${r.icon || "mdi:square"} style="--mdc-icon-size:14px"></ha-icon>
-                      ${active ? ["nw", "ne", "sw", "se"].map(pos => b `
-                        <div class="room-rect-handle room-rect-handle--${pos}"
-                          @pointerdown=${(e) => this._onRoomPointerDown(ri, ("resize-" + pos), r, e)}
-                          @pointermove=${(e) => this._onRoomPointerMove(e)}
-                          @pointerup=${() => this._onRoomPointerUp()}
-                          @click=${(e) => e.stopPropagation()}></div>
-                      `) : A}
-                    </div>`;
-            }
-            return b `
-                  <div class="pos-dot ${active ? "pos-dot--active" : ""}"
-                    style=${o({ left: cx + "%", top: cy + "%" })}
-                    @pointerdown=${(e) => this._onRoomPointerDown(ri, "move", r, e)}
-                    @pointermove=${(e) => this._onRoomPointerMove(e)}
-                    @pointerup=${() => this._onRoomPointerUp()}
-                    @click=${(e) => e.stopPropagation()}>
-                    <ha-icon icon=${r.icon || "mdi:square"} style="--mdc-icon-size:14px"></ha-icon>
-                  </div>`;
-        })}
+              style=${vt(this._pvAR>.1?{paddingTop:(100/this._pvAR).toFixed(2)+"%"}:{})}>
+              <img class="map-preview-img" src=${l} alt="Map preview"
+                @load=${t=>{const e=t.target;if(r&&e.naturalWidth&&e.naturalHeight){const t=e.naturalWidth/e.naturalHeight;Math.abs(t-this._pvAR)>.01&&(this._pvAR=t)}}}
+                style=${vt({left:50+h+"%",top:50+p+"%",width:d+"%",transform:"translate(-50%,-50%) rotate("+c+"deg)"})} />
+              ${this._mergedEdit&&r&&s?q`<img class="map-preview-img" src=${s} alt="Native map"
+                style=${vt({left:50+u.offset_x+"%",top:50+u.offset_y+"%",width:u.scale+"%",transform:"translate(-50%,-50%) rotate("+u.rotation+"deg)",opacity:"0.5"})} />`:G}
+              ${m.map((t,e)=>{const o=e===this._mapRoom,i=t.map_x??50,s=t.map_y??50;if(null!=t.map_w){const n=t.map_w,a=t.map_h??15;return q`
+                    <div class="room-rect ${o?"room-rect--active":""}"
+                      style=${vt({left:i+"%",top:s+"%",width:n+"%",height:a+"%"})}
+                      @pointerdown=${o=>this._onRoomPointerDown(e,"move",t,o)}
+                      @pointermove=${t=>this._onRoomPointerMove(t)}
+                      @pointerup=${()=>this._onRoomPointerUp()}
+                      @click=${t=>t.stopPropagation()}>
+                      <ha-icon icon=${t.icon||"mdi:square"} style="--mdc-icon-size:14px"></ha-icon>
+                      ${o?["nw","ne","sw","se"].map(o=>q`
+                        <div class="room-rect-handle room-rect-handle--${o}"
+                          @pointerdown=${i=>this._onRoomPointerDown(e,"resize-"+o,t,i)}
+                          @pointermove=${t=>this._onRoomPointerMove(t)}
+                          @pointerup=${()=>this._onRoomPointerUp()}
+                          @click=${t=>t.stopPropagation()}></div>
+                      `):G}
+                    </div>`}return q`
+                  <div class="pos-dot ${o?"pos-dot--active":""}"
+                    style=${vt({left:i+"%",top:s+"%"})}
+                    @pointerdown=${o=>this._onRoomPointerDown(e,"move",t,o)}
+                    @pointermove=${t=>this._onRoomPointerMove(t)}
+                    @pointerup=${()=>this._onRoomPointerUp()}
+                    @click=${t=>t.stopPropagation()}>
+                    <ha-icon icon=${t.icon||"mdi:square"} style="--mdc-icon-size:14px"></ha-icon>
+                  </div>`})}
             </div>
           </div>
 
-          <div class="section-title">Map seating ${this._mergedEdit ? "(this vacuum)" : ""}</div>
-          ${this._selectField("Seating", (map.seat === "manual" ? "manual" : "auto"), [{ value: "auto", label: "Auto — fit from rooms" },
-            { value: "manual", label: "Manual — sliders" }], v => this._setMap(mapVac, { seat: v === "manual" ? "manual" : undefined }))}
-          ${map.seat !== "manual" ? (es.auto ? b `
-            <p class="hint">✅ Auto-fit from <strong>${es.anchorCount}</strong> room${(es.anchorCount ?? 0) > 1 ? "s" : ""}:
-              rot ${es.rotation}° · scale ${es.scale.toFixed(1)}% · offset ${es.offset_x.toFixed(1)}/${es.offset_y.toFixed(1)}%
-              · fit error ${(es.residual ?? 0).toFixed(1)}%${(es.residual ?? 0) > 3 ? " ⚠️ check room rectangles / keys" : ""}${es.anchorCount === 1 ? " (single room — orientation estimated from its shape)" : ""}.
+          <div class="section-title">Map seating ${this._mergedEdit?"(this vacuum)":""}</div>
+          ${this._selectField("Seating","manual"===i.seat?"manual":"auto",[{value:"auto",label:"Auto — fit from rooms"},{value:"manual",label:"Manual — sliders"}],t=>this._setMap(e,{seat:"manual"===t?"manual":void 0}))}
+          ${"manual"!==i.seat?u.auto?q`
+            <p class="hint">✅ Auto-fit from <strong>${u.anchorCount}</strong> room${(u.anchorCount??0)>1?"s":""}:
+              rot ${u.rotation}° · scale ${u.scale.toFixed(1)}% · offset ${u.offset_x.toFixed(1)}/${u.offset_y.toFixed(1)}%
+              · fit error ${(u.residual??0).toFixed(1)}%${(u.residual??0)>3?" ⚠️ check room rectangles / keys":""}${1===u.anchorCount?" (single room — orientation estimated from its shape)":""}.
               Recomputed live — self-heals after the robot remaps.</p>
-          ` : b `
+          `:q`
             <p class="hint">Auto-fit inactive — it needs the integration sensor, a floorplan and at least one
               room rectangle whose key matches a room name on this robot's map. Using the manual values below.</p>
-          `) : A}
-          ${vacuums.length > 1 && rooms.length > 0 ? (() => {
-            const unmatched = this._unmatchedOwnRoomNames(mapVac);
-            return unmatched.length ? b `
-              <p class="hint" style="color:#faad14">⚠️ This vacuum reports room${unmatched.length > 1 ? "s" : ""}
-                not on the shared floorplan yet: <strong>${unmatched.join(", ")}</strong>. If any of these are the
+          `:G}
+          ${t.length>1&&m.length>0?(()=>{const t=this._unmatchedOwnRoomNames(e);return t.length?q`
+              <p class="hint" style="color:#faad14">⚠️ This vacuum reports room${t.length>1?"s":""}
+                not on the shared floorplan yet: <strong>${t.join(", ")}</strong>. If any of these are the
                 same physical room as one already listed above under a different name, rename it to match in the
                 Roborock app (room pairing is by exact name across vacuums) — otherwise use Import below to add it.</p>
-            ` : A;
-        })() : A}
-          ${(map.seat === "manual" || !es.auto) ? b `
-            ${this._numberSlider("Rotation", map.rotation ?? 0, 0, 360, 90, v => this._setMap(mapVac, { rotation: v }), "°")}
-            ${this._numberSlider("Scale", map.scale ?? 100, 50, 200, 5, v => this._setMap(mapVac, { scale: v }), "%")}
-            ${this._numberSlider("Offset X", map.offset_x ?? 0, -50, 50, 1, v => this._setMap(mapVac, { offset_x: v }), "%")}
-            ${this._numberSlider("Offset Y", map.offset_y ?? 0, -50, 50, 1, v => this._setMap(mapVac, { offset_y: v }), "%")}
-          ` : A}
-          ${this._intEntityFor(vac) ? b `
+            `:G})():G}
+          ${"manual"!==i.seat&&u.auto?G:q`
+            ${this._numberSlider("Rotation",i.rotation??0,0,360,90,t=>this._setMap(e,{rotation:t}),"°")}
+            ${this._numberSlider("Scale",i.scale??100,50,200,5,t=>this._setMap(e,{scale:t}),"%")}
+            ${this._numberSlider("Offset X",i.offset_x??0,-50,50,1,t=>this._setMap(e,{offset_x:t}),"%")}
+            ${this._numberSlider("Offset Y",i.offset_y??0,-50,50,1,t=>this._setMap(e,{offset_y:t}),"%")}
+          `}
+          ${this._intEntityFor(o)?q`
             <button class="btn btn--add btn--sm" style="align-self:flex-start"
-              @click=${() => this._importRooms(mapVac)}>
+              @click=${()=>this._importRooms(e)}>
               <ha-icon icon="mdi:import"></ha-icon> Import missing rooms from this vacuum
             </button>
             <p class="hint">Adds rooms this robot's map knows that aren't on the floorplan yet
               (key = Roborock room name), placed through its current seat. Import from your
               reference (whole-home) robot first; then switch to another robot to supplement
               rooms only it has — it will be seated via the rooms you already share.</p>
-          ` : A}
+          `:G}
 
-          ${(this._config.map_mode === "merged" && this._intEntityFor(vac) && rooms.length) ? (() => {
-            const seqMap = this._roomSequence(vac);
-            const ordered = this._roomsInSequenceOrder(rooms, seqMap);
-            const unsequencedCount = rooms.filter((r) => !r.key || seqMap[r.key] === undefined).length;
-            return b `
+          ${"merged"===this._config.map_mode&&this._intEntityFor(o)&&m.length?(()=>{const t=this._roomSequence(o),e=this._roomsInSequenceOrder(m,t),i=m.filter(e=>!e.key||void 0===t[e.key]).length;return q`
               <div class="section-title">Cleaning sequence</div>
               <p class="hint">The order configured in the Roborock app — it's dominant regardless of
                 what HA sends, so the backend needs to know it to predict wet-clean timing correctly
                 (docs/19). Drag to match your app's order. Shared across all vacuums/dashboards
                 (backend-owned, like room pinning) — not saved in this card's config.</p>
-              ${unsequencedCount ? b `<p class="hint" style="color:#faad14">⚠ ${unsequencedCount}
-                room${unsequencedCount > 1 ? "s" : ""} not yet sequenced — dragged to the end,
-                ETA will be a rough estimate for ${unsequencedCount > 1 ? "them" : "it"} until set.</p>` : A}
+              ${i?q`<p class="hint" style="color:#faad14">⚠ ${i}
+                room${i>1?"s":""} not yet sequenced — dragged to the end,
+                ETA will be a rough estimate for ${i>1?"them":"it"} until set.</p>`:G}
               <div class="seq-list">
-                ${ordered.map((r, ri) => b `
-                  <div class="seq-row ${this._dragSeq === ri ? "seq-row--dragging" : ""}"
-                    @dragover=${(e) => { if (this._dragSeq !== null)
-                e.preventDefault(); }}
-                    @drop=${(e) => {
-                e.preventDefault();
-                if (this._dragSeq !== null)
-                    this._moveSequence(vac, ordered, this._dragSeq, ri);
-                this._dragSeq = null;
-            }}>
+                ${e.map((i,s)=>q`
+                  <div class="seq-row ${this._dragSeq===s?"seq-row--dragging":""}"
+                    @dragover=${t=>{null!==this._dragSeq&&t.preventDefault()}}
+                    @drop=${t=>{t.preventDefault(),null!==this._dragSeq&&this._moveSequence(o,e,this._dragSeq,s),this._dragSeq=null}}>
                     <ha-icon icon="mdi:drag-horizontal-variant" title="Drag to reorder"
                       draggable="true" style="cursor:grab;opacity:0.5;--mdc-icon-size:18px;flex-shrink:0"
-                      @dragstart=${(e) => { this._dragSeq = ri; if (e.dataTransfer)
-                e.dataTransfer.effectAllowed = "move"; }}
-                      @dragend=${() => { this._dragSeq = null; }}></ha-icon>
-                    <span class="seq-pos">${ri + 1}</span>
-                    <ha-icon icon=${r.icon || "mdi:square"} style="--mdc-icon-size:15px"></ha-icon>
-                    <span class="seq-name">${r.name || r.key || "Room " + (ri + 1)}</span>
-                    ${!r.key || seqMap[r.key] === undefined ? b `<span class="seq-flag" title="Not yet sequenced">?</span>` : A}
+                      @dragstart=${t=>{this._dragSeq=s,t.dataTransfer&&(t.dataTransfer.effectAllowed="move")}}
+                      @dragend=${()=>{this._dragSeq=null}}></ha-icon>
+                    <span class="seq-pos">${s+1}</span>
+                    <ha-icon icon=${i.icon||"mdi:square"} style="--mdc-icon-size:15px"></ha-icon>
+                    <span class="seq-name">${i.name||i.key||"Room "+(s+1)}</span>
+                    ${i.key&&void 0!==t[i.key]?G:q`<span class="seq-flag" title="Not yet sequenced">?</span>`}
                   </div>`)}
               </div>
-            `;
-        })() : A}
+            `})():G}
 
-          ${this._config.map_mode === "merged" ? b `<button class="btn btn--add btn--sm" style="align-self:flex-start;margin-top:4px" @click=${() => this._addEditedRoom()}><ha-icon icon="mdi:plus"></ha-icon> Add room</button>` : A}
-          ${rooms.length ? b `
+          ${"merged"===this._config.map_mode?q`<button class="btn btn--add btn--sm" style="align-self:flex-start;margin-top:4px" @click=${()=>this._addEditedRoom()}><ha-icon icon="mdi:plus"></ha-icon> Add room</button>`:G}
+          ${m.length?q`
             <div class="section-title">Room positions</div>
-            <p class="hint">${this._mapRoom !== null
-            ? "Drag the dot/rectangle to move it (rectangle mode: drag a corner to resize). Tap it again to deselect, or click elsewhere on the map to jump the selected room there."
-            : "Select a room below, then drag it on the map — or click the map to jump the selected room there."}</p>
+            <p class="hint">${null!==this._mapRoom?"Drag the dot/rectangle to move it (rectangle mode: drag a corner to resize). Tap it again to deselect, or click elsewhere on the map to jump the selected room there.":"Select a room below, then drag it on the map — or click the map to jump the selected room there."}</p>
             <div class="pill-row">
-              ${rooms.map((r, ri) => b `
-                <button class="room-pill ${ri === this._mapRoom ? "room-pill--active" : ""}"
-                  @click=${() => { this._mapRoom = ri === this._mapRoom ? null : ri; }}>
-                  <ha-icon icon=${r.icon || "mdi:square"} style="--mdc-icon-size:13px"></ha-icon>
-                  ${r.name || r.key || "Room " + (ri + 1)}
+              ${m.map((t,e)=>q`
+                <button class="room-pill ${e===this._mapRoom?"room-pill--active":""}"
+                  @click=${()=>{this._mapRoom=e===this._mapRoom?null:e}}>
+                  <ha-icon icon=${t.icon||"mdi:square"} style="--mdc-icon-size:13px"></ha-icon>
+                  ${t.name||t.key||"Room "+(e+1)}
                 </button>`)}
             </div>
 
-            ${this._mapRoom !== null ? b `
-              ${this._config.map_mode === "merged" ? b `
-                ${this._textField("Key (= Roborock room name)", rooms[this._mapRoom]?.key, v => this._setEditedRoom(this._mapRoom, { key: v }), "Kitchen")}
-                ${this._textField("Name", rooms[this._mapRoom]?.name, v => this._setEditedRoom(this._mapRoom, { name: v }), "Kitchen")}
-                ${this._numberSlider("Dry clean time", rooms[this._mapRoom]?.clean_time_dry ?? 0, 0, 120, 1, v => this._setEditedRoom(this._mapRoom, { clean_time_dry: v > 0 ? v : undefined }), " min")}
-                ${this._numberSlider("Wet clean time", rooms[this._mapRoom]?.clean_time_wet ?? 0, 0, 180, 1, v => this._setEditedRoom(this._mapRoom, { clean_time_wet: v > 0 ? v : undefined }), " min")}
-              ` : A}
+            ${null!==this._mapRoom?q`
+              ${"merged"===this._config.map_mode?q`
+                ${this._textField("Key (= Roborock room name)",m[this._mapRoom]?.key,t=>this._setEditedRoom(this._mapRoom,{key:t}),"Kitchen")}
+                ${this._textField("Name",m[this._mapRoom]?.name,t=>this._setEditedRoom(this._mapRoom,{name:t}),"Kitchen")}
+                ${this._numberSlider("Dry clean time",m[this._mapRoom]?.clean_time_dry??0,0,120,1,t=>this._setEditedRoom(this._mapRoom,{clean_time_dry:t>0?t:void 0})," min")}
+                ${this._numberSlider("Wet clean time",m[this._mapRoom]?.clean_time_wet??0,0,180,1,t=>this._setEditedRoom(this._mapRoom,{clean_time_wet:t>0?t:void 0})," min")}
+              `:G}
               <div class="section-title" style="margin-top:4px">Position</div>
-              ${this._numberSlider("X", rooms[this._mapRoom]?.map_x ?? 50, 0, 100, 1, v => this._setEditedRoom(this._mapRoom, { map_x: v }), "%")}
-              ${this._numberSlider("Y", rooms[this._mapRoom]?.map_y ?? 50, 0, 100, 1, v => this._setEditedRoom(this._mapRoom, { map_y: v }), "%")}
+              ${this._numberSlider("X",m[this._mapRoom]?.map_x??50,0,100,1,t=>this._setEditedRoom(this._mapRoom,{map_x:t}),"%")}
+              ${this._numberSlider("Y",m[this._mapRoom]?.map_y??50,0,100,1,t=>this._setEditedRoom(this._mapRoom,{map_y:t}),"%")}
 
               <div class="section-title" style="margin-top:4px">Overlay mode</div>
-              ${(() => {
-            const room = rooms[this._mapRoom];
-            return room?.map_w !== undefined ? b `
-                  ${this._numberSlider("Width", room.map_w, 1, 100, 1, v => this._setEditedRoom(this._mapRoom, { map_w: v }), "%")}
-                  ${this._numberSlider("Height", room.map_h ?? 15, 1, 100, 1, v => this._setEditedRoom(this._mapRoom, { map_h: v }), "%")}
+              ${(()=>{const t=m[this._mapRoom];return void 0!==t?.map_w?q`
+                  ${this._numberSlider("Width",t.map_w,1,100,1,t=>this._setEditedRoom(this._mapRoom,{map_w:t}),"%")}
+                  ${this._numberSlider("Height",t.map_h??15,1,100,1,t=>this._setEditedRoom(this._mapRoom,{map_h:t}),"%")}
                   <button class="btn btn--sm" style="align-self:flex-start"
-                    @click=${() => this._setEditedRoom(this._mapRoom, { map_w: undefined, map_h: undefined })}>
+                    @click=${()=>this._setEditedRoom(this._mapRoom,{map_w:void 0,map_h:void 0})}>
                     Switch to point mode
                   </button>
-                ` : b `
+                `:q`
                   <button class="btn btn--add btn--sm" style="align-self:flex-start"
-                    @click=${() => this._setEditedRoom(this._mapRoom, { map_w: 20, map_h: 15 })}>
+                    @click=${()=>this._setEditedRoom(this._mapRoom,{map_w:20,map_h:15})}>
                     <ha-icon icon="mdi:rectangle-outline"></ha-icon> Enable rectangle overlay
                   </button>
-                `;
-        })()}
+                `})()}
 
               <div class="section-title" style="margin-top:4px">Icon</div>
-              ${this._iconPickerField(rooms[this._mapRoom]?.icon, v => this._setEditedRoom(this._mapRoom, { icon: v }))}
-              ${rooms[this._mapRoom]?.icon ? b `
+              ${this._iconPickerField(m[this._mapRoom]?.icon,t=>this._setEditedRoom(this._mapRoom,{icon:t}))}
+              ${m[this._mapRoom]?.icon?q`
                 <div class="field">
                   <label>Icon position</label>
                   <div class="anchor-picker">
-                    ${["tl", "t", "tr", "l", "c", "r", "bl", "b", "br"].map(pos => {
-            const lbl = { tl: "↖", t: "↑", tr: "↗", l: "←", c: "·", r: "→", bl: "↙", b: "↓", br: "↘" };
-            return b `<button
-                        class="anchor-cell ${(rooms[this._mapRoom]?.icon_anchor ?? "c") === pos ? "anchor-cell--active" : ""}"
-                        title=${pos}
-                        @click=${() => this._setEditedRoom(this._mapRoom, { icon_anchor: pos })}>
-                        ${lbl[pos]}
-                      </button>`;
-        })}
+                    ${["tl","t","tr","l","c","r","bl","b","br"].map(t=>q`<button
+                        class="anchor-cell ${(m[this._mapRoom]?.icon_anchor??"c")===t?"anchor-cell--active":""}"
+                        title=${t}
+                        @click=${()=>this._setEditedRoom(this._mapRoom,{icon_anchor:t})}>
+                        ${{tl:"↖",t:"↑",tr:"↗",l:"←",c:"·",r:"→",bl:"↙",b:"↓",br:"↘"}[t]}
+                      </button>`)}
                   </div>
                   <button class="btn btn--sm" style="margin-top:4px;align-self:flex-start"
-                    @click=${() => this._setEditedRoom(this._mapRoom, { icon_anchor: "none" })}>
+                    @click=${()=>this._setEditedRoom(this._mapRoom,{icon_anchor:"none"})}>
                     Hide icon in overlay
                   </button>
                 </div>
-              ` : A}
-              ${this._config.map_mode === "merged" ? b `<button class="btn btn--sm" style="align-self:flex-start;margin-top:6px" @click=${() => this._deleteEditedRoom(this._mapRoom)}><ha-icon icon="mdi:delete"></ha-icon> Delete room</button>` : A}
-            ` : A}
-          ` : b `${this._config.map_mode === "merged" ? b `<p class="hint">No rooms yet — use "Add room" above.</p>` : b `<p class="hint">Add rooms in the Vacuums tab to position them here.</p>`}`}
-        ` : b `<p class="hint">Select a map or image above to enable the placement preview.</p>`}
+              `:G}
+              ${"merged"===this._config.map_mode?q`<button class="btn btn--sm" style="align-self:flex-start;margin-top:6px" @click=${()=>this._deleteEditedRoom(this._mapRoom)}><ha-icon icon="mdi:delete"></ha-icon> Delete room</button>`:G}
+            `:G}
+          `:q`${"merged"===this._config.map_mode?q`<p class="hint">No rooms yet — use "Add room" above.</p>`:q`<p class="hint">Add rooms in the Vacuums tab to position them here.</p>`}`}
+        `:q`<p class="hint">Select a map or image above to enable the placement preview.</p>`}
 
-        ${this._intEntityFor(vac) ? b `
+        ${this._intEntityFor(o)?q`
           <div class="section-title" style="margin-top:4px">Appearance</div>
-          ${this._hexColorField("Path colour", vac.path_color, v => this._setVacuum(mapVac, { path_color: v || undefined }), vac.color ? this._resolveColor(vac.color, "green") : DEFAULT_VACUUM_PALETTE[mapVac % DEFAULT_VACUUM_PALETTE.length])}
-          ${this._numberSlider("Path width", vac.path_width ?? 100, 20, 300, 10, v => this._setVacuum(mapVac, { path_width: v }), "%")}
-          ${this._hexColorField("Mop band colour", vac.mop_path_color, v => this._setVacuum(mapVac, { mop_path_color: v || undefined }), "#40a9ff")}
-          ${this._numberSlider("Mop band opacity", vac.mop_band_opacity ?? 28, 0, 100, 5, v => this._setVacuum(mapVac, { mop_band_opacity: v }), "%")}
-          ${this._numberSlider("Mop band width", vac.mop_band_width ?? 100, 20, 400, 10, v => this._setVacuum(mapVac, { mop_band_width: v }), "%")}
-          ${vac.image ? this._selectField("Robot image on map (uses status image)", vac.robot_image_on_map ? "yes" : "no", [{ value: "no", label: "no" }, { value: "yes", label: "yes" }], v => this._setVacuum(mapVac, { robot_image_on_map: v === "yes" })) : A}
-          ${vac.robot_image_on_map ? this._numberSlider("Robot image size", vac.robot_size ?? 100, 40, 220, 10, v => this._setVacuum(mapVac, { robot_size: v }), "%") : A}
-          ${vac.robot_image_on_map ? this._numberSlider("Robot image rotation", vac.robot_image_rotation ?? 0, -180, 180, 15, v => this._setVacuum(mapVac, { robot_image_rotation: v }), "°") : A}
-        ` : A}
+          ${this._hexColorField("Path colour",o.path_color,t=>this._setVacuum(e,{path_color:t||void 0}),o.color?this._resolveColor(o.color,"green"):Mt[e%Mt.length])}
+          ${this._numberSlider("Path width",o.path_width??100,20,300,10,t=>this._setVacuum(e,{path_width:t}),"%")}
+          ${this._hexColorField("Mop band colour",o.mop_path_color,t=>this._setVacuum(e,{mop_path_color:t||void 0}),"#40a9ff")}
+          ${this._numberSlider("Mop band opacity",o.mop_band_opacity??28,0,100,5,t=>this._setVacuum(e,{mop_band_opacity:t}),"%")}
+          ${this._numberSlider("Mop band width",o.mop_band_width??100,20,400,10,t=>this._setVacuum(e,{mop_band_width:t}),"%")}
+          ${o.image?this._selectField("Robot image on map (uses status image)",o.robot_image_on_map?"yes":"no",[{value:"no",label:"no"},{value:"yes",label:"yes"}],t=>this._setVacuum(e,{robot_image_on_map:"yes"===t})):G}
+          ${o.robot_image_on_map?this._numberSlider("Robot image size",o.robot_size??100,40,220,10,t=>this._setVacuum(e,{robot_size:t}),"%"):G}
+          ${o.robot_image_on_map?this._numberSlider("Robot image rotation",o.robot_image_rotation??0,-180,180,15,t=>this._setVacuum(e,{robot_image_rotation:t}),"°"):G}
+        `:G}
 
-        ${this._numberSlider("Card height (0=auto)", (this._config.map_mode === "merged" ? this._config.base_height : vac.base_height) ?? 0, 0, 700, 10, v => this._config.map_mode === "merged" ? this._setConfig({ base_height: v > 0 ? v : undefined }) : this._setVacuum(mapVac, { base_height: v > 0 ? v : undefined }), "px")}
+        ${this._numberSlider("Card height (0=auto)",("merged"===this._config.map_mode?this._config.base_height:o.base_height)??0,0,700,10,t=>"merged"===this._config.map_mode?this._setConfig({base_height:t>0?t:void 0}):this._setVacuum(e,{base_height:t>0?t:void 0}),"px")}
 
-      </div>`;
-    }
-    // ── Tab: Global ───────────────────────────────────────────────────────────
-    _dbgRow(label, value) {
-        return b `<div class="field field--row">
-      <label>${label}</label>
-      <span style="font-size:12px;font-family:monospace;word-break:break-all">${value === undefined || value === null || value === "" ? "—" : String(value)}</span>
-    </div>`;
-    }
-    _renderDebugTab() {
-        const fmt = (v) => { try {
-            return JSON.stringify(v, null, 1);
-        }
-        catch {
-            return String(v);
-        } };
-        const pre = "font-size:11px;font-family:monospace;white-space:pre-wrap;word-break:break-all;background:rgba(127,127,127,0.12);padding:6px;border-radius:6px;margin:0;max-height:220px;overflow:auto";
-        return b `
+      </div>`}_dbgRow(t,e){return q`<div class="field field--row">
+      <label>${t}</label>
+      <span style="font-size:12px;font-family:monospace;word-break:break-all">${null==e||""===e?"—":String(e)}</span>
+    </div>`}_renderDebugTab(){const t=t=>{try{return JSON.stringify(t,null,1)}catch{return String(t)}},e="font-size:11px;font-family:monospace;white-space:pre-wrap;word-break:break-all;background:rgba(127,127,127,0.12);padding:6px;border-radius:6px;margin:0;max-height:220px;overflow:auto";return q`
       <div class="tab-body">
         <p class="hint">Live values from Home Assistant, read-only — to check the integration is writing data correctly.</p>
         <div class="field field--row">
           <label>Room progress gauges on map</label>
           <label class="toggle-wrap">
             <input type="checkbox" class="toggle-input"
-              .checked=${this._config.debug_room_progress ?? false}
-              @change=${(e) => this._setConfig({ debug_room_progress: e.target.checked || undefined })} />
+              .checked=${this._config.debug_room_progress??!1}
+              @change=${t=>this._setConfig({debug_room_progress:t.target.checked||void 0})} />
             <span class="toggle-track"></span>
           </label>
         </div>
@@ -8551,57 +2336,42 @@ let AnyVacCardEditor = class AnyVacCardEditor extends i$2 {
           <label>Dense portrait room list</label>
           <label class="toggle-wrap">
             <input type="checkbox" class="toggle-input"
-              .checked=${this._config.debug_dense_dock ?? false}
-              @change=${(e) => this._setConfig({ debug_dense_dock: e.target.checked || undefined })} />
+              .checked=${this._config.debug_dense_dock??!1}
+              @change=${t=>this._setConfig({debug_dense_dock:t.target.checked||void 0})} />
             <span class="toggle-track"></span>
           </label>
         </div>
         <p class="hint">Brings back the old portrait room list (name, age, pin, assigned vacuum) below the map — the minimalist cockpit (docs/25 §7c) drops it in favor of map-tap selection. Independent of the gauges toggle above — you can debug coverage % (which shows on the map either way) without this.</p>
-        ${this._config.vacuums.map((vac) => {
-            const ie = this._intEntityFor(vac);
-            const st = ie ? this.hass.states[ie] : undefined;
-            const at = (st?.attributes ?? {});
-            const ms = (at.mop_signal ?? {});
-            return b `
-            <div class="section-title">${vac.name ?? vac.entity}</div>
+        ${this._config.vacuums.map(o=>{const i=this._intEntityFor(o),s=i?this.hass.states[i]:void 0,n=s?.attributes??{},a=n.mop_signal??{};return q`
+            <div class="section-title">${o.name??o.entity}</div>
             <div class="sub-section">
-              ${!ie
-                ? b `<p class="hint">No AnyVac integration sensor found (config or auto-resolve) — backend values unavailable.</p>`
-                : !st
-                    ? b `<p class="hint">Sensor <code>${ie}</code> not found.</p>`
-                    : b `
-                    ${this._dbgRow("sensor", `${ie} = ${st.state}`)}
-                    ${this._dbgRow("schema_version", at.schema_version)}
-                    ${this._dbgRow("pipeline_ok", at.pipeline_ok)}
-                    ${this._dbgRow("clean_type", at.clean_type)}
-                    ${this._dbgRow("in_cleaning", at.in_cleaning)}
-                    ${this._dbgRow("vacuum_room_name", at.vacuum_room_name)}
-                    ${this._dbgRow("water_mode_name", ms.water_mode_name)}
-                    ${this._dbgRow("fan_speed_name", ms.fan_speed_name)}
-                    ${this._dbgRow("path pts (decimated)", Array.isArray(at.path) ? at.path.length : "—")}
-                    ${this._dbgRow("path pts (raw)", at.path_points)}
-                    ${this._dbgRow("mop pts (raw)", at.mop_path_points)}
+              ${i?s?q`
+                    ${this._dbgRow("sensor",`${i} = ${s.state}`)}
+                    ${this._dbgRow("schema_version",n.schema_version)}
+                    ${this._dbgRow("pipeline_ok",n.pipeline_ok)}
+                    ${this._dbgRow("clean_type",n.clean_type)}
+                    ${this._dbgRow("in_cleaning",n.in_cleaning)}
+                    ${this._dbgRow("vacuum_room_name",n.vacuum_room_name)}
+                    ${this._dbgRow("water_mode_name",a.water_mode_name)}
+                    ${this._dbgRow("fan_speed_name",a.fan_speed_name)}
+                    ${this._dbgRow("path pts (decimated)",Array.isArray(n.path)?n.path.length:"—")}
+                    ${this._dbgRow("path pts (raw)",n.path_points)}
+                    ${this._dbgRow("mop pts (raw)",n.mop_path_points)}
                     <div class="sub-title">calib — last single-room decision</div>
-                    <pre style=${pre}>${fmt(at.calib_debug)}</pre>
+                    <pre style=${e}>${t(n.calib_debug)}</pre>
                     <div class="sub-title">rooms_estimate (per vacuum)</div>
-                    <pre style=${pre}>${fmt(at.rooms_estimate)}</pre>
+                    <pre style=${e}>${t(n.rooms_estimate)}</pre>
                     <div class="sub-title">rooms_last_cleaned (cross-vacuum)</div>
-                    <pre style=${pre}>${fmt(at.rooms_last_cleaned)}</pre>
+                    <pre style=${e}>${t(n.rooms_last_cleaned)}</pre>
                     <div class="sub-title">rooms_progress — spatial % + time ratio (live)</div>
-                    <pre style=${pre}>${fmt(at.rooms_progress)}</pre>
+                    <pre style=${e}>${t(n.rooms_progress)}</pre>
                     <div class="sub-title">rooms (geometry — for spatial coverage)</div>
-                    <pre style=${pre}>${fmt((at.rooms ?? []).map((r) => ({ name: r.name, bbox_px: r.bbox_px, x0: r.x0, y0: r.y0, x1: r.x1, y1: r.y1 })))}</pre>
-                    <details><summary class="hint" style="cursor:pointer">Raw attributes</summary><pre style=${pre}>${fmt(at)}</pre></details>
-                  `}
-            </div>`;
-        })}
+                    <pre style=${e}>${t((n.rooms??[]).map(t=>({name:t.name,bbox_px:t.bbox_px,x0:t.x0,y0:t.y0,x1:t.x1,y1:t.y1})))}</pre>
+                    <details><summary class="hint" style="cursor:pointer">Raw attributes</summary><pre style=${e}>${t(n)}</pre></details>
+                  `:q`<p class="hint">Sensor <code>${i}</code> not found.</p>`:q`<p class="hint">No AnyVac integration sensor found (config or auto-resolve) — backend values unavailable.</p>`}
+            </div>`})}
       </div>
-    `;
-    }
-    _renderGlobalTab() {
-        const globals = this._config.global_actions ?? [];
-        const ths = this._config.room_thresholds ?? DEFAULT_THRESHOLDS;
-        return b `
+    `}_renderGlobalTab(){const t=this._config.global_actions??[],e=this._config.room_thresholds??Qt;return q`
       <div class="tab-body">
 
         <div class="section-title">Layout</div>
@@ -8610,9 +2380,7 @@ let AnyVacCardEditor = class AnyVacCardEditor extends i$2 {
           <label class="toggle-wrap">
             <input type="checkbox" class="toggle-input"
               .checked=${!!this._config.layout}
-              @change=${(e) => this._setConfig({
-            layout: e.target.checked ? (this._config.layout ?? {}) : undefined,
-        })} />
+              @change=${t=>this._setConfig({layout:t.target.checked?this._config.layout??{}:void 0})} />
             <span class="toggle-track"></span>
           </label>
         </div>
@@ -8623,13 +2391,13 @@ let AnyVacCardEditor = class AnyVacCardEditor extends i$2 {
           (column/row overrides, map crop, orientation) is still YAML-only — this toggle
           turns the system on with its built-in defaults; switch to YAML mode to fine-tune.</p>
 
-        ${this._config.layout ? b `
+        ${this._config.layout?q`
           <div class="field field--row">
             <label>Flip portrait map 180°</label>
             <label class="toggle-wrap">
               <input type="checkbox" class="toggle-input"
-                .checked=${this._config.layout.portrait?.crop?.flip === true}
-                @change=${(e) => this._setLayoutFlip("portrait", e.target.checked)} />
+                .checked=${!0===this._config.layout.portrait?.crop?.flip}
+                @change=${t=>this._setLayoutFlip("portrait",t.target.checked)} />
               <span class="toggle-track"></span>
             </label>
           </div>
@@ -8637,8 +2405,8 @@ let AnyVacCardEditor = class AnyVacCardEditor extends i$2 {
             <label>Flip landscape map 180°</label>
             <label class="toggle-wrap">
               <input type="checkbox" class="toggle-input"
-                .checked=${this._config.layout.landscape?.crop?.flip === true}
-                @change=${(e) => this._setLayoutFlip("landscape", e.target.checked)} />
+                .checked=${!0===this._config.layout.landscape?.crop?.flip}
+                @change=${t=>this._setLayoutFlip("landscape",t.target.checked)} />
               <span class="toggle-track"></span>
             </label>
           </div>
@@ -8646,41 +2414,36 @@ let AnyVacCardEditor = class AnyVacCardEditor extends i$2 {
             you're used to (docs/32) — a persisted default for this card. There's also a
             "Flip map" button in the running card's map toolbar for a quick, unsaved
             per-screen try-out that doesn't touch this setting.</p>
-        ` : A}
+        `:G}
 
         <div class="section-title" style="margin-top:4px">Controller</div>
-        ${this._selectField("Mode", this._config.ui_mode ?? "auto", [{ value: "auto", label: "Auto — one orchestrated controller" },
-            { value: "manual", label: "Manual — per-robot controllers" }], v => this._setConfig({ ui_mode: v }))}
+        ${this._selectField("Mode",this._config.ui_mode??"auto",[{value:"auto",label:"Auto — one orchestrated controller"},{value:"manual",label:"Manual — per-robot controllers"}],t=>this._setConfig({ui_mode:t}))}
 
         <div class="section-title" style="margin-top:4px">Global presets (Auto mode)</div>
         <p class="hint">Targeted whole-home cleans for Auto mode (e.g. "After dinner", "Whole home"). The integration decides which robots and the order; you pick the scope.</p>
-        ${(this._config.global_presets ?? []).map((gp, i) => b `
+        ${(this._config.global_presets??[]).map((t,e)=>q`
           <div class="sub-section">
             <div class="sub-title" style="display:flex;align-items:center;justify-content:space-between">
-              <span>${gp.label || gp.id}</span>
+              <span>${t.label||t.id}</span>
               <button class="icon-btn icon-btn--danger" title="Delete preset"
-                @click=${() => this._deleteGlobalPreset(i)}>
+                @click=${()=>this._deleteGlobalPreset(e)}>
                 <ha-icon icon="mdi:delete"></ha-icon>
               </button>
             </div>
-            ${this._textField("Label", gp.label, v => this._setGlobalPreset(i, { label: v }), "e.g. After dinner")}
-            ${this._textField("Icon", gp.icon, v => this._setGlobalPreset(i, { icon: v || undefined }), "mdi:silverware-fork-knife")}
-            ${this._selectField("Scope", (gp.scope === "all" ? "all" : "select"), [{ value: "all", label: "Whole flat" }, { value: "select", label: "Pick rooms on map" }], v => this._setGlobalPreset(i, { scope: v }))}
-            ${this._selectField("Mode", gp.mode ?? "dry", [{ value: "dry", label: "Dry only" },
-            { value: "wet", label: "Wet only" },
-            { value: "both", label: "Dry then wet (wet follows dry)" }], v => this._setGlobalPreset(i, { mode: v }))}
+            ${this._textField("Label",t.label,t=>this._setGlobalPreset(e,{label:t}),"e.g. After dinner")}
+            ${this._textField("Icon",t.icon,t=>this._setGlobalPreset(e,{icon:t||void 0}),"mdi:silverware-fork-knife")}
+            ${this._selectField("Scope","all"===t.scope?"all":"select",[{value:"all",label:"Whole flat"},{value:"select",label:"Pick rooms on map"}],t=>this._setGlobalPreset(e,{scope:t}))}
+            ${this._selectField("Mode",t.mode??"dry",[{value:"dry",label:"Dry only"},{value:"wet",label:"Wet only"},{value:"both",label:"Dry then wet (wet follows dry)"}],t=>this._setGlobalPreset(e,{mode:t}))}
           </div>
         `)}
-        <button class="btn btn--add" @click=${() => this._addGlobalPreset()}>
+        <button class="btn btn--add" @click=${()=>this._addGlobalPreset()}>
           <ha-icon icon="mdi:plus"></ha-icon> Add global preset
         </button>
 
         <div class="section-title" style="margin-top:4px">Global actions</div>
         <p class="hint">Badges that trigger a script across all vacuums (e.g. "Clean whole flat").</p>
-        ${globals.length === 0
-            ? b `<p class="hint">None configured.</p>`
-            : globals.map((ga, i) => this._renderGlobalAccordion(ga, i))}
-        <button class="btn btn--add" @click=${() => this._addGlobal()}>
+        ${0===t.length?q`<p class="hint">None configured.</p>`:t.map((t,e)=>this._renderGlobalAccordion(t,e))}
+        <button class="btn btn--add" @click=${()=>this._addGlobal()}>
           <ha-icon icon="mdi:plus"></ha-icon> Add global action
         </button>
 
@@ -8690,50 +2453,39 @@ let AnyVacCardEditor = class AnyVacCardEditor extends i$2 {
           <label>Hide room icons</label>
           <label class="toggle-wrap">
             <input type="checkbox" class="toggle-input"
-              .checked=${this._config.room_icon_hidden ?? false}
-              @change=${(e) => this._setConfig({ room_icon_hidden: e.target.checked || undefined })} />
+              .checked=${this._config.room_icon_hidden??!1}
+              @change=${t=>this._setConfig({room_icon_hidden:t.target.checked||void 0})} />
             <span class="toggle-track"></span>
           </label>
         </div>
-        ${this._numberSlider("Border (idle)", this._config.room_border_normal ?? 2, 0, 12, 1, v => this._setConfig({ room_border_normal: v }), "px")}
-        ${this._numberSlider("Border (selected)", this._config.room_border_selected ?? 4, 0, 12, 1, v => this._setConfig({ room_border_selected: v }), "px")}
+        ${this._numberSlider("Border (idle)",this._config.room_border_normal??2,0,12,1,t=>this._setConfig({room_border_normal:t}),"px")}
+        ${this._numberSlider("Border (selected)",this._config.room_border_selected??4,0,12,1,t=>this._setConfig({room_border_selected:t}),"px")}
 
         <div class="section-title" style="margin-top:4px">Thresholds (border colour by last clean age)</div>
         <p class="hint">Rules ascending — first match wins. Beyond the last = red.</p>
-        ${ths.map((th, ti) => b `
+        ${e.map((t,o)=>q`
           <div class="var-row threshold-row">
             <span class="threshold-label">≤</span>
             <input type="number" class="text-input text-input--sm threshold-days"
-              min="0" max="365" .value=${String(th.days)}
-              @change=${(e) => {
-            const days = parseInt(e.target.value);
-            const next = ths.map((t, i) => i === ti ? { ...t, days: isNaN(days) ? t.days : days } : t);
-            this._setConfig({ room_thresholds: next });
-        }} />
+              min="0" max="365" .value=${String(t.days)}
+              @change=${t=>{const i=parseInt(t.target.value),s=e.map((t,e)=>e===o?{...t,days:isNaN(i)?t.days:i}:t);this._setConfig({room_thresholds:s})}} />
             <span class="threshold-label">days</span>
-            <input type="color" class="threshold-color" .value=${th.color}
-              @input=${(e) => {
-            const color = e.target.value;
-            const next = ths.map((t, i) => i === ti ? { ...t, color } : t);
-            this._setConfig({ room_thresholds: next });
-        }} />
+            <input type="color" class="threshold-color" .value=${t.color}
+              @input=${t=>{const i=t.target.value,s=e.map((t,e)=>e===o?{...t,color:i}:t);this._setConfig({room_thresholds:s})}} />
             <button class="icon-btn icon-btn--danger icon-btn--sm"
-              @click=${() => {
-            const next = ths.filter((_, i) => i !== ti);
-            this._setConfig({ room_thresholds: next.length ? next : undefined });
-        }}>
+              @click=${()=>{const t=e.filter((t,e)=>e!==o);this._setConfig({room_thresholds:t.length?t:void 0})}}>
               <ha-icon icon="mdi:close"></ha-icon>
             </button>
           </div>`)}
         <div style="display:flex;gap:8px;flex-wrap:wrap">
-          <button class="btn btn--add btn--sm" @click=${() => this._setConfig({ room_thresholds: [...ths, { days: 14, color: "#ff4d4f" }] })}>
+          <button class="btn btn--add btn--sm" @click=${()=>this._setConfig({room_thresholds:[...e,{days:14,color:"#ff4d4f"}]})}>
             <ha-icon icon="mdi:plus"></ha-icon> Add threshold
           </button>
-          ${this._config.room_thresholds ? b `
-            <button class="btn btn--sm" @click=${() => this._setConfig({ room_thresholds: undefined })}>
+          ${this._config.room_thresholds?q`
+            <button class="btn btn--sm" @click=${()=>this._setConfig({room_thresholds:void 0})}>
               Reset to defaults
             </button>
-          ` : A}
+          `:G}
         </div>
 
         <div class="section-title" style="margin-top:4px">Notifications</div>
@@ -8751,117 +2503,71 @@ let AnyVacCardEditor = class AnyVacCardEditor extends i$2 {
           <code>anyvac_room_done</code> events, but neither has a shipped blueprint yet —
           build a custom automation on the event if you need one.</p>
 
-        ${(() => {
-            const usesAreaMappings = this._config.vacuums.some(v => v.clean_action?.type === "native-area");
-            if (!usesAreaMappings)
-                return A;
-            const allKeys = [...new Set(this._config.vacuums.flatMap(v => (v.rooms ?? []).map(r => r.key)).filter(Boolean))].sort();
-            const mappings = this._config.area_mappings ?? {};
-            return b `
+        ${(()=>{const t=this._config.vacuums.some(t=>"native-area"===t.clean_action?.type);if(!t)return G;const e=[...new Set(this._config.vacuums.flatMap(t=>(t.rooms??[]).map(t=>t.key)).filter(Boolean))].sort(),o=this._config.area_mappings??{};return q`
             <div class="section-title" style="margin-top:4px">Area mappings</div>
             <p class="hint">Maps room keys to HA areas for the <strong>native-area</strong> strategy (degraded mode only — irrelevant once the AnyVac integration is active for a vacuum). Set once here — applies to all vacuums.</p>
-            ${allKeys.length === 0
-                ? b `<p class="hint">No rooms configured yet.</p>`
-                : allKeys.map(key => this._areaPicker(key, mappings[key], v => {
-                    const next = { ...mappings };
-                    if (v)
-                        next[key] = v;
-                    else
-                        delete next[key];
-                    this._setConfig({ area_mappings: Object.keys(next).length ? next : undefined });
-                }))}
-          `;
-        })()}
+            ${0===e.length?q`<p class="hint">No rooms configured yet.</p>`:e.map(t=>this._areaPicker(t,o[t],e=>{const i={...o};e?i[t]=e:delete i[t],this._setConfig({area_mappings:Object.keys(i).length?i:void 0})}))}
+          `})()}
 
-      </div>`;
-    }
-    _renderGlobalAccordion(ga, idx) {
-        const color = this._resolveColor(ga.color, "orange");
-        const isOpen = this._openGlobal.has(idx);
-        const action = ga.action;
-        const watches = ga.watch_entities ?? [];
-        return b `
-      <div class="acc-row" style=${o({ borderLeft: "3px solid " + color })}>
-        <div class="acc-header" @click=${() => this._toggleGlobal(idx)}>
-          ${ga.image
-            ? b `<img class="acc-img" src=${ga.image} alt=${ga.name} />`
-            : b `<ha-icon icon="mdi:home-floor-a" style=${o({ color, width: "36px", height: "36px" })}></ha-icon>`}
+      </div>`}_renderGlobalAccordion(t,e){const o=this._resolveColor(t.color,"orange"),i=this._openGlobal.has(e),s=t.action,n=t.watch_entities??[];return q`
+      <div class="acc-row" style=${vt({borderLeft:"3px solid "+o})}>
+        <div class="acc-header" @click=${()=>this._toggleGlobal(e)}>
+          ${t.image?q`<img class="acc-img" src=${t.image} alt=${t.name} />`:q`<ha-icon icon="mdi:home-floor-a" style=${vt({color:o,width:"36px",height:"36px"})}></ha-icon>`}
           <div class="acc-info">
-            <span class="acc-name">${ga.name || "Unnamed action"}</span>
-            <span class="acc-sub">${action.type === "script" ? action.entity_id : action.service}</span>
+            <span class="acc-name">${t.name||"Unnamed action"}</span>
+            <span class="acc-sub">${"script"===s.type?s.entity_id:s.service}</span>
           </div>
           <button class="icon-btn icon-btn--danger"
-            @click=${(e) => { e.stopPropagation(); this._deleteGlobal(idx); }}>
+            @click=${t=>{t.stopPropagation(),this._deleteGlobal(e)}}>
             <ha-icon icon="mdi:delete"></ha-icon>
           </button>
-          <ha-icon icon=${isOpen ? "mdi:chevron-up" : "mdi:chevron-down"} class="acc-chevron"></ha-icon>
+          <ha-icon icon=${i?"mdi:chevron-up":"mdi:chevron-down"} class="acc-chevron"></ha-icon>
         </div>
-        ${isOpen ? b `
+        ${i?q`
           <div class="acc-body">
-            ${this._textField("Display name", ga.name, v => this._setGlobal(idx, { name: v }), "e.g. Whole flat")}
-            ${this._textField("Image path", ga.image, v => this._setGlobal(idx, { image: v || undefined }), "/local/...")}
-            ${this._hexColorField("Accent colour", ga.color ? this._resolveColor(ga.color, "orange") : undefined, v => this._setGlobal(idx, { color: v || undefined }), "#faad14")}
+            ${this._textField("Display name",t.name,t=>this._setGlobal(e,{name:t}),"e.g. Whole flat")}
+            ${this._textField("Image path",t.image,t=>this._setGlobal(e,{image:t||void 0}),"/local/...")}
+            ${this._hexColorField("Accent colour",t.color?this._resolveColor(t.color,"orange"):void 0,t=>this._setGlobal(e,{color:t||void 0}),"#faad14")}
 
             <div class="sub-title">Watch entities (badge glows when any is cleaning)</div>
-            ${watches.map((e, wi) => b `
+            ${n.map((t,o)=>q`
               <div class="var-row">
-                <ha-entity-picker .hass=${this.hass} .value=${e} .includeDomains=${["vacuum"]}
+                <ha-entity-picker .hass=${this.hass} .value=${t} .includeDomains=${["vacuum"]}
                   allow-custom-entity style="flex:1"
-                  @value-changed=${(ev) => {
-            const updated = [...watches];
-            updated[wi] = ev.detail.value;
-            this._setGlobal(idx, { watch_entities: updated.filter(Boolean) });
-        }}></ha-entity-picker>
+                  @value-changed=${t=>{const i=[...n];i[o]=t.detail.value,this._setGlobal(e,{watch_entities:i.filter(Boolean)})}}></ha-entity-picker>
                 <button class="icon-btn icon-btn--danger icon-btn--sm"
-                  @click=${() => this._setGlobal(idx, { watch_entities: watches.filter((_, i) => i !== wi) })}>
+                  @click=${()=>this._setGlobal(e,{watch_entities:n.filter((t,e)=>e!==o)})}>
                   <ha-icon icon="mdi:close"></ha-icon>
                 </button>
               </div>`)}
             <button class="btn btn--add btn--sm"
-              @click=${() => this._setGlobal(idx, { watch_entities: [...watches, ""] })}>
+              @click=${()=>this._setGlobal(e,{watch_entities:[...n,""]})}>
               <ha-icon icon="mdi:plus"></ha-icon> Add entity
             </button>
 
             <div class="sub-title">Action (hold-to-activate)</div>
-            ${this._selectField("Type", action.type, [{ value: "script", label: "Script" }, { value: "service", label: "Service call" }], v => this._setGlobal(idx, { action: v === "script"
-                ? { type: "script", entity_id: "" }
-                : { type: "service", service: "" } }))}
-            ${action.type === "script"
-            ? this._entityPicker("Script entity", action.entity_id, ["script"], v => this._setGlobalAction(idx, { entity_id: v }))
-            : this._textField("Service", action.service, v => this._setGlobalAction(idx, { service: v }), "e.g. script.celkovy_uklid_bytu")}
+            ${this._selectField("Type",s.type,[{value:"script",label:"Script"},{value:"service",label:"Service call"}],t=>this._setGlobal(e,{action:"script"===t?{type:"script",entity_id:""}:{type:"service",service:""}}))}
+            ${"script"===s.type?this._entityPicker("Script entity",s.entity_id,["script"],t=>this._setGlobalAction(e,{entity_id:t})):this._textField("Service",s.service,t=>this._setGlobalAction(e,{service:t}),"e.g. script.celkovy_uklid_bytu")}
           </div>
-        ` : A}
-      </div>`;
-    }
-    // ── Main render ───────────────────────────────────────────────────────────
-    render() {
-        if (!this._config)
-            return A;
-        return b `
+        `:G}
+      </div>`}render(){return this._config?q`
       <datalist id="ha-entities"></datalist>
       <div class="editor-root">
         <div class="tabs-bar">
-          ${["vacuums", "maps", "global"].map(t => b `
-            <button class="tab-btn ${this._tab === t ? "tab-btn--active" : ""}"
-              @click=${() => { this._tab = t; }}>
-              ${{ vacuums: "🤖 Vacuums", maps: "🗺 Maps", global: "⚙ Global" }[t]}
+          ${["vacuums","maps","global"].map(t=>q`
+            <button class="tab-btn ${this._tab===t?"tab-btn--active":""}"
+              @click=${()=>{this._tab=t}}>
+              ${{vacuums:"🤖 Vacuums",maps:"🗺 Maps",global:"⚙ Global"}[t]}
             </button>`)}
         </div>
-        ${this._tab === "vacuums" ? this._renderVacuumsTab()
-            : this._tab === "maps" ? this._renderMapsTab()
-                : this._tab === "debug" ? this._renderDebugTab()
-                    : this._renderGlobalTab()}
+        ${"vacuums"===this._tab?this._renderVacuumsTab():"maps"===this._tab?this._renderMapsTab():"debug"===this._tab?this._renderDebugTab():this._renderGlobalTab()}
         <div class="editor-footer">
-          <span class="footer-link" @click=${() => { this._tab = this._tab === "debug" ? "vacuums" : "debug"; }}>
-            ${this._tab === "debug" ? "← Back" : "🐞 Show debug info"}
+          <span class="footer-link" @click=${()=>{this._tab="debug"===this._tab?"vacuums":"debug"}}>
+            ${"debug"===this._tab?"← Back":"🐞 Show debug info"}
           </span>
-          <span>anyvac-card v${CARD_VERSION}</span>
+          <span>anyvac-card v${$t}</span>
         </div>
-      </div>`;
-    }
-};
-// ── Styles ────────────────────────────────────────────────────────────────
-AnyVacCardEditor.styles = i$5 `
+      </div>`:G}};ee.styles=a`
     .editor-root { display:flex; flex-direction:column; }
 
     /* ── Tabs ── */
@@ -9156,60 +2862,5 @@ AnyVacCardEditor.styles = i$5 `
 
     .hex-color-row { display:flex; align-items:center; gap:6px; }
     .hex-color-row .text-input { flex:1; }
-  `;
-__decorate([
-    n$1({ attribute: false })
-], AnyVacCardEditor.prototype, "hass", void 0);
-__decorate([
-    r()
-], AnyVacCardEditor.prototype, "_config", void 0);
-__decorate([
-    r()
-], AnyVacCardEditor.prototype, "_tab", void 0);
-__decorate([
-    r()
-], AnyVacCardEditor.prototype, "_dragRoom", void 0);
-__decorate([
-    r()
-], AnyVacCardEditor.prototype, "_dragSeq", void 0);
-__decorate([
-    r()
-], AnyVacCardEditor.prototype, "_openVac", void 0);
-__decorate([
-    r()
-], AnyVacCardEditor.prototype, "_openSensors", void 0);
-__decorate([
-    r()
-], AnyVacCardEditor.prototype, "_openPresets", void 0);
-__decorate([
-    r()
-], AnyVacCardEditor.prototype, "_openAction", void 0);
-__decorate([
-    r()
-], AnyVacCardEditor.prototype, "_openGlobal", void 0);
-__decorate([
-    r()
-], AnyVacCardEditor.prototype, "_openRoom", void 0);
-__decorate([
-    r()
-], AnyVacCardEditor.prototype, "_mapVac", void 0);
-__decorate([
-    r()
-], AnyVacCardEditor.prototype, "_mapRoom", void 0);
-__decorate([
-    r()
-], AnyVacCardEditor.prototype, "_pvAR", void 0);
-__decorate([
-    r()
-], AnyVacCardEditor.prototype, "_refMapUrl", void 0);
-__decorate([
-    r()
-], AnyVacCardEditor.prototype, "_floorplanSnapshotBusy", void 0);
-__decorate([
-    r()
-], AnyVacCardEditor.prototype, "_floorplanSnapshotError", void 0);
-AnyVacCardEditor = __decorate([
-    t$1(EDITOR_NAME)
-], AnyVacCardEditor);
-
-export { AnyVacCard, AnyVacCardEditor };
+  `,t([ut({attribute:!1})],ee.prototype,"hass",void 0),t([_t()],ee.prototype,"_config",void 0),t([_t()],ee.prototype,"_tab",void 0),t([_t()],ee.prototype,"_dragRoom",void 0),t([_t()],ee.prototype,"_dragSeq",void 0),t([_t()],ee.prototype,"_openVac",void 0),t([_t()],ee.prototype,"_openSensors",void 0),t([_t()],ee.prototype,"_openPresets",void 0),t([_t()],ee.prototype,"_openAction",void 0),t([_t()],ee.prototype,"_openGlobal",void 0),t([_t()],ee.prototype,"_openRoom",void 0),t([_t()],ee.prototype,"_mapVac",void 0),t([_t()],ee.prototype,"_mapRoom",void 0),t([_t()],ee.prototype,"_pvAR",void 0),t([_t()],ee.prototype,"_refMapUrl",void 0),t([_t()],ee.prototype,"_floorplanSnapshotBusy",void 0),t([_t()],ee.prototype,"_floorplanSnapshotError",void 0),ee=t([ht(wt)],ee);export{Lt as AnyVacCard,ee as AnyVacCardEditor};
+//# sourceMappingURL=anyvac-card.js.map

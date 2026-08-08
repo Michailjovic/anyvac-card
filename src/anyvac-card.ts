@@ -32,8 +32,8 @@ import {
   CLEANING_STATES,
 } from "./const";
 import {
-  assembleAnchors,
-  computeSeatFit,
+  resolveSeat,
+  resolveStaticRooms,
   roomBboxToRect,
   type SeatParams,
 } from "./seatfit";
@@ -340,6 +340,10 @@ export class AnyVacCard extends LitElement {
     this._mapCandCache.clear();
     this._autoCache.clear();
     this._careCache.clear();
+    // Room geometry and seats derive from the config as well as from hass, so
+    // the hass-identity check in `_memoSync()` alone wouldn't catch a config edit.
+    this._roomsMemo.clear();
+    this._seatMemo.clear();
     if (!this._initialized) {
       this._initialized = true;
       this._shownSet = this._loadShown();
@@ -1247,9 +1251,40 @@ export class AnyVacCard extends LitElement {
 
   /** Static (config-authored) rooms for a vacuum: card-level `rooms` if defined
    *  (merged config), else the vacuum's own. Never touches the integration —
-   *  also the anchor source for auto-seating (see `_effectiveSeat`). */
+   *  also the anchor source for auto-seating (see `_effectiveSeat`). Shared with
+   *  the editor via `seatfit.ts` since 1.1.0 so the two can't drift. */
   private _staticRoomsFor(vac: VacuumConfig): RoomConfig[] {
-    return (this._config.rooms?.length ? this._config.rooms : vac.rooms) ?? [];
+    return resolveStaticRooms(this._config, vac) as RoomConfig[];
+  }
+
+  /** Per-render memo for `_roomsFor`/`_effectiveSeat` (1.1.0).
+   *
+   *  A single render of a three-vacuum, ten-room merged card calls `_roomsFor()`
+   *  around 90 times (`_allRoomKeys()` twice in each of four regions, plus
+   *  `_pinCandidates()` per room per pass), each rebuilding the seat fit and a
+   *  fresh array of room objects. Measured, that's only ~0.19 ms on a desktop
+   *  and ~1 ms on a phone — this is NOT a hot spot and is not being sold as a
+   *  performance fix. What it does buy: ~900 fewer object allocations per render
+   *  (GC pressure matters with the 1 s debug tick running), and one consistent
+   *  answer per render instead of 90 independent recomputations that could in
+   *  principle disagree if `hass` changed underneath them.
+   *
+   *  Keyed on `hass` OBJECT IDENTITY rather than cleared from a lifecycle hook.
+   *  HA replaces `hass` wholesale on every state change, so this drops the memo
+   *  exactly when its inputs could have changed — and, unlike clearing in
+   *  `willUpdate()`, it stays correct on the paths where no render happens at
+   *  all: `shouldUpdate()` calls `_watchedEntities()` -> `_roomsFor()` BEFORE
+   *  `willUpdate()` would run, and doesn't run it at all when it returns false.
+   *  `setConfig()` clears both maps too, for the config half of the inputs. */
+  private _memoHass: unknown;
+  private _roomsMemo = new Map<string, RoomConfig[]>();
+  private _seatMemo = new Map<string, ReturnType<typeof resolveSeat>>();
+  private _memoSync(): void {
+    if (this.hass !== this._memoHass) {
+      this._memoHass = this.hass;
+      this._roomsMemo.clear();
+      this._seatMemo.clear();
+    }
   }
 
   /** Rooms z integrace (docs/20, RATIFIKOVÁNO 2026-07-22): live-merged view for
@@ -1265,6 +1300,14 @@ export class AnyVacCard extends LitElement {
    *  back to the plain static list whenever there's no usable integration data
    *  or no floorplan seat yet (degraded mode, schema < 2, fresh install). */
   private _roomsFor(vac: VacuumConfig): RoomConfig[] {
+    this._memoSync();
+    const memo = this._roomsMemo.get(vac.entity);
+    if (memo) return memo;
+    const out = this._computeRoomsFor(vac);
+    this._roomsMemo.set(vac.entity, out);
+    return out;
+  }
+  private _computeRoomsFor(vac: VacuumConfig): RoomConfig[] {
     const at = this._intAttrs(vac);
     const intRooms: Array<Record<string, any>> = Array.isArray(at?.rooms) ? at!.rooms : [];
     if (!at || !intRooms.length) return this._staticRoomsFor(vac);
@@ -1658,16 +1701,52 @@ export class AnyVacCard extends LitElement {
 
   // ── localStorage persistence ──────────────────────────────────────────────
 
+  /** Per-card storage key (1.1.0).
+   *
+   *  Two problems with the old flat `roborock-card:*` keys, fixed together:
+   *
+   *  1. **They were global.** Every AnyVac card in the browser shared one
+   *     `shown` set and one `flip` value, so two cards on different dashboards
+   *     (different floorplans, different orientations) overwrote each other.
+   *     That directly contradicted the flip toggle's own premise — "how THIS
+   *     screen likes its map" — since the key was per browser, not per card.
+   *  2. **The prefix was the predecessor's name.** `roborock-vacuum-card`, which
+   *     AnyVac was rebased on, is still installed alongside on this setup, so a
+   *     shared key namespace was a real collision risk, not a cosmetic one.
+   *
+   *  `scope` is derived from the configured vacuum entities rather than a
+   *  position or a random id: it is stable across restarts and dashboard edits,
+   *  distinct between cards showing different fleets, and deliberately SHARED
+   *  between two cards showing the same fleet (e.g. the same dashboard opened on
+   *  phone and tablet) — which is the behaviour you'd want there anyway. */
+  private _storeKey(what: string): string {
+    const scope = (this._config?.vacuums ?? []).map((v) => v.entity).join(",");
+    return `anyvac-card:${what}:${scope}`;
+  }
+
+  /** Read a key, falling back once to the pre-1.1.0 global `roborock-card:*`
+   *  name so an existing setup keeps its shown-set / selection / flip on
+   *  upgrade instead of silently resetting. Write-back happens naturally on the
+   *  next change, which is when the new key starts winning; the legacy key is
+   *  left in place rather than deleted, so downgrading still works. */
+  private _readStored(what: string, legacyKey: string): string | null {
+    try {
+      return localStorage.getItem(this._storeKey(what)) ?? localStorage.getItem(legacyKey);
+    } catch {
+      return null;
+    }
+  }
+
   private _saveShown(): void {
     try {
       const ids = [...this._shownSet].map(i => this._config.vacuums[i]?.entity).filter(Boolean);
-      localStorage.setItem("roborock-card:shown", JSON.stringify(ids));
+      localStorage.setItem(this._storeKey("shown"), JSON.stringify(ids));
     } catch { /* storage unavailable */ }
   }
 
   private _loadShown(): Set<number> {
     try {
-      const raw = localStorage.getItem("roborock-card:shown");
+      const raw = this._readStored("shown", "roborock-card:shown");
       if (raw) {
         const ids: string[] = JSON.parse(raw);
         const indices = ids
@@ -1690,17 +1769,19 @@ export class AnyVacCard extends LitElement {
    *  legitimately differ from another screen showing the same dashboard. */
   private _saveFlipLive(): void {
     try {
-      if (this._flipLive === null) localStorage.removeItem("roborock-card:flip");
-      else localStorage.setItem("roborock-card:flip", JSON.stringify(this._flipLive));
+      if (this._flipLive === null) localStorage.removeItem(this._storeKey("flip"));
+      else localStorage.setItem(this._storeKey("flip"), JSON.stringify(this._flipLive));
     } catch { /* storage unavailable */ }
   }
 
   private _loadFlipLive(): boolean | null {
+    const raw = this._readStored("flip", "roborock-card:flip");
+    if (raw === null) return null;
     try {
-      const raw = localStorage.getItem("roborock-card:flip");
-      if (raw !== null) return JSON.parse(raw) === true;
-    } catch { /* ignore */ }
-    return null;
+      return JSON.parse(raw) === true;
+    } catch {
+      return null;
+    }
   }
 
   private _saveRoomSel(vacEntity: string): void {
@@ -1710,7 +1791,7 @@ export class AnyVacCard extends LitElement {
       for (const [k, v] of this._localRoomSel.entries()) {
         if (k.startsWith(prefix)) sel[k.slice(prefix.length)] = v;
       }
-      localStorage.setItem("roborock-card:sel:" + vacEntity, JSON.stringify(sel));
+      localStorage.setItem(this._storeKey("sel:" + vacEntity), JSON.stringify(sel));
     } catch { /* ignore */ }
   }
 
@@ -1718,7 +1799,7 @@ export class AnyVacCard extends LitElement {
     const map = new Map<string, boolean>();
     try {
       for (const vac of this._config.vacuums) {
-        const raw = localStorage.getItem("roborock-card:sel:" + vac.entity);
+        const raw = this._readStored("sel:" + vac.entity, "roborock-card:sel:" + vac.entity);
         if (raw) {
           const sel: Record<string, boolean> = JSON.parse(raw);
           for (const [k, v] of Object.entries(sel)) {
@@ -1791,11 +1872,12 @@ export class AnyVacCard extends LitElement {
     for (const v of this._config.vacuums) for (const r of this._roomsFor(v)) keys.add(r.key);
     return [...keys];
   }
-  /** Vacuums the plan/orchestrator may use = the currently shown (held) badges. */
-  private _planVacuums(): VacuumConfig[] {
-    const shown = this._config.vacuums.filter((_, i) => this._shownSet.has(i));
-    return shown.length ? shown : this._config.vacuums;
-  }
+  // NOTE (docs/28 §3): `_planVacuums()` — "restrict the orchestrated plan to the
+  // currently SHOWN vacuums" — lived here without a single caller and was deleted
+  // 2026-08-08. The idea itself is still open, deliberately: hiding a robot on the
+  // map (a display action) silently dropping it from a whole-home plan is a real
+  // footgun in portrait, where hold-to-hide is easy to trigger. If it comes back it
+  // needs that decision made first, not a dangling helper waiting to be wired up.
   // ── Clean intent → backend planner (kontrakt v2, docs/14 §3.7) ─────────────
   /** Per-kind vacuum restriction for anyvac.clean/plan, from the configured roles —
    *  preserves the user's dry/wet split even when a robot is both-capable. */
@@ -2175,26 +2257,6 @@ export class AnyVacCard extends LitElement {
     }
     return Math.round(sum);
   }
-  /** Glanceable stats trio (grid badges region): selected rooms · est time · min battery.
-   *  docs/25 §5: no explicit selection still shows the whole-home estimate (what
-   *  START will actually do), not a bare "0 rooms". */
-  private _renderStatsTrio() {
-    const vacs = this._config.vacuums;
-    const selKeys = this._allRoomKeys().filter((k) => this._isRoomSelectedAny(k, vacs));
-    const runKeys = selKeys.length ? selKeys : this._allRoomKeys();
-    const hasInt = vacs.some((v) => this._intAttrs(v));
-    const est = this._etaFor(runKeys, this._planMode, hasInt);
-    const batts = vacs.map((v) => this._batteryPct(v)).filter((x): x is number => x !== null);
-    const minB = batts.length ? Math.min(...batts) : null;
-    return html`
-      <div class="stats-trio">
-        <span class="stat"><ha-icon icon="mdi:floor-plan"></ha-icon><b>${runKeys.length}</b></span>
-        ${est > 0 ? html`<span class="stat"><ha-icon icon="mdi:clock-outline"></ha-icon><b>${est}</b><small>min</small></span>` : nothing}
-        ${minB !== null ? html`<span class="stat"><ha-icon icon="mdi:battery"></ha-icon><b>${Math.round(minB)}</b><small>%</small></span>` : nothing}
-      </div>
-    `;
-  }
-
   /** Dock region (docs/12 §3 + docs/18 §3): selection, plan preview and pinning in
    *  one block. Row = room (tap toggles selection); the avatar shows the BACKEND's
    *  real assignment per pass; tapping the avatar cycles the room's vacuum pin.
@@ -3272,23 +3334,14 @@ export class AnyVacCard extends LitElement {
     this._zonePending = null; this._zoneDrag = null; this._zoneRectShown = null; this._zoneEdit = null;
   }
 
-  /** Refresh-all button in the badges row (grid mode) — the map corner variant
-   *  floated in dead space (field feedback 2026-07-11). */
-  private _renderBadgesRefresh() {
-    const withMap = this._config.vacuums.filter((v) => this._mapEntityFor(v));
-    if (!withMap.length) return nothing;
-    return html`<button class="mtbtn badges-refresh" title="Refresh maps"
-      @click=${() => { for (const v of withMap) this._refreshMap(v); }}>
-      <ha-icon icon="mdi:refresh"></ha-icon>
-    </button>`;
-  }
-
   /** Grid mode's consolidated meta bar (docs/19 A4) — replaces the old per-vacuum
    *  Refresh/Pin & Go/Zone header rows (one row × N vacuums) AND the badges
    *  region's stats-trio + refresh button with ONE row: Pin & Go, Zone, dry/wet
    *  layer visibility + oldest age, selected room count, ETA, refresh. Legacy
-   *  (no `layout:` block) is untouched — `_renderMapTools`/`_renderStatsTrio`/
-   *  `_renderBadgesRefresh` below still exist for it. */
+   *  (no `layout:` block) keeps `_renderMapTools`; the old `_renderStatsTrio`/
+   *  `_renderBadgesRefresh`/`_renderRoomList` were deleted 2026-08-08 — the
+   *  comment here claimed legacy still used them, but `render()`'s legacy path
+   *  never called any of the three, so they had been dead since docs/19 A4. */
   private _renderMetaBar(vacs: VacuumConfig[]) {
     const withMap = vacs.filter((v) => this._mapEntityFor(v));
     if (!withMap.length) return nothing;
@@ -3456,34 +3509,17 @@ export class AnyVacCard extends LitElement {
   private _effectiveSeat(vac: VacuumConfig): SeatParams & {
     auto: boolean; residual?: number; anchorCount?: number;
   } {
-    const m = vac.map;
-    const manual = {
-      rotation: m?.rotation ?? 0, scale: m?.scale ?? 100,
-      offset_x: m?.offset_x ?? 0, offset_y: m?.offset_y ?? 0, auto: false,
-    };
-    if (m?.seat === "manual") return manual;
-    const merged = this._config.map_mode === "merged";
-    const ib = merged
-      ? (this._config.image_base ?? this._config.vacuums.find((v) => v.image_base?.src)?.image_base)
-      : vac.image_base;
-    // Auto-seat only makes sense against a floorplan reference; a map-only base
-    // IS the reference itself and keeps its manual (default) seat.
-    if (!ib?.src) return manual;
-    // Kontrakt v2: anchors come from rooms[].bbox_px (integration ≥ 0.18).
-    const at = this._intAttrs(vac);
-    if (!at) return manual;
-    const ar = this._wrapAspect(this._baseHeightFor(vac));
-    // Anchors MUST come from the static (pinned/override) rooms only, never from
-    // `_roomsFor()`'s live-merged view (docs/20 §5) — that view's un-pinned rooms
-    // are themselves computed FROM this fit, so feeding them back in would be
-    // circular (residual ~0 regardless of whether the fit is actually right).
-    const fit = computeSeatFit(assembleAnchors(this._staticRoomsFor(vac), at, ar), ar);
-    if (!fit) return manual;
-    return {
-      rotation: fit.rotation, scale: fit.scale,
-      offset_x: fit.offset_x, offset_y: fit.offset_y,
-      auto: true, residual: fit.residual_pct, anchorCount: fit.anchors,
-    };
+    this._memoSync();
+    const memo = this._seatMemo.get(vac.entity);
+    if (memo) return memo;
+    // Kontrakt v2: anchors come from rooms[].bbox_px (integration ≥ 0.18), which
+    // `_intAttrs` already gates on schema_version. The fit itself lives in
+    // `seatfit.ts` so the editor's preview resolves it identically (1.1.0).
+    const out = resolveSeat(
+      this._config, vac, this._intAttrs(vac), this._wrapAspect(this._baseHeightFor(vac)),
+    );
+    this._seatMemo.set(vac.entity, out);
+    return out;
   }
 
   /** Integration mode: draw the robot + cleaning path as a vector overlay from the
@@ -3702,39 +3738,6 @@ export class AnyVacCard extends LitElement {
           <ha-icon icon="mdi:water"></ha-icon><span>${badge(oldest("wet"))}</span>
         </button>
         ${this._layerMenu ? this._renderLayerMenu(withInt, this._layerMenu) : nothing}
-      </div>
-    `;
-  }
-
-  /** Per-room status list (dry + wet age), deduped across vacuums; click selects across all. */
-  private _renderRoomList(shown: VacuumConfig[]) {
-    if (!shown.some((v) => this._intAttrs(v))) return nothing;
-    const seen = new Set<string>();
-    const rooms: Array<{ r: RoomConfig; v: VacuumConfig }> = [];
-    for (const v of shown) for (const r of this._roomsFor(v)) {
-      if (r.key && !seen.has(r.key)) { seen.add(r.key); rooms.push({ r, v }); }
-    }
-    if (!rooms.length) return nothing;
-    const badge = (d: number | null) => (d === null ? "\u2014" : d < 1 ? "<1d" : Math.round(d) + "d");
-    return html`
-      <div class="room-list">
-        ${rooms.map(({ r, v }) => {
-          const rec = this._intRoomRec(v, r);
-          const dry = this._ageDaysFromIso(rec?.dry);
-          const wet = this._ageDaysFromIso(rec?.wet);
-          const sel = this._isRoomSelectedAny(r.key, shown);
-          const locked = this._mapMode !== "normal";
-          return html`
-            <button class="room-row ${sel ? "on" : ""} ${locked ? "room-overlay--locked" : ""}" ?disabled=${locked}
-              title=${locked ? "Room selection is off while placing a pin/zone" : ""}
-              @click=${() => { if (!locked) this._toggleRoomAcross(r.key, shown); }}>
-              <ha-icon class="rl-icon" icon=${r.icon ?? "mdi:square"}></ha-icon>
-              <span class="rl-name">${r.name ?? r.key}</span>
-              <span class="rl-age">${this._renderProgChip(this._roomProgForType(r, shown, "dry"))}<ha-icon icon="mdi:broom"></ha-icon><b style=${styleMap({ color: this._colorForAgeDays(dry) })}>${badge(dry)}</b></span>
-              <span class="rl-age">${this._renderProgChip(this._roomProgForType(r, shown, "wet"))}<ha-icon icon="mdi:water"></ha-icon><b style=${styleMap({ color: this._colorForAgeDays(wet) })}>${badge(wet)}</b></span>
-            </button>
-          `;
-        })}
       </div>
     `;
   }
@@ -4842,17 +4845,17 @@ export class AnyVacCard extends LitElement {
     const stack = this._profile === "portrait" && this._stackTopology;
     const prof = stack ? STACK_PORTRAIT_PROFILE : resolveProfile(lay, this._profile);
     const schemaWarn = this._schemaWarning();
-    // TEMP debug (2026-07-24, field diagnosis of the split/stack decision —
-    // remove once the topology model is confirmed correct in the field):
-    // exposes the exact numbers `_stackTopology`/`shouldStackLayout` are
-    // computing from, since screenshot-based pixel estimates weren't
-    // reliable enough to debug the 0.73.1/0.73.2 fixes further.
-    const dbgAr = (this._narrow ? 1 / (this._mapAR > 0.1 ? this._mapAR : 3.636) : (this._mapAR > 0.1 ? this._mapAR : 3.636)).toFixed(3);
+    // The split/stack line that used to sit in this chip was TEMP diagnostics
+    // for the 0.73.1–0.73.7 topology work (screenshots weren't precise enough
+    // to debug it); the model was confirmed in the field in 0.73.7, so it went
+    // away with the 2026-08-08 cleanup. The `debug` config flag still exposes
+    // the same numbers where they're actually useful, and it isn't limited to
+    // edit mode the way this chip was.
     return html`
       <ha-card style="padding:0;display:block">
         ${this.editMode ? html`<div class="version-chip">
           <div>v${CARD_VERSION} · ${Math.round(this._cardW)}w · ${this._profile}</div>
-          <div>${stack ? "stack" : "split"} · box:${Math.round(this._mapAvailW)}x${Math.round(this._mapAvailH)} · ar:${dbgAr}</div>
+          ${this._config.debug ? html`<div>${stack ? "stack" : "split"} · box:${Math.round(this._mapAvailW)}x${Math.round(this._mapAvailH)}</div>` : nothing}
         </div>` : nothing}
         <div class="avc-grid avc-grid--${this._profile}" style=${styleMap(gridRootStyles(lay, prof))}>
           ${schemaWarn ? html`<div class="avc-schemawarn">
@@ -4944,24 +4947,6 @@ export class AnyVacCard extends LitElement {
       align-items: center;
       padding: 4px 6px;
     }
-
-    .stats-trio {
-      display: flex;
-      gap: 10px;
-      margin-left: auto;
-      align-items: center;
-      padding-right: 4px;
-    }
-    .stat {
-      display: inline-flex;
-      align-items: center;
-      gap: 3px;
-      font-size: 12px;
-      color: rgba(255, 255, 255, 0.75);
-    }
-    .stat ha-icon { --mdc-icon-size: 15px; color: rgba(255, 255, 255, 0.4); }
-    .stat b { font-weight: 700; }
-    .stat small { font-size: 10px; color: rgba(255, 255, 255, 0.4); }
 
     /* Emergency manual-control icon strip (docs/19 follow-up, portrait only).
        Full-width, one flex slot per vacuum (mirrors .dock-head/.dock-mode
@@ -5360,9 +5345,6 @@ export class AnyVacCard extends LitElement {
     }
     .start-seg--dock { position: relative; }
 
-    /* Grid badges-row extras */
-    .badges-refresh { margin-left: auto; flex-shrink: 0; padding: 8px; }
-    .stats-trio + .badges-refresh { margin-left: 6px; }
     .map-tools-label {
       font-size: 11px;
       font-weight: 700;
@@ -5559,13 +5541,9 @@ export class AnyVacCard extends LitElement {
     .layer-menu-row.on { background: rgba(255,255,255,0.12); border-color: rgba(255,255,255,0.4); }
     .lm-name { flex: 1; text-align: left; }
     .layer-menu-row b { font-weight: 700; }
-    .room-list { display: flex; flex-direction: column; gap: 4px; }
-    .room-row { display: flex; align-items: center; gap: 8px; padding: 6px 10px; border-radius: 10px; border: 1px solid rgba(255,255,255,0.08); background: rgba(255,255,255,0.03); color: rgba(255,255,255,0.85); cursor: pointer; --mdc-icon-size: 18px; }
-    .room-row.on { border-color: rgba(255,255,255,0.5); background: rgba(255,255,255,0.1); }
-    .rl-icon { color: rgba(255,255,255,0.6); }
-    .rl-name { flex: 1; text-align: left; font-size: 13px; }
-    .rl-age { display: flex; align-items: center; gap: 3px; font-size: 12px; --mdc-icon-size: 14px; color: rgba(255,255,255,0.45); }
-    .rl-age b { font-weight: 700; }
+    /* .rl-prog is the live coverage chip (_renderProgChip) and is still used —
+       the rest of the old .room-list/.rl-* set went with _renderRoomList
+       (dead since docs/19 A4, deleted 2026-08-08). */
     .rl-prog { font-size: 12px; font-weight: 700; display: flex; align-items: baseline; gap: 1px; }
     .rl-prog small { font-size: 8px; opacity: 0.55; }
     .map-wrap--fixed { padding-top: 0; }

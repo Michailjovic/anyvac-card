@@ -8,6 +8,78 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Planned
 
+## [1.1.0] - 2026-08-08
+
+Completes the bug-fix and optimisation pass started in 1.0.10, closing out the
+full code audit in `docs/34-analyza-kodu-2026-08-08.md`. Paired with integration
+1.1.0. No new features and no UI behaviour changes — everything here is either a
+silent bug or measured waste.
+
+### Fixed
+
+The editor and the card resolved map seating differently, so the Maps tab
+preview could show a placement the card would not actually render — during
+room anchoring, the one workflow where that preview is the whole point. Two
+independent divergences had crept in: the editor had no first-vacuum
+`image_base` fallback (a merged config with the floorplan set on a vacuum,
+rather than card-level, auto-seated at runtime but fell back to manual in the
+editor), and it selected fit anchors by `map_mode` while the card selected them
+by whether card-level `rooms` were defined (so a split config with card-level
+rooms disagreed the other way). Both now call one shared `resolveSeat()` in
+`seatfit.ts`, along with `resolveImageBaseSrc()`/`resolveStaticRooms()` for the
+two inputs that had drifted.
+
+localStorage keys are no longer global, and no longer carry the predecessor
+project's name. `roborock-card:shown` / `:flip` / `:sel:<entity>` were shared by
+every AnyVac card in the browser, so two cards on different dashboards
+overwrote each other's shown-set and flip — directly contradicting the flip
+toggle's own premise of being per-screen. They also shared a namespace with
+`roborock-vacuum-card`, which is still installed alongside on the setup this
+was built against. Keys are now `anyvac-card:<what>:<vacuum entity list>`, which
+is stable across restarts and distinct per fleet. Existing values are read once
+from the old key on upgrade, so nothing resets; the legacy key is left in place
+rather than deleted, so a downgrade still works.
+
+### Changed
+
+The bundle is minified. It shipped unminified until now, costing roughly half
+the download on every dashboard load:
+
+| | raw | gzip |
+|---|---|---|
+| before | 486.3 KiB | 133.7 KiB |
+| after | 252.8 KiB | 66.4 KiB |
+
+No source map is emitted, deliberately: HACS installs only `anyvac-card.js`, so
+a `sourceMappingURL` would 404 in every user's devtools. `keep_fnames` /
+`keep_classnames` buy back readable stack traces for 0.3 KiB gzipped instead —
+worth it because field reports on this card routinely arrive as a pasted console
+trace. Property mangling stays off, so `setConfig`, `hass` and the `@state`
+fields read live from the console during diagnosis keep their names.
+
+`_roomsFor()` / `_effectiveSeat()` are memoised per hass update. One render of a
+three-vacuum, ten-room merged card called `_roomsFor()` ~90 times, each redoing
+the seat fit and rebuilding the room array. To be clear about the scale: that
+was measured at ~0.19 ms on a desktop and ~1 ms on a phone, so this is **not** a
+performance fix — the real gain is ~900 fewer allocations per render and one
+consistent answer per render instead of 90 independent recomputations. The memo
+is keyed on `hass` object identity rather than cleared from a lifecycle hook,
+which keeps it correct on the paths where no render happens (`shouldUpdate()`
+reaches `_roomsFor()` before `willUpdate()` would run, and not at all when it
+returns false).
+
+### Removed
+
+Dead code, all verified to have no caller outside comments:
+`_renderRoomList()`, `_renderStatsTrio()`, `_renderBadgesRefresh()` (a stale
+comment claimed the legacy render path still used them — it never called any of
+the three, so they had been dead since docs/19 A4), `_planVacuums()` (noted at
+the deletion site: the docs/28 §3 idea behind it is still open and needs a
+decision before it comes back, not a dangling helper), the orphaned
+`.stats-trio`/`.stat`/`.badges-refresh`/`.room-list`/`.rl-*` CSS, and the TEMP
+split/stack diagnostics chip from 0.73.3 — its model was confirmed in the field
+in 0.73.7, and the same numbers stay available behind the `debug` config flag.
+
 ## [1.0.10] - 2026-08-08
 
 Paired with integration 1.0.10. Both fixes below come from a full code audit

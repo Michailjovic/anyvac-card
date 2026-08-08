@@ -26,9 +26,8 @@ import {
   DEFAULT_VACUUM_PALETTE,
 } from "./const";
 import {
-  assembleAnchors,
-  computeSeatFit,
   placeRoomInCrop,
+  resolveSeat,
   roomBboxToRect,
   type SeatParams,
 } from "./seatfit";
@@ -508,33 +507,23 @@ export class AnyVacCardEditor extends LitElement {
     void this.hass.callService("anyvac", "set_room_sequence", { rooms: keys });
   }
 
-  /** Editor-side view of the effective seat (mirrors the card's _effectiveSeat). */
+  /** Editor-side view of the effective seat.
+   *
+   *  Delegates to the SAME `resolveSeat()` the card runs (1.1.0). This used to be
+   *  a parallel implementation and had drifted from the card's in two ways — no
+   *  first-vacuum `image_base` fallback, and anchors chosen by `map_mode` rather
+   *  than by whether card-level `rooms` exist — so the preview here could show a
+   *  different placement than the card actually rendered. */
   private _editorSeat(vacIdx: number): SeatParams & {
     auto: boolean; residual?: number; anchorCount?: number;
   } {
     const vac = this._config.vacuums[vacIdx];
-    const m = vac?.map;
-    const manual = {
-      rotation: m?.rotation ?? 0, scale: m?.scale ?? 100,
-      offset_x: m?.offset_x ?? 0, offset_y: m?.offset_y ?? 0, auto: false,
-    };
-    if (!vac || m?.seat === "manual") return manual;
-    const merged = this._config.map_mode === "merged";
-    const ib = merged ? this._config.image_base : vac.image_base;
-    if (!ib?.src) return manual;
     const ie = this._intEntityFor(vac);
     const at = ie ? (this.hass?.states?.[ie]?.attributes as Record<string, any> | undefined) : undefined;
-    // Kontrakt v2: anchors need rooms[].bbox_px (integration ≥ 0.18).
-    if (!at || (at.schema_version ?? 0) < 2) return manual;
-    const ar = this._editorAR();
-    const rooms = merged ? (this._config.rooms ?? []) : (vac.rooms ?? []);
-    const fit = computeSeatFit(assembleAnchors(rooms as any, at, ar), ar);
-    if (!fit) return manual;
-    return {
-      rotation: fit.rotation, scale: fit.scale,
-      offset_x: fit.offset_x, offset_y: fit.offset_y,
-      auto: true, residual: fit.residual_pct, anchorCount: fit.anchors,
-    };
+    // Kontrakt v2 gate: anchors need rooms[].bbox_px (integration ≥ 0.18). The
+    // card applies the same gate inside `_intAttrs`; here it's explicit.
+    const gated = at && (at.schema_version ?? 0) >= 2 ? at : undefined;
+    return resolveSeat(this._config, vac, gated, this._editorAR());
   }
 
   /** Import rooms this vacuum's map knows that are missing on the floorplan —

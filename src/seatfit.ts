@@ -191,6 +191,97 @@ export function computeSeatFit(anchors: SeatAnchor[], ar: number): SeatFitResult
   return seatFromFrame(best.theta, best.s, c, ar, 0, 1, best.theta);
 }
 
+// ── Shared seat resolution (card + editor) ───────────────────────────────────
+
+/** Minimal shapes needed to resolve a seat — deliberately structural rather than
+ *  importing the full config types, so `seatfit.ts` stays dependency-free. */
+interface SeatVacuumLike {
+  map?: { seat?: string; rotation?: number; scale?: number; offset_x?: number; offset_y?: number };
+  image_base?: { src?: string };
+  rooms?: CardRoomLike[];
+}
+interface SeatConfigLike {
+  map_mode?: string;
+  image_base?: { src?: string };
+  rooms?: CardRoomLike[];
+  vacuums?: SeatVacuumLike[];
+}
+
+export type ResolvedSeat = SeatParams & {
+  auto: boolean;
+  residual?: number;
+  anchorCount?: number;
+};
+
+/** Which floorplan image a vacuum is seated against.
+ *
+ *  Merged mode prefers the card-level `image_base`, then falls back to the first
+ *  vacuum that has one — that fallback covers pre-docs/08 configs where the
+ *  floorplan still lives on a vacuum. Split mode uses the vacuum's own. */
+export function resolveImageBaseSrc(
+  config: SeatConfigLike, vac: SeatVacuumLike | undefined,
+): string | undefined {
+  const merged = config.map_mode === "merged";
+  const ib = merged
+    ? (config.image_base ?? (config.vacuums ?? []).find((v) => v.image_base?.src)?.image_base)
+    : vac?.image_base;
+  return ib?.src;
+}
+
+/** The config-authored rooms that act as fit anchors: card-level `rooms` when
+ *  the merged config defines them, else the vacuum's own. Never the live
+ *  integration view — those un-pinned rooms are computed FROM the fit, so
+ *  feeding them back in would be circular (docs/20 §5). */
+export function resolveStaticRooms(
+  config: SeatConfigLike, vac: SeatVacuumLike | undefined,
+): CardRoomLike[] {
+  return (config.rooms?.length ? config.rooms : vac?.rooms) ?? [];
+}
+
+/**
+ * Effective map seating: auto-fitted from room anchors (rooms drawn on the
+ * floorplan, matched by name against the integration's room bboxes) when
+ * possible, else the manual slider values. Recomputed from live attributes, so
+ * it self-heals when the robot remaps or the map trim changes.
+ *
+ * Shared by the card and the editor since 1.1.0. They had grown two independent
+ * copies that had quietly diverged in both inputs: the editor had no
+ * first-vacuum `image_base` fallback (so a merged config with the floorplan on a
+ * vacuum auto-seated at runtime but fell back to manual in the editor preview),
+ * and it picked anchors by `map_mode` while the card picked them by whether
+ * card-level `rooms` were defined (so a split config with card-level rooms
+ * disagreed the other way). Either way the editor showed the user a different
+ * placement than the card would actually render — during the one workflow, room
+ * anchoring, where the preview is the whole point.
+ *
+ * `attrs` must already be schema-gated by the caller (the card gates via
+ * `_intAttrs`, the editor checks `schema_version` itself).
+ */
+export function resolveSeat(
+  config: SeatConfigLike,
+  vac: SeatVacuumLike | undefined,
+  attrs: Record<string, any> | undefined,
+  ar: number,
+): ResolvedSeat {
+  const m = vac?.map;
+  const manual: ResolvedSeat = {
+    rotation: m?.rotation ?? 0, scale: m?.scale ?? 100,
+    offset_x: m?.offset_x ?? 0, offset_y: m?.offset_y ?? 0, auto: false,
+  };
+  if (!vac || m?.seat === "manual") return manual;
+  // Auto-seating only means anything against a floorplan reference; a map-only
+  // base IS the reference, so it keeps its manual (default) seat.
+  if (!resolveImageBaseSrc(config, vac)) return manual;
+  if (!attrs) return manual;
+  const fit = computeSeatFit(assembleAnchors(resolveStaticRooms(config, vac), attrs, ar), ar);
+  if (!fit) return manual;
+  return {
+    rotation: fit.rotation, scale: fit.scale,
+    offset_x: fit.offset_x, offset_y: fit.offset_y,
+    auto: true, residual: fit.residual_pct, anchorCount: fit.anchors,
+  };
+}
+
 // ── Forward transform (room import) ──────────────────────────────────────────
 
 /**
