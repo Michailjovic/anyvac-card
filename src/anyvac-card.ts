@@ -332,6 +332,14 @@ export class AnyVacCard extends LitElement {
     }
     this._config = config;
     this._watched = null;
+    // A config edit can change which entities a vacuum resolves to (explicit
+    // `integration_entity`/`map.entity` overrides, a renamed or reordered
+    // vacuum), so every auto-resolved answer keyed on `vac.entity` is suspect —
+    // these were previously never cleared anywhere at all (2026-08-08 fix).
+    this._intCache.clear();
+    this._mapCandCache.clear();
+    this._autoCache.clear();
+    this._careCache.clear();
     if (!this._initialized) {
       this._initialized = true;
       this._shownSet = this._loadShown();
@@ -803,6 +811,12 @@ export class AnyVacCard extends LitElement {
   }
 
   private _watchedEntities(): Set<string> {
+    // Before the early return, not after: `_registry()` is what drops `_watched`
+    // when the entity registry changes, and every other caller of it sits behind
+    // this cache — so without this line a registry change (integration reload,
+    // a vacuum gaining its AnyVac sensor) would not reach the watched set until
+    // some unrelated render happened to run first.
+    this._registry();
     if (this._watched) return this._watched;
     const s = new Set<string>();
     for (const vac of this._config?.vacuums ?? []) {
@@ -892,13 +906,40 @@ export class AnyVacCard extends LitElement {
     return this._resolveBg(vac.color, this._defaultColor(vac), true);
   }
 
+  /** Single access point for the entity registry, which every auto-resolver below
+   *  derives its cached answer from — and the one place those caches are dropped.
+   *
+   *  HA replaces `hass.entities` only when the entity registry actually changes
+   *  (it is not rebuilt on ordinary state updates, unlike `hass` itself), so a
+   *  reference comparison is a precise, cheap invalidation signal: it fires on an
+   *  integration load/reload/rename and essentially never otherwise. Before this,
+   *  `_intCache`/`_mapCandCache`/`_autoCache`/`_careCache` were populated once and
+   *  never cleared — not even in `setConfig()` — so anything resolved while the
+   *  registry was still filling in (e.g. reloading the anyvac integration with the
+   *  dashboard open) stayed wrong until a full page reload. Worst case, if some HA
+   *  version did replace the object more eagerly, the cost is a registry rescan
+   *  per render — which is what `editor.ts` already does unconditionally today. */
+  private _regRef: unknown;
+  private _registry(): Record<string, any> | undefined {
+    const reg = (this.hass as any)?.entities as Record<string, any> | undefined;
+    if (reg !== this._regRef) {
+      this._regRef = reg;
+      this._intCache.clear();
+      this._mapCandCache.clear();
+      this._autoCache.clear();
+      this._careCache.clear();
+      this._watched = null;
+    }
+    return reg;
+  }
+
   /** Integration sensor for a vacuum: explicit config, else auto-resolved from the
    *  entity registry — the AnyVac map sensor sits on the SAME device as the vacuum
    *  entity (platform "anyvac"), so no manual plumbing is needed (docs/14 Fáze 3). */
   private _intCache = new Map<string, string | undefined>();
   private _intEntity(vac: VacuumConfig): string | undefined {
     if (vac.integration_entity) return vac.integration_entity;
-    const reg = (this.hass as any)?.entities as Record<string, any> | undefined;
+    const reg = this._registry();
     if (!reg || !vac.entity) return undefined;
     if (this._intCache.has(vac.entity)) return this._intCache.get(vac.entity);
     const dev = reg[vac.entity]?.device_id;
@@ -930,26 +971,34 @@ export class AnyVacCard extends LitElement {
    *  freshly added vacuum whose first poll hasn't landed yet. Ambiguous cases (0 or
    *  2+ simultaneously-live candidates) fall through to undefined — same as today,
    *  the user picks manually. */
-  private _mapCache = new Map<string, string | undefined>();
+  /** Only the REGISTRY-derived half is cached (2026-08-08 fix): the candidate
+   *  list per vacuum is stable and expensive (a scan of every entity), while
+   *  liveness is volatile and cheap (a couple of state lookups), so they must
+   *  not share a cache entry. Caching the finished answer meant a vacuum with
+   *  2+ saved maps — exactly the S6 case this resolver was written for — that
+   *  was first asked before the Roborock integration's first poll saw
+   *  `live.length === 0`, fell through to `undefined`, and cached THAT
+   *  permanently: no map at all until the page was reloaded. */
+  private _mapCandCache = new Map<string, string[]>();
   private _mapEntityFor(vac: VacuumConfig): string | undefined {
     if (vac.map?.entity) return vac.map.entity;
-    const reg = (this.hass as any)?.entities as Record<string, any> | undefined;
+    const reg = this._registry();
     if (!reg || !vac.entity) return undefined;
-    if (this._mapCache.has(vac.entity)) return this._mapCache.get(vac.entity);
-    const dev = reg[vac.entity]?.device_id;
-    let found: string | undefined;
-    if (dev) {
-      const candidates = Object.keys(reg).filter(
+    let candidates = this._mapCandCache.get(vac.entity);
+    if (!candidates) {
+      const dev = reg[vac.entity]?.device_id;
+      if (!dev) return undefined;  // registry not ready for this vacuum yet — don't cache
+      candidates = Object.keys(reg).filter(
         (id) => reg[id]?.device_id === dev && id.startsWith("image.")
       );
-      const live = candidates.filter((id) => {
-        const st = this.hass.states[id];
-        return !!st && st.state !== "unavailable" && st.state !== "unknown" && !!st.attributes["entity_picture"];
-      });
-      found = live.length === 1 ? live[0] : (candidates.length === 1 ? candidates[0] : undefined);
+      this._mapCandCache.set(vac.entity, candidates);
     }
-    this._mapCache.set(vac.entity, found);
-    return found;
+    if (candidates.length === 1) return candidates[0];  // unambiguous, liveness irrelevant
+    const live = candidates.filter((id) => {
+      const st = this.hass.states[id];
+      return !!st && st.state !== "unavailable" && st.state !== "unknown" && !!st.attributes["entity_picture"];
+    });
+    return live.length === 1 ? live[0] : undefined;
   }
 
   /** Kontrakt v2 gate: attributes of the vacuum's integration sensor, only when the
@@ -978,7 +1027,7 @@ export class AnyVacCard extends LitElement {
   /** Resolve a vacuum's sibling entities (battery/status/last-clean/progress/room/error) from its
    *  device, so the user does not have to fill them in. Matched by translation_key / device_class. */
   private _autoEntities(vac: VacuumConfig): Record<string, string | undefined> {
-    const reg = (this.hass as any)?.entities as Record<string, any> | undefined;
+    const reg = this._registry();
     if (!reg || !vac.entity) return {};
     const cached = this._autoCache.get(vac.entity);
     if (cached) return cached;
@@ -1024,12 +1073,22 @@ export class AnyVacCard extends LitElement {
    *  across S6/S7 MaxV/S8 MaxV Ultra live registries. A vacuum/dock lacking a given
    *  entity (e.g. S6 has no dock device at all; S7's dock lacks reset buttons for its
    *  own consumables) simply omits that row — no guessing, no placeholders. */
+  /** Cache key is `entity|tier`, not just the entity (2026-08-08 fix): the row
+   *  set BRANCHES on `_dockTier(vac)` below, which reads `dock_status.dock_type`
+   *  off the integration sensor — live state, not registry data. Before the
+   *  first AnyVac poll lands, the tier reads "none", so the dock-mounted rows
+   *  (dock brush, strainer, tank sensors) were skipped and that incomplete list
+   *  was cached forever: those rows only ever appeared if a page reload happened
+   *  to land after a poll. Keying on the tier makes a tier change compute a
+   *  fresh list instead, while still caching every distinct answer exactly once. */
   private _careCache = new Map<string, CareRow[]>();
   private _careItems(vac: VacuumConfig): CareRow[] {
-    const reg = (this.hass as any)?.entities as Record<string, any> | undefined;
+    const reg = this._registry();
     const devs = (this.hass as any)?.devices as Record<string, any> | undefined;
     if (!reg || !devs || !vac.entity) return [];
-    if (this._careCache.has(vac.entity)) return this._careCache.get(vac.entity)!;
+    const tier = this._dockTier(vac);
+    const cacheKey = vac.entity + "|" + tier;
+    if (this._careCache.has(cacheKey)) return this._careCache.get(cacheKey)!;
 
     const devId = reg[vac.entity]?.device_id as string | undefined;
     const vacDevice = devId ? devs[devId] : undefined;
@@ -1068,7 +1127,7 @@ export class AnyVacCard extends LitElement {
     // report "unavailable"; gate on the same dock_type tier as the actions
     // above instead of just checking entity presence (docs/25 §10 3rd
     // follow-up, live-confirmed on the field-reporting user's S7 MaxV).
-    if (this._dockTier(vac) === "full") {
+    if (tier === "full") {
       consumable("Dock brush", "cleaning_brush_time_left", "reset_dock_cleaning_brush_consumable", dockDevId);
       consumable("Strainer", "strainer_time_left", "reset_dock_strainer_consumable", dockDevId);
 
@@ -1081,7 +1140,7 @@ export class AnyVacCard extends LitElement {
       binary("Cleaning fluid", "clean_fluid_empty");
     }
 
-    this._careCache.set(vac.entity, rows);
+    this._careCache.set(cacheKey, rows);
     return rows;
   }
 
@@ -1765,7 +1824,7 @@ export class AnyVacCard extends LitElement {
   private _unassignedRooms(selKeys: string[], mode: "dry" | "wet" | "both", hasInt: boolean): string[] {
     if (!hasInt || selKeys.length === 0) return [];
     const preview = this._planPreview;
-    if (!preview || preview.key !== JSON.stringify([selKeys, mode, this._v2Vacuums()])) return [];
+    if (!preview || preview.key !== this._planKey(selKeys, mode)) return [];
     const needDry = mode !== "wet";
     const needWet = mode !== "dry";
     const out: string[] = [];
@@ -1810,14 +1869,27 @@ export class AnyVacCard extends LitElement {
     eta: number | null; unsequenced: string[];
   } | null = null;
   private _planFetchKey = "";
+  /** Identity of a plan preview: everything the backend's answer depends on.
+   *
+   *  room_pins is part of it (not just selKeys/mode/vacuums) so that tapping an
+   *  avatar to cycle a room's pin (_cycleRoomPin → anyvac.pin_room) invalidates
+   *  the cached plan and re-fetches as soon as the backend's room_pins attribute
+   *  updates — without it the dock avatar stayed stuck on the old assignment
+   *  until something else (e.g. deselecting/reselecting the room) happened to
+   *  change selKeys and force a refetch (field-caught 2026-07-23).
+   *
+   *  Extracted into one method 2026-08-08: `_unassignedRooms` built the same key
+   *  inline but was never updated when room_pins was added here, so its
+   *  three-element key could never equal this four-element one — it returned []
+   *  unconditionally, silently disabling the whole unassigned-rooms warning
+   *  (card 0.66.5: the red `mdi:robot-off` markers in dock rows, the dock footer
+   *  summary and the landscape meta bar count). Both callers now share this, so
+   *  they cannot drift apart again. */
+  private _planKey(selKeys: string[], mode: "dry" | "wet" | "both"): string {
+    return JSON.stringify([selKeys, mode, this._v2Vacuums(), this._pinsAttr()]);
+  }
   private _fetchPlan(selKeys: string[], mode: "dry" | "wet" | "both"): void {
-    // room_pins is part of the cache key (not just selKeys/mode/vacuums) so that
-    // tapping an avatar to cycle a room's pin (_cycleRoomPin → anyvac.pin_room)
-    // invalidates the cached plan and re-fetches as soon as the backend's
-    // room_pins attribute updates — without it the dock avatar stayed stuck on
-    // the old assignment until something else (e.g. deselecting/reselecting the
-    // room) happened to change selKeys and force a refetch (field-caught 2026-07-23).
-    const key = JSON.stringify([selKeys, mode, this._v2Vacuums(), this._pinsAttr()]);
+    const key = this._planKey(selKeys, mode);
     if (key === this._planFetchKey) return;
     this._planFetchKey = key;
     void (async () => {

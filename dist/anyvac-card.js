@@ -87,7 +87,7 @@ const t={ATTRIBUTE:1},e=t=>(...e)=>({_$litDirective$:t,values:e});let i$1 = clas
 
 const CARD_NAME = "anyvac-card";
 const EDITOR_NAME = "anyvac-card-editor";
-const CARD_VERSION = "1.0.9";
+const CARD_VERSION = "1.0.10";
 /** Hold duration in ms required to trigger START / PAUSE actions */
 const HOLD_DURATION_MS = 600;
 /** docs/25 §10 field report (2026-07-25): Android's swipe-up-from-bottom-edge
@@ -1064,7 +1064,15 @@ let AnyVacCard = class AnyVacCard extends i$2 {
          *  freshly added vacuum whose first poll hasn't landed yet. Ambiguous cases (0 or
          *  2+ simultaneously-live candidates) fall through to undefined — same as today,
          *  the user picks manually. */
-        this._mapCache = new Map();
+        /** Only the REGISTRY-derived half is cached (2026-08-08 fix): the candidate
+         *  list per vacuum is stable and expensive (a scan of every entity), while
+         *  liveness is volatile and cheap (a couple of state lookups), so they must
+         *  not share a cache entry. Caching the finished answer meant a vacuum with
+         *  2+ saved maps — exactly the S6 case this resolver was written for — that
+         *  was first asked before the Roborock integration's first poll saw
+         *  `live.length === 0`, fell through to `undefined`, and cached THAT
+         *  permanently: no map at all until the page was reloaded. */
+        this._mapCandCache = new Map();
         this._autoCache = new Map();
         /** docs/25 §10 follow-up (2026-07-24): consumable/"care" rows auto-discovered from
          *  the official `roborock` integration's OWN entities — zero new config keys, zero
@@ -1082,6 +1090,14 @@ let AnyVacCard = class AnyVacCard extends i$2 {
          *  across S6/S7 MaxV/S8 MaxV Ultra live registries. A vacuum/dock lacking a given
          *  entity (e.g. S6 has no dock device at all; S7's dock lacks reset buttons for its
          *  own consumables) simply omits that row — no guessing, no placeholders. */
+        /** Cache key is `entity|tier`, not just the entity (2026-08-08 fix): the row
+         *  set BRANCHES on `_dockTier(vac)` below, which reads `dock_status.dock_type`
+         *  off the integration sensor — live state, not registry data. Before the
+         *  first AnyVac poll lands, the tier reads "none", so the dock-mounted rows
+         *  (dock brush, strainer, tank sensors) were skipped and that incomplete list
+         *  was cached forever: those rows only ever appeared if a page reload happened
+         *  to land after a poll. Keying on the tier makes a tier change compute a
+         *  fresh list instead, while still caching every distinct answer exactly once. */
         this._careCache = new Map();
         this._holdEnd = () => {
             this._cancelHold();
@@ -1164,6 +1180,14 @@ let AnyVacCard = class AnyVacCard extends i$2 {
         }
         this._config = config;
         this._watched = null;
+        // A config edit can change which entities a vacuum resolves to (explicit
+        // `integration_entity`/`map.entity` overrides, a renamed or reordered
+        // vacuum), so every auto-resolved answer keyed on `vac.entity` is suspect —
+        // these were previously never cleared anywhere at all (2026-08-08 fix).
+        this._intCache.clear();
+        this._mapCandCache.clear();
+        this._autoCache.clear();
+        this._careCache.clear();
         if (!this._initialized) {
             this._initialized = true;
             this._shownSet = this._loadShown();
@@ -1708,6 +1732,12 @@ let AnyVacCard = class AnyVacCard extends i$2 {
         return false;
     }
     _watchedEntities() {
+        // Before the early return, not after: `_registry()` is what drops `_watched`
+        // when the entity registry changes, and every other caller of it sits behind
+        // this cache — so without this line a registry change (integration reload,
+        // a vacuum gaining its AnyVac sensor) would not reach the watched set until
+        // some unrelated render happened to run first.
+        this._registry();
         if (this._watched)
             return this._watched;
         const s = new Set();
@@ -1798,10 +1828,22 @@ let AnyVacCard = class AnyVacCard extends i$2 {
     _colorBgActive(vac) {
         return this._resolveBg(vac.color, this._defaultColor(vac), true);
     }
+    _registry() {
+        const reg = this.hass?.entities;
+        if (reg !== this._regRef) {
+            this._regRef = reg;
+            this._intCache.clear();
+            this._mapCandCache.clear();
+            this._autoCache.clear();
+            this._careCache.clear();
+            this._watched = null;
+        }
+        return reg;
+    }
     _intEntity(vac) {
         if (vac.integration_entity)
             return vac.integration_entity;
-        const reg = this.hass?.entities;
+        const reg = this._registry();
         if (!reg || !vac.entity)
             return undefined;
         if (this._intCache.has(vac.entity))
@@ -1816,23 +1858,24 @@ let AnyVacCard = class AnyVacCard extends i$2 {
     _mapEntityFor(vac) {
         if (vac.map?.entity)
             return vac.map.entity;
-        const reg = this.hass?.entities;
+        const reg = this._registry();
         if (!reg || !vac.entity)
             return undefined;
-        if (this._mapCache.has(vac.entity))
-            return this._mapCache.get(vac.entity);
-        const dev = reg[vac.entity]?.device_id;
-        let found;
-        if (dev) {
-            const candidates = Object.keys(reg).filter((id) => reg[id]?.device_id === dev && id.startsWith("image."));
-            const live = candidates.filter((id) => {
-                const st = this.hass.states[id];
-                return !!st && st.state !== "unavailable" && st.state !== "unknown" && !!st.attributes["entity_picture"];
-            });
-            found = live.length === 1 ? live[0] : (candidates.length === 1 ? candidates[0] : undefined);
+        let candidates = this._mapCandCache.get(vac.entity);
+        if (!candidates) {
+            const dev = reg[vac.entity]?.device_id;
+            if (!dev)
+                return undefined; // registry not ready for this vacuum yet — don't cache
+            candidates = Object.keys(reg).filter((id) => reg[id]?.device_id === dev && id.startsWith("image."));
+            this._mapCandCache.set(vac.entity, candidates);
         }
-        this._mapCache.set(vac.entity, found);
-        return found;
+        if (candidates.length === 1)
+            return candidates[0]; // unambiguous, liveness irrelevant
+        const live = candidates.filter((id) => {
+            const st = this.hass.states[id];
+            return !!st && st.state !== "unavailable" && st.state !== "unknown" && !!st.attributes["entity_picture"];
+        });
+        return live.length === 1 ? live[0] : undefined;
     }
     /** Kontrakt v2 gate: attributes of the vacuum's integration sensor, only when the
      *  integration speaks schema_version ≥ 2. Older backends → smart features off. */
@@ -1858,7 +1901,7 @@ let AnyVacCard = class AnyVacCard extends i$2 {
     /** Resolve a vacuum's sibling entities (battery/status/last-clean/progress/room/error) from its
      *  device, so the user does not have to fill them in. Matched by translation_key / device_class. */
     _autoEntities(vac) {
-        const reg = this.hass?.entities;
+        const reg = this._registry();
         if (!reg || !vac.entity)
             return {};
         const cached = this._autoCache.get(vac.entity);
@@ -1890,12 +1933,14 @@ let AnyVacCard = class AnyVacCard extends i$2 {
         return STATUS_MAP[raw] ?? [raw, "rgba(255,255,255,0.5)"];
     }
     _careItems(vac) {
-        const reg = this.hass?.entities;
+        const reg = this._registry();
         const devs = this.hass?.devices;
         if (!reg || !devs || !vac.entity)
             return [];
-        if (this._careCache.has(vac.entity))
-            return this._careCache.get(vac.entity);
+        const tier = this._dockTier(vac);
+        const cacheKey = vac.entity + "|" + tier;
+        if (this._careCache.has(cacheKey))
+            return this._careCache.get(cacheKey);
         const devId = reg[vac.entity]?.device_id;
         const vacDevice = devId ? devs[devId] : undefined;
         const duid = vacDevice?.identifiers?.find(([domain]) => domain === "roborock")?.[1];
@@ -1923,7 +1968,7 @@ let AnyVacCard = class AnyVacCard extends i$2 {
         // report "unavailable"; gate on the same dock_type tier as the actions
         // above instead of just checking entity presence (docs/25 §10 3rd
         // follow-up, live-confirmed on the field-reporting user's S7 MaxV).
-        if (this._dockTier(vac) === "full") {
+        if (tier === "full") {
             consumable("Dock brush", "cleaning_brush_time_left", "reset_dock_cleaning_brush_consumable", dockDevId);
             consumable("Strainer", "strainer_time_left", "reset_dock_strainer_consumable", dockDevId);
             const binary = (label, tk) => {
@@ -1935,7 +1980,7 @@ let AnyVacCard = class AnyVacCard extends i$2 {
             binary("Clean water tank", "clean_box_empty");
             binary("Cleaning fluid", "clean_fluid_empty");
         }
-        this._careCache.set(vac.entity, rows);
+        this._careCache.set(cacheKey, rows);
         return rows;
     }
     /** Formats a consumable row: a % of nominal lifespan when the total is known
@@ -2639,7 +2684,7 @@ let AnyVacCard = class AnyVacCard extends i$2 {
         if (!hasInt || selKeys.length === 0)
             return [];
         const preview = this._planPreview;
-        if (!preview || preview.key !== JSON.stringify([selKeys, mode, this._v2Vacuums()]))
+        if (!preview || preview.key !== this._planKey(selKeys, mode))
             return [];
         const needDry = mode !== "wet";
         const needWet = mode !== "dry";
@@ -2684,14 +2729,27 @@ let AnyVacCard = class AnyVacCard extends i$2 {
         }
         return Object.keys(out).length ? out : undefined;
     }
+    /** Identity of a plan preview: everything the backend's answer depends on.
+     *
+     *  room_pins is part of it (not just selKeys/mode/vacuums) so that tapping an
+     *  avatar to cycle a room's pin (_cycleRoomPin → anyvac.pin_room) invalidates
+     *  the cached plan and re-fetches as soon as the backend's room_pins attribute
+     *  updates — without it the dock avatar stayed stuck on the old assignment
+     *  until something else (e.g. deselecting/reselecting the room) happened to
+     *  change selKeys and force a refetch (field-caught 2026-07-23).
+     *
+     *  Extracted into one method 2026-08-08: `_unassignedRooms` built the same key
+     *  inline but was never updated when room_pins was added here, so its
+     *  three-element key could never equal this four-element one — it returned []
+     *  unconditionally, silently disabling the whole unassigned-rooms warning
+     *  (card 0.66.5: the red `mdi:robot-off` markers in dock rows, the dock footer
+     *  summary and the landscape meta bar count). Both callers now share this, so
+     *  they cannot drift apart again. */
+    _planKey(selKeys, mode) {
+        return JSON.stringify([selKeys, mode, this._v2Vacuums(), this._pinsAttr()]);
+    }
     _fetchPlan(selKeys, mode) {
-        // room_pins is part of the cache key (not just selKeys/mode/vacuums) so that
-        // tapping an avatar to cycle a room's pin (_cycleRoomPin → anyvac.pin_room)
-        // invalidates the cached plan and re-fetches as soon as the backend's
-        // room_pins attribute updates — without it the dock avatar stayed stuck on
-        // the old assignment until something else (e.g. deselecting/reselecting the
-        // room) happened to change selKeys and force a refetch (field-caught 2026-07-23).
-        const key = JSON.stringify([selKeys, mode, this._v2Vacuums(), this._pinsAttr()]);
+        const key = this._planKey(selKeys, mode);
         if (key === this._planFetchKey)
             return;
         this._planFetchKey = key;

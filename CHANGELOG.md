@@ -8,6 +8,51 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Planned
 
+## [1.0.10] - 2026-08-08
+
+Paired with integration 1.0.10. Both fixes below come from a full code audit
+(`docs/34-analyza-kodu-2026-08-08.md`), not from a field report — they are
+silent failures that produce no error anywhere, which is why neither had been
+noticed in use.
+
+### Fixed
+
+The "unassigned rooms" warning could never appear. `_unassignedRooms()`
+rebuilt the plan-preview cache key inline as `[selKeys, mode, vacuums]`, but
+`_fetchPlan()` has stored a four-element key including `room_pins` since
+0.67.2 — a three-element key can never equal a four-element one, so the
+guard short-circuited on every call and the function returned `[]`
+unconditionally. That silently disabled the entire feature added in 0.66.5:
+the red `mdi:robot-off` markers on dock rows, the dock footer summary and
+the landscape meta bar count. So a "Both" run where the backend cannot
+assign a wet robot to a selected room went back to giving no feedback at
+all — exactly the failure 0.66.5 existed to surface. Both call sites now
+share one `_planKey()` method so they cannot drift apart again.
+
+Auto-resolved entities could be cached wrong permanently. `_intCache`,
+`_mapCache`, `_autoCache` and `_careCache` were populated on first use and
+never cleared anywhere — not even in `setConfig()` — and two of them derived
+their answer from LIVE state rather than the registry, so an answer computed
+before the first integration poll stuck until a full page reload:
+
+- `_careItems()` branches on `_dockTier()`, which reads `dock_status.dock_type`
+  off the AnyVac sensor. Asked before the first poll it sees tier "none",
+  skips the dock-mounted rows (dock brush, strainer, tank sensors) and cached
+  that incomplete list forever. It is now keyed on `entity|tier`, so a tier
+  change computes a fresh list.
+- `_mapEntityFor()` picks between multiple `image.*` candidates by liveness
+  (`entity_picture`). A vacuum with 2+ saved maps — the exact case it was
+  written for in 0.86.0 — asked before its first poll found nothing live,
+  fell through to `undefined` and cached that: no map at all until reload.
+  Split in two: the expensive registry-derived candidate list is cached
+  (`_mapCandCache`), the cheap liveness check re-runs per call.
+
+All four now also drop when the entity registry itself changes, via a single
+`_registry()` accessor every resolver goes through — HA replaces
+`hass.entities` only on a real registry change (integration load/reload/
+rename), not on ordinary state updates, so this is a precise and cheap
+invalidation signal rather than a per-render rescan.
+
 ## [1.0.9] - 2026-08-04
 
 ### Fixed
