@@ -29,6 +29,8 @@ import {
   COLOR_BG_ACTIVE,
   DEFAULT_VACUUM_PALETTE,
   hexToRgba,
+  hexToRgbChannel,
+  DEFAULT_THEME,
   CLEANING_STATES,
 } from "./const";
 import {
@@ -1058,7 +1060,7 @@ export class AnyVacCard extends LitElement {
 
   private _statusInfo(vac: VacuumConfig): readonly [string, string] {
     const raw = this.hass.states[this._ent(vac, "status") ?? vac.entity]?.state ?? "unknown";
-    return STATUS_MAP[raw] ?? [raw, "rgba(255,255,255,0.5)"];
+    return STATUS_MAP[raw] ?? [raw, "rgba(var(--avc-ink-rgb),0.5)"];
   }
 
   /** docs/25 §10 follow-up (2026-07-24): consumable/"care" rows auto-discovered from
@@ -2070,37 +2072,37 @@ export class AnyVacCard extends LitElement {
       const v = this._config.vacuums.find((x) => x.entity === entity);
       if (!v) return html`<span style="font-size:11px;opacity:.25">—</span>`;
       const c = this._color(v);
-      return html`<span style="display:inline-flex;align-items:center;justify-content:center;min-width:24px;height:17px;padding:0 5px;border-radius:9px;font-size:10px;font-weight:700;color:#fff;background:${c}30;border:1px solid ${c}">${this._vacAbbrev(v)}</span>`;
+      return html`<span style="display:inline-flex;align-items:center;justify-content:center;min-width:24px;height:17px;padding:0 5px;border-radius:9px;font-size:10px;font-weight:700;color:rgb(var(--avc-ink-rgb));background:${c}30;border:1px solid ${c}">${this._vacAbbrev(v)}</span>`;
     };
     const modeBtn = (m: "dry" | "wet" | "both", label: string) => {
       const on = mode === m;
       return html`<button @click=${(e: Event) => { e.stopPropagation(); this._planMode = m; }}
-        style="padding:2px 8px;border-radius:8px;font-size:10px;font-weight:700;cursor:pointer;font-family:inherit;border:1px solid ${on ? "rgba(255,255,255,0.5)" : "rgba(255,255,255,0.15)"};background:${on ? "rgba(255,255,255,0.12)" : "transparent"};color:${on ? "#fff" : "rgba(255,255,255,0.5)"}">${label}</button>`;
+        style="padding:2px 8px;border-radius:8px;font-size:10px;font-weight:700;cursor:pointer;font-family:inherit;border:1px solid ${on ? "rgba(var(--avc-ink-rgb),0.5)" : "rgba(var(--avc-ink-rgb),0.15)"};background:${on ? "rgba(var(--avc-ink-rgb),0.12)" : "transparent"};color:${on ? "#fff" : "rgba(var(--avc-ink-rgb),0.5)"}">${label}</button>`;
     };
     const runHid = "plan-run";
     return html`
-      <div style="margin:0 4px 6px;padding:6px 8px;background:rgba(255,255,255,0.03);border:1px solid rgba(255,255,255,0.08);border-radius:12px;display:flex;flex-direction:column;gap:6px">
+      <div style="margin:0 4px 6px;padding:6px 8px;background:rgba(var(--avc-ink-rgb),0.03);border:1px solid rgba(var(--avc-ink-rgb),0.08);border-radius:12px;display:flex;flex-direction:column;gap:6px">
         <div style="display:flex;align-items:center;justify-content:space-between">
-          <span style="font-size:9px;font-weight:600;letter-spacing:.6px;color:rgba(255,255,255,.35)">CLEAN PLAN${apLabel ? " · " + apLabel.toUpperCase() : ""}</span>
+          <span style="font-size:9px;font-weight:600;letter-spacing:.6px;color:rgba(var(--avc-ink-rgb),.35)">CLEAN PLAN${apLabel ? " · " + apLabel.toUpperCase() : ""}</span>
           <div style="display:flex;gap:4px">${modeBtn("dry", "Dry")}${modeBtn("wet", "Wet")}${modeBtn("both", "Both")}</div>
         </div>
         <div style="display:flex;gap:6px;overflow-x:auto;align-items:center">
           <div style="display:flex;flex-direction:column;gap:3px;align-items:center;flex-shrink:0;padding-right:2px">
             <span style="height:18px"></span>
-            ${showDry ? html`<ha-icon icon="mdi:broom" style="--mdc-icon-size:14px;color:rgba(255,255,255,.4)"></ha-icon>` : nothing}
+            ${showDry ? html`<ha-icon icon="mdi:broom" style="--mdc-icon-size:14px;color:rgba(var(--avc-ink-rgb),.4)"></ha-icon>` : nothing}
             ${showWet ? html`<ha-icon icon="mdi:water" style="--mdc-icon-size:14px;color:rgba(64,169,255,.7)"></ha-icon>` : nothing}
           </div>
           ${selKeys.map((k) => {
             const r = roomDef(k);
             return html`<div style="display:flex;flex-direction:column;align-items:center;gap:3px;min-width:32px;flex-shrink:0" title=${r?.name ?? k}>
-              <ha-icon icon=${r?.icon || "mdi:floor-plan"} style="--mdc-icon-size:18px;color:rgba(255,255,255,.7)"></ha-icon>
+              <ha-icon icon=${r?.icon || "mdi:floor-plan"} style="--mdc-icon-size:18px;color:rgba(var(--avc-ink-rgb),.7)"></ha-icon>
               ${showDry ? cell(dryOf.get(k)) : nothing}
               ${showWet ? cell(wetOf.get(k)) : nothing}
             </div>`;
           })}
         </div>
         <button class="action-btn ${this._holdId === runHid ? "action-btn--holding" : ""}"
-          style="flex:0 0 auto;align-self:flex-end;flex-direction:row;gap:6px;padding:7px 16px;background:rgba(82,196,26,0.14);border:1px solid rgba(82,196,26,0.55);color:#fff"
+          style="flex:0 0 auto;align-self:flex-end;flex-direction:row;gap:6px;padding:7px 16px;background:rgba(var(--avc-ok-rgb),0.14);border:1px solid rgba(var(--avc-ok-rgb),0.55);color:rgb(var(--avc-ink-rgb))"
           @pointerdown=${this._holdStart(runHid, () => this._runOrchestrated(selKeys, this._planMode))}
           @pointermove=${this._holdMove}
           @pointerup=${this._holdEnd}
@@ -2123,11 +2125,11 @@ export class AnyVacCard extends LitElement {
           const active = this._activeGlobalPreset === gp.id;
           return html`<button
             @click=${() => this._selectGlobalPreset(gp)}
-            style="flex:0 1 auto;min-width:128px;display:flex;flex-direction:row;align-items:center;justify-content:flex-start;gap:10px;padding:9px 14px;border-radius:14px;cursor:pointer;font-family:inherit;color:white;background:${active ? "rgba(82,196,26,0.14)" : "rgba(255,255,255,0.05)"};border:1px solid ${active ? "rgba(82,196,26,0.6)" : "rgba(255,255,255,0.12)"}">
+            style="flex:0 1 auto;min-width:128px;display:flex;flex-direction:row;align-items:center;justify-content:flex-start;gap:10px;padding:9px 14px;border-radius:14px;cursor:pointer;font-family:inherit;color:white;background:${active ? "rgba(var(--avc-ok-rgb),0.14)" : "rgba(var(--avc-ink-rgb),0.05)"};border:1px solid ${active ? "rgba(var(--avc-ok-rgb),0.6)" : "rgba(var(--avc-ink-rgb),0.12)"}">
             <ha-icon icon=${gp.icon || "mdi:robot-vacuum-variant"} style="--mdc-icon-size:24px"></ha-icon>
             <div style="display:flex;flex-direction:column;align-items:flex-start;line-height:1.15">
               <span style="font-size:13px;font-weight:700">${gp.label}</span>
-              <small style="font-size:9px;font-weight:600;letter-spacing:.4px;color:rgba(255,255,255,0.4)">${
+              <small style="font-size:9px;font-weight:600;letter-spacing:.4px;color:rgba(var(--avc-ink-rgb),0.4)">${
                 gp.scope === "all" ? "WHOLE HOME" : gp.scope === "select" ? "SELECTED" : "ROOMS"
               }${gp.mode ? " · " + (gp.mode === "dry" ? "DRY" : gp.mode === "wet" ? "WET" : "BOTH") : ""}</small>
             </div>
@@ -2226,7 +2228,7 @@ export class AnyVacCard extends LitElement {
     }
     const c = this._color(v);
     return html`<span class="dock-chip"
-      style="color:#fff;background:${c}30;border-color:${c}"
+      style="color:rgb(var(--avc-ink-rgb));background:${c}30;border-color:${c}"
       title=${(v.name ?? v.entity) + (onTap ? " · tap to assign a different vacuum" : "")}
       @click=${onTap ?? nothing}>${this._vacAbbrev(v)}</span>`;
   }
@@ -2463,7 +2465,7 @@ export class AnyVacCard extends LitElement {
               ${unsequenced.size ? html`<ha-icon class="dock-unseq" icon="mdi:sort-variant-off"
                 title="${unsequenced.size} selected room${unsequenced.size > 1 ? "s have" : " has"} no cleaning order set — the time above may be off. Set the order in the card editor's Maps tab."></ha-icon>` : nothing}</span>
             <button class="action-btn ${this._holdId === runHid ? "action-btn--holding" : ""}"
-              style="flex:0 0 auto;padding:7px 14px;background:rgba(111,191,115,0.24);border:1px solid rgba(111,191,115,0.65);color:#fff"
+              style="flex:0 0 auto;padding:7px 14px;background:rgba(var(--avc-accent-rgb),0.24);border:1px solid rgba(var(--avc-accent-rgb),0.65);color:rgb(var(--avc-ink-rgb))"
               ?disabled=${!runKeys.length}
               @pointerdown=${runKeys.length ? this._holdStart(runHid, () => this._runOrchestrated(runKeys, this._planMode)) : nothing}
               @pointermove=${this._holdMove}
@@ -2785,9 +2787,9 @@ export class AnyVacCard extends LitElement {
               display: "inline-flex", alignItems: "center", gap: "4px", flexShrink: "0",
               padding: "4px 10px", borderRadius: "14px", cursor: "pointer",
               fontSize: "12px", lineHeight: "1",
-              border: "1px solid " + (active ? color : "rgba(255,255,255,0.15)"),
-              background: active ? this._colorBg(vac) : "rgba(255,255,255,0.04)",
-              color: active ? "white" : "rgba(255,255,255,0.55)",
+              border: "1px solid " + (active ? color : "rgba(var(--avc-ink-rgb),0.15)"),
+              background: active ? this._colorBg(vac) : "rgba(var(--avc-ink-rgb),0.04)",
+              color: active ? "rgb(var(--avc-ink-rgb))" : "rgba(var(--avc-ink-rgb),0.55)",
             })}
           >
             ${p.icon ? html`<ha-icon icon=${p.icon} style="--mdc-icon-size:14px"></ha-icon>` : nothing}
@@ -2921,7 +2923,7 @@ export class AnyVacCard extends LitElement {
       ? "3px solid " + statusColor
       : active
       ? "2px solid " + statusColor
-      : "2px solid rgba(255,255,255,0.18)";
+      : "2px solid rgba(var(--avc-ink-rgb),0.18)";
     const shadow = cleaning
       ? "0 0 18px " + statusColor
       : active
@@ -2960,7 +2962,7 @@ export class AnyVacCard extends LitElement {
         ${vac.image
           ? html`<img class="badge-img" src=${vac.image} alt=${name} />`
           : html`<ha-icon class="badge-icon" icon="mdi:robot-vacuum" style=${styleMap({ color })}></ha-icon>`}
-        <span class="badge-name" style=${styleMap({ color: active ? "white" : "rgba(255,255,255,0.55)" })}>
+        <span class="badge-name" style=${styleMap({ color: active ? "rgb(var(--avc-ink-rgb))" : "rgba(var(--avc-ink-rgb),0.55)" })}>
           ${name}
         </span>
       </button>
@@ -2984,7 +2986,7 @@ export class AnyVacCard extends LitElement {
     const holding = this._holdId === holdId;
 
     const bg = active ? this._resolveBg(ga.color, "orange", true) : "rgba(30,30,30,0.85)";
-    const border = active ? "3px solid " + color : "2px solid rgba(255,255,255,0.18)";
+    const border = active ? "3px solid " + color : "2px solid rgba(var(--avc-ink-rgb),0.18)";
     const shadow = active ? "0 0 18px " + color + "B0" : "none";
 
     return html`
@@ -3003,7 +3005,7 @@ export class AnyVacCard extends LitElement {
         ${ga.image
           ? html`<img class="badge-img" src=${ga.image} alt=${ga.name} />`
           : html`<ha-icon class="badge-icon" icon="mdi:home-floor-a" style=${styleMap({ color })}></ha-icon>`}
-        <span class="badge-name" style=${styleMap({ color: active ? "white" : "rgba(255,255,255,0.55)" })}>
+        <span class="badge-name" style=${styleMap({ color: active ? "rgb(var(--avc-ink-rgb))" : "rgba(var(--avc-ink-rgb),0.55)" })}>
           ${ga.name}
         </span>
       </button>
@@ -3600,8 +3602,18 @@ export class AnyVacCard extends LitElement {
     const mopLine = wetSegs.length
       ? svg`${wetSegs.map((s) => svg`<polyline points=${s} fill="none" stroke=${wetColor} stroke-width=${sw} stroke-linejoin="round" stroke-linecap="round" opacity="0.9"></polyline>`)}`
       : nothing;
+    // v1.2.0 (docs/35 §6): the dry trace was a single hairline, which reads as
+    // a scribble once a whole flat has been covered. A much wider, very faint
+    // pass underneath turns it into a lit trail instead — same geometry drawn
+    // twice, so the cost is one extra <polyline> per segment (the points are
+    // already RDP-simplified server-side, integration 0.67.0) and nothing else.
+    // Skipped on `legacy` so that theme stays exactly as it was, and so there
+    // is a way back if the doubled node count ever bites on weak hardware.
+    const dryColor = vac.path_color || color;
+    const softMap = (this._config.theme ?? DEFAULT_THEME) !== "legacy";
+    const glowW = (pw * 3).toFixed(2);
     const traceT = drySegs.length
-      ? svg`${drySegs.map((s) => svg`<polyline points=${s} fill="none" stroke=${vac.path_color || color} stroke-width=${sw} stroke-linejoin="round" stroke-linecap="round" opacity="0.85"></polyline>`)}`
+      ? svg`${softMap ? drySegs.map((s) => svg`<polyline points=${s} fill="none" stroke=${dryColor} stroke-width=${glowW} stroke-linejoin="round" stroke-linecap="round" opacity="0.12"></polyline>`) : nothing}${drySegs.map((s) => svg`<polyline points=${s} fill="none" stroke=${dryColor} stroke-width=${sw} stroke-linejoin="round" stroke-linecap="round" opacity="0.85"></polyline>`)}`
       : nothing;
     const useImg = !!(vac.robot_image_on_map && vac.image);
     const robSize = rr * 2.6 * ((vac.robot_size ?? 100) / 100);
@@ -4479,7 +4491,7 @@ export class AnyVacCard extends LitElement {
       <div class="status-line2">
         ${currentRoom ? html`
           <span class="current-room">
-            <ha-icon icon="mdi:map-marker" style="--mdc-icon-size:12px;color:rgba(255,255,255,0.4)"></ha-icon>
+            <ha-icon icon="mdi:map-marker" style="--mdc-icon-size:12px;color:rgba(var(--avc-ink-rgb),0.4)"></ha-icon>
             ${currentRoom}
           </span>
         ` : html`<span></span>`}
@@ -4605,9 +4617,9 @@ export class AnyVacCard extends LitElement {
 
     const hId = "start-" + vacIdx;
     const startBg = hasRooms ? this._colorBg(vac) : "rgba(60,60,60,0.4)";
-    const startBorder = hasRooms ? "1px solid " + color + "80" : "1px solid rgba(255,255,255,0.1)";
-    const startIconColor = hasRooms ? color : "rgba(255,255,255,0.2)";
-    const startTextColor = hasRooms ? "white" : "rgba(255,255,255,0.25)";
+    const startBorder = hasRooms ? "1px solid " + color + "80" : "1px solid rgba(var(--avc-ink-rgb),0.1)";
+    const startIconColor = hasRooms ? color : "rgba(var(--avc-ink-rgb),0.2)";
+    const startTextColor = hasRooms ? "rgb(var(--avc-ink-rgb))" : "rgba(var(--avc-ink-rgb),0.25)";
     // v1.1.0 (2026-08-03, user-approved mockup): the old per-room icon strip
     // (every configured room as its own tiny icon, colored if selected) was
     // read-only display, not a control — replaced with a plain "N/M rooms"
@@ -4635,7 +4647,7 @@ export class AnyVacCard extends LitElement {
           <ha-icon icon="mdi:play" style=${styleMap({ color: startIconColor })}></ha-icon>
           <div class="start-body">
             <span style=${styleMap({ color: startTextColor })}>${hasRooms ? "START" : "Select rooms"}</span>
-            ${metaStr ? html`<small style="color:rgba(255,255,255,0.4)">${metaStr}</small>` : nothing}
+            ${metaStr ? html`<small style="color:rgba(var(--avc-ink-rgb),0.4)">${metaStr}</small>` : nothing}
           </div>
         </button>
       </div>
@@ -4655,8 +4667,12 @@ export class AnyVacCard extends LitElement {
     const color = this._color(vac);
     const name = vac.name ?? vac.entity.split(".")[1] ?? vac.entity;
 
-    const cardBorder = cleaning ? "2px solid " + color : "1px solid rgba(255,255,255,0.08)";
-    const cardShadow = cleaning ? "0 0 22px " + color + "40" : "none";
+    // v1.2.0: the resting border goes through the panel-line token so a theme
+    // can drop the hairline entirely and let elevation do the separating
+    // (docs/35 §2). `legacy` resolves it back to the old literal. The active
+    // border stays the vacuum's identity colour — that one carries meaning.
+    const cardBorder = cleaning ? "2px solid " + color : "1px solid var(--avc-panel-line)";
+    const cardShadow = cleaning ? "0 0 22px " + color + "40" : "var(--avc-elev-1)";
     const imgFilter = cleaning
       ? "drop-shadow(0 0 8px " + color + "D8)"
       : "drop-shadow(0 2px 5px " + color + "33)";
@@ -4695,7 +4711,7 @@ export class AnyVacCard extends LitElement {
     return html`
       <span class="mini-gauge-wrap">
         <ha-icon class="mini-gauge-ico" icon=${icon} style=${styleMap({ color })}></ha-icon>
-        <span class="mini-gauge" style=${styleMap({ background: `conic-gradient(${color} ${pct * 3.6}deg, rgba(255,255,255,0.12) 0)` })}>
+        <span class="mini-gauge" style=${styleMap({ background: `conic-gradient(${color} ${pct * 3.6}deg, rgba(var(--avc-ink-rgb),0.12) 0)` })}>
           <span>${pct}${calibrating ? "~" : ""}</span>
         </span>
       </span>`;
@@ -4837,6 +4853,59 @@ export class AnyVacCard extends LitElement {
     }
   }
 
+  /* ── Theming (v1.2.0, docs/35) ───────────────────────────────────────── */
+
+  /**
+   * Class list for the card root. `legacy` deliberately yields an EMPTY string:
+   * the stylesheet's `:host` block already carries the pre-1.2.0 values, so the
+   * old look is what you get when none of the theme classes apply. That makes
+   * `theme: legacy` an escape hatch with no code path of its own to rot —
+   * there is nothing to keep in sync, only something to leave off.
+   *
+   * `avc-still` is the config-level motion opt-out; `prefers-reduced-motion`
+   * covers the OS-level one on its own, in CSS.
+   */
+  private _rootClasses(): string {
+    const theme = this._config.theme ?? DEFAULT_THEME;
+    const cls: string[] = [];
+    if (theme !== "legacy") cls.push("avc-theme", "avc-theme--" + theme);
+    if (this._config.reduce_motion) cls.push("avc-still");
+    if (this._isCalm()) cls.push("avc-calm");
+    return cls.join(" ");
+  }
+
+  /**
+   * Inline custom properties for the card root: just the accent channel, and
+   * only when it actually differs from the token default. Anything that fails
+   * to parse as a hex is dropped rather than written through — an invalid
+   * custom-property value would poison every rule referencing it, which on
+   * this card includes START itself.
+   */
+  private _rootVars(): Record<string, string> {
+    const accent = this._config.accent;
+    if (!accent) return {};
+    const ch = hexToRgbChannel(accent);
+    return ch ? { "--avc-accent-rgb": ch } : {};
+  }
+
+  /**
+   * Resting state (docs/35 §7): nothing is running, nothing is explicitly
+   * selected, no map tool is armed and no sheet is open. Read as "the user is
+   * looking at the card, not operating it" — the CSS then steps the leftover
+   * trace and the secondary metadata back so the primary action is the one
+   * thing that reads. Deliberately NOT a state machine: it is derived fresh on
+   * every render from state the card already tracks, so it can never get stuck
+   * out of sync with what is actually happening.
+   */
+  private _isCalm(): boolean {
+    if (this._config.calm_state === false) return false;
+    if (this._mapMode !== "normal") return false;
+    if (this._dockSheetOpen || this._modeSheetOpen) return false;
+    const vacs = this._config.vacuums;
+    if (vacs.some((v) => this._isCleaning(v) || this._hasError(v))) return false;
+    return !this._allRoomKeys().some((k) => this._isRoomSelectedAny(k, vacs));
+  }
+
   /** Grid render path (docs/18): active only with a `layout:` config block. */
   private _renderGrid(lay: LayoutConfig) {
     // docs/25 §7c: stack topology substitutes the whole resolved profile —
@@ -4852,7 +4921,7 @@ export class AnyVacCard extends LitElement {
     // the same numbers where they're actually useful, and it isn't limited to
     // edit mode the way this chip was.
     return html`
-      <ha-card style="padding:0;display:block">
+      <ha-card class=${this._rootClasses()} style=${styleMap({ padding: "0", display: "block", ...this._rootVars() })}>
         ${this.editMode ? html`<div class="version-chip">
           <div>v${CARD_VERSION} · ${Math.round(this._cardW)}w · ${this._profile}</div>
           ${this._config.debug ? html`<div>${stack ? "stack" : "split"} · box:${Math.round(this._mapAvailW)}x${Math.round(this._mapAvailH)}</div>` : nothing}
@@ -4877,7 +4946,7 @@ export class AnyVacCard extends LitElement {
 
     const schemaWarn = this._schemaWarning();
     return html`
-      <ha-card>
+      <ha-card class=${this._rootClasses()} style=${styleMap(this._rootVars())}>
         ${this.editMode ? html`<div class="version-chip">v${CARD_VERSION} · ${Math.round(this._cardW)}w</div>` : nothing}
         ${schemaWarn ? html`<div style="margin:0 4px;padding:8px 12px;border-radius:12px;border:1px solid rgba(250,173,20,0.55);background:rgba(250,173,20,0.12);color:#faad14;font-size:12px;display:flex;align-items:center;gap:8px">
           <ha-icon icon="mdi:alert" style="--mdc-icon-size:18px"></ha-icon><span>${schemaWarn}</span>
@@ -4909,9 +4978,75 @@ export class AnyVacCard extends LitElement {
   // ── Styles ──────────────────────────────────────────────────────────────
 
   static styles = css`
+    /* ══ Design tokens (v1.2.0, docs/35) ═══════════════════════════════════
+     * Every colour in this stylesheet resolves through one of the channel
+     * bases below, so a theme is a handful of numbers rather than the ~130
+     * literals this file used to carry — and, more importantly, a theme can
+     * no longer MISS a spot the way a find-and-replace pass would.
+     *
+     * :host holds the LEGACY values verbatim: with no theme class applied
+     * the card renders exactly as 1.1.0 did. .avc-theme-* further down
+     * layers the real themes on top of that baseline, so theme: legacy
+     * costs nothing but the absence of a class name.
+     *
+     * The one deliberate exception is .map-wrap, which pins the ink/shade
+     * channels back to white-on-black regardless of theme — everything
+     * inside it is painted on the vacuum's own map bitmap, not on the card's
+     * surface, so a light theme must not reach in there (it would turn every
+     * on-map label invisible). Derived tokens re-resolve per element, so
+     * that one reset covers all of them without listing any.
+     */
     :host {
       display: block;
       width: 100%;
+
+      /* Channel bases */
+      --avc-ink-rgb: 255, 255, 255;
+      --avc-shade-rgb: 0, 0, 0;
+      --avc-scrim-rgb: 18, 18, 18;
+      --avc-scrim-2-rgb: 30, 30, 30;
+
+      /* Semantic palette. accent is intent (START, selection, focus);
+       * ok/warn/err/hint/tool/info are meaning and stay out of the accent's
+       * reach on purpose (docs/25 §6). */
+      --avc-accent-rgb: 111, 191, 115;
+      --avc-ok-rgb: 82, 196, 26;
+      --avc-warn-rgb: 250, 173, 20;
+      --avc-err-rgb: 255, 77, 79;
+      --avc-hint-rgb: 212, 160, 23;
+      --avc-tool-rgb: 59, 130, 246;
+      --avc-info-rgb: 64, 169, 255;
+      /* Only the CHANNELS live here, never a ready-made
+       * --avc-ink: rgb(var(--avc-ink-rgb)) alias. A custom property whose
+       * value contains var() is substituted at computed-value time on the
+       * element it is DECLARED on, and the already-substituted result is what
+       * inherits — so such an alias would freeze at the :host value and quietly
+       * ignore both the theme classes and the .map-wrap reset below. Rules
+       * therefore spell out rgb(var(--avc-x-rgb)) at the point of use, where it
+       * resolves against that element's channels. Caught by
+       * tests/theme.spec.ts, not by reading the spec. */
+
+      /* Surfaces — named separately from the raw shade channel so a theme can
+       * LIFT a panel off the background instead of only tinting it. */
+      --avc-surface: rgba(var(--avc-shade-rgb), 0.6);
+      --avc-panel: rgba(var(--avc-ink-rgb), 0.03);
+      --avc-panel-line: rgba(var(--avc-ink-rgb), 0.08);
+      --avc-panel-strong: rgba(var(--avc-ink-rgb), 0.06);
+      --avc-panel-strong-line: rgba(var(--avc-ink-rgb), 0.16);
+      --avc-sunken: rgba(var(--avc-shade-rgb), 0.25);
+      --avc-disabled: rgba(60, 60, 60, 0.4);
+
+      /* Elevation. Legacy has none: hairline borders did the whole job, which
+       * is the single loudest "instrument panel" tell in the old look. */
+      --avc-elev-1: none;
+      --avc-elev-2: none;
+
+      /* Motion. --avc-press is the scale a pressable element takes while
+       * held — 1 means no feedback at all, i.e. 1.1.0's behaviour. */
+      --avc-ease: cubic-bezier(0.2, 0.8, 0.2, 1);
+      --avc-press: 1;
+      --avc-press-ms: 0s;
+      --avc-live: none;
     }
 
     ha-card {
@@ -4934,8 +5069,8 @@ export class AnyVacCard extends LitElement {
       font-size: 10px;
       line-height: 1.5;
       font-weight: 600;
-      color: rgba(255, 255, 255, 0.85);
-      background: rgba(0, 0, 0, 0.75);
+      color: rgba(var(--avc-ink-rgb), 0.85);
+      background: rgba(var(--avc-shade-rgb), 0.75);
       border-radius: 6px;
       padding: 3px 6px;
       pointer-events: none;
@@ -4965,7 +5100,7 @@ export class AnyVacCard extends LitElement {
       display: flex; align-items: center; justify-content: center;
       /* docs/25 §6: thinner ring (was 2px) — reads calmer, still clearly a
        * status indicator, without competing for visual weight with START. */
-      background: rgba(255,255,255,0.05); border: 1.5px solid rgba(255,255,255,0.2); cursor: pointer;
+      background: rgba(var(--avc-ink-rgb), 0.05); border: 1.5px solid rgba(var(--avc-ink-rgb), 0.2); cursor: pointer;
       transition: opacity 0.15s ease;
       /* Mobile hold-gesture fix: without these, iOS/Android WebViews race our
        * 600ms pointerdown timer against their own long-press affordances
@@ -4990,8 +5125,8 @@ export class AnyVacCard extends LitElement {
       gap: 4px;
       padding: 5px;
       box-sizing: border-box;
-      background: rgba(255, 255, 255, 0.03);
-      border: 1px solid rgba(255, 255, 255, 0.08);
+      background: var(--avc-panel);
+      border: 1px solid var(--avc-panel-line);
       border-radius: 12px;
     }
     /* v1.1.0 follow-up (2026-08-03): field feedback that the picker column's
@@ -5016,8 +5151,8 @@ export class AnyVacCard extends LitElement {
       height: 100%;
       padding: 8px;
       box-sizing: border-box;
-      background: rgba(255, 255, 255, 0.03);
-      border: 1px solid rgba(255, 255, 255, 0.08);
+      background: var(--avc-panel);
+      border: 1px solid var(--avc-panel-line);
       border-radius: 12px;
     }
     /* Portrait-only dry/wet path visibility row (see _renderDock) — reuses
@@ -5042,16 +5177,16 @@ export class AnyVacCard extends LitElement {
        * The .on state keeps its own distinct (bolder) weight below, so the
        * active/inactive contrast doesn't shrink. */
       font-weight: 600;
-      color: rgba(255, 255, 255, 0.5);
+      color: rgba(var(--avc-ink-rgb), 0.5);
       background: transparent;
-      border: 1px solid rgba(255, 255, 255, 0.15);
+      border: 1px solid rgba(var(--avc-ink-rgb), 0.15);
     }
     .dock-mode ha-icon { --mdc-icon-size: 15px; }
     .dock-mode.on {
-      color: #fff;
+      color: rgb(var(--avc-ink-rgb));
       font-weight: 700;
-      background: rgba(255, 255, 255, 0.12);
-      border-color: rgba(255, 255, 255, 0.5);
+      background: rgba(var(--avc-ink-rgb), 0.12);
+      border-color: rgba(var(--avc-ink-rgb), 0.5);
     }
     /* docs/25 §7 field follow-up: Dock button — same base as the mode
      * buttons (visually one row), but a flex-0 fixed width since it's an
@@ -5064,15 +5199,15 @@ export class AnyVacCard extends LitElement {
       width: 7px;
       height: 7px;
       border-radius: 50%;
-      background: #e0994a;
+      background: rgb(var(--avc-warn-rgb));
     }
     .dock-sheet {
       display: flex;
       flex-direction: column;
       gap: 8px;
       padding: 8px;
-      background: rgba(0, 0, 0, 0.25);
-      border: 1px solid rgba(255, 255, 255, 0.1);
+      background: var(--avc-sunken);
+      border: 1px solid var(--avc-panel-line);
       border-radius: 10px;
     }
     .dock-sheet-tabs { display: flex; gap: 6px; }
@@ -5083,8 +5218,8 @@ export class AnyVacCard extends LitElement {
       overflow: hidden;
       padding: 0;
       cursor: pointer;
-      background: rgba(255, 255, 255, 0.05);
-      border: 1.5px solid rgba(255, 255, 255, 0.2);
+      background: rgba(var(--avc-ink-rgb), 0.05);
+      border: 1.5px solid rgba(var(--avc-ink-rgb), 0.2);
       opacity: 0.55;
     }
     .dock-sheet-tab.on { opacity: 1; }
@@ -5095,7 +5230,7 @@ export class AnyVacCard extends LitElement {
       flex-direction: column;
       gap: 2px;
       font-size: 10px;
-      color: rgba(255, 255, 255, 0.4);
+      color: rgba(var(--avc-ink-rgb), 0.4);
     }
     .dock-sheet-actions { display: flex; flex-wrap: wrap; gap: 8px; }
     .dock-sheet-action {
@@ -5109,9 +5244,9 @@ export class AnyVacCard extends LitElement {
       cursor: pointer;
       font-family: inherit;
       font-size: 11px;
-      color: rgba(255, 255, 255, 0.8);
-      background: rgba(255, 255, 255, 0.05);
-      border: 1px solid rgba(255, 255, 255, 0.12);
+      color: rgba(var(--avc-ink-rgb), 0.8);
+      background: rgba(var(--avc-ink-rgb), 0.05);
+      border: 1px solid rgba(var(--avc-ink-rgb), 0.12);
     }
     .dock-sheet-action ha-icon { --mdc-icon-size: 18px; }
     .dock-sheet-care {
@@ -5120,7 +5255,7 @@ export class AnyVacCard extends LitElement {
       gap: 6px;
       margin-top: 10px;
       padding-top: 10px;
-      border-top: 1px solid rgba(255, 255, 255, 0.08);
+      border-top: 1px solid rgba(var(--avc-ink-rgb), 0.08);
     }
     .dock-sheet-care-row {
       display: flex;
@@ -5130,10 +5265,10 @@ export class AnyVacCard extends LitElement {
     }
     .dock-sheet-care-label {
       flex: 1;
-      color: rgba(255, 255, 255, 0.75);
+      color: rgba(var(--avc-ink-rgb), 0.75);
     }
     .dock-sheet-care-value {
-      color: rgba(255, 255, 255, 0.5);
+      color: rgba(var(--avc-ink-rgb), 0.5);
       font-variant-numeric: tabular-nums;
     }
     .dock-sheet-care-badge {
@@ -5141,12 +5276,12 @@ export class AnyVacCard extends LitElement {
       font-weight: 600;
       padding: 2px 7px;
       border-radius: 20px;
-      background: rgba(82, 196, 26, 0.18);
-      color: #52c41a;
+      background: rgba(var(--avc-ok-rgb), 0.18);
+      color: rgb(var(--avc-ok-rgb));
     }
     .dock-sheet-care-badge.warn {
-      background: rgba(250, 173, 20, 0.2);
-      color: #faad14;
+      background: rgba(var(--avc-warn-rgb), 0.2);
+      color: rgb(var(--avc-warn-rgb));
     }
     .dock-sheet-care-reset {
       display: flex;
@@ -5156,9 +5291,9 @@ export class AnyVacCard extends LitElement {
       height: 26px;
       border-radius: 50%;
       cursor: pointer;
-      color: rgba(255, 255, 255, 0.6);
-      background: rgba(255, 255, 255, 0.06);
-      border: 1px solid rgba(255, 255, 255, 0.1);
+      color: rgba(var(--avc-ink-rgb), 0.6);
+      background: rgba(var(--avc-ink-rgb), 0.06);
+      border: 1px solid rgba(var(--avc-ink-rgb), 0.1);
     }
     .dock-sheet-care-reset ha-icon { --mdc-icon-size: 14px; }
     /* docs/25 §10 field-caught (2026-07-25): spinner while waiting for the
@@ -5184,15 +5319,15 @@ export class AnyVacCard extends LitElement {
       cursor: pointer;
       font-family: inherit;
       text-align: left;
-      color: rgba(255, 255, 255, 0.85);
-      background: rgba(255, 255, 255, 0.03);
-      border: 1px solid rgba(255, 255, 255, 0.07);
+      color: rgba(var(--avc-ink-rgb), 0.85);
+      background: rgba(var(--avc-ink-rgb), 0.03);
+      border: 1px solid rgba(var(--avc-ink-rgb), 0.07);
     }
     .dock-row.on {
-      background: rgba(82, 196, 26, 0.1);
-      border-color: rgba(82, 196, 26, 0.5);
+      background: rgba(var(--avc-ok-rgb), 0.1);
+      border-color: rgba(var(--avc-ok-rgb), 0.5);
     }
-    .dock-ric { --mdc-icon-size: 16px; color: rgba(255, 255, 255, 0.55); flex-shrink: 0; }
+    .dock-ric { --mdc-icon-size: 16px; color: rgba(var(--avc-ink-rgb), 0.55); flex-shrink: 0; }
     /* docs/28 §4: wraps to a second line instead of truncating — an unusually
      * long room name stays fully readable, it just costs that one row a bit
      * more height. Deliberately NOT flex:1 (that would make this the
@@ -5213,8 +5348,8 @@ export class AnyVacCard extends LitElement {
     }
     /* Sequence hint (docs/19 follow-up, TODO #2) — amber, not red: it's a
        heads-up about ETA accuracy, not an error blocking the clean. */
-    .dock-unseq { --mdc-icon-size: 13px; color: #d4a017; flex-shrink: 0; margin: 0 2px; }
-    .dock-unassigned { --mdc-icon-size: 13px; color: #ff4d4f; flex-shrink: 0; margin: 0 2px; }
+    .dock-unseq { --mdc-icon-size: 13px; color: rgb(var(--avc-hint-rgb)); flex-shrink: 0; margin: 0 2px; }
+    .dock-unassigned { --mdc-icon-size: 13px; color: rgb(var(--avc-err-rgb)); flex-shrink: 0; margin: 0 2px; }
     /* 2026-07-25 field feedback: the trailing warning icons + ages + avatars
      * used to be flat siblings of .dock-ric/.dock-name in the row's own
      * flex flow — with no growing element and no justify-content, they
@@ -5231,7 +5366,7 @@ export class AnyVacCard extends LitElement {
     .dock-info { display: inline-flex; align-items: center; gap: 6px; margin-left: auto; flex-shrink: 0; }
     .dock-ages { display: inline-flex; gap: 6px; flex-shrink: 0; }
     .dock-age { display: inline-flex; align-items: center; gap: 2px; font-size: 10px; }
-    .dock-age ha-icon { --mdc-icon-size: 12px; color: rgba(255, 255, 255, 0.3); }
+    .dock-age ha-icon { --mdc-icon-size: 12px; color: rgba(var(--avc-ink-rgb), 0.3); }
     /* Persistent last-clean coverage % (docs/29) — deliberately dimmer/smaller than the
        age badge next to it: age is the primary "should I clean this?" signal, coverage
        is supporting detail. */
@@ -5251,16 +5386,16 @@ export class AnyVacCard extends LitElement {
       border: 1px solid transparent;
       cursor: pointer;
     }
-    .dock-chip--empty { color: rgba(255, 255, 255, 0.25); border-color: rgba(255, 255, 255, 0.15); }
+    .dock-chip--empty { color: rgba(var(--avc-ink-rgb), 0.25); border-color: rgba(var(--avc-ink-rgb), 0.15); }
     .dock-foot {
       display: flex;
       align-items: center;
       justify-content: space-between;
       gap: 8px;
-      border-top: 1px solid rgba(255, 255, 255, 0.08);
+      border-top: 1px solid rgba(var(--avc-ink-rgb), 0.08);
       padding-top: 6px;
     }
-    .dock-est { font-size: 11px; color: rgba(255, 255, 255, 0.45); }
+    .dock-est { font-size: 11px; color: rgba(var(--avc-ink-rgb), 0.45); }
 
     /* START bar (portrait bottom, docs/18 §7d). docs/25 §6 (visual language
      * pass, 2026-07-24): the one thing this whole screen is FOR, so it
@@ -5301,21 +5436,21 @@ export class AnyVacCard extends LitElement {
       font-family: inherit;
       font-size: 16px;
       font-weight: 700;
-      color: #fff;
-      background: rgba(111, 191, 115, 0.24);
-      border: 1px solid rgba(111, 191, 115, 0.65);
+      color: rgb(var(--avc-ink-rgb));
+      background: rgba(var(--avc-accent-rgb), 0.24);
+      border: 1px solid rgba(var(--avc-accent-rgb), 0.65);
     }
     .start-bar:disabled {
       cursor: default;
-      color: rgba(255, 255, 255, 0.25);
-      background: rgba(60, 60, 60, 0.4);
-      border-color: rgba(255, 255, 255, 0.1);
+      color: rgba(var(--avc-ink-rgb), 0.25);
+      background: var(--avc-disabled);
+      border-color: rgba(var(--avc-ink-rgb), 0.1);
     }
     .start-bar ha-icon { --mdc-icon-size: 22px; position: relative; z-index: 1; }
     .start-bar span { position: relative; z-index: 1; }
     .start-bar--cancel {
-      background: rgba(250, 173, 20, 0.16);
-      border-color: rgba(250, 173, 20, 0.6);
+      background: rgba(var(--avc-warn-rgb), 0.16);
+      border-color: rgba(var(--avc-warn-rgb), 0.6);
     }
     /* Side segments (mode / dock) — same family as .start-bar but a fixed
      * narrow width so the middle START segment keeps most of the bar. */
@@ -5332,23 +5467,23 @@ export class AnyVacCard extends LitElement {
       font-family: inherit;
       font-size: 10px;
       font-weight: 600;
-      color: rgba(255, 255, 255, 0.65);
-      background: rgba(255, 255, 255, 0.05);
-      border: 1px solid rgba(255, 255, 255, 0.15);
+      color: rgba(var(--avc-ink-rgb), 0.65);
+      background: rgba(var(--avc-ink-rgb), 0.05);
+      border: 1px solid rgba(var(--avc-ink-rgb), 0.15);
     }
     .start-seg ha-icon { --mdc-icon-size: 20px; }
     .start-seg.on {
-      color: #fff;
+      color: rgb(var(--avc-ink-rgb));
       font-weight: 700;
-      background: rgba(255, 255, 255, 0.14);
-      border-color: rgba(255, 255, 255, 0.5);
+      background: rgba(var(--avc-ink-rgb), 0.14);
+      border-color: rgba(var(--avc-ink-rgb), 0.5);
     }
     .start-seg--dock { position: relative; }
 
     .map-tools-label {
       font-size: 11px;
       font-weight: 700;
-      color: rgba(255, 255, 255, 0.45);
+      color: rgba(var(--avc-ink-rgb), 0.45);
       align-self: center;
       min-width: 64px;
     }
@@ -5408,9 +5543,9 @@ export class AnyVacCard extends LitElement {
       z-index: 5;
       padding: 8px 12px;
       border-radius: 12px;
-      border: 1px solid rgba(250, 173, 20, 0.55);
-      background: rgba(250, 173, 20, 0.12);
-      color: #faad14;
+      border: 1px solid rgba(var(--avc-warn-rgb), 0.55);
+      background: rgba(var(--avc-warn-rgb), 0.12);
+      color: rgb(var(--avc-warn-rgb));
       font-size: 12px;
       display: flex;
       align-items: center;
@@ -5482,7 +5617,7 @@ export class AnyVacCard extends LitElement {
       position: absolute;
       inset: 0;
       border-radius: inherit;
-      background: rgba(255, 255, 255, 0.18);
+      background: rgba(var(--avc-ink-rgb), 0.18);
       transform: scaleX(0);
       transform-origin: left;
       pointer-events: none;
@@ -5522,23 +5657,23 @@ export class AnyVacCard extends LitElement {
     .map-vector { position: absolute; transform-origin: center center; pointer-events: none; overflow: visible; }
     .avc-err-halo { animation: avc-err-pulse 1.3s ease-in-out infinite; }
     @keyframes avc-err-pulse { 0%,100% { opacity: 0.18; } 50% { opacity: 0.6; } }
-    .zone-rect { position: absolute; border: 2px solid #fff; background: rgba(255,255,255,0.15); border-radius: 4px; pointer-events: none; box-shadow: 0 0 0 1px rgba(0,0,0,0.45); }
+    .zone-rect { position: absolute; border: 2px solid rgb(var(--avc-ink-rgb)); background: rgba(var(--avc-ink-rgb), 0.15); border-radius: 4px; pointer-events: none; box-shadow: 0 0 0 1px rgba(var(--avc-shade-rgb), 0.45); }
     /* Move/resize handles (docs/19 follow-up) — decoration only, no pointer
        handlers: the overlaying .map-clickcatch does the actual hit-testing
        (_zoneHit) so a drag anywhere near a corner resizes, and inside the box
        moves the whole rectangle. */
-    .zone-handle { position: absolute; width: 12px; height: 12px; margin: -6px; border-radius: 50%; background: #fff; border: 2px solid rgba(0,0,0,0.45); pointer-events: none; }
+    .zone-handle { position: absolute; width: 12px; height: 12px; margin: -6px; border-radius: 50%; background: rgb(var(--avc-ink-rgb)); border: 2px solid rgba(var(--avc-shade-rgb), 0.45); pointer-events: none; }
     .zone-handle--nw { left: 0; top: 0; }
     .zone-handle--ne { left: 100%; top: 0; }
     .zone-handle--sw { left: 0; top: 100%; }
     .zone-handle--se { left: 100%; top: 100%; }
     .layer-toggles { position: absolute; top: 8px; right: 8px; display: flex; gap: 6px; z-index: 3; }
-    .layer-btn { display: flex; align-items: center; gap: 3px; padding: 3px 8px; border-radius: 999px; border: 1px solid rgba(255,255,255,0.2); background: rgba(0,0,0,0.45); color: rgba(255,255,255,0.55); font-size: 11px; font-weight: 600; cursor: pointer; --mdc-icon-size: 16px; user-select: none; -webkit-touch-callout: none; touch-action: manipulation; }
-    .layer-btn.on { color: #fff; border-color: rgba(255,255,255,0.55); background: rgba(0,0,0,0.7); }
-    .layer-menu { position: absolute; top: 38px; right: 0; min-width: 200px; max-width: 86vw; max-height: 60vh; overflow-y: auto; display: flex; flex-direction: column; gap: 2px; padding: 6px; border-radius: 12px; background: rgba(15,15,18,0.96); border: 1px solid rgba(255,255,255,0.15); box-shadow: 0 8px 24px rgba(0,0,0,0.5); }
-    .layer-menu-head { display: flex; align-items: center; gap: 6px; font-size: 11px; color: rgba(255,255,255,0.5); padding: 2px 6px 5px; --mdc-icon-size: 14px; }
-    .layer-menu-row { display: flex; align-items: center; gap: 8px; padding: 6px 8px; border-radius: 8px; border: 1px solid transparent; background: transparent; color: rgba(255,255,255,0.88); cursor: pointer; font-size: 13px; --mdc-icon-size: 16px; }
-    .layer-menu-row.on { background: rgba(255,255,255,0.12); border-color: rgba(255,255,255,0.4); }
+    .layer-btn { display: flex; align-items: center; gap: 3px; padding: 3px 8px; border-radius: 999px; border: 1px solid rgba(var(--avc-ink-rgb), 0.2); background: rgba(var(--avc-shade-rgb), 0.45); color: rgba(var(--avc-ink-rgb), 0.55); font-size: 11px; font-weight: 600; cursor: pointer; --mdc-icon-size: 16px; user-select: none; -webkit-touch-callout: none; touch-action: manipulation; }
+    .layer-btn.on { color: rgb(var(--avc-ink-rgb)); border-color: rgba(var(--avc-ink-rgb), 0.55); background: rgba(var(--avc-shade-rgb), 0.7); }
+    .layer-menu { position: absolute; top: 38px; right: 0; min-width: 200px; max-width: 86vw; max-height: 60vh; overflow-y: auto; display: flex; flex-direction: column; gap: 2px; padding: 6px; border-radius: 12px; background: rgba(var(--avc-scrim-rgb), 0.96); border: 1px solid rgba(var(--avc-ink-rgb), 0.15); box-shadow: 0 8px 24px rgba(var(--avc-shade-rgb), 0.5); }
+    .layer-menu-head { display: flex; align-items: center; gap: 6px; font-size: 11px; color: rgba(var(--avc-ink-rgb), 0.5); padding: 2px 6px 5px; --mdc-icon-size: 14px; }
+    .layer-menu-row { display: flex; align-items: center; gap: 8px; padding: 6px 8px; border-radius: 8px; border: 1px solid transparent; background: transparent; color: rgba(var(--avc-ink-rgb), 0.88); cursor: pointer; font-size: 13px; --mdc-icon-size: 16px; }
+    .layer-menu-row.on { background: rgba(var(--avc-ink-rgb), 0.12); border-color: rgba(var(--avc-ink-rgb), 0.4); }
     .lm-name { flex: 1; text-align: left; }
     .layer-menu-row b { font-weight: 700; }
     /* .rl-prog is the live coverage chip (_renderProgChip) and is still used —
@@ -5605,7 +5740,7 @@ export class AnyVacCard extends LitElement {
        around the whole room was tried and rejected (splits into one blurry
        edge at real room size, field-tested). */
     .room-age-dots { position: absolute; top: -3px; right: -3px; display: flex; gap: 1.5px; }
-    .room-age-dot { width: 7px; height: 7px; border-radius: 50%; border: 1px solid rgba(0,0,0,0.5); }
+    .room-age-dot { width: 7px; height: 7px; border-radius: 50%; border: 1px solid rgba(var(--avc-shade-rgb), 0.5); }
     /* Who's assigned to a selected room (docs/19 A1) — small chips, not area
        tinting, so assignment doesn't fight with the selection highlight or the
        age-gradient colors. */
@@ -5642,7 +5777,7 @@ export class AnyVacCard extends LitElement {
       pointer-events: none;
       z-index: 4;
     }
-    .room-overlay-assign .dock-chip { box-shadow: 0 1px 4px rgba(0,0,0,0.7); }
+    .room-overlay-assign .dock-chip { box-shadow: 0 1px 4px rgba(var(--avc-shade-rgb), 0.7); }
 
     /* docs/25 §7b: hold-to-inspect popup — per-room detail moved out of the
        (now hidden-by-default) portrait dock room list. cursor:default plus
@@ -5680,16 +5815,16 @@ export class AnyVacCard extends LitElement {
        * even though the popup is already the topmost paint layer
        * (z-index: 20). Bumped near-opaque + isolation:isolate so no
        * ancestor glow/blend can show through at all. */
-      background: rgba(18, 18, 18, 0.99);
-      border: 1px solid rgba(255, 255, 255, 0.25);
+      background: rgba(var(--avc-scrim-rgb), 0.99);
+      border: 1px solid rgba(var(--avc-ink-rgb), 0.25);
       border-radius: 8px;
       padding: 6px 8px;
       font-size: 11px;
       white-space: nowrap;
-      box-shadow: 0 4px 14px rgba(0, 0, 0, 0.45);
+      box-shadow: 0 4px 14px rgba(var(--avc-shade-rgb), 0.45);
       isolation: isolate;
     }
-    .room-inspect-name { font-weight: 600; margin-bottom: 4px; color: #fff; }
+    .room-inspect-name { font-weight: 600; margin-bottom: 4px; color: rgb(var(--avc-ink-rgb)); }
     .room-inspect-ages { display: flex; gap: 8px; margin-bottom: 4px; }
     /* Unlike the small icon/gauges, a whole popup of TEXT read sideways is
        genuinely unreadable, not just a minor legibility ding — worth the
@@ -5722,8 +5857,8 @@ export class AnyVacCard extends LitElement {
       width: 19px;
       height: 19px;
       border-radius: 50%;
-      background: rgba(0, 0, 0, 0.82);
-      color: #fff;
+      background: rgba(var(--avc-shade-rgb), 0.82);
+      color: rgb(var(--avc-ink-rgb));
       font-size: 9px;
       font-weight: 700;
       display: flex;
@@ -5737,7 +5872,7 @@ export class AnyVacCard extends LitElement {
       flex-direction: column;
       gap: 4px;
       padding: 10px 12px;
-      background: rgba(0, 0, 0, 0.6);
+      background: var(--avc-surface);
       backdrop-filter: blur(12px);
       -webkit-backdrop-filter: blur(12px);
       border-radius: 16px;
@@ -5758,8 +5893,8 @@ export class AnyVacCard extends LitElement {
       flex-shrink: 0;
       width: 44px; height: 44px;
       border-radius: 50%;
-      border: 1.5px solid rgba(255,255,255,0.2);
-      background: rgba(255,255,255,0.05);
+      border: 1.5px solid rgba(var(--avc-ink-rgb), 0.2);
+      background: rgba(var(--avc-ink-rgb), 0.05);
       display: flex; align-items: center; justify-content: center;
       overflow: hidden;
       cursor: pointer;
@@ -5771,10 +5906,10 @@ export class AnyVacCard extends LitElement {
     .avatar-info-badge {
       position: absolute; bottom: -2px; right: -2px;
       width: 14px; height: 14px; border-radius: 50%;
-      background: rgba(30,30,30,0.95); border: 1px solid rgba(0,0,0,0.6);
+      background: rgba(var(--avc-scrim-2-rgb), 0.95); border: 1px solid rgba(var(--avc-shade-rgb), 0.6);
       display: flex; align-items: center; justify-content: center;
     }
-    .avatar-info-badge ha-icon { --mdc-icon-size: 9px; color: rgba(255,255,255,0.6); }
+    .avatar-info-badge ha-icon { --mdc-icon-size: 9px; color: rgba(var(--avc-ink-rgb), 0.6); }
 
     .status-info { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 2px; }
 
@@ -5785,37 +5920,37 @@ export class AnyVacCard extends LitElement {
     @keyframes pulse-error { 0%,100% { opacity:1; } 50% { opacity:0.6; } }
 
     .status-line1 { display: flex; align-items: baseline; justify-content: space-between; gap: 8px; }
-    .model-label { font-size: 13px; font-weight: 500; color: rgba(255,255,255,0.85); }
+    .model-label { font-size: 13px; font-weight: 500; color: rgba(var(--avc-ink-rgb), 0.85); }
     .status-label { font-size: 12px; font-weight: 600; text-align: right; }
 
     .status-line2 { display: flex; align-items: center; justify-content: space-between; gap: 8px; }
-    .current-room { display: flex; align-items: center; gap: 3px; font-size: 11px; color: rgba(255,255,255,0.45); }
+    .current-room { display: flex; align-items: center; gap: 3px; font-size: 11px; color: rgba(var(--avc-ink-rgb), 0.45); }
 
     .status-meta { display: flex; align-items: center; gap: 8px; flex-shrink: 0; }
     .battery { display: flex; align-items: center; gap: 3px; font-size: 11px; font-weight: 600; }
     .battery ha-icon { --mdc-icon-size: 13px; }
-    .last-clean { display: flex; align-items: center; gap: 3px; font-size: 11px; color: rgba(255, 255, 255, 0.45); }
-    .last-clean ha-icon { --mdc-icon-size: 11px; color: rgba(255, 255, 255, 0.25); }
+    .last-clean { display: flex; align-items: center; gap: 3px; font-size: 11px; color: rgba(var(--avc-ink-rgb), 0.45); }
+    .last-clean ha-icon { --mdc-icon-size: 11px; color: rgba(var(--avc-ink-rgb), 0.25); }
 
     /* ── Progress bar ────────────────────────────────────────────────── */
     .progress { display: flex; align-items: center; gap: 8px; }
     .progress-track {
       flex: 1; height: 3px;
-      background: rgba(255, 255, 255, 0.08); border-radius: 2px; overflow: hidden;
+      background: rgba(var(--avc-ink-rgb), 0.08); border-radius: 2px; overflow: hidden;
     }
     .progress-fill { height: 100%; border-radius: 2px; transition: width 0.5s ease; }
     .progress-label { font-size: 11px; font-weight: 600; flex-shrink: 0; }
 
     /* ── Debug per-room progress strip ───────────────────────────────── */
     .dbg-prog { display: flex; flex-wrap: wrap; gap: 6px 12px; padding-top: 2px; }
-    .dbg-prog-item { display: flex; align-items: center; gap: 3px; font-size: 11px; color: rgba(255,255,255,0.55); --mdc-icon-size: 14px; }
-    .dbg-prog-name { color: rgba(255,255,255,0.45); }
+    .dbg-prog-item { display: flex; align-items: center; gap: 3px; font-size: 11px; color: rgba(var(--avc-ink-rgb), 0.55); --mdc-icon-size: 14px; }
+    .dbg-prog-name { color: rgba(var(--avc-ink-rgb), 0.45); }
     .dbg-prog-item b { font-weight: 700; }
-    .dbg-prog-item small { color: rgba(255,255,255,0.4); font-size: 10px; }
+    .dbg-prog-item small { color: rgba(var(--avc-ink-rgb), 0.4); font-size: 10px; }
     .mini-gauge-wrap { display: inline-flex; align-items: center; gap: 2px; }
     .mini-gauge-ico { --mdc-icon-size: 12px; opacity: 0.8; }
     .mini-gauge { width: 22px; height: 22px; border-radius: 50%; display: inline-flex; align-items: center; justify-content: center; }
-    .mini-gauge span { width: 16px; height: 16px; border-radius: 50%; background: rgba(0,0,0,0.82); color: #fff; font-size: 8px; font-weight: 700; display: flex; align-items: center; justify-content: center; }
+    .mini-gauge span { width: 16px; height: 16px; border-radius: 50%; background: rgba(var(--avc-shade-rgb), 0.82); color: rgb(var(--avc-ink-rgb)); font-size: 8px; font-weight: 700; display: flex; align-items: center; justify-content: center; }
 
     /* ── Action buttons ──────────────────────────────────────────────── */
     .actions { display: flex; gap: 8px; }
@@ -5853,13 +5988,13 @@ export class AnyVacCard extends LitElement {
     .action-btn span { font-size: 13px; font-weight: 700; color: white; position: relative; z-index: 1; }
 
     .action-btn--secondary {
-      background: rgba(64, 169, 255, 0.08);
-      border: 1px solid rgba(64, 169, 255, 0.2) !important;
+      background: rgba(var(--avc-info-rgb), 0.08);
+      border: 1px solid rgba(var(--avc-info-rgb), 0.2) !important;
     }
 
     .action-btn--warn {
-      background: rgba(250, 173, 20, 0.18);
-      border: 1px solid rgba(250, 173, 20, 0.5) !important;
+      background: rgba(var(--avc-warn-rgb), 0.18);
+      border: 1px solid rgba(var(--avc-warn-rgb), 0.5) !important;
     }
 
     /* ── Start button body ───────────────────────────────────────────── */
@@ -5876,8 +6011,8 @@ export class AnyVacCard extends LitElement {
 
     .map-clickcatch { position: absolute; inset: 0; cursor: crosshair; z-index: 5; }
     .map-tools { display: flex; gap: 6px; margin: 6px 0 0; }
-    .mtbtn { display: inline-flex; align-items: center; gap: 4px; padding: 5px 10px; border-radius: 8px; border: 1px solid rgba(255,255,255,0.18); background: rgba(255,255,255,0.06); color: inherit; cursor: pointer; font-size: 12px; font-weight: 600; }
-    .mtbtn.on { background: rgba(59,130,246,0.25); border-color: #3b82f6; }
+    .mtbtn { display: inline-flex; align-items: center; gap: 4px; padding: 5px 10px; border-radius: 8px; border: 1px solid rgba(var(--avc-ink-rgb), 0.18); background: rgba(var(--avc-ink-rgb), 0.06); color: inherit; cursor: pointer; font-size: 12px; font-weight: 600; }
+    .mtbtn.on { background: rgba(var(--avc-tool-rgb), 0.25); border-color: rgb(var(--avc-tool-rgb)); }
     .mtbtn:disabled { opacity: 0.4; cursor: default; }
     .mtbtn ha-icon { --mdc-icon-size: 16px; }
     .mtbtn--stat { cursor: default; background: transparent; border-color: transparent; gap: 3px; padding: 5px 6px; }
@@ -5885,10 +6020,10 @@ export class AnyVacCard extends LitElement {
     .mtbtn--stat small { opacity: 0.7; font-weight: 500; }
     /* Sequence hint (docs/19 follow-up, TODO #2) — amber to read as "heads up",
        distinct from the neutral stat pills either side of it. */
-    .mtbtn--warn { color: #d4a017; }
-    .mtbtn--warn ha-icon { color: #d4a017; }
-    .mtbtn--err { color: #ff4d4f; }
-    .mtbtn--err ha-icon { color: #ff4d4f; }
+    .mtbtn--warn { color: rgb(var(--avc-hint-rgb)); }
+    .mtbtn--warn ha-icon { color: rgb(var(--avc-hint-rgb)); }
+    .mtbtn--err { color: rgb(var(--avc-err-rgb)); }
+    .mtbtn--err ha-icon { color: rgb(var(--avc-err-rgb)); }
     /* docs/28 §2: own panel (was transparent, flush with the map above and the
      * dock below) — background + radius visually lifts it off both neighbors
      * instead of reading as a loose row of same-weight buttons. */
@@ -5900,22 +6035,319 @@ export class AnyVacCard extends LitElement {
      * distinct panel at all — the specific goal this section was built for.
      * Bumped just for .meta-bar/.meta-bar-divider, not the other panels,
      * which weren't reported as a problem. */
-    .meta-bar { display: flex; align-items: center; gap: 4px; flex-wrap: wrap; padding: 6px 8px; background: rgba(255, 255, 255, 0.06); border: 1px solid rgba(255, 255, 255, 0.16); border-radius: 12px; }
+    .meta-bar { display: flex; align-items: center; gap: 4px; flex-wrap: wrap; padding: 6px 8px; background: var(--avc-panel-strong); border: 1px solid var(--avc-panel-strong-line); border-radius: 12px; }
     .meta-bar-cluster { display: flex; align-items: center; gap: 4px; }
     .meta-bar-spacer { flex: 1 1 auto; }
-    .meta-bar-divider { width: 0.5px; align-self: stretch; background: rgba(255, 255, 255, 0.22); margin: 0 4px; }
+    .meta-bar-divider { width: 0.5px; align-self: stretch; background: rgba(var(--avc-ink-rgb), 0.22); margin: 0 4px; }
     /* Refresh: a quiet icon, not a bordered button on par with Pin & Go/Zone —
      * it shouldn't compete with the actual map-interaction tools for attention. */
-    .mtbtn--ghost { border: none; background: transparent; color: rgba(255, 255, 255, 0.45); padding: 5px; }
-    .mtbtn--ghost:hover { color: rgba(255, 255, 255, 0.75); }
+    .mtbtn--ghost { border: none; background: transparent; color: rgba(var(--avc-ink-rgb), 0.45); padding: 5px; }
+    .mtbtn--ghost:hover { color: rgba(var(--avc-ink-rgb), 0.75); }
     .mtbtn--spin ha-icon { animation: avc-refresh-spin 0.6s ease; }
     @keyframes avc-refresh-spin { from { transform: rotate(0deg); } to { transform: rotate(360deg); } }
     .mode-action { display: flex; flex-wrap: wrap; gap: 6px; margin-bottom: 6px; }
     .mode-action .mtbtn { width: 100%; justify-content: center; box-sizing: border-box; animation: avc-mode-action-pulse 1.6s ease-in-out infinite; }
-    @keyframes avc-mode-action-pulse { 0%,100% { box-shadow: 0 0 0 rgba(59,130,246,0); } 50% { box-shadow: 0 0 12px rgba(59,130,246,0.55); } }
-    .calib-panel { margin-top: 4px; font-size: 12px; opacity: 0.9; padding: 6px 8px; background: rgba(59,130,246,0.12); border-radius: 8px; }
+    @keyframes avc-mode-action-pulse { 0%,100% { box-shadow: 0 0 0 rgba(var(--avc-tool-rgb), 0); } 50% { box-shadow: 0 0 12px rgba(var(--avc-tool-rgb), 0.55); } }
+    .calib-panel { margin-top: 4px; font-size: 12px; opacity: 0.9; padding: 6px 8px; background: rgba(var(--avc-tool-rgb), 0.12); border-radius: 8px; }
     .calib-panel > div { margin-bottom: 4px; }
     .calib-actions { display: flex; gap: 6px; flex-wrap: wrap; }
+
+    /* ══ On-map channel reset ══════════════════════════════════════════════
+     * Everything inside .map-wrap is painted on the vacuum's own map bitmap,
+     * not on the card's surface, so it must keep white-on-black regardless of
+     * the card's theme — a light theme reaching in here would erase every
+     * on-map label. Derived tokens (--avc-ink, the panel/surface set) re-
+     * resolve per element against these, so resetting the three channel bases
+     * is enough; nothing has to be listed individually. */
+    .map-wrap {
+      --avc-ink-rgb: 255, 255, 255;
+      --avc-shade-rgb: 0, 0, 0;
+      --avc-scrim-rgb: 18, 18, 18;
+    }
+
+    /* ══ Theme: dark (the v1.2.0 default) ══════════════════════════════════
+     * Off pure black and off pure white: a near-black surface swallows any
+     * low-alpha accent laid over it, which is exactly why docs/25 §6's sage
+     * START read as "no change" in the field. Surfaces are lifted, the ink is
+     * very slightly cool, and the semantic palette steps down from the Ant
+     * Design defaults it inherited — same hues, same meanings, less shout. */
+    .avc-theme--dark,
+    .avc-theme--auto {
+      --avc-ink-rgb: 234, 238, 245;
+      --avc-shade-rgb: 5, 7, 12;
+      --avc-scrim-rgb: 24, 26, 33;
+      --avc-scrim-2-rgb: 38, 41, 51;
+
+      --avc-ok-rgb: 108, 197, 118;
+      --avc-warn-rgb: 226, 170, 82;
+      --avc-err-rgb: 230, 110, 116;
+      --avc-hint-rgb: 208, 168, 96;
+      --avc-tool-rgb: 116, 158, 232;
+      --avc-info-rgb: 112, 176, 224;
+
+      --avc-surface: rgba(30, 33, 42, 0.78);
+      --avc-panel: rgba(var(--avc-ink-rgb), 0.05);
+      --avc-panel-line: transparent;
+      --avc-panel-strong: rgba(var(--avc-ink-rgb), 0.075);
+      --avc-panel-strong-line: transparent;
+      --avc-sunken: rgba(var(--avc-shade-rgb), 0.45);
+      --avc-disabled: rgba(var(--avc-ink-rgb), 0.07);
+
+      --avc-elev-1: 0 1px 2px rgba(0, 0, 0, 0.45), 0 8px 22px rgba(0, 0, 0, 0.3);
+      --avc-elev-2: 0 2px 6px rgba(0, 0, 0, 0.5), 0 18px 44px rgba(0, 0, 0, 0.38);
+
+      --avc-press: 0.972;
+      --avc-press-ms: 0.12s;
+      --avc-live: avc-live-breathe 3.4s ease-in-out infinite;
+    }
+
+    /* ══ Theme: light ══════════════════════════════════════════════════════
+     * Before 1.2.0 the card painted white text and white-alpha panels
+     * unconditionally, so on a light HA theme it was not merely ugly but
+     * unreadable. The palette darkens rather than just inverting: the same
+     * hue at the same lightness that reads as "calm" on near-black reads as
+     * "washed out" on porcelain. */
+    .avc-theme--light {
+      --avc-ink-rgb: 26, 29, 37;
+      --avc-shade-rgb: 30, 36, 48;
+      --avc-scrim-rgb: 252, 252, 253;
+      --avc-scrim-2-rgb: 244, 245, 248;
+
+      --avc-ok-rgb: 56, 142, 76;
+      --avc-warn-rgb: 176, 122, 24;
+      --avc-err-rgb: 197, 58, 66;
+      --avc-hint-rgb: 158, 118, 30;
+      --avc-tool-rgb: 42, 104, 210;
+      --avc-info-rgb: 34, 122, 186;
+
+      --avc-surface: rgba(255, 255, 255, 0.93);
+      --avc-panel: rgba(255, 255, 255, 0.68);
+      --avc-panel-line: rgba(var(--avc-ink-rgb), 0.07);
+      --avc-panel-strong: rgba(255, 255, 255, 0.94);
+      --avc-panel-strong-line: rgba(var(--avc-ink-rgb), 0.09);
+      --avc-sunken: rgba(var(--avc-ink-rgb), 0.045);
+      --avc-disabled: rgba(var(--avc-ink-rgb), 0.06);
+
+      --avc-elev-1: 0 1px 2px rgba(24, 30, 45, 0.06), 0 8px 20px rgba(24, 30, 45, 0.08);
+      --avc-elev-2: 0 2px 6px rgba(24, 30, 45, 0.08), 0 18px 40px rgba(24, 30, 45, 0.12);
+
+      --avc-press: 0.972;
+      --avc-press-ms: 0.12s;
+      --avc-live: avc-live-breathe 3.4s ease-in-out infinite;
+    }
+
+    /* auto = dark, flipped by the OS/browser preference. The light values
+     * are restated rather than shared because CSS custom properties have no
+     * conditional aliasing — a media query can only re-declare them. Kept
+     * adjacent to the block above so the two never drift apart unnoticed. */
+    @media (prefers-color-scheme: light) {
+      .avc-theme--auto {
+        --avc-ink-rgb: 26, 29, 37;
+        --avc-shade-rgb: 30, 36, 48;
+        --avc-scrim-rgb: 252, 252, 253;
+        --avc-scrim-2-rgb: 244, 245, 248;
+
+        --avc-ok-rgb: 56, 142, 76;
+        --avc-warn-rgb: 176, 122, 24;
+        --avc-err-rgb: 197, 58, 66;
+        --avc-hint-rgb: 158, 118, 30;
+        --avc-tool-rgb: 42, 104, 210;
+        --avc-info-rgb: 34, 122, 186;
+
+        --avc-surface: rgba(255, 255, 255, 0.93);
+        --avc-panel: rgba(255, 255, 255, 0.68);
+        --avc-panel-line: rgba(var(--avc-ink-rgb), 0.07);
+        --avc-panel-strong: rgba(255, 255, 255, 0.94);
+        --avc-panel-strong-line: rgba(var(--avc-ink-rgb), 0.09);
+        --avc-sunken: rgba(var(--avc-ink-rgb), 0.045);
+        --avc-disabled: rgba(var(--avc-ink-rgb), 0.06);
+
+        --avc-elev-1: 0 1px 2px rgba(24, 30, 45, 0.06), 0 8px 20px rgba(24, 30, 45, 0.08);
+        --avc-elev-2: 0 2px 6px rgba(24, 30, 45, 0.08), 0 18px 40px rgba(24, 30, 45, 0.12);
+      }
+    }
+
+    /* ══ Structural pass — every theme except legacy ═════════════════════
+     * The token flip above only changes colour. This is the part that changes
+     * the card's genre: panels carry elevation instead of a hairline outline,
+     * and corners step up one notch. legacy simply never gets the
+     * .avc-theme class, so none of this applies to it. */
+    .avc-theme .status-card { border-radius: 20px; box-shadow: var(--avc-elev-1); }
+    .avc-theme .dock,
+    .avc-theme .vac-picker { border-radius: 18px; box-shadow: var(--avc-elev-1); }
+    .avc-theme .meta-bar { border-radius: 16px; box-shadow: var(--avc-elev-1); }
+    .avc-theme .map-wrap { border-radius: 18px; box-shadow: var(--avc-elev-1); }
+    .avc-theme .dock-sheet { border-radius: 14px; }
+    .avc-theme .dock-row,
+    .avc-theme .dock-mode,
+    .avc-theme .dock-sheet-action { border-radius: 12px; }
+    .avc-theme .action-btn { border-radius: 14px; }
+    .avc-theme .mtbtn { border-radius: 10px; }
+    .avc-theme .start-bar { border-radius: 22px; }
+    .avc-theme .start-seg { border-radius: 18px; }
+    .avc-theme .room-inspect-inner { border-radius: 12px; box-shadow: var(--avc-elev-2); }
+    .avc-theme .layer-menu { border-radius: 16px; box-shadow: var(--avc-elev-2); }
+    /* Rounder rooms read softer without touching the field-tuned selection
+     * ring itself (0.52/0.53 spent real effort landing that gradient). */
+    .avc-theme .room-overlay { border-radius: 10px; }
+    .avc-theme .room-btn { border-radius: 14px; }
+    /* The age dots were the most instrument-like detail on the map: two 7px
+     * discs with a hard 1px black stroke. Same information, softer edge. */
+    .avc-theme .room-age-dot {
+      width: 8px; height: 8px; border: none;
+      box-shadow: 0 0 0 1.5px rgba(0, 0, 0, 0.5), 0 1px 3px rgba(0, 0, 0, 0.45);
+    }
+
+    /* START is the one thing the whole screen exists for. docs/25 §6 gave it
+     * its own sage green but at 24% over near-black, where the hue simply
+     * disappeared (the user's verdict at the time: "looks unchanged"). On the
+     * lifted surface it can finally carry a gradient, a stronger edge and a
+     * soft cast without shouting. */
+    .avc-theme .start-bar:not(:disabled) {
+      background: linear-gradient(180deg, rgba(var(--avc-accent-rgb), 0.34), rgba(var(--avc-accent-rgb), 0.2));
+      border-color: rgba(var(--avc-accent-rgb), 0.55);
+      box-shadow: 0 6px 18px rgba(var(--avc-accent-rgb), 0.14);
+      letter-spacing: 0.2px;
+    }
+    .avc-theme .start-bar--cancel:not(:disabled) {
+      background: linear-gradient(180deg, rgba(var(--avc-warn-rgb), 0.28), rgba(var(--avc-warn-rgb), 0.16));
+      border-color: rgba(var(--avc-warn-rgb), 0.55);
+      box-shadow: 0 6px 18px rgba(var(--avc-warn-rgb), 0.14);
+      animation: var(--avc-live);
+    }
+    .avc-theme .dock-row.on {
+      background: rgba(var(--avc-accent-rgb), 0.14);
+      border-color: rgba(var(--avc-accent-rgb), 0.5);
+    }
+
+    /* Type floor (docs/35 §4). 8–10px is instrument sizing; nothing sits
+     * below 10px any more, and everything whose value ticks gets tabular
+     * figures so a live ETA or battery reading stops shoving its neighbours
+     * sideways on every poll. */
+    .avc-theme .dock-age,
+    .avc-theme .dock-chip,
+    .avc-theme .start-seg,
+    .avc-theme .dock-sheet-debug,
+    .avc-theme .dock-sheet-care-badge,
+    .avc-theme .start-body small,
+    .avc-theme .dbg-prog-item small,
+    .avc-theme .version-chip { font-size: 11px; }
+    .avc-theme .dock-cov { font-size: 10px; }
+    .avc-theme .rl-prog small { font-size: 9px; }
+    .avc-theme .room-gauge span { font-size: 10px; }
+    .avc-theme .mini-gauge span { font-size: 9px; }
+    /* Portrait keeps its own tighter scale, just lifted off the floor too —
+     * these need one more class than the .avc-grid--portrait rules above to
+     * win, hence the doubled prefix rather than a plain override. */
+    .avc-theme .avc-grid--portrait .dock-age { font-size: 10px; }
+    .avc-theme .avc-grid--portrait .dock-cov { font-size: 9px; }
+    .avc-theme .avc-grid--portrait .badge-name { font-size: 12px; }
+    .avc-theme .dock-age,
+    .avc-theme .dock-est,
+    .avc-theme .dock-cov,
+    .avc-theme .battery,
+    .avc-theme .status-label,
+    .avc-theme .progress-label,
+    .avc-theme .last-clean,
+    .avc-theme .rl-prog,
+    .avc-theme .mtbtn--stat { font-variant-numeric: tabular-nums; }
+
+    /* ══ Micro-interactions (docs/35 §5) ═══════════════════════════════════
+     * Transform/opacity only, declarative only — no JS, nothing per frame.
+     * The mobile companion app has real crash history around anything that
+     * takes imperative ownership of layout (docs/21 §5b), so this stays
+     * entirely in CSS.
+     *
+     * Deliberately NOT applied to .room-btn / .room-overlay: those carry a
+     * positioning transform of their own (translate(-50%, -50%)), and a
+     * scale() here would replace it and throw the room off its anchor. */
+    .avc-theme .action-btn,
+    .avc-theme .start-bar,
+    .avc-theme .start-seg,
+    .avc-theme .dock-mode,
+    .avc-theme .dock-row,
+    .avc-theme .dock-sheet-action,
+    .avc-theme .dock-sheet-tab,
+    .avc-theme .dock-sheet-care-reset,
+    .avc-theme .mtbtn,
+    .avc-theme .badge,
+    .avc-theme .vac-icon-btn,
+    .avc-theme .layer-btn {
+      transition: transform var(--avc-press-ms) var(--avc-ease),
+                  opacity 0.15s ease,
+                  background 0.25s var(--avc-ease),
+                  border-color 0.25s var(--avc-ease),
+                  box-shadow 0.25s var(--avc-ease);
+    }
+    .avc-theme .action-btn:active:not(:disabled),
+    .avc-theme .start-bar:active:not(:disabled),
+    .avc-theme .start-seg:active,
+    .avc-theme .dock-mode:active,
+    .avc-theme .dock-row:active:not(:disabled),
+    .avc-theme .dock-sheet-action:active,
+    .avc-theme .dock-sheet-tab:active,
+    .avc-theme .dock-sheet-care-reset:active:not(.pending),
+    .avc-theme .mtbtn:active:not(:disabled),
+    .avc-theme .badge:active,
+    .avc-theme .vac-icon-btn:active,
+    .avc-theme .layer-btn:active { transform: scale(var(--avc-press)); }
+
+    @keyframes avc-live-breathe {
+      0%, 100% { box-shadow: 0 6px 18px rgba(var(--avc-warn-rgb), 0.12); }
+      50%      { box-shadow: 0 6px 26px rgba(var(--avc-warn-rgb), 0.3); }
+    }
+
+    /* A slow highlight travelling along the progress bar — the difference
+     * between "a bar that happens to be partly filled" and "something is
+     * happening right now". White on purpose: it is a specular highlight on
+     * a coloured bar, not ink, so it does not follow the theme. */
+    .avc-theme .progress-track { height: 4px; border-radius: 3px; }
+    .avc-theme .progress-fill { position: relative; overflow: hidden; }
+    .avc-theme .progress-fill::after {
+      content: "";
+      position: absolute;
+      inset: 0;
+      background: linear-gradient(90deg, transparent, rgba(255, 255, 255, 0.45), transparent);
+      transform: translateX(-100%);
+      animation: avc-sheen 2.6s ease-in-out infinite;
+    }
+    @keyframes avc-sheen {
+      0%        { transform: translateX(-100%); }
+      60%, 100% { transform: translateX(100%); }
+    }
+
+    /* ══ Calm resting state (docs/35 §7) ═══════════════════════════════════
+     * Applied when nothing is running, nothing is selected and no map tool is
+     * armed — which is most of the time. Purely de-emphasis: every control
+     * stays present, tappable and in place, the leftover trace and the
+     * secondary metadata just stop competing with the one thing worth
+     * touching. calm_state: false opts out. */
+    .avc-calm .map-vector { opacity: 0.5; }
+    .avc-calm .room-age-dots { opacity: 0.55; }
+    .avc-calm .dock-cov { opacity: 0.35; }
+    .avc-calm .dbg-prog { opacity: 0.55; }
+    .avc-theme.avc-calm .meta-bar { background: var(--avc-panel); box-shadow: none; }
+    .avc-theme.avc-calm .start-bar:not(:disabled) {
+      box-shadow: 0 0 0 1px rgba(var(--avc-accent-rgb), 0.4),
+                  0 10px 26px rgba(var(--avc-accent-rgb), 0.16);
+    }
+    .avc-theme .map-vector,
+    .avc-theme .room-age-dots { transition: opacity 0.6s var(--avc-ease); }
+
+    /* Motion opt-outs. The OS preference wins unconditionally; .avc-still
+     * is the config-level equivalent (reduce_motion: true) for people who
+     * want them off without changing an OS setting. */
+    .avc-still,
+    .avc-still .start-bar--cancel { --avc-press: 1; --avc-press-ms: 0s; --avc-live: none; }
+    .avc-still .progress-fill::after { display: none; }
+    @media (prefers-reduced-motion: reduce) {
+      .avc-theme,
+      .avc-theme .start-bar--cancel { --avc-press: 1; --avc-press-ms: 0s; --avc-live: none; }
+      .avc-theme .progress-fill::after { display: none; }
+      .avc-theme .avc-err-halo { animation: none; opacity: 0.45; }
+      .avc-theme .error-row { animation: none; }
+      .avc-theme .mode-action .mtbtn { animation: none; }
+    }
   `;
 }
 

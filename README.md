@@ -186,6 +186,11 @@ here has a working default:
 
 ![Global tab](media/editor-global.png)
 
+- **Appearance** — `Theme` (`Dark` by default, `Light` for a light Home
+  Assistant theme, `Auto` to follow the system setting, or `Legacy` for the
+  pre-1.2.0 look), an `Accent colour` with six presets that drives START and
+  room selection, a `Calm resting state` toggle that lets the card step back
+  when nothing is running, and `Reduce motion`.
 - **Fit card to available screen space** — recommended for essentially every
   dashboard; turns on the responsive portrait/landscape layout with sensible
   built-in defaults (same as `layout: {}` in YAML). Off keeps the older,

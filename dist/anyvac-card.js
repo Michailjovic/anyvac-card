@@ -1,82 +1,82 @@
 /* AnyVac Card — https://github.com/Michailjovic/anyvac-card */
-function t(t,e,o,i){var s,n=arguments.length,a=n<3?e:null===i?i=Object.getOwnPropertyDescriptor(e,o):i;if("object"==typeof Reflect&&"function"==typeof Reflect.decorate)a=Reflect.decorate(t,e,o,i);else for(var r=t.length-1;r>=0;r--)(s=t[r])&&(a=(n<3?s(a):n>3?s(e,o,a):s(e,o))||a);return n>3&&a&&Object.defineProperty(e,o,a),a}"function"==typeof SuppressedError&&SuppressedError;
+function __decorate(e,t,o,s){var l,d=arguments.length,h=d<3?t:null===s?s=Object.getOwnPropertyDescriptor(t,o):s;if("object"==typeof Reflect&&"function"==typeof Reflect.decorate)h=Reflect.decorate(e,t,o,s);else for(var p=e.length-1;p>=0;p--)(l=e[p])&&(h=(d<3?l(h):d>3?l(t,o,h):l(t,o))||h);return d>3&&h&&Object.defineProperty(t,o,h),h}"function"==typeof SuppressedError&&SuppressedError;
 /**
  * @license
  * Copyright 2019 Google LLC
  * SPDX-License-Identifier: BSD-3-Clause
  */
-const e=globalThis,o=e.ShadowRoot&&(void 0===e.ShadyCSS||e.ShadyCSS.nativeShadow)&&"adoptedStyleSheets"in Document.prototype&&"replace"in CSSStyleSheet.prototype,i=Symbol(),s=new WeakMap;let n=class{constructor(t,e,o){if(this._$cssResult$=!0,o!==i)throw Error("CSSResult is not constructable. Use `unsafeCSS` or `css` instead.");this.cssText=t,this.t=e}get styleSheet(){let t=this.o;const e=this.t;if(o&&void 0===t){const o=void 0!==e&&1===e.length;o&&(t=s.get(e)),void 0===t&&((this.o=t=new CSSStyleSheet).replaceSync(this.cssText),o&&s.set(e,t))}return t}toString(){return this.cssText}};const a=(t,...e)=>{const o=1===t.length?t[0]:e.reduce((e,o,i)=>e+(t=>{if(!0===t._$cssResult$)return t.cssText;if("number"==typeof t)return t;throw Error("Value passed to 'css' function must be a 'css' function result: "+t+". Use 'unsafeCSS' to pass non-literal values, but take care to ensure page security.")})(o)+t[i+1],t[0]);return new n(o,t,i)},r=o?t=>t:t=>t instanceof CSSStyleSheet?(t=>{let e="";for(const o of t.cssRules)e+=o.cssText;return(t=>new n("string"==typeof t?t:t+"",void 0,i))(e)})(t):t,{is:l,defineProperty:c,getOwnPropertyDescriptor:d,getOwnPropertyNames:h,getOwnPropertySymbols:p,getPrototypeOf:m}=Object,u=globalThis,_=u.trustedTypes,g=_?_.emptyScript:"",f=u.reactiveElementPolyfillSupport,b=(t,e)=>t,y={toAttribute(t,e){switch(e){case Boolean:t=t?g:null;break;case Object:case Array:t=null==t?t:JSON.stringify(t)}return t},fromAttribute(t,e){let o=t;switch(e){case Boolean:o=null!==t;break;case Number:o=null===t?null:Number(t);break;case Object:case Array:try{o=JSON.parse(t)}catch(t){o=null}}return o}},v=(t,e)=>!l(t,e),x={attribute:!0,type:String,converter:y,reflect:!1,useDefault:!1,hasChanged:v};
+const e=globalThis,t=e.ShadowRoot&&(void 0===e.ShadyCSS||e.ShadyCSS.nativeShadow)&&"adoptedStyleSheets"in Document.prototype&&"replace"in CSSStyleSheet.prototype,o=Symbol(),s=new WeakMap;let l=class n{constructor(e,t,s){if(this._$cssResult$=!0,s!==o)throw Error("CSSResult is not constructable. Use `unsafeCSS` or `css` instead.");this.cssText=e,this.t=t}get styleSheet(){let e=this.o;const o=this.t;if(t&&void 0===e){const t=void 0!==o&&1===o.length;t&&(e=s.get(o)),void 0===e&&((this.o=e=new CSSStyleSheet).replaceSync(this.cssText),t&&s.set(o,e))}return e}toString(){return this.cssText}};const i$5=(e,...t)=>{const s=1===e.length?e[0]:t.reduce((t,o,s)=>t+(e=>{if(!0===e._$cssResult$)return e.cssText;if("number"==typeof e)return e;throw Error("Value passed to 'css' function must be a 'css' function result: "+e+". Use 'unsafeCSS' to pass non-literal values, but take care to ensure page security.")})(o)+e[s+1],e[0]);return new l(s,e,o)},d=t?e=>e:e=>e instanceof CSSStyleSheet?(e=>{let t="";for(const o of e.cssRules)t+=o.cssText;return(e=>new l("string"==typeof e?e:e+"",void 0,o))(t)})(e):e,{is:h,defineProperty:p,getOwnPropertyDescriptor:m,getOwnPropertyNames:u,getOwnPropertySymbols:_,getPrototypeOf:b}=Object,v=globalThis,f=v.trustedTypes,w=f?f.emptyScript:"",$=v.reactiveElementPolyfillSupport,d$1=(e,t)=>e,A={toAttribute(e,t){switch(t){case Boolean:e=e?w:null;break;case Object:case Array:e=null==e?e:JSON.stringify(e)}return e},fromAttribute(e,t){let o=e;switch(t){case Boolean:o=null!==e;break;case Number:o=null===e?null:Number(e);break;case Object:case Array:try{o=JSON.parse(e)}catch(e){o=null}}return o}},f$1=(e,t)=>!h(e,t),C={attribute:!0,type:String,converter:A,reflect:!1,useDefault:!1,hasChanged:f$1};
 /**
  * @license
  * Copyright 2017 Google LLC
  * SPDX-License-Identifier: BSD-3-Clause
- */Symbol.metadata??=Symbol("metadata"),u.litPropertyMetadata??=new WeakMap;let w=class extends HTMLElement{static addInitializer(t){this._$Ei(),(this.l??=[]).push(t)}static get observedAttributes(){return this.finalize(),this._$Eh&&[...this._$Eh.keys()]}static createProperty(t,e=x){if(e.state&&(e.attribute=!1),this._$Ei(),this.prototype.hasOwnProperty(t)&&((e=Object.create(e)).wrapped=!0),this.elementProperties.set(t,e),!e.noAccessor){const o=Symbol(),i=this.getPropertyDescriptor(t,o,e);void 0!==i&&c(this.prototype,t,i)}}static getPropertyDescriptor(t,e,o){const{get:i,set:s}=d(this.prototype,t)??{get(){return this[e]},set(t){this[e]=t}};return{get:i,set(e){const n=i?.call(this);s?.call(this,e),this.requestUpdate(t,n,o)},configurable:!0,enumerable:!0}}static getPropertyOptions(t){return this.elementProperties.get(t)??x}static _$Ei(){if(this.hasOwnProperty(b("elementProperties")))return;const t=m(this);t.finalize(),void 0!==t.l&&(this.l=[...t.l]),this.elementProperties=new Map(t.elementProperties)}static finalize(){if(this.hasOwnProperty(b("finalized")))return;if(this.finalized=!0,this._$Ei(),this.hasOwnProperty(b("properties"))){const t=this.properties,e=[...h(t),...p(t)];for(const o of e)this.createProperty(o,t[o])}const t=this[Symbol.metadata];if(null!==t){const e=litPropertyMetadata.get(t);if(void 0!==e)for(const[t,o]of e)this.elementProperties.set(t,o)}this._$Eh=new Map;for(const[t,e]of this.elementProperties){const o=this._$Eu(t,e);void 0!==o&&this._$Eh.set(o,t)}this.elementStyles=this.finalizeStyles(this.styles)}static finalizeStyles(t){const e=[];if(Array.isArray(t)){const o=new Set(t.flat(1/0).reverse());for(const t of o)e.unshift(r(t))}else void 0!==t&&e.push(r(t));return e}static _$Eu(t,e){const o=e.attribute;return!1===o?void 0:"string"==typeof o?o:"string"==typeof t?t.toLowerCase():void 0}constructor(){super(),this._$Ep=void 0,this.isUpdatePending=!1,this.hasUpdated=!1,this._$Em=null,this._$Ev()}_$Ev(){this._$ES=new Promise(t=>this.enableUpdating=t),this._$AL=new Map,this._$E_(),this.requestUpdate(),this.constructor.l?.forEach(t=>t(this))}addController(t){(this._$EO??=new Set).add(t),void 0!==this.renderRoot&&this.isConnected&&t.hostConnected?.()}removeController(t){this._$EO?.delete(t)}_$E_(){const t=new Map,e=this.constructor.elementProperties;for(const o of e.keys())this.hasOwnProperty(o)&&(t.set(o,this[o]),delete this[o]);t.size>0&&(this._$Ep=t)}createRenderRoot(){const t=this.shadowRoot??this.attachShadow(this.constructor.shadowRootOptions);return((t,i)=>{if(o)t.adoptedStyleSheets=i.map(t=>t instanceof CSSStyleSheet?t:t.styleSheet);else for(const o of i){const i=document.createElement("style"),s=e.litNonce;void 0!==s&&i.setAttribute("nonce",s),i.textContent=o.cssText,t.appendChild(i)}})(t,this.constructor.elementStyles),t}connectedCallback(){this.renderRoot??=this.createRenderRoot(),this.enableUpdating(!0),this._$EO?.forEach(t=>t.hostConnected?.())}enableUpdating(t){}disconnectedCallback(){this._$EO?.forEach(t=>t.hostDisconnected?.())}attributeChangedCallback(t,e,o){this._$AK(t,o)}_$ET(t,e){const o=this.constructor.elementProperties.get(t),i=this.constructor._$Eu(t,o);if(void 0!==i&&!0===o.reflect){const s=(void 0!==o.converter?.toAttribute?o.converter:y).toAttribute(e,o.type);this._$Em=t,null==s?this.removeAttribute(i):this.setAttribute(i,s),this._$Em=null}}_$AK(t,e){const o=this.constructor,i=o._$Eh.get(t);if(void 0!==i&&this._$Em!==i){const t=o.getPropertyOptions(i),s="function"==typeof t.converter?{fromAttribute:t.converter}:void 0!==t.converter?.fromAttribute?t.converter:y;this._$Em=i;const n=s.fromAttribute(e,t.type);this[i]=n??this._$Ej?.get(i)??n,this._$Em=null}}requestUpdate(t,e,o,i=!1,s){if(void 0!==t){const n=this.constructor;if(!1===i&&(s=this[t]),o??=n.getPropertyOptions(t),!((o.hasChanged??v)(s,e)||o.useDefault&&o.reflect&&s===this._$Ej?.get(t)&&!this.hasAttribute(n._$Eu(t,o))))return;this.C(t,e,o)}!1===this.isUpdatePending&&(this._$ES=this._$EP())}C(t,e,{useDefault:o,reflect:i,wrapped:s},n){o&&!(this._$Ej??=new Map).has(t)&&(this._$Ej.set(t,n??e??this[t]),!0!==s||void 0!==n)||(this._$AL.has(t)||(this.hasUpdated||o||(e=void 0),this._$AL.set(t,e)),!0===i&&this._$Em!==t&&(this._$Eq??=new Set).add(t))}async _$EP(){this.isUpdatePending=!0;try{await this._$ES}catch(t){Promise.reject(t)}const t=this.scheduleUpdate();return null!=t&&await t,!this.isUpdatePending}scheduleUpdate(){return this.performUpdate()}performUpdate(){if(!this.isUpdatePending)return;if(!this.hasUpdated){if(this.renderRoot??=this.createRenderRoot(),this._$Ep){for(const[t,e]of this._$Ep)this[t]=e;this._$Ep=void 0}const t=this.constructor.elementProperties;if(t.size>0)for(const[e,o]of t){const{wrapped:t}=o,i=this[e];!0!==t||this._$AL.has(e)||void 0===i||this.C(e,void 0,o,i)}}let t=!1;const e=this._$AL;try{t=this.shouldUpdate(e),t?(this.willUpdate(e),this._$EO?.forEach(t=>t.hostUpdate?.()),this.update(e)):this._$EM()}catch(e){throw t=!1,this._$EM(),e}t&&this._$AE(e)}willUpdate(t){}_$AE(t){this._$EO?.forEach(t=>t.hostUpdated?.()),this.hasUpdated||(this.hasUpdated=!0,this.firstUpdated(t)),this.updated(t)}_$EM(){this._$AL=new Map,this.isUpdatePending=!1}get updateComplete(){return this.getUpdateComplete()}getUpdateComplete(){return this._$ES}shouldUpdate(t){return!0}update(t){this._$Eq&&=this._$Eq.forEach(t=>this._$ET(t,this[t])),this._$EM()}updated(t){}firstUpdated(t){}};w.elementStyles=[],w.shadowRootOptions={mode:"open"},w[b("elementProperties")]=new Map,w[b("finalized")]=new Map,f?.({ReactiveElement:w}),(u.reactiveElementVersions??=[]).push("2.1.2");
-/**
- * @license
- * Copyright 2017 Google LLC
- * SPDX-License-Identifier: BSD-3-Clause
- */
-const $=globalThis,k=t=>t,S=$.trustedTypes,R=S?S.createPolicy("lit-html",{createHTML:t=>t}):void 0,M="$lit$",A=`lit$${Math.random().toFixed(9).slice(2)}$`,z="?"+A,P=`<${z}>`,C=document,E=()=>C.createComment(""),T=t=>null===t||"object"!=typeof t&&"function"!=typeof t,F=Array.isArray,D="[ \t\n\f\r]",O=/<(?:(!--|\/[^a-zA-Z])|(\/?[a-zA-Z][^>\s]*)|(\/?$))/g,I=/-->/g,V=/>/g,N=RegExp(`>|${D}(?:([^\\s"'>=/]+)(${D}*=${D}*(?:[^ \t\n\f\r"'\`<>=]|("|')|))|$)`,"g"),H=/'/g,B=/"/g,j=/^(?:script|style|textarea|title)$/i,W=t=>(e,...o)=>({_$litType$:t,strings:e,values:o}),q=W(1),L=W(2),U=Symbol.for("lit-noChange"),G=Symbol.for("lit-nothing"),Z=new WeakMap,K=C.createTreeWalker(C,129);function Y(t,e){if(!F(t)||!t.hasOwnProperty("raw"))throw Error("invalid template strings array");return void 0!==R?R.createHTML(e):e}const X=(t,e)=>{const o=t.length-1,i=[];let s,n=2===e?"<svg>":3===e?"<math>":"",a=O;for(let e=0;e<o;e++){const o=t[e];let r,l,c=-1,d=0;for(;d<o.length&&(a.lastIndex=d,l=a.exec(o),null!==l);)d=a.lastIndex,a===O?"!--"===l[1]?a=I:void 0!==l[1]?a=V:void 0!==l[2]?(j.test(l[2])&&(s=RegExp("</"+l[2],"g")),a=N):void 0!==l[3]&&(a=N):a===N?">"===l[0]?(a=s??O,c=-1):void 0===l[1]?c=-2:(c=a.lastIndex-l[2].length,r=l[1],a=void 0===l[3]?N:'"'===l[3]?B:H):a===B||a===H?a=N:a===I||a===V?a=O:(a=N,s=void 0);const h=a===N&&t[e+1].startsWith("/>")?" ":"";n+=a===O?o+P:c>=0?(i.push(r),o.slice(0,c)+M+o.slice(c)+A+h):o+A+(-2===c?e:h)}return[Y(t,n+(t[o]||"<?>")+(2===e?"</svg>":3===e?"</math>":"")),i]};class J{constructor({strings:t,_$litType$:e},o){let i;this.parts=[];let s=0,n=0;const a=t.length-1,r=this.parts,[l,c]=X(t,e);if(this.el=J.createElement(l,o),K.currentNode=this.el.content,2===e||3===e){const t=this.el.content.firstChild;t.replaceWith(...t.childNodes)}for(;null!==(i=K.nextNode())&&r.length<a;){if(1===i.nodeType){if(i.hasAttributes())for(const t of i.getAttributeNames())if(t.endsWith(M)){const e=c[n++],o=i.getAttribute(t).split(A),a=/([.?@])?(.*)/.exec(e);r.push({type:1,index:s,name:a[2],strings:o,ctor:"."===a[1]?it:"?"===a[1]?st:"@"===a[1]?nt:ot}),i.removeAttribute(t)}else t.startsWith(A)&&(r.push({type:6,index:s}),i.removeAttribute(t));if(j.test(i.tagName)){const t=i.textContent.split(A),e=t.length-1;if(e>0){i.textContent=S?S.emptyScript:"";for(let o=0;o<e;o++)i.append(t[o],E()),K.nextNode(),r.push({type:2,index:++s});i.append(t[e],E())}}}else if(8===i.nodeType)if(i.data===z)r.push({type:2,index:s});else{let t=-1;for(;-1!==(t=i.data.indexOf(A,t+1));)r.push({type:7,index:s}),t+=A.length-1}s++}}static createElement(t,e){const o=C.createElement("template");return o.innerHTML=t,o}}function Q(t,e,o=t,i){if(e===U)return e;let s=void 0!==i?o._$Co?.[i]:o._$Cl;const n=T(e)?void 0:e._$litDirective$;return s?.constructor!==n&&(s?._$AO?.(!1),void 0===n?s=void 0:(s=new n(t),s._$AT(t,o,i)),void 0!==i?(o._$Co??=[])[i]=s:o._$Cl=s),void 0!==s&&(e=Q(t,s._$AS(t,e.values),s,i)),e}class tt{constructor(t,e){this._$AV=[],this._$AN=void 0,this._$AD=t,this._$AM=e}get parentNode(){return this._$AM.parentNode}get _$AU(){return this._$AM._$AU}u(t){const{el:{content:e},parts:o}=this._$AD,i=(t?.creationScope??C).importNode(e,!0);K.currentNode=i;let s=K.nextNode(),n=0,a=0,r=o[0];for(;void 0!==r;){if(n===r.index){let e;2===r.type?e=new et(s,s.nextSibling,this,t):1===r.type?e=new r.ctor(s,r.name,r.strings,this,t):6===r.type&&(e=new at(s,this,t)),this._$AV.push(e),r=o[++a]}n!==r?.index&&(s=K.nextNode(),n++)}return K.currentNode=C,i}p(t){let e=0;for(const o of this._$AV)void 0!==o&&(void 0!==o.strings?(o._$AI(t,o,e),e+=o.strings.length-2):o._$AI(t[e])),e++}}class et{get _$AU(){return this._$AM?._$AU??this._$Cv}constructor(t,e,o,i){this.type=2,this._$AH=G,this._$AN=void 0,this._$AA=t,this._$AB=e,this._$AM=o,this.options=i,this._$Cv=i?.isConnected??!0}get parentNode(){let t=this._$AA.parentNode;const e=this._$AM;return void 0!==e&&11===t?.nodeType&&(t=e.parentNode),t}get startNode(){return this._$AA}get endNode(){return this._$AB}_$AI(t,e=this){t=Q(this,t,e),T(t)?t===G||null==t||""===t?(this._$AH!==G&&this._$AR(),this._$AH=G):t!==this._$AH&&t!==U&&this._(t):void 0!==t._$litType$?this.$(t):void 0!==t.nodeType?this.T(t):(t=>F(t)||"function"==typeof t?.[Symbol.iterator])(t)?this.k(t):this._(t)}O(t){return this._$AA.parentNode.insertBefore(t,this._$AB)}T(t){this._$AH!==t&&(this._$AR(),this._$AH=this.O(t))}_(t){this._$AH!==G&&T(this._$AH)?this._$AA.nextSibling.data=t:this.T(C.createTextNode(t)),this._$AH=t}$(t){const{values:e,_$litType$:o}=t,i="number"==typeof o?this._$AC(t):(void 0===o.el&&(o.el=J.createElement(Y(o.h,o.h[0]),this.options)),o);if(this._$AH?._$AD===i)this._$AH.p(e);else{const t=new tt(i,this),o=t.u(this.options);t.p(e),this.T(o),this._$AH=t}}_$AC(t){let e=Z.get(t.strings);return void 0===e&&Z.set(t.strings,e=new J(t)),e}k(t){F(this._$AH)||(this._$AH=[],this._$AR());const e=this._$AH;let o,i=0;for(const s of t)i===e.length?e.push(o=new et(this.O(E()),this.O(E()),this,this.options)):o=e[i],o._$AI(s),i++;i<e.length&&(this._$AR(o&&o._$AB.nextSibling,i),e.length=i)}_$AR(t=this._$AA.nextSibling,e){for(this._$AP?.(!1,!0,e);t!==this._$AB;){const e=k(t).nextSibling;k(t).remove(),t=e}}setConnected(t){void 0===this._$AM&&(this._$Cv=t,this._$AP?.(t))}}class ot{get tagName(){return this.element.tagName}get _$AU(){return this._$AM._$AU}constructor(t,e,o,i,s){this.type=1,this._$AH=G,this._$AN=void 0,this.element=t,this.name=e,this._$AM=i,this.options=s,o.length>2||""!==o[0]||""!==o[1]?(this._$AH=Array(o.length-1).fill(new String),this.strings=o):this._$AH=G}_$AI(t,e=this,o,i){const s=this.strings;let n=!1;if(void 0===s)t=Q(this,t,e,0),n=!T(t)||t!==this._$AH&&t!==U,n&&(this._$AH=t);else{const i=t;let a,r;for(t=s[0],a=0;a<s.length-1;a++)r=Q(this,i[o+a],e,a),r===U&&(r=this._$AH[a]),n||=!T(r)||r!==this._$AH[a],r===G?t=G:t!==G&&(t+=(r??"")+s[a+1]),this._$AH[a]=r}n&&!i&&this.j(t)}j(t){t===G?this.element.removeAttribute(this.name):this.element.setAttribute(this.name,t??"")}}class it extends ot{constructor(){super(...arguments),this.type=3}j(t){this.element[this.name]=t===G?void 0:t}}class st extends ot{constructor(){super(...arguments),this.type=4}j(t){this.element.toggleAttribute(this.name,!!t&&t!==G)}}class nt extends ot{constructor(t,e,o,i,s){super(t,e,o,i,s),this.type=5}_$AI(t,e=this){if((t=Q(this,t,e,0)??G)===U)return;const o=this._$AH,i=t===G&&o!==G||t.capture!==o.capture||t.once!==o.once||t.passive!==o.passive,s=t!==G&&(o===G||i);i&&this.element.removeEventListener(this.name,this,o),s&&this.element.addEventListener(this.name,this,t),this._$AH=t}handleEvent(t){"function"==typeof this._$AH?this._$AH.call(this.options?.host??this.element,t):this._$AH.handleEvent(t)}}class at{constructor(t,e,o){this.element=t,this.type=6,this._$AN=void 0,this._$AM=e,this.options=o}get _$AU(){return this._$AM._$AU}_$AI(t){Q(this,t)}}const rt=$.litHtmlPolyfillSupport;rt?.(J,et),($.litHtmlVersions??=[]).push("3.3.3");const lt=globalThis;
-/**
- * @license
- * Copyright 2017 Google LLC
- * SPDX-License-Identifier: BSD-3-Clause
- */let ct=class extends w{constructor(){super(...arguments),this.renderOptions={host:this},this._$Do=void 0}createRenderRoot(){const t=super.createRenderRoot();return this.renderOptions.renderBefore??=t.firstChild,t}update(t){const e=this.render();this.hasUpdated||(this.renderOptions.isConnected=this.isConnected),super.update(t),this._$Do=((t,e,o)=>{const i=o?.renderBefore??e;let s=i._$litPart$;if(void 0===s){const t=o?.renderBefore??null;i._$litPart$=s=new et(e.insertBefore(E(),t),t,void 0,o??{})}return s._$AI(t),s})(e,this.renderRoot,this.renderOptions)}connectedCallback(){super.connectedCallback(),this._$Do?.setConnected(!0)}disconnectedCallback(){super.disconnectedCallback(),this._$Do?.setConnected(!1)}render(){return U}};ct._$litElement$=!0,ct.finalized=!0,lt.litElementHydrateSupport?.({LitElement:ct});const dt=lt.litElementPolyfillSupport;dt?.({LitElement:ct}),(lt.litElementVersions??=[]).push("4.2.2");
+ */Symbol.metadata??=Symbol("metadata"),v.litPropertyMetadata??=new WeakMap;let P=class y extends HTMLElement{static addInitializer(e){this._$Ei(),(this.l??=[]).push(e)}static get observedAttributes(){return this.finalize(),this._$Eh&&[...this._$Eh.keys()]}static createProperty(e,t=C){if(t.state&&(t.attribute=!1),this._$Ei(),this.prototype.hasOwnProperty(e)&&((t=Object.create(t)).wrapped=!0),this.elementProperties.set(e,t),!t.noAccessor){const o=Symbol(),s=this.getPropertyDescriptor(e,o,t);void 0!==s&&p(this.prototype,e,s)}}static getPropertyDescriptor(e,t,o){const{get:s,set:l}=m(this.prototype,e)??{get(){return this[t]},set(e){this[t]=e}};return{get:s,set(t){const d=s?.call(this);l?.call(this,t),this.requestUpdate(e,d,o)},configurable:!0,enumerable:!0}}static getPropertyOptions(e){return this.elementProperties.get(e)??C}static _$Ei(){if(this.hasOwnProperty(d$1("elementProperties")))return;const e=b(this);e.finalize(),void 0!==e.l&&(this.l=[...e.l]),this.elementProperties=new Map(e.elementProperties)}static finalize(){if(this.hasOwnProperty(d$1("finalized")))return;if(this.finalized=!0,this._$Ei(),this.hasOwnProperty(d$1("properties"))){const e=this.properties,t=[...u(e),..._(e)];for(const o of t)this.createProperty(o,e[o])}const e=this[Symbol.metadata];if(null!==e){const t=litPropertyMetadata.get(e);if(void 0!==t)for(const[e,o]of t)this.elementProperties.set(e,o)}this._$Eh=new Map;for(const[e,t]of this.elementProperties){const o=this._$Eu(e,t);void 0!==o&&this._$Eh.set(o,e)}this.elementStyles=this.finalizeStyles(this.styles)}static finalizeStyles(e){const t=[];if(Array.isArray(e)){const o=new Set(e.flat(1/0).reverse());for(const e of o)t.unshift(d(e))}else void 0!==e&&t.push(d(e));return t}static _$Eu(e,t){const o=t.attribute;return!1===o?void 0:"string"==typeof o?o:"string"==typeof e?e.toLowerCase():void 0}constructor(){super(),this._$Ep=void 0,this.isUpdatePending=!1,this.hasUpdated=!1,this._$Em=null,this._$Ev()}_$Ev(){this._$ES=new Promise(e=>this.enableUpdating=e),this._$AL=new Map,this._$E_(),this.requestUpdate(),this.constructor.l?.forEach(e=>e(this))}addController(e){(this._$EO??=new Set).add(e),void 0!==this.renderRoot&&this.isConnected&&e.hostConnected?.()}removeController(e){this._$EO?.delete(e)}_$E_(){const e=new Map,t=this.constructor.elementProperties;for(const o of t.keys())this.hasOwnProperty(o)&&(e.set(o,this[o]),delete this[o]);e.size>0&&(this._$Ep=e)}createRenderRoot(){const o=this.shadowRoot??this.attachShadow(this.constructor.shadowRootOptions);return((o,s)=>{if(t)o.adoptedStyleSheets=s.map(e=>e instanceof CSSStyleSheet?e:e.styleSheet);else for(const t of s){const s=document.createElement("style"),l=e.litNonce;void 0!==l&&s.setAttribute("nonce",l),s.textContent=t.cssText,o.appendChild(s)}})(o,this.constructor.elementStyles),o}connectedCallback(){this.renderRoot??=this.createRenderRoot(),this.enableUpdating(!0),this._$EO?.forEach(e=>e.hostConnected?.())}enableUpdating(e){}disconnectedCallback(){this._$EO?.forEach(e=>e.hostDisconnected?.())}attributeChangedCallback(e,t,o){this._$AK(e,o)}_$ET(e,t){const o=this.constructor.elementProperties.get(e),s=this.constructor._$Eu(e,o);if(void 0!==s&&!0===o.reflect){const l=(void 0!==o.converter?.toAttribute?o.converter:A).toAttribute(t,o.type);this._$Em=e,null==l?this.removeAttribute(s):this.setAttribute(s,l),this._$Em=null}}_$AK(e,t){const o=this.constructor,s=o._$Eh.get(e);if(void 0!==s&&this._$Em!==s){const e=o.getPropertyOptions(s),l="function"==typeof e.converter?{fromAttribute:e.converter}:void 0!==e.converter?.fromAttribute?e.converter:A;this._$Em=s;const d=l.fromAttribute(t,e.type);this[s]=d??this._$Ej?.get(s)??d,this._$Em=null}}requestUpdate(e,t,o,s=!1,l){if(void 0!==e){const d=this.constructor;if(!1===s&&(l=this[e]),o??=d.getPropertyOptions(e),!((o.hasChanged??f$1)(l,t)||o.useDefault&&o.reflect&&l===this._$Ej?.get(e)&&!this.hasAttribute(d._$Eu(e,o))))return;this.C(e,t,o)}!1===this.isUpdatePending&&(this._$ES=this._$EP())}C(e,t,{useDefault:o,reflect:s,wrapped:l},d){o&&!(this._$Ej??=new Map).has(e)&&(this._$Ej.set(e,d??t??this[e]),!0!==l||void 0!==d)||(this._$AL.has(e)||(this.hasUpdated||o||(t=void 0),this._$AL.set(e,t)),!0===s&&this._$Em!==e&&(this._$Eq??=new Set).add(e))}async _$EP(){this.isUpdatePending=!0;try{await this._$ES}catch(e){Promise.reject(e)}const e=this.scheduleUpdate();return null!=e&&await e,!this.isUpdatePending}scheduleUpdate(){return this.performUpdate()}performUpdate(){if(!this.isUpdatePending)return;if(!this.hasUpdated){if(this.renderRoot??=this.createRenderRoot(),this._$Ep){for(const[e,t]of this._$Ep)this[e]=t;this._$Ep=void 0}const e=this.constructor.elementProperties;if(e.size>0)for(const[t,o]of e){const{wrapped:e}=o,s=this[t];!0!==e||this._$AL.has(t)||void 0===s||this.C(t,void 0,o,s)}}let e=!1;const t=this._$AL;try{e=this.shouldUpdate(t),e?(this.willUpdate(t),this._$EO?.forEach(e=>e.hostUpdate?.()),this.update(t)):this._$EM()}catch(t){throw e=!1,this._$EM(),t}e&&this._$AE(t)}willUpdate(e){}_$AE(e){this._$EO?.forEach(e=>e.hostUpdated?.()),this.hasUpdated||(this.hasUpdated=!0,this.firstUpdated(e)),this.updated(e)}_$EM(){this._$AL=new Map,this.isUpdatePending=!1}get updateComplete(){return this.getUpdateComplete()}getUpdateComplete(){return this._$ES}shouldUpdate(e){return!0}update(e){this._$Eq&&=this._$Eq.forEach(e=>this._$ET(e,this[e])),this._$EM()}updated(e){}firstUpdated(e){}};P.elementStyles=[],P.shadowRootOptions={mode:"open"},P[d$1("elementProperties")]=new Map,P[d$1("finalized")]=new Map,$?.({ReactiveElement:P}),(v.reactiveElementVersions??=[]).push("2.1.2");
 /**
  * @license
  * Copyright 2017 Google LLC
  * SPDX-License-Identifier: BSD-3-Clause
  */
-const ht=t=>(e,o)=>{void 0!==o?o.addInitializer(()=>{customElements.define(t,e)}):customElements.define(t,e)},pt={attribute:!0,type:String,converter:y,reflect:!1,hasChanged:v},mt=(t=pt,e,o)=>{const{kind:i,metadata:s}=o;let n=globalThis.litPropertyMetadata.get(s);if(void 0===n&&globalThis.litPropertyMetadata.set(s,n=new Map),"setter"===i&&((t=Object.create(t)).wrapped=!0),n.set(o.name,t),"accessor"===i){const{name:i}=o;return{set(o){const s=e.get.call(this);e.set.call(this,o),this.requestUpdate(i,s,t,!0,o)},init(e){return void 0!==e&&this.C(i,void 0,t,e),e}}}if("setter"===i){const{name:i}=o;return function(o){const s=this[i];e.call(this,o),this.requestUpdate(i,s,t,!0,o)}}throw Error("Unsupported decorator location: "+i)};
+const E=globalThis,i$3=e=>e,T=E.trustedTypes,F=T?T.createPolicy("lit-html",{createHTML:e=>e}):void 0,D="$lit$",O=`lit$${Math.random().toFixed(9).slice(2)}$`,B="?"+O,j=`<${B}>`,W=document,c=()=>W.createComment(""),a=e=>null===e||"object"!=typeof e&&"function"!=typeof e,q=Array.isArray,U="[ \t\n\f\r]",G=/<(?:(!--|\/[^a-zA-Z])|(\/?[a-zA-Z][^>\s]*)|(\/?$))/g,K=/-->/g,X=/>/g,Y=RegExp(`>|${U}(?:([^\\s"'>=/]+)(${U}*=${U}*(?:[^ \t\n\f\r"'\`<>=]|("|')|))|$)`,"g"),J=/'/g,Q=/"/g,ee=/^(?:script|style|textarea|title)$/i,x=e=>(t,...o)=>({_$litType$:e,strings:t,values:o}),te=x(1),oe=x(2),ie=Symbol.for("lit-noChange"),ae=Symbol.for("lit-nothing"),se=new WeakMap,ne=W.createTreeWalker(W,129);function V(e,t){if(!q(e)||!e.hasOwnProperty("raw"))throw Error("invalid template strings array");return void 0!==F?F.createHTML(t):t}const N=(e,t)=>{const o=e.length-1,s=[];let l,d=2===t?"<svg>":3===t?"<math>":"",h=G;for(let t=0;t<o;t++){const o=e[t];let p,m,u=-1,_=0;for(;_<o.length&&(h.lastIndex=_,m=h.exec(o),null!==m);)_=h.lastIndex,h===G?"!--"===m[1]?h=K:void 0!==m[1]?h=X:void 0!==m[2]?(ee.test(m[2])&&(l=RegExp("</"+m[2],"g")),h=Y):void 0!==m[3]&&(h=Y):h===Y?">"===m[0]?(h=l??G,u=-1):void 0===m[1]?u=-2:(u=h.lastIndex-m[2].length,p=m[1],h=void 0===m[3]?Y:'"'===m[3]?Q:J):h===Q||h===J?h=Y:h===K||h===X?h=G:(h=Y,l=void 0);const b=h===Y&&e[t+1].startsWith("/>")?" ":"";d+=h===G?o+j:u>=0?(s.push(p),o.slice(0,u)+D+o.slice(u)+O+b):o+O+(-2===u?t:b)}return[V(e,d+(e[o]||"<?>")+(2===t?"</svg>":3===t?"</math>":"")),s]};class S{constructor({strings:e,_$litType$:t},o){let s;this.parts=[];let l=0,d=0;const h=e.length-1,p=this.parts,[m,u]=N(e,t);if(this.el=S.createElement(m,o),ne.currentNode=this.el.content,2===t||3===t){const e=this.el.content.firstChild;e.replaceWith(...e.childNodes)}for(;null!==(s=ne.nextNode())&&p.length<h;){if(1===s.nodeType){if(s.hasAttributes())for(const e of s.getAttributeNames())if(e.endsWith(D)){const t=u[d++],o=s.getAttribute(e).split(O),h=/([.?@])?(.*)/.exec(t);p.push({type:1,index:l,name:h[2],strings:o,ctor:"."===h[1]?I:"?"===h[1]?L:"@"===h[1]?z:H}),s.removeAttribute(e)}else e.startsWith(O)&&(p.push({type:6,index:l}),s.removeAttribute(e));if(ee.test(s.tagName)){const e=s.textContent.split(O),t=e.length-1;if(t>0){s.textContent=T?T.emptyScript:"";for(let o=0;o<t;o++)s.append(e[o],c()),ne.nextNode(),p.push({type:2,index:++l});s.append(e[t],c())}}}else if(8===s.nodeType)if(s.data===B)p.push({type:2,index:l});else{let e=-1;for(;-1!==(e=s.data.indexOf(O,e+1));)p.push({type:7,index:l}),e+=O.length-1}l++}}static createElement(e,t){const o=W.createElement("template");return o.innerHTML=e,o}}function M(e,t,o=e,s){if(t===ie)return t;let l=void 0!==s?o._$Co?.[s]:o._$Cl;const d=a(t)?void 0:t._$litDirective$;return l?.constructor!==d&&(l?._$AO?.(!1),void 0===d?l=void 0:(l=new d(e),l._$AT(e,o,s)),void 0!==s?(o._$Co??=[])[s]=l:o._$Cl=l),void 0!==l&&(t=M(e,l._$AS(e,t.values),l,s)),t}class R{constructor(e,t){this._$AV=[],this._$AN=void 0,this._$AD=e,this._$AM=t}get parentNode(){return this._$AM.parentNode}get _$AU(){return this._$AM._$AU}u(e){const{el:{content:t},parts:o}=this._$AD,s=(e?.creationScope??W).importNode(t,!0);ne.currentNode=s;let l=ne.nextNode(),d=0,h=0,p=o[0];for(;void 0!==p;){if(d===p.index){let t;2===p.type?t=new k(l,l.nextSibling,this,e):1===p.type?t=new p.ctor(l,p.name,p.strings,this,e):6===p.type&&(t=new Z(l,this,e)),this._$AV.push(t),p=o[++h]}d!==p?.index&&(l=ne.nextNode(),d++)}return ne.currentNode=W,s}p(e){let t=0;for(const o of this._$AV)void 0!==o&&(void 0!==o.strings?(o._$AI(e,o,t),t+=o.strings.length-2):o._$AI(e[t])),t++}}class k{get _$AU(){return this._$AM?._$AU??this._$Cv}constructor(e,t,o,s){this.type=2,this._$AH=ae,this._$AN=void 0,this._$AA=e,this._$AB=t,this._$AM=o,this.options=s,this._$Cv=s?.isConnected??!0}get parentNode(){let e=this._$AA.parentNode;const t=this._$AM;return void 0!==t&&11===e?.nodeType&&(e=t.parentNode),e}get startNode(){return this._$AA}get endNode(){return this._$AB}_$AI(e,t=this){e=M(this,e,t),a(e)?e===ae||null==e||""===e?(this._$AH!==ae&&this._$AR(),this._$AH=ae):e!==this._$AH&&e!==ie&&this._(e):void 0!==e._$litType$?this.$(e):void 0!==e.nodeType?this.T(e):(e=>q(e)||"function"==typeof e?.[Symbol.iterator])(e)?this.k(e):this._(e)}O(e){return this._$AA.parentNode.insertBefore(e,this._$AB)}T(e){this._$AH!==e&&(this._$AR(),this._$AH=this.O(e))}_(e){this._$AH!==ae&&a(this._$AH)?this._$AA.nextSibling.data=e:this.T(W.createTextNode(e)),this._$AH=e}$(e){const{values:t,_$litType$:o}=e,s="number"==typeof o?this._$AC(e):(void 0===o.el&&(o.el=S.createElement(V(o.h,o.h[0]),this.options)),o);if(this._$AH?._$AD===s)this._$AH.p(t);else{const e=new R(s,this),o=e.u(this.options);e.p(t),this.T(o),this._$AH=e}}_$AC(e){let t=se.get(e.strings);return void 0===t&&se.set(e.strings,t=new S(e)),t}k(e){q(this._$AH)||(this._$AH=[],this._$AR());const t=this._$AH;let o,s=0;for(const l of e)s===t.length?t.push(o=new k(this.O(c()),this.O(c()),this,this.options)):o=t[s],o._$AI(l),s++;s<t.length&&(this._$AR(o&&o._$AB.nextSibling,s),t.length=s)}_$AR(e=this._$AA.nextSibling,t){for(this._$AP?.(!1,!0,t);e!==this._$AB;){const t=i$3(e).nextSibling;i$3(e).remove(),e=t}}setConnected(e){void 0===this._$AM&&(this._$Cv=e,this._$AP?.(e))}}class H{get tagName(){return this.element.tagName}get _$AU(){return this._$AM._$AU}constructor(e,t,o,s,l){this.type=1,this._$AH=ae,this._$AN=void 0,this.element=e,this.name=t,this._$AM=s,this.options=l,o.length>2||""!==o[0]||""!==o[1]?(this._$AH=Array(o.length-1).fill(new String),this.strings=o):this._$AH=ae}_$AI(e,t=this,o,s){const l=this.strings;let d=!1;if(void 0===l)e=M(this,e,t,0),d=!a(e)||e!==this._$AH&&e!==ie,d&&(this._$AH=e);else{const s=e;let h,p;for(e=l[0],h=0;h<l.length-1;h++)p=M(this,s[o+h],t,h),p===ie&&(p=this._$AH[h]),d||=!a(p)||p!==this._$AH[h],p===ae?e=ae:e!==ae&&(e+=(p??"")+l[h+1]),this._$AH[h]=p}d&&!s&&this.j(e)}j(e){e===ae?this.element.removeAttribute(this.name):this.element.setAttribute(this.name,e??"")}}class I extends H{constructor(){super(...arguments),this.type=3}j(e){this.element[this.name]=e===ae?void 0:e}}class L extends H{constructor(){super(...arguments),this.type=4}j(e){this.element.toggleAttribute(this.name,!!e&&e!==ae)}}class z extends H{constructor(e,t,o,s,l){super(e,t,o,s,l),this.type=5}_$AI(e,t=this){if((e=M(this,e,t,0)??ae)===ie)return;const o=this._$AH,s=e===ae&&o!==ae||e.capture!==o.capture||e.once!==o.once||e.passive!==o.passive,l=e!==ae&&(o===ae||s);s&&this.element.removeEventListener(this.name,this,o),l&&this.element.addEventListener(this.name,this,e),this._$AH=e}handleEvent(e){"function"==typeof this._$AH?this._$AH.call(this.options?.host??this.element,e):this._$AH.handleEvent(e)}}class Z{constructor(e,t,o){this.element=e,this.type=6,this._$AN=void 0,this._$AM=t,this.options=o}get _$AU(){return this._$AM._$AU}_$AI(e){M(this,e)}}const re=E.litHtmlPolyfillSupport;re?.(S,k),(E.litHtmlVersions??=[]).push("3.3.3");const ce=globalThis;
 /**
  * @license
  * Copyright 2017 Google LLC
  * SPDX-License-Identifier: BSD-3-Clause
- */function ut(t){return(e,o)=>"object"==typeof o?mt(t,e,o):((t,e,o)=>{const i=e.hasOwnProperty(o);return e.constructor.createProperty(o,t),i?Object.getOwnPropertyDescriptor(e,o):void 0})(t,e,o)}
+ */let le=class i extends P{constructor(){super(...arguments),this.renderOptions={host:this},this._$Do=void 0}createRenderRoot(){const e=super.createRenderRoot();return this.renderOptions.renderBefore??=e.firstChild,e}update(e){const t=this.render();this.hasUpdated||(this.renderOptions.isConnected=this.isConnected),super.update(e),this._$Do=((e,t,o)=>{const s=o?.renderBefore??t;let l=s._$litPart$;if(void 0===l){const e=o?.renderBefore??null;s._$litPart$=l=new k(t.insertBefore(c(),e),e,void 0,o??{})}return l._$AI(e),l})(t,this.renderRoot,this.renderOptions)}connectedCallback(){super.connectedCallback(),this._$Do?.setConnected(!0)}disconnectedCallback(){super.disconnectedCallback(),this._$Do?.setConnected(!1)}render(){return ie}};le._$litElement$=!0,le.finalized=!0,ce.litElementHydrateSupport?.({LitElement:le});const de=ce.litElementPolyfillSupport;de?.({LitElement:le}),(ce.litElementVersions??=[]).push("4.2.2");
 /**
  * @license
  * Copyright 2017 Google LLC
  * SPDX-License-Identifier: BSD-3-Clause
- */function _t(t){return ut({...t,state:!0,attribute:!1})}
+ */
+const t$1=e=>(t,o)=>{void 0!==o?o.addInitializer(()=>{customElements.define(e,t)}):customElements.define(e,t)},he={attribute:!0,type:String,converter:A,reflect:!1,hasChanged:f$1},r$1=(e=he,t,o)=>{const{kind:s,metadata:l}=o;let d=globalThis.litPropertyMetadata.get(l);if(void 0===d&&globalThis.litPropertyMetadata.set(l,d=new Map),"setter"===s&&((e=Object.create(e)).wrapped=!0),d.set(o.name,e),"accessor"===s){const{name:s}=o;return{set(o){const l=t.get.call(this);t.set.call(this,o),this.requestUpdate(s,l,e,!0,o)},init(t){return void 0!==t&&this.C(s,void 0,e,t),t}}}if("setter"===s){const{name:s}=o;return function(o){const l=this[s];t.call(this,o),this.requestUpdate(s,l,e,!0,o)}}throw Error("Unsupported decorator location: "+s)};
 /**
  * @license
  * Copyright 2017 Google LLC
  * SPDX-License-Identifier: BSD-3-Clause
- */const gt=1;let ft=class{constructor(t){}get _$AU(){return this._$AM._$AU}_$AT(t,e,o){this._$Ct=t,this._$AM=e,this._$Ci=o}_$AS(t,e){return this.update(t,e)}update(t,e){return this.render(...e)}};
+ */function n$1(e){return(t,o)=>"object"==typeof o?r$1(e,t,o):((e,t,o)=>{const s=t.hasOwnProperty(o);return t.constructor.createProperty(o,e),s?Object.getOwnPropertyDescriptor(t,o):void 0})(e,t,o)}
+/**
+ * @license
+ * Copyright 2017 Google LLC
+ * SPDX-License-Identifier: BSD-3-Clause
+ */function r(e){return n$1({...e,state:!0,attribute:!1})}
+/**
+ * @license
+ * Copyright 2017 Google LLC
+ * SPDX-License-Identifier: BSD-3-Clause
+ */const pe=1;let me=class i{constructor(e){}get _$AU(){return this._$AM._$AU}_$AT(e,t,o){this._$Ct=e,this._$AM=t,this._$Ci=o}_$AS(e,t){return this.update(e,t)}update(e,t){return this.render(...t)}};
 /**
  * @license
  * Copyright 2018 Google LLC
  * SPDX-License-Identifier: BSD-3-Clause
- */const bt="important",yt=" !"+bt,vt=(t=>(...e)=>({_$litDirective$:t,values:e}))(class extends ft{constructor(t){if(super(t),t.type!==gt||"style"!==t.name||t.strings?.length>2)throw Error("The `styleMap` directive must be used in the `style` attribute and must be the only part in the attribute.")}render(t){return Object.keys(t).reduce((e,o)=>{const i=t[o];return null==i?e:e+`${o=o.includes("-")?o:o.replace(/(?:^(webkit|moz|ms|o)|)(?=[A-Z])/g,"-$&").toLowerCase()}:${i};`},"")}update(t,[e]){const{style:o}=t.element;if(void 0===this.ft)return this.ft=new Set(Object.keys(e)),this.render(e);for(const t of this.ft)null==e[t]&&(this.ft.delete(t),t.includes("-")?o.removeProperty(t):o[t]=null);for(const t in e){const i=e[t];if(null!=i){this.ft.add(t);const e="string"==typeof i&&i.endsWith(yt);t.includes("-")||e?o.setProperty(t,e?i.slice(0,-11):i,e?bt:""):o[t]=i}}return U}}),xt="anyvac-card",wt="anyvac-card-editor",$t="1.1.0",kt=600,St={cleaning:["🧹 Cleaning","#52c41a"],segment_cleaning:["🧹 Cleaning rooms","#52c41a"],zoned_cleaning:["🧹 Zone cleaning","#52c41a"],spot_cleaning:["🎯 Spot cleaning","#52c41a"],starting:["▶️ Starting","#52c41a"],segment_mopping:["🫧 Mopping rooms","#40a9ff"],zoned_mopping:["🫧 Zone mopping","#40a9ff"],robot_status_mopping:["🫧 Mopping","#40a9ff"],clean_mop_cleaning:["🧹🫧 Vacuuming+mopping","#52c41a"],clean_mop_mopping:["🧹🫧 Vacuuming+mopping","#52c41a"],segment_clean_mop_cleaning:["🧹🫧 Rooms (vac)","#52c41a"],segment_clean_mop_mopping:["🧹🫧 Rooms (mop)","#52c41a"],zoned_clean_mop_cleaning:["🧹🫧 Zones (vac)","#52c41a"],zoned_clean_mop_mopping:["🧹🫧 Zones (mop)","#52c41a"],washing_the_mop:["🚿 Washing mop","#9254de"],washing_the_mop_2:["🚿 Washing mop","#9254de"],going_to_wash_the_mop:["🚿 Going to wash mop","#9254de"],air_drying_stopping:["💨 Drying mop","#9254de"],back_to_dock_washing_duster:["🏠 Dock + washing","#faad14"],returning_home:["🏠 Returning home","#faad14"],docking:["🏠 Docking","#faad14"],going_to_target:["🎯 Going to target","#40a9ff"],charging:["⚡ Charging","rgba(255,255,255,0.75)"],charging_complete:["✅ Fully charged","#52c41a"],docked:["✅ Docked","rgba(255,255,255,0.75)"],charger_disconnected:["🔌 Charger disconnected","#faad14"],emptying_the_bin:["🗑️ Emptying bin","#faad14"],idle:["💤 Idle","rgba(255,255,255,0.45)"],paused:["⏸️ Paused","#faad14"],mapping:["🗺️ Mapping","#40a9ff"],remote_control_active:["🕹️ Remote control","#40a9ff"],manual_mode:["🕹️ Manual mode","#40a9ff"],updating:["⬆️ Updating","#faad14"],in_call:["📞 In call","#faad14"],shutting_down:["⏹️ Shutting down","rgba(255,255,255,0.4)"],error:["❌ Error","#ff4d4f"],charging_problem:["⚠️ Charging problem","#ff4d4f"],locked:["🔒 Locked","#ff4d4f"],device_offline:["📴 Offline","#ff4d4f"]},Rt={green:"#52c41a",blue:"#2196F3",orange:"#faad14"},Mt=["#52c41a","#2196F3","#faad14","#eb2f96","#722ed1","#13c2c2","#fa541c","#a0d911"],At={green:"rgba(46,204,113,0.18)",blue:"rgba(33,150,243,0.18)",orange:"rgba(250,173,20,0.18)"},zt={green:"rgba(46,204,113,0.30)",blue:"rgba(33,150,243,0.30)",orange:"rgba(250,173,20,0.30)"};const Pt=new Set(["cleaning","segment_cleaning","zoned_cleaning","spot_cleaning","segment_mopping","zoned_mopping","robot_status_mopping","clean_mop_cleaning","clean_mop_mopping","segment_clean_mop_cleaning","segment_clean_mop_mopping","zoned_clean_mop_cleaning","zoned_clean_mop_mopping"]);function Ct(t){if(!t)return null;const e=t.scale??1;let o=(t.width??0)*e,i=(t.height??0)*e;const s=t.rotation??0;if(90===s||270===s){const t=o;o=i,i=t}return o>0&&i>0?{NW:o,NH:i}:null}const Et=Math.PI/180;function Tt(t,e,o,i,s,n,a){let r=Math.round(t/Et)%360;return r<0&&(r+=360),{rotation:r,scale:100*e,offset_x:100*o.x-50,offset_y:o.y*i*100-50,residual_pct:100*s,anchors:n,raw_rotation:Math.round(a/Et*10)/10}}function Ft(t,e){return(t.rooms?.length?t.rooms:e?.rooms)??[]}function Dt(t,e,o,i){const s=e?.map,n={rotation:s?.rotation??0,scale:s?.scale??100,offset_x:s?.offset_x??0,offset_y:s?.offset_y??0,auto:!1};if(!e||"manual"===s?.seat)return n;if(!function(t,e){const o="merged"===t.map_mode?t.image_base??(t.vacuums??[]).find(t=>t.image_base?.src)?.image_base:e?.image_base;return o?.src}(t,e))return n;if(!o)return n;const a=function(t,e){if(!(t.length&&e>0))return null;if(t.length>=2){const o=t.length,i={x:0,y:0},s={x:0,y:0};for(const e of t)i.x+=e.q.x,i.y+=e.q.y,s.x+=e.a.x,s.y+=e.a.y;i.x/=o,i.y/=o,s.x/=o,s.y/=o;let n=0,a=0,r=0;for(const e of t){const t=e.q.x-i.x,o=e.q.y-i.y,l=e.a.x-s.x,c=e.a.y-s.y;n+=t*l+o*c,a+=t*c-o*l,r+=t*t+o*o}if(r>1e-8){const l=Math.atan2(a,n),c=Math.round(l/(Math.PI/2))*(Math.PI/2),d=Math.cos(c),h=Math.sin(c);let p=0;for(const e of t){const t=e.q.x-i.x,o=e.q.y-i.y,n=h*t+d*o;p+=(d*t-h*o)*(e.a.x-s.x)+n*(e.a.y-s.y)}const m=p/r;if(m>1e-4){const n={x:s.x-m*(d*i.x-h*i.y),y:s.y-m*(h*i.x+d*i.y)};let a=0;for(const e of t){const t=n.x+m*(d*e.q.x-h*e.q.y)-e.a.x,o=n.y+m*(h*e.q.x+d*e.q.y)-e.a.y;a+=t*t+o*o}return Tt(c,m,n,e,Math.sqrt(a/o),o,l)}}}const o=t.find(t=>t.sizeQ&&t.sizeA)??null;if(!o||!o.sizeQ||!o.sizeA||o.sizeQ.w<1e-6||o.sizeQ.h<1e-6)return null;let i=null;for(const t of[0,1,2,3]){const e=t*(Math.PI/2),s=t%2==0?o.sizeQ.w:o.sizeQ.h,n=t%2==0?o.sizeQ.h:o.sizeQ.w,a=o.sizeA.w/s,r=o.sizeA.h/n;if(!(a>0&&r>0))continue;const l=Math.sqrt(a*r),c=Math.abs(Math.log(a/r));(!i||c<i.mism-1e-9)&&(i={theta:e,s:l,mism:c})}if(!i)return null;const s=Math.cos(i.theta),n=Math.sin(i.theta),a={x:o.a.x-i.s*(s*o.q.x-n*o.q.y),y:o.a.y-i.s*(n*o.q.x+s*o.q.y)};return Tt(i.theta,i.s,a,e,0,1,i.theta)}(function(t,e,o){if(!e)return[];const i=Ct(e.image_dims),s=Array.isArray(e.rooms)?e.rooms:[];if(!i||!s.length)return[];const{NW:n,NH:a}=i,r=[];for(const e of t){if(null==e.map_x||null==e.map_y)continue;const t=s.find(t=>t.name===e.key)??s.find(t=>t.name===e.name),i=t?.bbox_px;if(!i||[i.x0,i.y0,i.x1,i.y1].some(t=>null==t))continue;const l={q:{x:((i.x0+i.x1)/2-n/2)/n,y:((i.y0+i.y1)/2-a/2)/n},a:{x:e.map_x/100,y:e.map_y/100/o}};null!=e.map_w&&null!=e.map_h&&e.map_w>0&&e.map_h>0&&(l.sizeQ={w:(i.x1-i.x0)/n,h:(i.y1-i.y0)/n},l.sizeA={w:e.map_w/100,h:e.map_h/100/o}),r.push(l)}return r}(Ft(t,e),o,i),i);return a?{rotation:a.rotation,scale:a.scale,offset_x:a.offset_x,offset_y:a.offset_y,auto:!0,residual:a.residual_pct,anchorCount:a.anchors}:n}function Ot(t,e){const o=e.x1-e.x0,i=e.y1-e.y0;if(!(o>0&&i>0))return null;const s=(t.x0+t.x1)/2-e.x0,n=(t.y0+t.y1)/2-e.y0,a=t.x1-t.x0,r=t.y1-t.y0,l=(t,e,o)=>Math.min(o,Math.max(e,t));return{map_x:l(Math.round(s/o*1e3)/10,0,100),map_y:l(Math.round(n/i*1e3)/10,0,100),map_w:l(Math.round(a/o*1e3)/10,2,100),map_h:l(Math.round(r/i*1e3)/10,2,100)}}function It(t,e,o,i){const s=Ct(e?.image_dims),n=t?.bbox_px;if(!s||!n||[n.x0,n.y0,n.x1,n.y1].some(t=>null==t))return null;const{NW:a,NH:r}=s,l=((n.x0+n.x1)/2-a/2)/a,c=((n.y0+n.y1)/2-r/2)/a;let d=(n.x1-n.x0)/a,h=(n.y1-n.y0)/a;const p=o.scale/100,m=o.rotation*Et,u=Math.cos(m),_=Math.sin(m),g=(50+o.offset_x)/100+p*(u*l-_*c),f=(50+o.offset_y)/100/i+p*(_*l+u*c);if(Math.round(o.rotation/90)%2!=0){const t=d;d=h,h=t}const b=(t,e,o)=>Math.min(o,Math.max(e,t));return{map_x:b(Math.round(1e3*g)/10,0,100),map_y:b(Math.round(f*i*1e3)/10,0,100),map_w:b(Math.round(p*d*1e3)/10,2,100),map_h:b(Math.round(p*h*i*1e3)/10,2,100)}}const Vt={columns:[100],rows:["minmax(0, 1fr)","auto","auto"],place:{map:{row:1,col:1},dock:{row:2,col:1,overflow:"auto"},start:{row:3,col:1}}},Nt={landscape:{columns:["minmax(0, 1fr)","max-content"],rows:["auto","minmax(260px, 1fr)","auto","auto"],place:{badges:{row:1,col:"1/3"},map:{row:2,col:"1/3"},tools:{row:3,col:"1/3",align:"start"},status:{row:4,col:1,overflow:"auto"},dock:{row:4,col:2,overflow:"auto"}}},portrait:{columns:[72,28],rows:[90,10],place:{map:{row:1,col:1},dock:{row:1,col:2,overflow:"auto"},start:{row:2,col:"1/3"}}}};function Ht(t){return"number"==typeof t?t+"fr":t}function Bt(t){return t.map(Ht).join(" ")}function jt(t){const e=t.height??"viewport";return"viewport"===e?"calc(100svh - var(--header-height, 0px))":"container"===e?"100%":e}var Wt;const qt={main_brush_time_left:300,side_brush_time_left:200,filter_time_left:150,sensor_time_left:30};console.info(`%c ANYVAC-CARD %c v${$t} `,"background:#2196F3;color:#fff;font-weight:700;padding:2px 4px;border-radius:3px 0 0 3px","background:#1a1a1a;color:#fff;font-weight:400;padding:2px 4px;border-radius:0 3px 3px 0");let Lt=class extends ct{constructor(){super(...arguments),this.editMode=!1,this._shownSet=new Set([0]),this._holdId=null,this._mapMode="normal",this._inspectKey=null,this._dockSheetOpen=!1,this._dockSheetIdx=0,this._modeSheetOpen=!1,this._careResetPending=new Map,this._modeEntity=null,this._dbg="",this._zoneDrag=null,this._zoneRectShown=null,this._zonePending=null,this._zoneMulti=!1,this._zoneEdit=null,this._pinPending=null,this._layers={dry:!0,wet:!1},this._layerMenu=null,this._layerHoldTimer=null,this._layerHeld=!1,this._localRoomSel=new Map,this._activePresets=new Map,this._planMode="both",this._activeGlobalPreset=null,this._cardW=0,this._mapAR=3.636,this._profile="landscape",this._mapRegW=0,this._mapRegH=0,this._mapAvailW=0,this._mapAvailH=0,this._lastStack=!1,this._lastPortraitFitW=0,this._lastRotate=!0,this._flipLive=null,this._ro=null,this._onWinResize=null,this._measureRaf=0,this._measureTimer=null,this._settleTimer=null,this._panelViewMo=null,this._panelViewWarned=!1,this._panelViewNode=null,this._barMo=null,this._editBarRo=null,this._now=Date.now(),this._tickTimer=null,this._holdTimer=null,this._holdStartPos=null,this._initialized=!1,this._watched=null,this._intCache=new Map,this._mapCandCache=new Map,this._autoCache=new Map,this._careCache=new Map,this._roomsMemo=new Map,this._seatMemo=new Map,this._holdEnd=()=>{this._cancelHold()},this._holdMove=t=>{if(!this._holdStartPos||null===this._holdTimer)return;const e=t.clientX-this._holdStartPos.x,o=t.clientY-this._holdStartPos.y;e*e+o*o>144&&this._cancelHold()},this._planPreview=null,this._planFetchKey="",this._onFloorplanLoad=t=>{const e=t.target;if(e?.naturalWidth&&e.naturalHeight){const t=e.naturalWidth/e.naturalHeight;t>.1&&Math.abs(t-this._mapAR)>.01&&(this._mapAR=t)}}}static getConfigElement(){return document.createElement(wt)}static getStubConfig(t){const e=t?Object.keys(t.states).filter(t=>t.startsWith("vacuum.")):[],o=t?.entities,i=o?e.filter(t=>"matter"!==o[t]?.platform):e,s=i.length>0?i:e;return 0===s.length?{type:`custom:${xt}`,vacuums:[{entity:"vacuum.my_roborock",name:"Roborock",rooms:[],clean_action:{type:"native"}}]}:{type:`custom:${xt}`,vacuums:s.map(e=>({entity:e,name:t.states[e]?.attributes.friendly_name??e.replace(/^vacuum\./,""),rooms:[],clean_action:{type:"native"}}))}}setConfig(t){if(!t.vacuums||!Array.isArray(t.vacuums)||0===t.vacuums.length)throw new Error("[anyvac-card] 'vacuums' must be a non-empty array");if(this._config=t,this._watched=null,this._intCache.clear(),this._mapCandCache.clear(),this._autoCache.clear(),this._careCache.clear(),this._roomsMemo.clear(),this._seatMemo.clear(),this._initialized){const e=new Set;for(const o of this._shownSet)o<t.vacuums.length&&e.add(o);this._shownSet=e.size>0?e:new Set(t.vacuums.map((t,e)=>e))}else this._initialized=!0,this._shownSet=this._loadShown(),this._localRoomSel=this._loadRoomSel(),this._flipLive=this._loadFlipLive()}getCardSize(){return 6}connectedCallback(){super.connectedCallback(),this.style.setProperty("--hold-ms",kt+"ms"),this._ro||"undefined"==typeof ResizeObserver||(this._ro=new ResizeObserver(()=>this._scheduleMeasure()),this._ro.observe(this)),this._onWinResize||(this._onWinResize=()=>this._scheduleMeasure(),window.addEventListener("resize",this._onWinResize,{passive:!0}),window.addEventListener("orientationchange",this._onWinResize,{passive:!0})),this._setupPanelViewObserver(),this._scheduleMeasure(),this._tickTimer||(this._tickTimer=window.setInterval(()=>{this._config?.debug_room_progress&&(this._config.vacuums??[]).some(t=>this._isCleaning(t)||this._isPaused(t))&&(this._now=Date.now())},1e3))}_scheduleMeasure(){if(this._measureRaf||null!==this._measureTimer)return;const t=()=>{this._measureRaf=0,this._measureTimer=null,this._doMeasure()};"undefined"!=typeof document&&document.hidden?this._measureTimer=window.setTimeout(t,0):this._measureRaf=requestAnimationFrame(t)}_doMeasure(){const t=this.getBoundingClientRect(),e=Math.round(t.width);e&&Math.abs(e-this._cardW)>=2&&(this._cardW=e);const o=this._config?.layout;if(o){const i=function(t,e,o){const i=t?.orientation;return"portrait"===i||"landscape"===i?i:e&&o&&e/o<(t?.threshold??1)?"portrait":"landscape"}(o,this._cardW||e||window.innerWidth,this._availableHeight(o,t));i!==this._profile&&(this._profile=i),this._refineGridHeight()}}_availableHeight(t,e){if("container"===(t.height??"viewport"))return e.height>1?Math.round(e.height):window.innerHeight;const o=e.top;return o>=0&&o<window.innerHeight?Math.max(1,Math.round(window.innerHeight-o-this._editBarHeight())):window.innerHeight}_editBarHeight(){try{const t=this._findCardOptionsAncestor();if(!t?.shadowRoot)return 0;const e=t.shadowRoot.querySelector(".card-actions");if(!e)return 0;const o=e.getBoundingClientRect();if(!(o.height>0))return 0;const i=getComputedStyle(e);return Math.ceil(o.height+(parseFloat(i.marginTop)||0)+(parseFloat(i.marginBottom)||0))}catch{return 0}}_findPanelViewAncestor(){let t=this.parentElement??this.getRootNode().host??null,e=0;for(;t&&e++<20;){if(t instanceof Element&&("HUI-PANEL-VIEW"===t.tagName||"HUI-VIEW"===t.tagName))return t;const e=t;t=e.parentElement??e.getRootNode()?.host??null}return null}_findCardOptionsAncestor(){let t=this.parentElement??this.getRootNode().host??null,e=0;for(;t&&e++<12;){if(t instanceof Element&&"HUI-CARD-OPTIONS"===t.tagName)return t;const e=t;t=e.parentElement??e.getRootNode()?.host??null}return null}_setupPanelViewObserver(){if("undefined"==typeof MutationObserver)return;if(this._panelViewMo&&this._panelViewNode?.isConnected)return;this._panelViewMo&&(this._panelViewMo.disconnect(),this._panelViewMo=null,this._panelViewNode=null);const t=this._findPanelViewAncestor();if(!t){if(!this._panelViewWarned){this._panelViewWarned=!0;try{console.warn("[anyvac-card] hui-panel-view/hui-view ancestor not found (HA internal DOM may have changed) — edit-mode layout refresh via MutationObserver is disabled; resize-based refresh still works.")}catch{}}return}const e=new MutationObserver(()=>{this._scheduleMeasure(),this._watchEditBar();const t=this._findCardOptionsAncestor();if(t?.shadowRoot)try{e.observe(t.shadowRoot,{childList:!0,subtree:!0})}catch{}});try{e.observe(t,{childList:!0,subtree:!0})}catch{}if(t.shadowRoot)try{e.observe(t.shadowRoot,{childList:!0,subtree:!0})}catch{}const o=this._findCardOptionsAncestor();if(o?.shadowRoot)try{e.observe(o.shadowRoot,{childList:!0,subtree:!0})}catch{}this._panelViewMo=e,this._panelViewNode=t,this._watchEditBar()}_watchEditBar(){this._barMo&&(this._barMo.disconnect(),this._barMo=null);const t=this._findCardOptionsAncestor();if(!t?.shadowRoot)return;const e=t.shadowRoot.querySelector(".card-actions");if(e)return void this._observeEditBar(e);const o=t.shadowRoot,i=new MutationObserver(()=>{const t=o.querySelector(".card-actions");t&&(i.disconnect(),this._barMo=null,this._observeEditBar(t))});try{i.observe(o,{childList:!0,subtree:!0})}catch{return}this._barMo=i}_observeEditBar(t){if(this._scheduleMeasure(),"undefined"==typeof ResizeObserver)return;this._editBarRo&&(this._editBarRo.disconnect(),this._editBarRo=null);const e=new ResizeObserver(()=>this._scheduleMeasure());try{e.observe(t)}catch{return}this._editBarRo=e}_refineGridHeight(){const t=this._config?.layout;if(!t)return;const e=this.renderRoot?.querySelector(".avc-grid");if(!e)return;if("viewport"===(t.height??"viewport")){const t=e.getBoundingClientRect().top;if(t>=0&&t<window.innerHeight){const o=Math.round(window.innerHeight-t-this._editBarHeight());o>120&&(e.style.height=o+"px")}}const o=this.renderRoot?.querySelector(".avc-region--map");if(o){const t=Math.round(o.clientWidth),e=Math.round(o.clientHeight);t&&Math.abs(t-this._mapRegW)>=2&&(this._mapRegW=t),e&&Math.abs(e-this._mapRegH)>=2&&(this._mapRegH=e)}if("portrait"===this._profile){const t=this.renderRoot?.querySelector(".avc-region--start"),o=parseFloat(getComputedStyle(e).rowGap||getComputedStyle(e).gap||"0")||0,i=t?Math.round(t.getBoundingClientRect().height):0,s=Math.round(e.clientWidth),n=Math.round(e.clientHeight-i-(i?o:0));s&&Math.abs(s-this._mapAvailW)>=2&&(this._mapAvailW=s),n>0&&Math.abs(n-this._mapAvailH)>=2&&(this._mapAvailH=n)}}disconnectedCallback(){super.disconnectedCallback(),this._cancelHold(),this._measureRaf&&(cancelAnimationFrame(this._measureRaf),this._measureRaf=0),null!==this._measureTimer&&(clearTimeout(this._measureTimer),this._measureTimer=null),null!==this._settleTimer&&(clearTimeout(this._settleTimer),this._settleTimer=null),this._tickTimer&&(clearInterval(this._tickTimer),this._tickTimer=null),this._onWinResize&&(window.removeEventListener("resize",this._onWinResize),window.removeEventListener("orientationchange",this._onWinResize),this._onWinResize=null),this._ro&&(this._ro.disconnect(),this._ro=null),this._panelViewMo&&(this._panelViewMo.disconnect(),this._panelViewMo=null),this._panelViewNode=null,this._barMo&&(this._barMo.disconnect(),this._barMo=null),this._editBarRo&&(this._editBarRo.disconnect(),this._editBarRo=null)}firstUpdated(){const t=Math.round(this.getBoundingClientRect().width);t&&(this._cardW=t),this._scheduleMeasure()}updated(){if(this._careResetPending.size){let t=null;for(const[e,o]of this._careResetPending){const i=this.hass?.states[e],s=i?Date.parse(i.last_changed):NaN;Number.isFinite(s)&&s>o&&(t||(t=new Map(this._careResetPending)),t.delete(e))}t&&(this._careResetPending=t)}this._refineGridHeight(),this._refineGridColumns(),this._setupPanelViewObserver(),null!==this._settleTimer&&clearTimeout(this._settleTimer),this._settleTimer=window.setTimeout(()=>{this._settleTimer=null,this._scheduleMeasure()},250)}_refineGridColumns(){if("portrait"!==this._profile||!this._lastPortraitFitW)return;if(this._config.layout?.portrait?.columns?.length)return;if(this._stackTopology)return;const t=this.renderRoot?.querySelector(".avc-grid");if(!t)return;const e=t.clientWidth-(parseFloat(getComputedStyle(t).columnGap||"0")||0);let o=Math.round(this._lastPortraitFitW);e>0&&(o=Math.min(o,e));const i=Math.round(o)+"px 1fr";t.style.gridTemplateColumns!==i&&(t.style.gridTemplateColumns=i)}shouldUpdate(t){if(!t.has("hass")||t.size>1)return!0;const e=t.get("hass");if(!e||!this._config)return!0;for(const t of this._watchedEntities())if(e.states[t]!==this.hass.states[t])return!0;return!1}_watchedEntities(){if(this._registry(),this._watched)return this._watched;const t=new Set;for(const e of this._config?.vacuums??[]){for(const o of[e.entity,e.status_entity,e.battery_entity,e.last_clean_entity,e.progress_entity,e.current_room_entity,e.error_entity,this._mapEntityFor(e),this._intEntity(e),...Object.values(this._autoEntities(e))])o&&t.add(o);for(const o of this._roomsFor(e))o.last_clean_entity&&t.add(o.last_clean_entity),o.clean_time_entity&&t.add(o.clean_time_entity);for(const o of this._careItems(e))o.entity&&t.add(o.entity),o.reset&&t.add(o.reset),o.binary&&t.add(o.binary)}for(const e of this._config?.global_actions??[])for(const o of e.watch_entities??[])o&&t.add(o);return this.hass?.entities&&(this._watched=t),t}_resolveColor(t,e){const o=t??e;return Rt[o]??o}_resolveBg(t,e,o){return(o?zt:At)[t??e]??function(t,e){const o=/^#([0-9a-f]{3}|[0-9a-f]{6})$/i.exec(t);if(!o)return`rgba(255,255,255,${e})`;let i=o[1];return 3===i.length&&(i=i.split("").map(t=>t+t).join("")),`rgba(${parseInt(i.slice(0,2),16)},${parseInt(i.slice(2,4),16)},${parseInt(i.slice(4,6),16)},${e})`}(this._resolveColor(t,e),o?.3:.18)}_vacIndex(t){const e=this._config?.vacuums?.findIndex(e=>e.entity===t.entity)??-1;return e<0?0:e}_defaultColor(t){return Mt[this._vacIndex(t)%Mt.length]}_color(t){return this._resolveColor(t.color,this._defaultColor(t))}_colorBg(t){return this._resolveBg(t.color,this._defaultColor(t),!1)}_colorBgActive(t){return this._resolveBg(t.color,this._defaultColor(t),!0)}_registry(){const t=this.hass?.entities;return t!==this._regRef&&(this._regRef=t,this._intCache.clear(),this._mapCandCache.clear(),this._autoCache.clear(),this._careCache.clear(),this._watched=null),t}_intEntity(t){if(t.integration_entity)return t.integration_entity;const e=this._registry();if(!e||!t.entity)return;if(this._intCache.has(t.entity))return this._intCache.get(t.entity);const o=e[t.entity]?.device_id,i=o?Object.keys(e).find(t=>e[t]?.device_id===o&&"anyvac"===e[t]?.platform&&t.startsWith("sensor.")):void 0;return this._intCache.set(t.entity,i),i}_mapEntityFor(t){if(t.map?.entity)return t.map.entity;const e=this._registry();if(!e||!t.entity)return;let o=this._mapCandCache.get(t.entity);if(!o){const i=e[t.entity]?.device_id;if(!i)return;o=Object.keys(e).filter(t=>e[t]?.device_id===i&&t.startsWith("image.")),this._mapCandCache.set(t.entity,o)}if(1===o.length)return o[0];const i=o.filter(t=>{const e=this.hass.states[t];return!!e&&"unavailable"!==e.state&&"unknown"!==e.state&&!!e.attributes.entity_picture});return 1===i.length?i[0]:void 0}_intAttrs(t){const e=this._intEntity(t),o=e?this.hass.states[e]?.attributes:void 0;if(o)return(o.schema_version??0)>=2?o:void 0}_schemaWarning(){for(const t of this._config?.vacuums??[]){const e=this._intEntity(t),o=e?this.hass.states[e]?.attributes:void 0;if(o&&(o.schema_version??0)<2)return`AnyVac integration is too old for this card (schema ${o.schema_version??1} < 2). Update the anyvac integration to ≥ 0.18.0.`}return null}_autoEntities(t){const e=this._registry();if(!e||!t.entity)return{};const o=this._autoCache.get(t.entity);if(o)return o;const i=e[t.entity]?.device_id;if(!i)return{};const s=Object.keys(e).filter(t=>e[t]?.device_id===i),n=t=>s.find(o=>e[o]?.translation_key===t),a={status:n("status"),battery:(t=>s.find(e=>this.hass.states[e]?.attributes?.device_class===t))("battery"),last_clean:n("last_clean_end"),progress:n("clean_percent"),current_room:n("current_room"),error:n("vacuum_error")};return this._autoCache.set(t.entity,a),a}_ent(t,e){return t[e+"_entity"]??this._autoEntities(t)[e]}_statusInfo(t){const e=this.hass.states[this._ent(t,"status")??t.entity]?.state??"unknown";return St[e]??[e,"rgba(255,255,255,0.5)"]}_careItems(t){const e=this._registry(),o=this.hass?.devices;if(!e||!o||!t.entity)return[];const i=this._dockTier(t),s=t.entity+"|"+i;if(this._careCache.has(s))return this._careCache.get(s);const n=e[t.entity]?.device_id,a=n?o[n]:void 0,r=a?.identifiers?.find(([t])=>"roborock"===t)?.[1],l=r?Object.values(o).find(t=>t.identifiers?.some(([t,e])=>"roborock"===t&&e===`${r}_dock`)):void 0,c=l?.id,d=(t,o,i)=>t?Object.keys(e).find(s=>e[s]?.device_id===t&&e[s]?.translation_key===o&&s.startsWith(i+".")):void 0,h=[],p=(t,e,o,i)=>{const s=d(i,e,"sensor"),n=d(i,o,"button");(s||n)&&h.push({key:e,label:t,entity:s,reset:n,totalHours:qt[e]})};if(p("Main brush","main_brush_time_left","reset_main_brush_consumable",n),p("Side brush","side_brush_time_left","reset_side_brush_consumable",n),p("Filter","filter_time_left","reset_air_filter_consumable",n),p("Sensors","sensor_time_left","reset_sensor_consumable",n),"full"===i){p("Dock brush","cleaning_brush_time_left","reset_dock_cleaning_brush_consumable",c),p("Strainer","strainer_time_left","reset_dock_strainer_consumable",c);const t=(t,e)=>{const o=d(c,e,"binary_sensor");o&&h.push({key:e,label:t,binary:o})};t("Dirty water tank","dirty_box_full"),t("Clean water tank","clean_box_empty"),t("Cleaning fluid","clean_fluid_empty")}return this._careCache.set(s,h),h}_careValue(t){if(!t.entity)return"—";const e=this.hass.states[t.entity];if(!e||"unavailable"===e.state||"unknown"===e.state)return"—";const o=Number(e.state);if(Number.isNaN(o))return e.state;const i=e.attributes?.unit_of_measurement,s="s"===i?o/3600:"min"===i?o/60:o;if(t.totalHours){return`${Math.max(0,Math.min(100,Math.round(s/t.totalHours*100)))} %`}return`${Math.round(s)} h`}_isCleaning(t){return Pt.has(this.hass.states[t.entity]?.state??"")}_hasError(t){const e=this._ent(t,"error"),o=e?this.hass.states[e]?.state:null;return!!o&&"none"!==o&&"unknown"!==o&&"unavailable"!==o}_isPaused(t){return"paused"===this.hass.states[t.entity]?.state}_battery(t){const e=this._ent(t,"battery");if(!e)return null;const o=parseInt(this.hass.states[e]?.state??"");return isNaN(o)?null:o}_lastCleanStr(t){const e=this._ent(t,"last_clean"),o=e?this.hass.states[e]?.state:void 0;if(!o||"unavailable"===o||"unknown"===o)return"—";const i=new Date(o),s=Math.floor((Date.now()-i.getTime())/864e5),n=i.toLocaleTimeString([],{hour:"2-digit",minute:"2-digit"});return 0===s?"Today · "+n:1===s?"Yesterday · "+n:i.toLocaleDateString([],{day:"2-digit",month:"2-digit"})+" · "+n}_progress(t){const e=this._ent(t,"progress");if(!e)return null;const o=parseInt(this.hass.states[e]?.state??"");return isNaN(o)||0===o?null:o}_selSensor(){for(const t of this._config.vacuums){const e=this._intEntity(t);if(e&&Array.isArray(this.hass.states[e]?.attributes?.selected_rooms))return e}}_backendSel(){const t=this._selSensor();return t?new Set(this.hass.states[t]?.attributes?.selected_rooms??[]):null}_setBackendSel(t,e){this._call("anyvac","select_rooms",{rooms:t,mode:e})}_isRoomSelected(t,e){const o=this._backendSel();return o?o.has(t.key):this._localRoomSel.get(e.entity+":"+t.key)??!1}_layersEff(){const t=this._selSensor(),e=t?this.hass.states[t]?.attributes?.view_layers:void 0;return e&&"boolean"==typeof e.dry&&"boolean"==typeof e.wet?{dry:e.dry,wet:e.wet}:this._layers}_staticRoomsFor(t){return Ft(this._config,t)}_memoSync(){this.hass!==this._memoHass&&(this._memoHass=this.hass,this._roomsMemo.clear(),this._seatMemo.clear())}_roomsFor(t){this._memoSync();const e=this._roomsMemo.get(t.entity);if(e)return e;const o=this._computeRoomsFor(t);return this._roomsMemo.set(t.entity,o),o}_computeRoomsFor(t){const e=this._intAttrs(t),o=Array.isArray(e?.rooms)?e.rooms:[];if(!e||!o.length)return this._staticRoomsFor(t);const i=this._effectiveSeat(t),s=this._wrapAspect(this._baseHeightFor(t)),n=this._staticRoomsFor(t),a=new Map(n.filter(t=>t.key).map(t=>[t.key,t])),r=new Set,l=[];for(const t of o){const o=t?.name;if(!o)continue;r.add(o);const n=a.get(o);if(n&&null!=n.map_x&&null!=n.map_y){l.push(n);continue}const c=It(t,e,i,s);c?l.push({...n??{key:o,name:o,icon:"mdi:floor-plan"},...c}):n&&l.push(n)}for(const t of n)t.key&&!r.has(t.key)&&l.push(t);return l}_hasSelectedRooms(t){return this._roomsFor(t).some(e=>this._isRoomSelected(e,t))}_liveCleanType(t){if((t.presets?.length??0)>=2){const e=this._activePreset(t);return null!=e.mop_intensity&&""!==e.mop_intensity&&"off"!==e.mop_intensity||null!=e.mop_mode&&""!==e.mop_mode?"wet":"dry"}const e=this._intAttrs(t)?.clean_type;if("wet"===e||"dry"===e)return e;const o=this._vacCleanType(t);return o.wet&&!o.dry?"wet":"dry"}_backendEstimate(t,e,o){const i=this._intAttrs(t)?.rooms_estimate;if(!i)return null;const s=i[e.name??""]??i[e.key],n=s?s[o]:void 0;return"number"==typeof n&&n>0?n:null}_roomCleanMins(t,e){const o=this._vacCleanType(e),i=!(!o.wet||o.dry)||!(o.dry&&!o.wet)&&"wet"===this._liveCleanType(e),s=this._backendEstimate(e,t,i?"wet":"dry");if(null!=s)return s;const n=i?t.clean_time_wet:t.clean_time_dry;if(null!=n&&n>0)return n;const a=i?t.clean_time_dry:t.clean_time_wet;if(null!=a&&a>0)return a;if(t.clean_time_entity){const e=parseFloat(this.hass.states[t.clean_time_entity]?.state??"");if(!isNaN(e)&&e>0)return e}return t.clean_time_mins??0}_totalCleanMins(t){return this._roomsFor(t).reduce((e,o)=>this._isRoomSelected(o,t)?e+this._roomCleanMins(o,t):e,0)}_intRoomRec(t,e){const o=this._intAttrs(t)?.rooms_last_cleaned;return o?o[e.key]??o[e.name??""]??null:null}_roomCoverageRec(t,e){const o=this._intAttrs(t)?.rooms_coverage;return o?o[e.key]??o[e.name??""]??null:null}_ageDaysFromIso(t){if(!t)return null;const e=new Date(t).getTime();return isNaN(e)?null:(Date.now()-e)/864e5}_roomAgeDays(t,e){if(e){const o=this._intRoomRec(e,t);if(o){const t=this._ageDaysFromIso(o.dry),e=this._ageDaysFromIso(o.wet),i=this._ageDaysFromIso(o.any),s=this._layersEff(),n=s.dry,a=s.wet;let r;if(r=n&&a?Math.max(t??9999,e??9999):n?t:a?e:i,null!==r)return r}}if(!t.last_clean_entity)return null;const o=this.hass.states[t.last_clean_entity]?.state;return o&&"unavailable"!==o&&"unknown"!==o?(Date.now()-new Date(o).getTime())/864e5:null}_colorForAgeDays(t){if(null===t)return"rgba(255,77,77,0.85)";const e=[...this._config.room_thresholds??[{days:2,color:"rgba(46,204,113,0.85)"},{days:5,color:"rgba(250,173,20,0.85)"},{days:10,color:"rgba(255,152,0,0.85)"}]].sort((t,e)=>t.days-e.days);for(const o of e)if(t<=o.days)return o.color;return"rgba(255,77,77,0.85)"}_vacCleanType(t){if("dry"===t.clean_type)return{dry:!0,wet:!1};if("wet"===t.clean_type)return{dry:!1,wet:!0};if("both"===t.clean_type)return{dry:!0,wet:!0};const e=this._intAttrs(t)?.mop_signal;if(e){return{dry:!0,wet:null!=e.water_box_mode||!!e.water_mode_name}}const o=t.clean_action,i=!(!o||!(o.mop_mode||o.mop_mode_entity||o.mop_intensity||o.mop_intensity_entity));return{dry:!i||null!=o?.suction_level&&"off"!==o.suction_level,wet:i}}_roomProgress(t,e){const o=this._intAttrs(t)?.rooms_progress;return o?o[e.key]??o[e.name??""]??null:null}_roomProgForType(t,e,o){let i=null,s=null,n=!1;for(const a of e){const e=this._roomProgress(a,t);if(!e)continue;const r="dry"===o?e.dry_pct:e.wet_pct;null!=r&&(null===i||r>i)&&(i=r,s=a,n=!!("dry"===o?e.dry_calibrating:e.wet_calibrating))}return null!==i&&s?{pct:i,kind:"S",title:`${o} coverage ${i}%`,color:this._color(s),calibrating:n}:null}_progColor(t){return t>=90?"#52c41a":t>=50?"#faad14":"#40a9ff"}_renderRoomGauge(t,e){if(!this._config.debug_room_progress)return G;const o=this._roomProgForType(e,t,"dry"),i=this._roomProgForType(e,t,"wet");if(!o&&!i)return G;const s=(t,e,o,i)=>q`
-      <span class="room-gauge" title=${e}
-        style=${vt({background:`conic-gradient(${o} ${3.6*t}deg, rgba(255,255,255,0.12) 0)`})}>
-        <span>${t}${i?"~":""}</span>
-      </span>`;return q`<div class="room-gauges">
-      ${o?s(o.pct,"dry · "+o.title,o.color,o.calibrating):G}
-      ${i?s(i.pct,"wet · "+i.title,"#40a9ff",i.calibrating):G}
-    </div>`}_renderProgChip(t){return t?q`<span class="rl-prog" title=${t.title}
-      style=${vt({color:t.color??this._progColor(t.pct)})}>${t.pct}${t.calibrating?"~":""}%<small>${t.kind}</small></span>`:G}_batIcon(t){return t>80?"mdi:battery":t>50?"mdi:battery-60":t>20?"mdi:battery-30":"mdi:battery-10"}_batColor(t){return t>50?"#52c41a":t>20?"#faad14":"#ff4d4f"}_mapUrl(t){const e=this.hass.states[t];if(!e)return"";const o=e.attributes.entity_picture;if(!o)return"";const i=new Date(e.last_updated).getTime(),s=o.includes("?")?"&":"?";return this.hass.hassUrl(o+s+"_t="+i)}_timeStr(t){const e=Math.round(t);if(e<=0)return"";if(e>=60){const t=Math.floor(e/60),o=e%60;return o>0?"~"+t+" h "+o+" min":"~"+t+" h"}return"~"+e+" min"}_isGlobalActive(t){return(t.watch_entities??[]).some(t=>Pt.has(this.hass.states[t]?.state??""))}async _triggerGlobal(t){const e=t.action;try{if("script"===e.type)await this.hass.callService("script","turn_on",{entity_id:e.entity_id,variables:e.variables??{}});else{const[t,o]=e.service.split(".");await this.hass.callService(t,o,e.data??{})}}catch(t){console.error("[anyvac-card] global action failed:",t)}}_cancelHold(){null!==this._holdTimer&&(clearTimeout(this._holdTimer),this._holdTimer=null),this._holdId=null,this._holdStartPos=null}_holdStart(t,e){return o=>{o.preventDefault(),this._cancelHold(),this._holdId=t,this._holdStartPos={x:o.clientX,y:o.clientY},this._holdTimer=setTimeout(()=>{this._holdTimer=null,this._holdId=null,this._holdStartPos=null,e()},kt)}}_toggleShown(t){if(this._config.layout&&"portrait"===this._profile)return this._shownSet=new Set([t]),void this._saveShown();this._toggleShownMulti(t)}_toggleShownMulti(t){const e=new Set(this._shownSet);e.has(t)?e.size>1&&e.delete(t):e.add(t),this._shownSet=e,this._saveShown()}async _call(t,e,o){try{await this.hass.callService(t,e,o)}catch(o){console.error("[anyvac-card] "+t+"."+e+" failed:",o)}}_fireMoreInfo(t){this.dispatchEvent(new CustomEvent("hass-more-info",{bubbles:!0,composed:!0,detail:{entityId:t}}))}_storeKey(t){const e=(this._config?.vacuums??[]).map(t=>t.entity).join(",");return`anyvac-card:${t}:${e}`}_readStored(t,e){try{return localStorage.getItem(this._storeKey(t))??localStorage.getItem(e)}catch{return null}}_saveShown(){try{const t=[...this._shownSet].map(t=>this._config.vacuums[t]?.entity).filter(Boolean);localStorage.setItem(this._storeKey("shown"),JSON.stringify(t))}catch{}}_loadShown(){try{const t=this._readStored("shown","roborock-card:shown");if(t){const e=JSON.parse(t).map(t=>this._config.vacuums.findIndex(e=>e.entity===t)).filter(t=>t>=0);if(e.length>0)return new Set(e)}}catch{}return new Set(this._config.vacuums.map((t,e)=>e))}_saveFlipLive(){try{null===this._flipLive?localStorage.removeItem(this._storeKey("flip")):localStorage.setItem(this._storeKey("flip"),JSON.stringify(this._flipLive))}catch{}}_loadFlipLive(){const t=this._readStored("flip","roborock-card:flip");if(null===t)return null;try{return!0===JSON.parse(t)}catch{return null}}_saveRoomSel(t){try{const e=t+":",o={};for(const[t,i]of this._localRoomSel.entries())t.startsWith(e)&&(o[t.slice(e.length)]=i);localStorage.setItem(this._storeKey("sel:"+t),JSON.stringify(o))}catch{}}_loadRoomSel(){const t=new Map;try{for(const e of this._config.vacuums){const o=this._readStored("sel:"+e.entity,"roborock-card:sel:"+e.entity);if(o){const i=JSON.parse(o);for(const[o,s]of Object.entries(i))s&&t.set(e.entity+":"+o,!0)}}}catch{}return t}_pause(t){this._call("vacuum","pause",{entity_id:t.entity})}_resume(t){this._call("vacuum","start",{entity_id:t.entity})}_dock(t){this._call("vacuum","return_to_base",{entity_id:t.entity})}_toggleRoom(t,e){if(this._backendSel())return void this._setBackendSel([t.key],"toggle");const o=e.entity+":"+t.key,i=new Map(this._localRoomSel);i.set(o,!i.get(o)),this._localRoomSel=i,this._saveRoomSel(e.entity)}_isRoomSelectedAny(t,e){const o=this._backendSel();return o?o.has(t):e.some(e=>this._localRoomSel.get(e.entity+":"+t)??!1)}_toggleRoomAcross(t,e){if(this._isRoomSelectedAny(t,e)&&e.some(t=>this._intAttrs(t))&&this._call("anyvac","pin_room",{room:t}),this._backendSel())return void this._setBackendSel([t],"toggle");const o=!this._isRoomSelectedAny(t,e),i=new Map(this._localRoomSel);for(const s of e)this._roomsFor(s).some(e=>e.key===t)&&i.set(s.entity+":"+t,o);this._localRoomSel=i;for(const t of e)this._saveRoomSel(t.entity)}_allRoomKeys(){const t=new Set;for(const e of this._config.vacuums)for(const o of this._roomsFor(e))t.add(o.key);return[...t]}_v2Vacuums(){const t=[],e=[];for(const o of this._config.vacuums){const i=this._vacCleanType(o);i.dry&&t.push(o.entity),i.wet&&e.push(o.entity)}return{dry:t,wet:e}}_unassignedRooms(t,e,o){if(!o||0===t.length)return[];const i=this._planPreview;if(!i||i.key!==this._planKey(t,e))return[];const s="wet"!==e,n="dry"!==e,a=[];for(const e of t)(s&&!i.dry.has(e)||n&&!i.wet.has(e))&&a.push(e);return a}_v2Settings(){const t={};for(const e of["dry","wet"])for(const o of this._config.vacuums){const i=this._vacCleanType(o);if(!("dry"===e?i.dry:i.wet))continue;const s=this._activePreset(o),n={};s.suction_level&&(n.fan_speed=s.suction_level),"wet"===e&&s.mop_mode&&(n.mop_mode=s.mop_mode),"wet"===e&&s.mop_intensity&&(n.mop_intensity=s.mop_intensity),s.repeat&&s.repeat>1&&(n.repeat=s.repeat),Object.keys(n).length&&((t[e]??(t[e]={}))[o.entity]=n)}return Object.keys(t).length?t:void 0}_planKey(t,e){return JSON.stringify([t,e,this._v2Vacuums(),this._pinsAttr()])}_fetchPlan(t,e){const o=this._planKey(t,e);o!==this._planFetchKey&&(this._planFetchKey=o,(async()=>{try{const i=await this.hass.callService("anyvac","plan",{rooms:t,mode:e,vacuums:this._v2Vacuums()},void 0,!1,!0);if(this._planFetchKey!==o)return;const s=i?.response?.plan??{},n=t=>{const e=new Map;for(const[o,i]of Object.entries(t??{}))for(const t of i)e.set(t,o);return e};this._planPreview={key:o,dry:n(s.dry),wet:n(s.wet),eta:"number"==typeof s.eta_min?s.eta_min:null,unsequenced:Array.isArray(s.unsequenced)?s.unsequenced:[]}}catch(t){console.warn("[anyvac-card] anyvac.plan preview failed:",t),this._planFetchKey===o&&(this._planPreview={key:o,dry:new Map,wet:new Map,eta:null,unsequenced:[]})}})())}_etaFor(t,e,o){o&&t.length&&this._fetchPlan(t,e);const i=this._planPreview?.eta;return o&&null!=i?i:this._selEstMins(t)}async _runOrchestrated(t,e){t.length&&await this._call("anyvac","clean",{rooms:t,mode:e,vacuums:this._v2Vacuums(),...this._v2Settings()?{settings:this._v2Settings()}:{}})}_selectGlobalPreset(t){if(this._activeGlobalPreset=t.id,t.mode&&(this._planMode=t.mode),"all"===t.scope||Array.isArray(t.scope)){const e="all"===t.scope?this._allRoomKeys():t.scope;if(this._backendSel())return void this._setBackendSel(e,"set");const o=new Map(this._localRoomSel);for(const t of this._config.vacuums)for(const e of this._roomsFor(t))o.delete(t.entity+":"+e.key);for(const t of e)for(const e of this._config.vacuums)this._roomsFor(e).some(e=>e.key===t)&&o.set(e.entity+":"+t,!0);this._localRoomSel=o;for(const t of this._config.vacuums)this._saveRoomSel(t.entity)}}_vacAbbrev(t){return((t.name??t.entity.split(".")[1]??"").replace(/[^A-Za-z0-9]/g,"").slice(0,2)||"??").toUpperCase()}_renderPlanPreview(){if("auto"!==this._config.ui_mode)return G;const t=this._allRoomKeys().filter(t=>this._isRoomSelectedAny(t,this._config.vacuums));if(!t.length)return G;const e=this._planMode,o=(this._config.global_presets??[]).find(t=>t.id===this._activeGlobalPreset)?.label,i="dry"===e||"both"===e,s="wet"===e||"both"===e;this._fetchPlan(t,e);const n=this._planPreview?.dry??new Map,a=this._planPreview?.wet??new Map,r=t=>{for(const e of this._config.vacuums){const o=this._roomsFor(e).find(e=>e.key===t);if(o)return o}},l=t=>{const e=this._config.vacuums.find(e=>e.entity===t);if(!e)return q`<span style="font-size:11px;opacity:.25">—</span>`;const o=this._color(e);return q`<span style="display:inline-flex;align-items:center;justify-content:center;min-width:24px;height:17px;padding:0 5px;border-radius:9px;font-size:10px;font-weight:700;color:#fff;background:${o}30;border:1px solid ${o}">${this._vacAbbrev(e)}</span>`},c=(t,o)=>{const i=e===t;return q`<button @click=${e=>{e.stopPropagation(),this._planMode=t}}
-        style="padding:2px 8px;border-radius:8px;font-size:10px;font-weight:700;cursor:pointer;font-family:inherit;border:1px solid ${i?"rgba(255,255,255,0.5)":"rgba(255,255,255,0.15)"};background:${i?"rgba(255,255,255,0.12)":"transparent"};color:${i?"#fff":"rgba(255,255,255,0.5)"}">${o}</button>`},d="plan-run";return q`
-      <div style="margin:0 4px 6px;padding:6px 8px;background:rgba(255,255,255,0.03);border:1px solid rgba(255,255,255,0.08);border-radius:12px;display:flex;flex-direction:column;gap:6px">
+ */const ge="important",ue=" !"+ge,_e=(e=>(...t)=>({_$litDirective$:e,values:t}))(class extends me{constructor(e){if(super(e),e.type!==pe||"style"!==e.name||e.strings?.length>2)throw Error("The `styleMap` directive must be used in the `style` attribute and must be the only part in the attribute.")}render(e){return Object.keys(e).reduce((t,o)=>{const s=e[o];return null==s?t:t+`${o=o.includes("-")?o:o.replace(/(?:^(webkit|moz|ms|o)|)(?=[A-Z])/g,"-$&").toLowerCase()}:${s};`},"")}update(e,[t]){const{style:o}=e.element;if(void 0===this.ft)return this.ft=new Set(Object.keys(t)),this.render(t);for(const e of this.ft)null==t[e]&&(this.ft.delete(e),e.includes("-")?o.removeProperty(e):o[e]=null);for(const e in t){const s=t[e];if(null!=s){this.ft.add(e);const t="string"==typeof s&&s.endsWith(ue);e.includes("-")||t?o.setProperty(e,t?s.slice(0,-11):s,t?ge:""):o[e]=s}}return ie}}),be="anyvac-card",ve="anyvac-card-editor",fe="1.2.0",ye=600,xe={cleaning:["🧹 Cleaning","#52c41a"],segment_cleaning:["🧹 Cleaning rooms","#52c41a"],zoned_cleaning:["🧹 Zone cleaning","#52c41a"],spot_cleaning:["🎯 Spot cleaning","#52c41a"],starting:["▶️ Starting","#52c41a"],segment_mopping:["🫧 Mopping rooms","#40a9ff"],zoned_mopping:["🫧 Zone mopping","#40a9ff"],robot_status_mopping:["🫧 Mopping","#40a9ff"],clean_mop_cleaning:["🧹🫧 Vacuuming+mopping","#52c41a"],clean_mop_mopping:["🧹🫧 Vacuuming+mopping","#52c41a"],segment_clean_mop_cleaning:["🧹🫧 Rooms (vac)","#52c41a"],segment_clean_mop_mopping:["🧹🫧 Rooms (mop)","#52c41a"],zoned_clean_mop_cleaning:["🧹🫧 Zones (vac)","#52c41a"],zoned_clean_mop_mopping:["🧹🫧 Zones (mop)","#52c41a"],washing_the_mop:["🚿 Washing mop","#9254de"],washing_the_mop_2:["🚿 Washing mop","#9254de"],going_to_wash_the_mop:["🚿 Going to wash mop","#9254de"],air_drying_stopping:["💨 Drying mop","#9254de"],back_to_dock_washing_duster:["🏠 Dock + washing","#faad14"],returning_home:["🏠 Returning home","#faad14"],docking:["🏠 Docking","#faad14"],going_to_target:["🎯 Going to target","#40a9ff"],charging:["⚡ Charging","rgba(var(--avc-ink-rgb),0.75)"],charging_complete:["✅ Fully charged","#52c41a"],docked:["✅ Docked","rgba(var(--avc-ink-rgb),0.75)"],charger_disconnected:["🔌 Charger disconnected","#faad14"],emptying_the_bin:["🗑️ Emptying bin","#faad14"],idle:["💤 Idle","rgba(var(--avc-ink-rgb),0.45)"],paused:["⏸️ Paused","#faad14"],mapping:["🗺️ Mapping","#40a9ff"],remote_control_active:["🕹️ Remote control","#40a9ff"],manual_mode:["🕹️ Manual mode","#40a9ff"],updating:["⬆️ Updating","#faad14"],in_call:["📞 In call","#faad14"],shutting_down:["⏹️ Shutting down","rgba(var(--avc-ink-rgb),0.4)"],error:["❌ Error","#ff4d4f"],charging_problem:["⚠️ Charging problem","#ff4d4f"],locked:["🔒 Locked","#ff4d4f"],device_offline:["📴 Offline","#ff4d4f"]},we={green:"#52c41a",blue:"#2196F3",orange:"#faad14"},$e=["#52c41a","#2196F3","#faad14","#eb2f96","#722ed1","#13c2c2","#fa541c","#a0d911"],ke={green:"rgba(46,204,113,0.18)",blue:"rgba(33,150,243,0.18)",orange:"rgba(250,173,20,0.18)"},Se={green:"rgba(46,204,113,0.30)",blue:"rgba(33,150,243,0.30)",orange:"rgba(250,173,20,0.30)"};const Re="dark",Me=[{id:"sage",label:"Sage",hex:"#6FBF73"},{id:"ocean",label:"Ocean",hex:"#4FA5C7"},{id:"terracotta",label:"Terracotta",hex:"#D98A6A"},{id:"plum",label:"Plum",hex:"#A87CC0"},{id:"amber",label:"Amber",hex:"#D9A441"},{id:"graphite",label:"Graphite",hex:"#8E97A8"}],Ae="#6FBF73";const ze=new Set(["cleaning","segment_cleaning","zoned_cleaning","spot_cleaning","segment_mopping","zoned_mopping","robot_status_mopping","clean_mop_cleaning","clean_mop_mopping","segment_clean_mop_cleaning","segment_clean_mop_mopping","zoned_clean_mop_cleaning","zoned_clean_mop_mopping"]);function mapPxDims(e){if(!e)return null;const t=e.scale??1;let o=(e.width??0)*t,s=(e.height??0)*t;const l=e.rotation??0;if(90===l||270===l){const e=o;o=s,s=e}return o>0&&s>0?{NW:o,NH:s}:null}const Ce=Math.PI/180;function seatFromFrame(e,t,o,s,l,d,h){let p=Math.round(e/Ce)%360;return p<0&&(p+=360),{rotation:p,scale:100*t,offset_x:100*o.x-50,offset_y:o.y*s*100-50,residual_pct:100*l,anchors:d,raw_rotation:Math.round(h/Ce*10)/10}}function resolveStaticRooms(e,t){return(e.rooms?.length?e.rooms:t?.rooms)??[]}function resolveSeat(e,t,o,s){const l=t?.map,d={rotation:l?.rotation??0,scale:l?.scale??100,offset_x:l?.offset_x??0,offset_y:l?.offset_y??0,auto:!1};if(!t||"manual"===l?.seat)return d;if(!function resolveImageBaseSrc(e,t){const o="merged"===e.map_mode?e.image_base??(e.vacuums??[]).find(e=>e.image_base?.src)?.image_base:t?.image_base;return o?.src}(e,t))return d;if(!o)return d;const h=function computeSeatFit(e,t){if(!(e.length&&t>0))return null;if(e.length>=2){const o=e.length,s={x:0,y:0},l={x:0,y:0};for(const t of e)s.x+=t.q.x,s.y+=t.q.y,l.x+=t.a.x,l.y+=t.a.y;s.x/=o,s.y/=o,l.x/=o,l.y/=o;let d=0,h=0,p=0;for(const t of e){const e=t.q.x-s.x,o=t.q.y-s.y,m=t.a.x-l.x,u=t.a.y-l.y;d+=e*m+o*u,h+=e*u-o*m,p+=e*e+o*o}if(p>1e-8){const m=Math.atan2(h,d),u=Math.round(m/(Math.PI/2))*(Math.PI/2),_=Math.cos(u),b=Math.sin(u);let v=0;for(const t of e){const e=t.q.x-s.x,o=t.q.y-s.y,d=b*e+_*o;v+=(_*e-b*o)*(t.a.x-l.x)+d*(t.a.y-l.y)}const f=v/p;if(f>1e-4){const d={x:l.x-f*(_*s.x-b*s.y),y:l.y-f*(b*s.x+_*s.y)};let h=0;for(const t of e){const e=d.x+f*(_*t.q.x-b*t.q.y)-t.a.x,o=d.y+f*(b*t.q.x+_*t.q.y)-t.a.y;h+=e*e+o*o}return seatFromFrame(u,f,d,t,Math.sqrt(h/o),o,m)}}}const o=e.find(e=>e.sizeQ&&e.sizeA)??null;if(!o||!o.sizeQ||!o.sizeA||o.sizeQ.w<1e-6||o.sizeQ.h<1e-6)return null;let s=null;for(const e of[0,1,2,3]){const t=e*(Math.PI/2),l=e%2==0?o.sizeQ.w:o.sizeQ.h,d=e%2==0?o.sizeQ.h:o.sizeQ.w,h=o.sizeA.w/l,p=o.sizeA.h/d;if(!(h>0&&p>0))continue;const m=Math.sqrt(h*p),u=Math.abs(Math.log(h/p));(!s||u<s.mism-1e-9)&&(s={theta:t,s:m,mism:u})}if(!s)return null;const l=Math.cos(s.theta),d=Math.sin(s.theta),h={x:o.a.x-s.s*(l*o.q.x-d*o.q.y),y:o.a.y-s.s*(d*o.q.x+l*o.q.y)};return seatFromFrame(s.theta,s.s,h,t,0,1,s.theta)}(function assembleAnchors(e,t,o){if(!t)return[];const s=mapPxDims(t.image_dims),l=Array.isArray(t.rooms)?t.rooms:[];if(!s||!l.length)return[];const{NW:d,NH:h}=s,p=[];for(const t of e){if(null==t.map_x||null==t.map_y)continue;const e=l.find(e=>e.name===t.key)??l.find(e=>e.name===t.name),s=e?.bbox_px;if(!s||[s.x0,s.y0,s.x1,s.y1].some(e=>null==e))continue;const m={q:{x:((s.x0+s.x1)/2-d/2)/d,y:((s.y0+s.y1)/2-h/2)/d},a:{x:t.map_x/100,y:t.map_y/100/o}};null!=t.map_w&&null!=t.map_h&&t.map_w>0&&t.map_h>0&&(m.sizeQ={w:(s.x1-s.x0)/d,h:(s.y1-s.y0)/d},m.sizeA={w:t.map_w/100,h:t.map_h/100/o}),p.push(m)}return p}(resolveStaticRooms(e,t),o,s),s);return h?{rotation:h.rotation,scale:h.scale,offset_x:h.offset_x,offset_y:h.offset_y,auto:!0,residual:h.residual_pct,anchorCount:h.anchors}:d}function placeRoomInCrop(e,t){const o=t.x1-t.x0,s=t.y1-t.y0;if(!(o>0&&s>0))return null;const l=(e.x0+e.x1)/2-t.x0,d=(e.y0+e.y1)/2-t.y0,h=e.x1-e.x0,p=e.y1-e.y0,clamp=(e,t,o)=>Math.min(o,Math.max(t,e));return{map_x:clamp(Math.round(l/o*1e3)/10,0,100),map_y:clamp(Math.round(d/s*1e3)/10,0,100),map_w:clamp(Math.round(h/o*1e3)/10,2,100),map_h:clamp(Math.round(p/s*1e3)/10,2,100)}}function roomBboxToRect(e,t,o,s){const l=mapPxDims(t?.image_dims),d=e?.bbox_px;if(!l||!d||[d.x0,d.y0,d.x1,d.y1].some(e=>null==e))return null;const{NW:h,NH:p}=l,m=((d.x0+d.x1)/2-h/2)/h,u=((d.y0+d.y1)/2-p/2)/h;let _=(d.x1-d.x0)/h,b=(d.y1-d.y0)/h;const v=o.scale/100,f=o.rotation*Ce,w=Math.cos(f),$=Math.sin(f),A=(50+o.offset_x)/100+v*(w*m-$*u),C=(50+o.offset_y)/100/s+v*($*m+w*u);if(Math.round(o.rotation/90)%2!=0){const e=_;_=b,b=e}const clamp=(e,t,o)=>Math.min(o,Math.max(t,e));return{map_x:clamp(Math.round(1e3*A)/10,0,100),map_y:clamp(Math.round(C*s*1e3)/10,0,100),map_w:clamp(Math.round(v*_*1e3)/10,2,100),map_h:clamp(Math.round(v*b*s*1e3)/10,2,100)}}const Pe={columns:[100],rows:["minmax(0, 1fr)","auto","auto"],place:{map:{row:1,col:1},dock:{row:2,col:1,overflow:"auto"},start:{row:3,col:1}}},Ee={landscape:{columns:["minmax(0, 1fr)","max-content"],rows:["auto","minmax(260px, 1fr)","auto","auto"],place:{badges:{row:1,col:"1/3"},map:{row:2,col:"1/3"},tools:{row:3,col:"1/3",align:"start"},status:{row:4,col:1,overflow:"auto"},dock:{row:4,col:2,overflow:"auto"}}},portrait:{columns:[72,28],rows:[90,10],place:{map:{row:1,col:1},dock:{row:1,col:2,overflow:"auto"},start:{row:2,col:"1/3"}}}};function track(e){return"number"==typeof e?e+"fr":e}function trackList(e){return e.map(track).join(" ")}function resolveHeightCss(e){const t=e.height??"viewport";return"viewport"===t?"calc(100svh - var(--header-height, 0px))":"container"===t?"100%":t}var Te;const Fe={main_brush_time_left:300,side_brush_time_left:200,filter_time_left:150,sensor_time_left:30};console.info(`%c ANYVAC-CARD %c v${fe} `,"background:#2196F3;color:#fff;font-weight:700;padding:2px 4px;border-radius:3px 0 0 3px","background:#1a1a1a;color:#fff;font-weight:400;padding:2px 4px;border-radius:0 3px 3px 0");let De=class AnyVacCard extends le{constructor(){super(...arguments),this.editMode=!1,this._shownSet=new Set([0]),this._holdId=null,this._mapMode="normal",this._inspectKey=null,this._dockSheetOpen=!1,this._dockSheetIdx=0,this._modeSheetOpen=!1,this._careResetPending=new Map,this._modeEntity=null,this._dbg="",this._zoneDrag=null,this._zoneRectShown=null,this._zonePending=null,this._zoneMulti=!1,this._zoneEdit=null,this._pinPending=null,this._layers={dry:!0,wet:!1},this._layerMenu=null,this._layerHoldTimer=null,this._layerHeld=!1,this._localRoomSel=new Map,this._activePresets=new Map,this._planMode="both",this._activeGlobalPreset=null,this._cardW=0,this._mapAR=3.636,this._profile="landscape",this._mapRegW=0,this._mapRegH=0,this._mapAvailW=0,this._mapAvailH=0,this._lastStack=!1,this._lastPortraitFitW=0,this._lastRotate=!0,this._flipLive=null,this._ro=null,this._onWinResize=null,this._measureRaf=0,this._measureTimer=null,this._settleTimer=null,this._panelViewMo=null,this._panelViewWarned=!1,this._panelViewNode=null,this._barMo=null,this._editBarRo=null,this._now=Date.now(),this._tickTimer=null,this._holdTimer=null,this._holdStartPos=null,this._initialized=!1,this._watched=null,this._intCache=new Map,this._mapCandCache=new Map,this._autoCache=new Map,this._careCache=new Map,this._roomsMemo=new Map,this._seatMemo=new Map,this._holdEnd=()=>{this._cancelHold()},this._holdMove=e=>{if(!this._holdStartPos||null===this._holdTimer)return;const t=e.clientX-this._holdStartPos.x,o=e.clientY-this._holdStartPos.y;t*t+o*o>144&&this._cancelHold()},this._planPreview=null,this._planFetchKey="",this._onFloorplanLoad=e=>{const t=e.target;if(t?.naturalWidth&&t.naturalHeight){const e=t.naturalWidth/t.naturalHeight;e>.1&&Math.abs(e-this._mapAR)>.01&&(this._mapAR=e)}}}static getConfigElement(){return document.createElement(ve)}static getStubConfig(e){const t=e?Object.keys(e.states).filter(e=>e.startsWith("vacuum.")):[],o=e?.entities,s=o?t.filter(e=>"matter"!==o[e]?.platform):t,l=s.length>0?s:t;return 0===l.length?{type:`custom:${be}`,vacuums:[{entity:"vacuum.my_roborock",name:"Roborock",rooms:[],clean_action:{type:"native"}}]}:{type:`custom:${be}`,vacuums:l.map(t=>({entity:t,name:e.states[t]?.attributes.friendly_name??t.replace(/^vacuum\./,""),rooms:[],clean_action:{type:"native"}}))}}setConfig(e){if(!e.vacuums||!Array.isArray(e.vacuums)||0===e.vacuums.length)throw new Error("[anyvac-card] 'vacuums' must be a non-empty array");if(this._config=e,this._watched=null,this._intCache.clear(),this._mapCandCache.clear(),this._autoCache.clear(),this._careCache.clear(),this._roomsMemo.clear(),this._seatMemo.clear(),this._initialized){const t=new Set;for(const o of this._shownSet)o<e.vacuums.length&&t.add(o);this._shownSet=t.size>0?t:new Set(e.vacuums.map((e,t)=>t))}else this._initialized=!0,this._shownSet=this._loadShown(),this._localRoomSel=this._loadRoomSel(),this._flipLive=this._loadFlipLive()}getCardSize(){return 6}connectedCallback(){super.connectedCallback(),this.style.setProperty("--hold-ms",ye+"ms"),this._ro||"undefined"==typeof ResizeObserver||(this._ro=new ResizeObserver(()=>this._scheduleMeasure()),this._ro.observe(this)),this._onWinResize||(this._onWinResize=()=>this._scheduleMeasure(),window.addEventListener("resize",this._onWinResize,{passive:!0}),window.addEventListener("orientationchange",this._onWinResize,{passive:!0})),this._setupPanelViewObserver(),this._scheduleMeasure(),this._tickTimer||(this._tickTimer=window.setInterval(()=>{this._config?.debug_room_progress&&(this._config.vacuums??[]).some(e=>this._isCleaning(e)||this._isPaused(e))&&(this._now=Date.now())},1e3))}_scheduleMeasure(){if(this._measureRaf||null!==this._measureTimer)return;const run=()=>{this._measureRaf=0,this._measureTimer=null,this._doMeasure()};"undefined"!=typeof document&&document.hidden?this._measureTimer=window.setTimeout(run,0):this._measureRaf=requestAnimationFrame(run)}_doMeasure(){const e=this.getBoundingClientRect(),t=Math.round(e.width);t&&Math.abs(t-this._cardW)>=2&&(this._cardW=t);const o=this._config?.layout;if(o){const s=function pickProfile(e,t,o){const s=e?.orientation;return"portrait"===s||"landscape"===s?s:t&&o&&t/o<(e?.threshold??1)?"portrait":"landscape"}(o,this._cardW||t||window.innerWidth,this._availableHeight(o,e));s!==this._profile&&(this._profile=s),this._refineGridHeight()}}_availableHeight(e,t){if("container"===(e.height??"viewport"))return t.height>1?Math.round(t.height):window.innerHeight;const o=t.top;return o>=0&&o<window.innerHeight?Math.max(1,Math.round(window.innerHeight-o-this._editBarHeight())):window.innerHeight}_editBarHeight(){try{const e=this._findCardOptionsAncestor();if(!e?.shadowRoot)return 0;const t=e.shadowRoot.querySelector(".card-actions");if(!t)return 0;const o=t.getBoundingClientRect();if(!(o.height>0))return 0;const s=getComputedStyle(t);return Math.ceil(o.height+(parseFloat(s.marginTop)||0)+(parseFloat(s.marginBottom)||0))}catch{return 0}}_findPanelViewAncestor(){let e=this.parentElement??this.getRootNode().host??null,t=0;for(;e&&t++<20;){if(e instanceof Element&&("HUI-PANEL-VIEW"===e.tagName||"HUI-VIEW"===e.tagName))return e;const t=e;e=t.parentElement??t.getRootNode()?.host??null}return null}_findCardOptionsAncestor(){let e=this.parentElement??this.getRootNode().host??null,t=0;for(;e&&t++<12;){if(e instanceof Element&&"HUI-CARD-OPTIONS"===e.tagName)return e;const t=e;e=t.parentElement??t.getRootNode()?.host??null}return null}_setupPanelViewObserver(){if("undefined"==typeof MutationObserver)return;if(this._panelViewMo&&this._panelViewNode?.isConnected)return;this._panelViewMo&&(this._panelViewMo.disconnect(),this._panelViewMo=null,this._panelViewNode=null);const e=this._findPanelViewAncestor();if(!e){if(!this._panelViewWarned){this._panelViewWarned=!0;try{console.warn("[anyvac-card] hui-panel-view/hui-view ancestor not found (HA internal DOM may have changed) — edit-mode layout refresh via MutationObserver is disabled; resize-based refresh still works.")}catch{}}return}const t=new MutationObserver(()=>{this._scheduleMeasure(),this._watchEditBar();const e=this._findCardOptionsAncestor();if(e?.shadowRoot)try{t.observe(e.shadowRoot,{childList:!0,subtree:!0})}catch{}});try{t.observe(e,{childList:!0,subtree:!0})}catch{}if(e.shadowRoot)try{t.observe(e.shadowRoot,{childList:!0,subtree:!0})}catch{}const o=this._findCardOptionsAncestor();if(o?.shadowRoot)try{t.observe(o.shadowRoot,{childList:!0,subtree:!0})}catch{}this._panelViewMo=t,this._panelViewNode=e,this._watchEditBar()}_watchEditBar(){this._barMo&&(this._barMo.disconnect(),this._barMo=null);const e=this._findCardOptionsAncestor();if(!e?.shadowRoot)return;const t=e.shadowRoot.querySelector(".card-actions");if(t)return void this._observeEditBar(t);const o=e.shadowRoot,s=new MutationObserver(()=>{const e=o.querySelector(".card-actions");e&&(s.disconnect(),this._barMo=null,this._observeEditBar(e))});try{s.observe(o,{childList:!0,subtree:!0})}catch{return}this._barMo=s}_observeEditBar(e){if(this._scheduleMeasure(),"undefined"==typeof ResizeObserver)return;this._editBarRo&&(this._editBarRo.disconnect(),this._editBarRo=null);const t=new ResizeObserver(()=>this._scheduleMeasure());try{t.observe(e)}catch{return}this._editBarRo=t}_refineGridHeight(){const e=this._config?.layout;if(!e)return;const t=this.renderRoot?.querySelector(".avc-grid");if(!t)return;if("viewport"===(e.height??"viewport")){const e=t.getBoundingClientRect().top;if(e>=0&&e<window.innerHeight){const o=Math.round(window.innerHeight-e-this._editBarHeight());o>120&&(t.style.height=o+"px")}}const o=this.renderRoot?.querySelector(".avc-region--map");if(o){const e=Math.round(o.clientWidth),t=Math.round(o.clientHeight);e&&Math.abs(e-this._mapRegW)>=2&&(this._mapRegW=e),t&&Math.abs(t-this._mapRegH)>=2&&(this._mapRegH=t)}if("portrait"===this._profile){const e=this.renderRoot?.querySelector(".avc-region--start"),o=parseFloat(getComputedStyle(t).rowGap||getComputedStyle(t).gap||"0")||0,s=e?Math.round(e.getBoundingClientRect().height):0,l=Math.round(t.clientWidth),d=Math.round(t.clientHeight-s-(s?o:0));l&&Math.abs(l-this._mapAvailW)>=2&&(this._mapAvailW=l),d>0&&Math.abs(d-this._mapAvailH)>=2&&(this._mapAvailH=d)}}disconnectedCallback(){super.disconnectedCallback(),this._cancelHold(),this._measureRaf&&(cancelAnimationFrame(this._measureRaf),this._measureRaf=0),null!==this._measureTimer&&(clearTimeout(this._measureTimer),this._measureTimer=null),null!==this._settleTimer&&(clearTimeout(this._settleTimer),this._settleTimer=null),this._tickTimer&&(clearInterval(this._tickTimer),this._tickTimer=null),this._onWinResize&&(window.removeEventListener("resize",this._onWinResize),window.removeEventListener("orientationchange",this._onWinResize),this._onWinResize=null),this._ro&&(this._ro.disconnect(),this._ro=null),this._panelViewMo&&(this._panelViewMo.disconnect(),this._panelViewMo=null),this._panelViewNode=null,this._barMo&&(this._barMo.disconnect(),this._barMo=null),this._editBarRo&&(this._editBarRo.disconnect(),this._editBarRo=null)}firstUpdated(){const e=Math.round(this.getBoundingClientRect().width);e&&(this._cardW=e),this._scheduleMeasure()}updated(){if(this._careResetPending.size){let e=null;for(const[t,o]of this._careResetPending){const s=this.hass?.states[t],l=s?Date.parse(s.last_changed):NaN;Number.isFinite(l)&&l>o&&(e||(e=new Map(this._careResetPending)),e.delete(t))}e&&(this._careResetPending=e)}this._refineGridHeight(),this._refineGridColumns(),this._setupPanelViewObserver(),null!==this._settleTimer&&clearTimeout(this._settleTimer),this._settleTimer=window.setTimeout(()=>{this._settleTimer=null,this._scheduleMeasure()},250)}_refineGridColumns(){if("portrait"!==this._profile||!this._lastPortraitFitW)return;if(this._config.layout?.portrait?.columns?.length)return;if(this._stackTopology)return;const e=this.renderRoot?.querySelector(".avc-grid");if(!e)return;const t=e.clientWidth-(parseFloat(getComputedStyle(e).columnGap||"0")||0);let o=Math.round(this._lastPortraitFitW);t>0&&(o=Math.min(o,t));const s=Math.round(o)+"px 1fr";e.style.gridTemplateColumns!==s&&(e.style.gridTemplateColumns=s)}shouldUpdate(e){if(!e.has("hass")||e.size>1)return!0;const t=e.get("hass");if(!t||!this._config)return!0;for(const e of this._watchedEntities())if(t.states[e]!==this.hass.states[e])return!0;return!1}_watchedEntities(){if(this._registry(),this._watched)return this._watched;const e=new Set;for(const t of this._config?.vacuums??[]){for(const o of[t.entity,t.status_entity,t.battery_entity,t.last_clean_entity,t.progress_entity,t.current_room_entity,t.error_entity,this._mapEntityFor(t),this._intEntity(t),...Object.values(this._autoEntities(t))])o&&e.add(o);for(const o of this._roomsFor(t))o.last_clean_entity&&e.add(o.last_clean_entity),o.clean_time_entity&&e.add(o.clean_time_entity);for(const o of this._careItems(t))o.entity&&e.add(o.entity),o.reset&&e.add(o.reset),o.binary&&e.add(o.binary)}for(const t of this._config?.global_actions??[])for(const o of t.watch_entities??[])o&&e.add(o);return this.hass?.entities&&(this._watched=e),e}_resolveColor(e,t){const o=e??t;return we[o]??o}_resolveBg(e,t,o){return(o?Se:ke)[e??t]??function hexToRgba(e,t){const o=/^#([0-9a-f]{3}|[0-9a-f]{6})$/i.exec(e);if(!o)return`rgba(255,255,255,${t})`;let s=o[1];return 3===s.length&&(s=s.split("").map(e=>e+e).join("")),`rgba(${parseInt(s.slice(0,2),16)},${parseInt(s.slice(2,4),16)},${parseInt(s.slice(4,6),16)},${t})`}(this._resolveColor(e,t),o?.3:.18)}_vacIndex(e){const t=this._config?.vacuums?.findIndex(t=>t.entity===e.entity)??-1;return t<0?0:t}_defaultColor(e){return $e[this._vacIndex(e)%$e.length]}_color(e){return this._resolveColor(e.color,this._defaultColor(e))}_colorBg(e){return this._resolveBg(e.color,this._defaultColor(e),!1)}_colorBgActive(e){return this._resolveBg(e.color,this._defaultColor(e),!0)}_registry(){const e=this.hass?.entities;return e!==this._regRef&&(this._regRef=e,this._intCache.clear(),this._mapCandCache.clear(),this._autoCache.clear(),this._careCache.clear(),this._watched=null),e}_intEntity(e){if(e.integration_entity)return e.integration_entity;const t=this._registry();if(!t||!e.entity)return;if(this._intCache.has(e.entity))return this._intCache.get(e.entity);const o=t[e.entity]?.device_id,s=o?Object.keys(t).find(e=>t[e]?.device_id===o&&"anyvac"===t[e]?.platform&&e.startsWith("sensor.")):void 0;return this._intCache.set(e.entity,s),s}_mapEntityFor(e){if(e.map?.entity)return e.map.entity;const t=this._registry();if(!t||!e.entity)return;let o=this._mapCandCache.get(e.entity);if(!o){const s=t[e.entity]?.device_id;if(!s)return;o=Object.keys(t).filter(e=>t[e]?.device_id===s&&e.startsWith("image.")),this._mapCandCache.set(e.entity,o)}if(1===o.length)return o[0];const s=o.filter(e=>{const t=this.hass.states[e];return!!t&&"unavailable"!==t.state&&"unknown"!==t.state&&!!t.attributes.entity_picture});return 1===s.length?s[0]:void 0}_intAttrs(e){const t=this._intEntity(e),o=t?this.hass.states[t]?.attributes:void 0;if(o)return(o.schema_version??0)>=2?o:void 0}_schemaWarning(){for(const e of this._config?.vacuums??[]){const t=this._intEntity(e),o=t?this.hass.states[t]?.attributes:void 0;if(o&&(o.schema_version??0)<2)return`AnyVac integration is too old for this card (schema ${o.schema_version??1} < 2). Update the anyvac integration to ≥ 0.18.0.`}return null}_autoEntities(e){const t=this._registry();if(!t||!e.entity)return{};const o=this._autoCache.get(e.entity);if(o)return o;const s=t[e.entity]?.device_id;if(!s)return{};const l=Object.keys(t).filter(e=>t[e]?.device_id===s),byTk=e=>l.find(o=>t[o]?.translation_key===e),d={status:byTk("status"),battery:(e=>l.find(t=>this.hass.states[t]?.attributes?.device_class===e))("battery"),last_clean:byTk("last_clean_end"),progress:byTk("clean_percent"),current_room:byTk("current_room"),error:byTk("vacuum_error")};return this._autoCache.set(e.entity,d),d}_ent(e,t){return e[t+"_entity"]??this._autoEntities(e)[t]}_statusInfo(e){const t=this.hass.states[this._ent(e,"status")??e.entity]?.state??"unknown";return xe[t]??[t,"rgba(var(--avc-ink-rgb),0.5)"]}_careItems(e){const t=this._registry(),o=this.hass?.devices;if(!t||!o||!e.entity)return[];const s=this._dockTier(e),l=e.entity+"|"+s;if(this._careCache.has(l))return this._careCache.get(l);const d=t[e.entity]?.device_id,h=d?o[d]:void 0,p=h?.identifiers?.find(([e])=>"roborock"===e)?.[1],m=p?Object.values(o).find(e=>e.identifiers?.some(([e,t])=>"roborock"===e&&t===`${p}_dock`)):void 0,u=m?.id,byTk=(e,o,s)=>e?Object.keys(t).find(l=>t[l]?.device_id===e&&t[l]?.translation_key===o&&l.startsWith(s+".")):void 0,_=[],consumable=(e,t,o,s)=>{const l=byTk(s,t,"sensor"),d=byTk(s,o,"button");(l||d)&&_.push({key:t,label:e,entity:l,reset:d,totalHours:Fe[t]})};if(consumable("Main brush","main_brush_time_left","reset_main_brush_consumable",d),consumable("Side brush","side_brush_time_left","reset_side_brush_consumable",d),consumable("Filter","filter_time_left","reset_air_filter_consumable",d),consumable("Sensors","sensor_time_left","reset_sensor_consumable",d),"full"===s){consumable("Dock brush","cleaning_brush_time_left","reset_dock_cleaning_brush_consumable",u),consumable("Strainer","strainer_time_left","reset_dock_strainer_consumable",u);const binary=(e,t)=>{const o=byTk(u,t,"binary_sensor");o&&_.push({key:t,label:e,binary:o})};binary("Dirty water tank","dirty_box_full"),binary("Clean water tank","clean_box_empty"),binary("Cleaning fluid","clean_fluid_empty")}return this._careCache.set(l,_),_}_careValue(e){if(!e.entity)return"—";const t=this.hass.states[e.entity];if(!t||"unavailable"===t.state||"unknown"===t.state)return"—";const o=Number(t.state);if(Number.isNaN(o))return t.state;const s=t.attributes?.unit_of_measurement,l="s"===s?o/3600:"min"===s?o/60:o;if(e.totalHours){return`${Math.max(0,Math.min(100,Math.round(l/e.totalHours*100)))} %`}return`${Math.round(l)} h`}_isCleaning(e){return ze.has(this.hass.states[e.entity]?.state??"")}_hasError(e){const t=this._ent(e,"error"),o=t?this.hass.states[t]?.state:null;return!!o&&"none"!==o&&"unknown"!==o&&"unavailable"!==o}_isPaused(e){return"paused"===this.hass.states[e.entity]?.state}_battery(e){const t=this._ent(e,"battery");if(!t)return null;const o=parseInt(this.hass.states[t]?.state??"");return isNaN(o)?null:o}_lastCleanStr(e){const t=this._ent(e,"last_clean"),o=t?this.hass.states[t]?.state:void 0;if(!o||"unavailable"===o||"unknown"===o)return"—";const s=new Date(o),l=Math.floor((Date.now()-s.getTime())/864e5),d=s.toLocaleTimeString([],{hour:"2-digit",minute:"2-digit"});return 0===l?"Today · "+d:1===l?"Yesterday · "+d:s.toLocaleDateString([],{day:"2-digit",month:"2-digit"})+" · "+d}_progress(e){const t=this._ent(e,"progress");if(!t)return null;const o=parseInt(this.hass.states[t]?.state??"");return isNaN(o)||0===o?null:o}_selSensor(){for(const e of this._config.vacuums){const t=this._intEntity(e);if(t&&Array.isArray(this.hass.states[t]?.attributes?.selected_rooms))return t}}_backendSel(){const e=this._selSensor();return e?new Set(this.hass.states[e]?.attributes?.selected_rooms??[]):null}_setBackendSel(e,t){this._call("anyvac","select_rooms",{rooms:e,mode:t})}_isRoomSelected(e,t){const o=this._backendSel();return o?o.has(e.key):this._localRoomSel.get(t.entity+":"+e.key)??!1}_layersEff(){const e=this._selSensor(),t=e?this.hass.states[e]?.attributes?.view_layers:void 0;return t&&"boolean"==typeof t.dry&&"boolean"==typeof t.wet?{dry:t.dry,wet:t.wet}:this._layers}_staticRoomsFor(e){return resolveStaticRooms(this._config,e)}_memoSync(){this.hass!==this._memoHass&&(this._memoHass=this.hass,this._roomsMemo.clear(),this._seatMemo.clear())}_roomsFor(e){this._memoSync();const t=this._roomsMemo.get(e.entity);if(t)return t;const o=this._computeRoomsFor(e);return this._roomsMemo.set(e.entity,o),o}_computeRoomsFor(e){const t=this._intAttrs(e),o=Array.isArray(t?.rooms)?t.rooms:[];if(!t||!o.length)return this._staticRoomsFor(e);const s=this._effectiveSeat(e),l=this._wrapAspect(this._baseHeightFor(e)),d=this._staticRoomsFor(e),h=new Map(d.filter(e=>e.key).map(e=>[e.key,e])),p=new Set,m=[];for(const e of o){const o=e?.name;if(!o)continue;p.add(o);const d=h.get(o);if(d&&null!=d.map_x&&null!=d.map_y){m.push(d);continue}const u=roomBboxToRect(e,t,s,l);u?m.push({...d??{key:o,name:o,icon:"mdi:floor-plan"},...u}):d&&m.push(d)}for(const e of d)e.key&&!p.has(e.key)&&m.push(e);return m}_hasSelectedRooms(e){return this._roomsFor(e).some(t=>this._isRoomSelected(t,e))}_liveCleanType(e){if((e.presets?.length??0)>=2){const t=this._activePreset(e);return null!=t.mop_intensity&&""!==t.mop_intensity&&"off"!==t.mop_intensity||null!=t.mop_mode&&""!==t.mop_mode?"wet":"dry"}const t=this._intAttrs(e)?.clean_type;if("wet"===t||"dry"===t)return t;const o=this._vacCleanType(e);return o.wet&&!o.dry?"wet":"dry"}_backendEstimate(e,t,o){const s=this._intAttrs(e)?.rooms_estimate;if(!s)return null;const l=s[t.name??""]??s[t.key],d=l?l[o]:void 0;return"number"==typeof d&&d>0?d:null}_roomCleanMins(e,t){const o=this._vacCleanType(t),s=!(!o.wet||o.dry)||!(o.dry&&!o.wet)&&"wet"===this._liveCleanType(t),l=this._backendEstimate(t,e,s?"wet":"dry");if(null!=l)return l;const d=s?e.clean_time_wet:e.clean_time_dry;if(null!=d&&d>0)return d;const h=s?e.clean_time_dry:e.clean_time_wet;if(null!=h&&h>0)return h;if(e.clean_time_entity){const t=parseFloat(this.hass.states[e.clean_time_entity]?.state??"");if(!isNaN(t)&&t>0)return t}return e.clean_time_mins??0}_totalCleanMins(e){return this._roomsFor(e).reduce((t,o)=>this._isRoomSelected(o,e)?t+this._roomCleanMins(o,e):t,0)}_intRoomRec(e,t){const o=this._intAttrs(e)?.rooms_last_cleaned;return o?o[t.key]??o[t.name??""]??null:null}_roomCoverageRec(e,t){const o=this._intAttrs(e)?.rooms_coverage;return o?o[t.key]??o[t.name??""]??null:null}_ageDaysFromIso(e){if(!e)return null;const t=new Date(e).getTime();return isNaN(t)?null:(Date.now()-t)/864e5}_roomAgeDays(e,t){if(t){const o=this._intRoomRec(t,e);if(o){const e=this._ageDaysFromIso(o.dry),t=this._ageDaysFromIso(o.wet),s=this._ageDaysFromIso(o.any),l=this._layersEff(),d=l.dry,h=l.wet;let p;if(p=d&&h?Math.max(e??9999,t??9999):d?e:h?t:s,null!==p)return p}}if(!e.last_clean_entity)return null;const o=this.hass.states[e.last_clean_entity]?.state;return o&&"unavailable"!==o&&"unknown"!==o?(Date.now()-new Date(o).getTime())/864e5:null}_colorForAgeDays(e){if(null===e)return"rgba(255,77,77,0.85)";const t=[...this._config.room_thresholds??[{days:2,color:"rgba(46,204,113,0.85)"},{days:5,color:"rgba(250,173,20,0.85)"},{days:10,color:"rgba(255,152,0,0.85)"}]].sort((e,t)=>e.days-t.days);for(const o of t)if(e<=o.days)return o.color;return"rgba(255,77,77,0.85)"}_vacCleanType(e){if("dry"===e.clean_type)return{dry:!0,wet:!1};if("wet"===e.clean_type)return{dry:!1,wet:!0};if("both"===e.clean_type)return{dry:!0,wet:!0};const t=this._intAttrs(e)?.mop_signal;if(t){return{dry:!0,wet:null!=t.water_box_mode||!!t.water_mode_name}}const o=e.clean_action,s=!(!o||!(o.mop_mode||o.mop_mode_entity||o.mop_intensity||o.mop_intensity_entity));return{dry:!s||null!=o?.suction_level&&"off"!==o.suction_level,wet:s}}_roomProgress(e,t){const o=this._intAttrs(e)?.rooms_progress;return o?o[t.key]??o[t.name??""]??null:null}_roomProgForType(e,t,o){let s=null,l=null,d=!1;for(const h of t){const t=this._roomProgress(h,e);if(!t)continue;const p="dry"===o?t.dry_pct:t.wet_pct;null!=p&&(null===s||p>s)&&(s=p,l=h,d=!!("dry"===o?t.dry_calibrating:t.wet_calibrating))}return null!==s&&l?{pct:s,kind:"S",title:`${o} coverage ${s}%`,color:this._color(l),calibrating:d}:null}_progColor(e){return e>=90?"#52c41a":e>=50?"#faad14":"#40a9ff"}_renderRoomGauge(e,t){if(!this._config.debug_room_progress)return ae;const o=this._roomProgForType(t,e,"dry"),s=this._roomProgForType(t,e,"wet");if(!o&&!s)return ae;const g=(e,t,o,s)=>te`
+      <span class="room-gauge" title=${t}
+        style=${_e({background:`conic-gradient(${o} ${3.6*e}deg, rgba(255,255,255,0.12) 0)`})}>
+        <span>${e}${s?"~":""}</span>
+      </span>`;return te`<div class="room-gauges">
+      ${o?g(o.pct,"dry · "+o.title,o.color,o.calibrating):ae}
+      ${s?g(s.pct,"wet · "+s.title,"#40a9ff",s.calibrating):ae}
+    </div>`}_renderProgChip(e){return e?te`<span class="rl-prog" title=${e.title}
+      style=${_e({color:e.color??this._progColor(e.pct)})}>${e.pct}${e.calibrating?"~":""}%<small>${e.kind}</small></span>`:ae}_batIcon(e){return e>80?"mdi:battery":e>50?"mdi:battery-60":e>20?"mdi:battery-30":"mdi:battery-10"}_batColor(e){return e>50?"#52c41a":e>20?"#faad14":"#ff4d4f"}_mapUrl(e){const t=this.hass.states[e];if(!t)return"";const o=t.attributes.entity_picture;if(!o)return"";const s=new Date(t.last_updated).getTime(),l=o.includes("?")?"&":"?";return this.hass.hassUrl(o+l+"_t="+s)}_timeStr(e){const t=Math.round(e);if(t<=0)return"";if(t>=60){const e=Math.floor(t/60),o=t%60;return o>0?"~"+e+" h "+o+" min":"~"+e+" h"}return"~"+t+" min"}_isGlobalActive(e){return(e.watch_entities??[]).some(e=>ze.has(this.hass.states[e]?.state??""))}async _triggerGlobal(e){const t=e.action;try{if("script"===t.type)await this.hass.callService("script","turn_on",{entity_id:t.entity_id,variables:t.variables??{}});else{const[e,o]=t.service.split(".");await this.hass.callService(e,o,t.data??{})}}catch(e){console.error("[anyvac-card] global action failed:",e)}}_cancelHold(){null!==this._holdTimer&&(clearTimeout(this._holdTimer),this._holdTimer=null),this._holdId=null,this._holdStartPos=null}_holdStart(e,t){return o=>{o.preventDefault(),this._cancelHold(),this._holdId=e,this._holdStartPos={x:o.clientX,y:o.clientY},this._holdTimer=setTimeout(()=>{this._holdTimer=null,this._holdId=null,this._holdStartPos=null,t()},ye)}}_toggleShown(e){if(this._config.layout&&"portrait"===this._profile)return this._shownSet=new Set([e]),void this._saveShown();this._toggleShownMulti(e)}_toggleShownMulti(e){const t=new Set(this._shownSet);t.has(e)?t.size>1&&t.delete(e):t.add(e),this._shownSet=t,this._saveShown()}async _call(e,t,o){try{await this.hass.callService(e,t,o)}catch(o){console.error("[anyvac-card] "+e+"."+t+" failed:",o)}}_fireMoreInfo(e){this.dispatchEvent(new CustomEvent("hass-more-info",{bubbles:!0,composed:!0,detail:{entityId:e}}))}_storeKey(e){const t=(this._config?.vacuums??[]).map(e=>e.entity).join(",");return`anyvac-card:${e}:${t}`}_readStored(e,t){try{return localStorage.getItem(this._storeKey(e))??localStorage.getItem(t)}catch{return null}}_saveShown(){try{const e=[...this._shownSet].map(e=>this._config.vacuums[e]?.entity).filter(Boolean);localStorage.setItem(this._storeKey("shown"),JSON.stringify(e))}catch{}}_loadShown(){try{const e=this._readStored("shown","roborock-card:shown");if(e){const t=JSON.parse(e).map(e=>this._config.vacuums.findIndex(t=>t.entity===e)).filter(e=>e>=0);if(t.length>0)return new Set(t)}}catch{}return new Set(this._config.vacuums.map((e,t)=>t))}_saveFlipLive(){try{null===this._flipLive?localStorage.removeItem(this._storeKey("flip")):localStorage.setItem(this._storeKey("flip"),JSON.stringify(this._flipLive))}catch{}}_loadFlipLive(){const e=this._readStored("flip","roborock-card:flip");if(null===e)return null;try{return!0===JSON.parse(e)}catch{return null}}_saveRoomSel(e){try{const t=e+":",o={};for(const[e,s]of this._localRoomSel.entries())e.startsWith(t)&&(o[e.slice(t.length)]=s);localStorage.setItem(this._storeKey("sel:"+e),JSON.stringify(o))}catch{}}_loadRoomSel(){const e=new Map;try{for(const t of this._config.vacuums){const o=this._readStored("sel:"+t.entity,"roborock-card:sel:"+t.entity);if(o){const s=JSON.parse(o);for(const[o,l]of Object.entries(s))l&&e.set(t.entity+":"+o,!0)}}}catch{}return e}_pause(e){this._call("vacuum","pause",{entity_id:e.entity})}_resume(e){this._call("vacuum","start",{entity_id:e.entity})}_dock(e){this._call("vacuum","return_to_base",{entity_id:e.entity})}_toggleRoom(e,t){if(this._backendSel())return void this._setBackendSel([e.key],"toggle");const o=t.entity+":"+e.key,s=new Map(this._localRoomSel);s.set(o,!s.get(o)),this._localRoomSel=s,this._saveRoomSel(t.entity)}_isRoomSelectedAny(e,t){const o=this._backendSel();return o?o.has(e):t.some(t=>this._localRoomSel.get(t.entity+":"+e)??!1)}_toggleRoomAcross(e,t){if(this._isRoomSelectedAny(e,t)&&t.some(e=>this._intAttrs(e))&&this._call("anyvac","pin_room",{room:e}),this._backendSel())return void this._setBackendSel([e],"toggle");const o=!this._isRoomSelectedAny(e,t),s=new Map(this._localRoomSel);for(const l of t)this._roomsFor(l).some(t=>t.key===e)&&s.set(l.entity+":"+e,o);this._localRoomSel=s;for(const e of t)this._saveRoomSel(e.entity)}_allRoomKeys(){const e=new Set;for(const t of this._config.vacuums)for(const o of this._roomsFor(t))e.add(o.key);return[...e]}_v2Vacuums(){const e=[],t=[];for(const o of this._config.vacuums){const s=this._vacCleanType(o);s.dry&&e.push(o.entity),s.wet&&t.push(o.entity)}return{dry:e,wet:t}}_unassignedRooms(e,t,o){if(!o||0===e.length)return[];const s=this._planPreview;if(!s||s.key!==this._planKey(e,t))return[];const l="wet"!==t,d="dry"!==t,h=[];for(const t of e)(l&&!s.dry.has(t)||d&&!s.wet.has(t))&&h.push(t);return h}_v2Settings(){const e={};for(const t of["dry","wet"])for(const o of this._config.vacuums){const s=this._vacCleanType(o);if(!("dry"===t?s.dry:s.wet))continue;const l=this._activePreset(o),d={};l.suction_level&&(d.fan_speed=l.suction_level),"wet"===t&&l.mop_mode&&(d.mop_mode=l.mop_mode),"wet"===t&&l.mop_intensity&&(d.mop_intensity=l.mop_intensity),l.repeat&&l.repeat>1&&(d.repeat=l.repeat),Object.keys(d).length&&((e[t]??(e[t]={}))[o.entity]=d)}return Object.keys(e).length?e:void 0}_planKey(e,t){return JSON.stringify([e,t,this._v2Vacuums(),this._pinsAttr()])}_fetchPlan(e,t){const o=this._planKey(e,t);o!==this._planFetchKey&&(this._planFetchKey=o,(async()=>{try{const s=await this.hass.callService("anyvac","plan",{rooms:e,mode:t,vacuums:this._v2Vacuums()},void 0,!1,!0);if(this._planFetchKey!==o)return;const l=s?.response?.plan??{},inv=e=>{const t=new Map;for(const[o,s]of Object.entries(e??{}))for(const e of s)t.set(e,o);return t};this._planPreview={key:o,dry:inv(l.dry),wet:inv(l.wet),eta:"number"==typeof l.eta_min?l.eta_min:null,unsequenced:Array.isArray(l.unsequenced)?l.unsequenced:[]}}catch(e){console.warn("[anyvac-card] anyvac.plan preview failed:",e),this._planFetchKey===o&&(this._planPreview={key:o,dry:new Map,wet:new Map,eta:null,unsequenced:[]})}})())}_etaFor(e,t,o){o&&e.length&&this._fetchPlan(e,t);const s=this._planPreview?.eta;return o&&null!=s?s:this._selEstMins(e)}async _runOrchestrated(e,t){e.length&&await this._call("anyvac","clean",{rooms:e,mode:t,vacuums:this._v2Vacuums(),...this._v2Settings()?{settings:this._v2Settings()}:{}})}_selectGlobalPreset(e){if(this._activeGlobalPreset=e.id,e.mode&&(this._planMode=e.mode),"all"===e.scope||Array.isArray(e.scope)){const t="all"===e.scope?this._allRoomKeys():e.scope;if(this._backendSel())return void this._setBackendSel(t,"set");const o=new Map(this._localRoomSel);for(const e of this._config.vacuums)for(const t of this._roomsFor(e))o.delete(e.entity+":"+t.key);for(const e of t)for(const t of this._config.vacuums)this._roomsFor(t).some(t=>t.key===e)&&o.set(t.entity+":"+e,!0);this._localRoomSel=o;for(const e of this._config.vacuums)this._saveRoomSel(e.entity)}}_vacAbbrev(e){return((e.name??e.entity.split(".")[1]??"").replace(/[^A-Za-z0-9]/g,"").slice(0,2)||"??").toUpperCase()}_renderPlanPreview(){if("auto"!==this._config.ui_mode)return ae;const e=this._allRoomKeys().filter(e=>this._isRoomSelectedAny(e,this._config.vacuums));if(!e.length)return ae;const t=this._planMode,o=(this._config.global_presets??[]).find(e=>e.id===this._activeGlobalPreset)?.label,s="dry"===t||"both"===t,l="wet"===t||"both"===t;this._fetchPlan(e,t);const d=this._planPreview?.dry??new Map,h=this._planPreview?.wet??new Map,roomDef=e=>{for(const t of this._config.vacuums){const o=this._roomsFor(t).find(t=>t.key===e);if(o)return o}},cell=e=>{const t=this._config.vacuums.find(t=>t.entity===e);if(!t)return te`<span style="font-size:11px;opacity:.25">—</span>`;const o=this._color(t);return te`<span style="display:inline-flex;align-items:center;justify-content:center;min-width:24px;height:17px;padding:0 5px;border-radius:9px;font-size:10px;font-weight:700;color:rgb(var(--avc-ink-rgb));background:${o}30;border:1px solid ${o}">${this._vacAbbrev(t)}</span>`},modeBtn=(e,o)=>{const s=t===e;return te`<button @click=${t=>{t.stopPropagation(),this._planMode=e}}
+        style="padding:2px 8px;border-radius:8px;font-size:10px;font-weight:700;cursor:pointer;font-family:inherit;border:1px solid ${s?"rgba(var(--avc-ink-rgb),0.5)":"rgba(var(--avc-ink-rgb),0.15)"};background:${s?"rgba(var(--avc-ink-rgb),0.12)":"transparent"};color:${s?"#fff":"rgba(var(--avc-ink-rgb),0.5)"}">${o}</button>`},p="plan-run";return te`
+      <div style="margin:0 4px 6px;padding:6px 8px;background:rgba(var(--avc-ink-rgb),0.03);border:1px solid rgba(var(--avc-ink-rgb),0.08);border-radius:12px;display:flex;flex-direction:column;gap:6px">
         <div style="display:flex;align-items:center;justify-content:space-between">
-          <span style="font-size:9px;font-weight:600;letter-spacing:.6px;color:rgba(255,255,255,.35)">CLEAN PLAN${o?" · "+o.toUpperCase():""}</span>
-          <div style="display:flex;gap:4px">${c("dry","Dry")}${c("wet","Wet")}${c("both","Both")}</div>
+          <span style="font-size:9px;font-weight:600;letter-spacing:.6px;color:rgba(var(--avc-ink-rgb),.35)">CLEAN PLAN${o?" · "+o.toUpperCase():""}</span>
+          <div style="display:flex;gap:4px">${modeBtn("dry","Dry")}${modeBtn("wet","Wet")}${modeBtn("both","Both")}</div>
         </div>
         <div style="display:flex;gap:6px;overflow-x:auto;align-items:center">
           <div style="display:flex;flex-direction:column;gap:3px;align-items:center;flex-shrink:0;padding-right:2px">
             <span style="height:18px"></span>
-            ${i?q`<ha-icon icon="mdi:broom" style="--mdc-icon-size:14px;color:rgba(255,255,255,.4)"></ha-icon>`:G}
-            ${s?q`<ha-icon icon="mdi:water" style="--mdc-icon-size:14px;color:rgba(64,169,255,.7)"></ha-icon>`:G}
+            ${s?te`<ha-icon icon="mdi:broom" style="--mdc-icon-size:14px;color:rgba(var(--avc-ink-rgb),.4)"></ha-icon>`:ae}
+            ${l?te`<ha-icon icon="mdi:water" style="--mdc-icon-size:14px;color:rgba(64,169,255,.7)"></ha-icon>`:ae}
           </div>
-          ${t.map(t=>{const e=r(t);return q`<div style="display:flex;flex-direction:column;align-items:center;gap:3px;min-width:32px;flex-shrink:0" title=${e?.name??t}>
-              <ha-icon icon=${e?.icon||"mdi:floor-plan"} style="--mdc-icon-size:18px;color:rgba(255,255,255,.7)"></ha-icon>
-              ${i?l(n.get(t)):G}
-              ${s?l(a.get(t)):G}
+          ${e.map(e=>{const t=roomDef(e);return te`<div style="display:flex;flex-direction:column;align-items:center;gap:3px;min-width:32px;flex-shrink:0" title=${t?.name??e}>
+              <ha-icon icon=${t?.icon||"mdi:floor-plan"} style="--mdc-icon-size:18px;color:rgba(var(--avc-ink-rgb),.7)"></ha-icon>
+              ${s?cell(d.get(e)):ae}
+              ${l?cell(h.get(e)):ae}
             </div>`})}
         </div>
-        <button class="action-btn ${this._holdId===d?"action-btn--holding":""}"
-          style="flex:0 0 auto;align-self:flex-end;flex-direction:row;gap:6px;padding:7px 16px;background:rgba(82,196,26,0.14);border:1px solid rgba(82,196,26,0.55);color:#fff"
-          @pointerdown=${this._holdStart(d,()=>this._runOrchestrated(t,this._planMode))}
+        <button class="action-btn ${this._holdId===p?"action-btn--holding":""}"
+          style="flex:0 0 auto;align-self:flex-end;flex-direction:row;gap:6px;padding:7px 16px;background:rgba(var(--avc-ok-rgb),0.14);border:1px solid rgba(var(--avc-ok-rgb),0.55);color:rgb(var(--avc-ink-rgb))"
+          @pointerdown=${this._holdStart(p,()=>this._runOrchestrated(e,this._planMode))}
           @pointermove=${this._holdMove}
           @pointerup=${this._holdEnd}
           @pointerleave=${this._holdEnd}
@@ -86,103 +86,103 @@ const ht=t=>(e,o)=>{void 0!==o?o.addInitializer(()=>{customElements.define(t,e)}
           <span style="font-size:12px">Start · hold</span>
         </button>
       </div>
-    `}_renderAutoBar(){if("auto"!==this._config.ui_mode)return G;const t=this._config.global_presets??[];return t.length?q`
+    `}_renderAutoBar(){if("auto"!==this._config.ui_mode)return ae;const e=this._config.global_presets??[];return e.length?te`
       <div style="display:flex;flex-wrap:wrap;gap:8px;padding:2px 4px 4px">
-        ${t.map(t=>{const e=this._activeGlobalPreset===t.id;return q`<button
-            @click=${()=>this._selectGlobalPreset(t)}
-            style="flex:0 1 auto;min-width:128px;display:flex;flex-direction:row;align-items:center;justify-content:flex-start;gap:10px;padding:9px 14px;border-radius:14px;cursor:pointer;font-family:inherit;color:white;background:${e?"rgba(82,196,26,0.14)":"rgba(255,255,255,0.05)"};border:1px solid ${e?"rgba(82,196,26,0.6)":"rgba(255,255,255,0.12)"}">
-            <ha-icon icon=${t.icon||"mdi:robot-vacuum-variant"} style="--mdc-icon-size:24px"></ha-icon>
+        ${e.map(e=>{const t=this._activeGlobalPreset===e.id;return te`<button
+            @click=${()=>this._selectGlobalPreset(e)}
+            style="flex:0 1 auto;min-width:128px;display:flex;flex-direction:row;align-items:center;justify-content:flex-start;gap:10px;padding:9px 14px;border-radius:14px;cursor:pointer;font-family:inherit;color:white;background:${t?"rgba(var(--avc-ok-rgb),0.14)":"rgba(var(--avc-ink-rgb),0.05)"};border:1px solid ${t?"rgba(var(--avc-ok-rgb),0.6)":"rgba(var(--avc-ink-rgb),0.12)"}">
+            <ha-icon icon=${e.icon||"mdi:robot-vacuum-variant"} style="--mdc-icon-size:24px"></ha-icon>
             <div style="display:flex;flex-direction:column;align-items:flex-start;line-height:1.15">
-              <span style="font-size:13px;font-weight:700">${t.label}</span>
-              <small style="font-size:9px;font-weight:600;letter-spacing:.4px;color:rgba(255,255,255,0.4)">${"all"===t.scope?"WHOLE HOME":"select"===t.scope?"SELECTED":"ROOMS"}${t.mode?" · "+("dry"===t.mode?"DRY":"wet"===t.mode?"WET":"BOTH"):""}</small>
+              <span style="font-size:13px;font-weight:700">${e.label}</span>
+              <small style="font-size:9px;font-weight:600;letter-spacing:.4px;color:rgba(var(--avc-ink-rgb),0.4)">${"all"===e.scope?"WHOLE HOME":"select"===e.scope?"SELECTED":"ROOMS"}${e.mode?" · "+("dry"===e.mode?"DRY":"wet"===e.mode?"WET":"BOTH"):""}</small>
             </div>
           </button>`})}
       </div>
-    `:G}_pinsAttr(){const t=this._selSensor(),e=t?this.hass.states[t]?.attributes?.room_pins:void 0;return e&&"object"==typeof e?e:{}}_pinCandidates(t,e){return this._config.vacuums.filter(o=>this._roomsFor(o).some(e=>e.key===t)&&this._vacCleanType(o)[e])}_cycleRoomPin(t,e,o){const i=this._pinCandidates(t,e);if(i.length<2)return;const s=i.findIndex(t=>t.entity===o),n=i[(s+1)%i.length];this._call("anyvac","pin_room",{room:t,kind:e,vacuum:n.entity})}_vacChip(t,e){const o=this._config.vacuums.find(e=>e.entity===t);if(!o)return q`<span class="dock-chip dock-chip--empty" @click=${e??G}>—</span>`;const i=this._color(o);return q`<span class="dock-chip"
-      style="color:#fff;background:${i}30;border-color:${i}"
-      title=${(o.name??o.entity)+(e?" · tap to assign a different vacuum":"")}
-      @click=${e??G}>${this._vacAbbrev(o)}</span>`}_batteryPct(t){if(t.battery_entity){const e=Number(this.hass.states[t.battery_entity]?.state);if(Number.isFinite(e))return e}const e=Number(this.hass.states[t.entity]?.attributes?.battery_level);return Number.isFinite(e)?e:null}_selEstMins(t){let e=0;for(const o of t){let t=0;for(const e of this._config.vacuums){const i=this._roomsFor(e).find(t=>t.key===o);i&&(t=Math.max(t,this._roomCleanMins(i,e)))}e+=t}return Math.round(e)}_renderVacuumIconStrip(){if("portrait"!==this._profile)return G;const t=this._config.vacuums;return t.length?q`
+    `:ae}_pinsAttr(){const e=this._selSensor(),t=e?this.hass.states[e]?.attributes?.room_pins:void 0;return t&&"object"==typeof t?t:{}}_pinCandidates(e,t){return this._config.vacuums.filter(o=>this._roomsFor(o).some(t=>t.key===e)&&this._vacCleanType(o)[t])}_cycleRoomPin(e,t,o){const s=this._pinCandidates(e,t);if(s.length<2)return;const l=s.findIndex(e=>e.entity===o),d=s[(l+1)%s.length];this._call("anyvac","pin_room",{room:e,kind:t,vacuum:d.entity})}_vacChip(e,t){const o=this._config.vacuums.find(t=>t.entity===e);if(!o)return te`<span class="dock-chip dock-chip--empty" @click=${t??ae}>—</span>`;const s=this._color(o);return te`<span class="dock-chip"
+      style="color:rgb(var(--avc-ink-rgb));background:${s}30;border-color:${s}"
+      title=${(o.name??o.entity)+(t?" · tap to assign a different vacuum":"")}
+      @click=${t??ae}>${this._vacAbbrev(o)}</span>`}_batteryPct(e){if(e.battery_entity){const t=Number(this.hass.states[e.battery_entity]?.state);if(Number.isFinite(t))return t}const t=Number(this.hass.states[e.entity]?.attributes?.battery_level);return Number.isFinite(t)?t:null}_selEstMins(e){let t=0;for(const o of e){let e=0;for(const t of this._config.vacuums){const s=this._roomsFor(t).find(e=>e.key===o);s&&(e=Math.max(e,this._roomCleanMins(s,t)))}t+=e}return Math.round(t)}_renderVacuumIconStrip(){if("portrait"!==this._profile)return ae;const e=this._config.vacuums;return e.length?te`
       <div class="vac-icon-strip">
-        ${t.map((t,e)=>{const o=this._shownSet.has(e),i="vacicon-"+e,s=this._holdId===i;return q`
+        ${e.map((e,t)=>{const o=this._shownSet.has(t),s="vacicon-"+t,l=this._holdId===s;return te`
             <div class="vac-icon-slot">
-              <button class="vac-icon-btn ${s?"vac-icon-btn--holding":""} ${o?"":"vac-icon-btn--hidden"}"
-                style=${vt({borderColor:this._statusInfo(t)[1]})}
-                @pointerdown=${t=>{t.preventDefault(),this._cancelHold(),this._holdId=i,this._holdTimer=setTimeout(()=>{this._holdTimer=null,this._holdId=null,this._toggleShownMulti(e)},kt)}}
-                @pointerup=${()=>{null!==this._holdTimer?(this._cancelHold(),this._fireMoreInfo(t.entity)):this._holdId=null}}
+              <button class="vac-icon-btn ${l?"vac-icon-btn--holding":""} ${o?"":"vac-icon-btn--hidden"}"
+                style=${_e({borderColor:this._statusInfo(e)[1]})}
+                @pointerdown=${e=>{e.preventDefault(),this._cancelHold(),this._holdId=s,this._holdTimer=setTimeout(()=>{this._holdTimer=null,this._holdId=null,this._toggleShownMulti(t)},ye)}}
+                @pointerup=${()=>{null!==this._holdTimer?(this._cancelHold(),this._fireMoreInfo(e.entity)):this._holdId=null}}
                 @pointerleave=${this._holdEnd}
                 @pointercancel=${this._holdEnd}
-                title=${t.name??t.entity} aria-label=${t.name??t.entity}
+                title=${e.name??e.entity} aria-label=${e.name??e.entity}
                 aria-pressed=${o?"true":"false"}>
                 <div class="hold-ring"></div>
-                ${t.image?q`<img src=${t.image} alt="" />`:q`<ha-icon icon="mdi:robot-vacuum" style=${vt({color:this._color(t)})}></ha-icon>`}
+                ${e.image?te`<img src=${e.image} alt="" />`:te`<ha-icon icon="mdi:robot-vacuum" style=${_e({color:this._color(e)})}></ha-icon>`}
               </button>
             </div>
           `})}
       </div>
-    `:G}_renderDock(t,e=!1){const o=this._config.vacuums,i=this._mergedRoomDefs(o);if(!i.length)return q`${e?this._renderVacuumPicker():G}${this._renderVacuumIconStrip()}`;const s=o.some(t=>this._intAttrs(t)),n=this._planMode,a=this._allRoomKeys().filter(t=>this._isRoomSelectedAny(t,o)),r=a.length?a:this._allRoomKeys();s&&r.length&&this._fetchPlan(r,n);const l=this._planPreview?.dry??new Map,c=this._planPreview?.wet??new Map,d=new Set(s?this._planPreview?.unsequenced??[]:[]),h=new Set(this._unassignedRooms(r,n,s)),p="wet"!==n,m="dry"!==n,u=t=>null===t?"—":t<1?"<1d":Math.round(t)+"d",_=(t,e,o)=>q`
-      <button class="dock-mode ${n===t?"on":""}"
-        @click=${e=>{e.stopPropagation(),this._planMode=t}}>
-        <ha-icon icon=${e}></ha-icon><span>${o}</span>
-      </button>`,g="dock-run",f="portrait"!==this._profile||!!this._config.debug_dense_dock;return q`
+    `:ae}_renderDock(e,t=!1){const o=this._config.vacuums,s=this._mergedRoomDefs(o);if(!s.length)return te`${t?this._renderVacuumPicker():ae}${this._renderVacuumIconStrip()}`;const l=o.some(e=>this._intAttrs(e)),d=this._planMode,h=this._allRoomKeys().filter(e=>this._isRoomSelectedAny(e,o)),p=h.length?h:this._allRoomKeys();l&&p.length&&this._fetchPlan(p,d);const m=this._planPreview?.dry??new Map,u=this._planPreview?.wet??new Map,_=new Set(l?this._planPreview?.unsequenced??[]:[]),b=new Set(this._unassignedRooms(p,d,l)),v="wet"!==d,f="dry"!==d,badge=e=>null===e?"—":e<1?"<1d":Math.round(e)+"d",modeBtn=(e,t,o)=>te`
+      <button class="dock-mode ${d===e?"on":""}"
+        @click=${t=>{t.stopPropagation(),this._planMode=e}}>
+        <ha-icon icon=${t}></ha-icon><span>${o}</span>
+      </button>`,w="dock-run",$="portrait"!==this._profile||!!this._config.debug_dense_dock;return te`
       <div class="dock">
-        ${e?this._renderVacuumPicker():G}
+        ${t?this._renderVacuumPicker():ae}
         ${this._renderVacuumIconStrip()}
-        ${"portrait"===this._profile?q`
+        ${"portrait"===this._profile?te`
             <div class="dock-layers">${this._renderLayerToggleCompact(o)}
-              ${this._config.layout?q`<button class="mtbtn ${this._flipEff?"on":""}"
+              ${this._config.layout?te`<button class="mtbtn ${this._flipEff?"on":""}"
                   title="Flip map 180° for this screen (this session only)"
                   @click=${()=>this._toggleFlipLive()}>
                 <ha-icon icon="mdi:flip-vertical"></ha-icon>
-              </button>`:G}
+              </button>`:ae}
             </div>
-          `:G}
-        ${t?q`
+          `:ae}
+        ${e?te`
           <div class="dock-head">
-            ${_("dry","mdi:broom","Dry")}${_("wet","mdi:water","Wet")}${_("both","mdi:water-plus","Both")}
-            ${o.some(t=>"none"!==this._dockTier(t)||this._careItems(t).length>0)?q`
+            ${modeBtn("dry","mdi:broom","Dry")}${modeBtn("wet","mdi:water","Wet")}${modeBtn("both","mdi:water-plus","Both")}
+            ${o.some(e=>"none"!==this._dockTier(e)||this._careItems(e).length>0)?te`
               <button class="dock-mode dock-mode--dock ${this._dockSheetOpen?"on":""}"
-                @click=${t=>{t.stopPropagation(),this._dockSheetOpen=!this._dockSheetOpen}}>
+                @click=${e=>{e.stopPropagation(),this._dockSheetOpen=!this._dockSheetOpen}}>
                 <ha-icon icon="mdi:home-outline"></ha-icon><span>Dock</span>
-                ${this._dockNeedsAttention()?q`<span class="dock-mode-dot"></span>`:G}
-              </button>`:G}
-          </div>`:G}
+                ${this._dockNeedsAttention()?te`<span class="dock-mode-dot"></span>`:ae}
+              </button>`:ae}
+          </div>`:ae}
         ${this._renderModeSheet()}
         ${this._renderDockSheet()}
-        ${f?q`<div class="dock-rows">
-          ${i.map(({r:t,v:e})=>{const i=this._intRoomRec(e,t),a=this._ageDaysFromIso(i?.dry),r=this._ageDaysFromIso(i?.wet),_=this._roomCoverageRec(e,t),g=t=>null==t?"—":t+"%",f=this._isRoomSelectedAny(t.key,o),b=this._pinCandidates(t.key,"dry").length>1,y=this._pinCandidates(t.key,"wet").length>1,v=(e,o)=>("dry"===e?b:y)?i=>{i.stopPropagation(),this._cycleRoomPin(t.key,e,o)}:void 0,x="normal"!==this._mapMode;return q`
-              <button class="dock-row ${f?"on":""} ${x?"room-overlay--locked":""}" ?disabled=${x}
-                title=${x?"Room selection is off while placing a pin/zone":""}
-                @click=${()=>{x||this._toggleRoomAcross(t.key,o)}}>
-                <ha-icon class="dock-ric" icon=${t.icon??"mdi:square"}></ha-icon>
-                <span class="dock-name">${t.name??t.key}</span>
+        ${$?te`<div class="dock-rows">
+          ${s.map(({r:e,v:t})=>{const s=this._intRoomRec(t,e),h=this._ageDaysFromIso(s?.dry),p=this._ageDaysFromIso(s?.wet),w=this._roomCoverageRec(t,e),covBadge=e=>null==e?"—":e+"%",$=this._isRoomSelectedAny(e.key,o),A=this._pinCandidates(e.key,"dry").length>1,C=this._pinCandidates(e.key,"wet").length>1,pinTap=(t,o)=>("dry"===t?A:C)?s=>{s.stopPropagation(),this._cycleRoomPin(e.key,t,o)}:void 0,P="normal"!==this._mapMode;return te`
+              <button class="dock-row ${$?"on":""} ${P?"room-overlay--locked":""}" ?disabled=${P}
+                title=${P?"Room selection is off while placing a pin/zone":""}
+                @click=${()=>{P||this._toggleRoomAcross(e.key,o)}}>
+                <ha-icon class="dock-ric" icon=${e.icon??"mdi:square"}></ha-icon>
+                <span class="dock-name">${e.name??e.key}</span>
                 <span class="dock-info">
-                  ${f&&h.has(t.key)?q`<ha-icon class="dock-unassigned" icon="mdi:robot-off"
-                    title="No available robot for this room's ${n} pass — check that a vacuum is configured with the right role and knows this room."></ha-icon>`:G}
-                  ${f&&d.has(t.key)?q`<ha-icon class="dock-unseq" icon="mdi:sort-variant-off"
-                    title="No cleaning order set for this room — the time estimate may be off. Set the order in the card editor's Maps tab."></ha-icon>`:G}
+                  ${$&&b.has(e.key)?te`<ha-icon class="dock-unassigned" icon="mdi:robot-off"
+                    title="No available robot for this room's ${d} pass — check that a vacuum is configured with the right role and knows this room."></ha-icon>`:ae}
+                  ${$&&_.has(e.key)?te`<ha-icon class="dock-unseq" icon="mdi:sort-variant-off"
+                    title="No cleaning order set for this room — the time estimate may be off. Set the order in the card editor's Maps tab."></ha-icon>`:ae}
                   <span class="dock-ages">
-                    <span class="dock-age">${this._renderProgChip(this._roomProgForType(t,o,"dry"))}<ha-icon icon="mdi:broom"></ha-icon><b style=${vt({color:this._colorForAgeDays(a)})}>${u(a)}</b><small class="dock-cov" title="Last completed dry clean's coverage">${g(_?.dry)}</small></span>
-                    <span class="dock-age">${this._renderProgChip(this._roomProgForType(t,o,"wet"))}<ha-icon icon="mdi:water"></ha-icon><b style=${vt({color:this._colorForAgeDays(r)})}>${u(r)}</b><small class="dock-cov" title="Last completed wet clean's coverage">${g(_?.wet)}</small></span>
+                    <span class="dock-age">${this._renderProgChip(this._roomProgForType(e,o,"dry"))}<ha-icon icon="mdi:broom"></ha-icon><b style=${_e({color:this._colorForAgeDays(h)})}>${badge(h)}</b><small class="dock-cov" title="Last completed dry clean's coverage">${covBadge(w?.dry)}</small></span>
+                    <span class="dock-age">${this._renderProgChip(this._roomProgForType(e,o,"wet"))}<ha-icon icon="mdi:water"></ha-icon><b style=${_e({color:this._colorForAgeDays(p)})}>${badge(p)}</b><small class="dock-cov" title="Last completed wet clean's coverage">${covBadge(w?.wet)}</small></span>
                   </span>
-                  ${s&&f?q`
+                  ${l&&$?te`
                     <span class="dock-avatars">
-                      ${p?this._vacChip(l.get(t.key),v("dry",l.get(t.key))):G}
-                      ${m?this._vacChip(c.get(t.key),v("wet",c.get(t.key))):G}
-                    </span>`:G}
+                      ${v?this._vacChip(m.get(e.key),pinTap("dry",m.get(e.key))):ae}
+                      ${f?this._vacChip(u.get(e.key),pinTap("wet",u.get(e.key))):ae}
+                    </span>`:ae}
                 </span>
               </button>`})}
-        </div>`:G}
-        ${t&&s?q`
+        </div>`:ae}
+        ${e&&l?te`
           <div class="dock-foot">
-            <span class="dock-est">${a.length?a.length+" rooms · ~"+this._etaFor(r,n,s)+" min":"Whole home · ~"+this._etaFor(r,n,s)+" min"}
-              ${h.size?q`<ha-icon class="dock-unassigned" icon="mdi:robot-off"
-                title="${h.size} selected room${h.size>1?"s have":" has"} no available robot for the ${n} pass — it/they will be silently skipped. Check vacuum roles/config."></ha-icon>`:G}
-              ${d.size?q`<ha-icon class="dock-unseq" icon="mdi:sort-variant-off"
-                title="${d.size} selected room${d.size>1?"s have":" has"} no cleaning order set — the time above may be off. Set the order in the card editor's Maps tab."></ha-icon>`:G}</span>
-            <button class="action-btn ${this._holdId===g?"action-btn--holding":""}"
-              style="flex:0 0 auto;padding:7px 14px;background:rgba(111,191,115,0.24);border:1px solid rgba(111,191,115,0.65);color:#fff"
-              ?disabled=${!r.length}
-              @pointerdown=${r.length?this._holdStart(g,()=>this._runOrchestrated(r,this._planMode)):G}
+            <span class="dock-est">${h.length?h.length+" rooms · ~"+this._etaFor(p,d,l)+" min":"Whole home · ~"+this._etaFor(p,d,l)+" min"}
+              ${b.size?te`<ha-icon class="dock-unassigned" icon="mdi:robot-off"
+                title="${b.size} selected room${b.size>1?"s have":" has"} no available robot for the ${d} pass — it/they will be silently skipped. Check vacuum roles/config."></ha-icon>`:ae}
+              ${_.size?te`<ha-icon class="dock-unseq" icon="mdi:sort-variant-off"
+                title="${_.size} selected room${_.size>1?"s have":" has"} no cleaning order set — the time above may be off. Set the order in the card editor's Maps tab."></ha-icon>`:ae}</span>
+            <button class="action-btn ${this._holdId===w?"action-btn--holding":""}"
+              style="flex:0 0 auto;padding:7px 14px;background:rgba(var(--avc-accent-rgb),0.24);border:1px solid rgba(var(--avc-accent-rgb),0.65);color:rgb(var(--avc-ink-rgb))"
+              ?disabled=${!p.length}
+              @pointerdown=${p.length?this._holdStart(w,()=>this._runOrchestrated(p,this._planMode)):ae}
               @pointermove=${this._holdMove}
               @pointerup=${this._holdEnd}
               @pointerleave=${this._holdEnd}
@@ -191,487 +191,487 @@ const ht=t=>(e,o)=>{void 0!==o?o.addInitializer(()=>{customElements.define(t,e)}
               <ha-icon icon="mdi:play" style="--mdc-icon-size:16px"></ha-icon>
               <span style="font-size:12px">Start · hold</span>
             </button>
-          </div>`:G}
+          </div>`:ae}
       </div>
-    `}_dockNeedsAttention(){return this._config.vacuums.some(t=>{const e=this._intAttrs(t)?.dock_status,o=e?.dock_error_status;return null!=o&&0!==o&&"0"!==o})}_dockTier(t){const e=this._intAttrs(t)?.dock_status?.dock_type;return null==e||0===e?"none":1===e||5===e?"empty":"full"}_renderDockSheet(){if(!this._dockSheetOpen)return G;const t=this._config.vacuums.filter(t=>"none"!==this._dockTier(t)||this._careItems(t).length>0);if(!t.length)return G;const e=Math.min(this._dockSheetIdx,t.length-1),o=t[e],i=this._dockTier(o),s=this._intAttrs(o)?.dock_status,n=t=>()=>{this._call("anyvac",t,{entity_id:o.entity})},a=this._careItems(o),r=t=>e=>{e.stopPropagation();const o=t.entity??t.reset,i=new Map(this._careResetPending);i.set(o,Date.now()),this._careResetPending=i,setTimeout(()=>{if(this._careResetPending.get(o)===i.get(o)){const t=new Map(this._careResetPending);t.delete(o),this._careResetPending=t}},4e4),this._call("button","press",{entity_id:t.reset})};return q`
+    `}_dockNeedsAttention(){return this._config.vacuums.some(e=>{const t=this._intAttrs(e)?.dock_status,o=t?.dock_error_status;return null!=o&&0!==o&&"0"!==o})}_dockTier(e){const t=this._intAttrs(e)?.dock_status?.dock_type;return null==t||0===t?"none":1===t||5===t?"empty":"full"}_renderDockSheet(){if(!this._dockSheetOpen)return ae;const e=this._config.vacuums.filter(e=>"none"!==this._dockTier(e)||this._careItems(e).length>0);if(!e.length)return ae;const t=Math.min(this._dockSheetIdx,e.length-1),o=e[t],s=this._dockTier(o),l=this._intAttrs(o)?.dock_status,act=e=>()=>{this._call("anyvac",e,{entity_id:o.entity})},d=this._careItems(o),reset=e=>t=>{t.stopPropagation();const o=e.entity??e.reset,s=new Map(this._careResetPending);s.set(o,Date.now()),this._careResetPending=s,setTimeout(()=>{if(this._careResetPending.get(o)===s.get(o)){const e=new Map(this._careResetPending);e.delete(o),this._careResetPending=e}},4e4),this._call("button","press",{entity_id:e.reset})};return te`
       <div class="dock-sheet">
-        ${t.length>1?q`
+        ${e.length>1?te`
           <div class="dock-sheet-tabs">
-            ${t.map((t,o)=>q`
-              <button class="dock-sheet-tab ${o===e?"on":""}"
-                style=${vt({borderColor:this._color(t)})}
-                title=${t.name??t.entity}
-                @click=${t=>{t.stopPropagation(),this._dockSheetIdx=o}}>
-                ${t.image?q`<img src=${t.image} alt="" />`:q`<ha-icon icon="mdi:robot-vacuum" style=${vt({color:this._color(t)})}></ha-icon>`}
+            ${e.map((e,o)=>te`
+              <button class="dock-sheet-tab ${o===t?"on":""}"
+                style=${_e({borderColor:this._color(e)})}
+                title=${e.name??e.entity}
+                @click=${e=>{e.stopPropagation(),this._dockSheetIdx=o}}>
+                ${e.image?te`<img src=${e.image} alt="" />`:te`<ha-icon icon="mdi:robot-vacuum" style=${_e({color:this._color(e)})}></ha-icon>`}
               </button>`)}
-          </div>`:G}
-        ${this._config.debug&&s?q`
+          </div>`:ae}
+        ${this._config.debug&&l?te`
           <div class="dock-sheet-debug">
-            ${Object.entries(s).filter(([,t])=>null!=t).map(([t,e])=>q`<span>${t}: ${String(e)}</span>`)}
-          </div>`:G}
-        ${"none"!==i?q`
+            ${Object.entries(l).filter(([,e])=>null!=e).map(([e,t])=>te`<span>${e}: ${String(t)}</span>`)}
+          </div>`:ae}
+        ${"none"!==s?te`
           <div class="dock-sheet-actions">
-            <button class="dock-sheet-action" @click=${n("dock_empty")}>
+            <button class="dock-sheet-action" @click=${act("dock_empty")}>
               <ha-icon icon="mdi:delete-empty"></ha-icon><span>Empty</span>
             </button>
-            ${"full"===i?q`
-              <button class="dock-sheet-action" @click=${n("dock_wash")}>
+            ${"full"===s?te`
+              <button class="dock-sheet-action" @click=${act("dock_wash")}>
                 <ha-icon icon="mdi:water"></ha-icon><span>Wash</span>
               </button>
-              <button class="dock-sheet-action" @click=${n("dock_dry")}>
+              <button class="dock-sheet-action" @click=${act("dock_dry")}>
                 <ha-icon icon="mdi:hair-dryer"></ha-icon><span>Dry</span>
               </button>
-              <button class="dock-sheet-action" @click=${n("dock_pump")}>
+              <button class="dock-sheet-action" @click=${act("dock_pump")}>
                 <ha-icon icon="mdi:water-pump"></ha-icon><span>Pump</span>
               </button>
-              <button class="dock-sheet-action" @click=${n("dock_self_clean")}>
+              <button class="dock-sheet-action" @click=${act("dock_self_clean")}>
                 <ha-icon icon="mdi:autorenew"></ha-icon><span>Self-clean</span>
-              </button>`:G}
-          </div>`:G}
-        ${a.length?q`
+              </button>`:ae}
+          </div>`:ae}
+        ${d.length?te`
           <div class="dock-sheet-care">
-            ${a.map(t=>q`
+            ${d.map(e=>te`
               <div class="dock-sheet-care-row">
-                <span class="dock-sheet-care-label">${t.label}</span>
-                ${t.binary?q`<span class="dock-sheet-care-badge ${"on"===this.hass.states[t.binary]?.state?"warn":""}">
-                      ${"on"===this.hass.states[t.binary]?.state?"⚠":"OK"}
-                    </span>`:q`<span class="dock-sheet-care-value">${this._careValue(t)}</span>`}
-                ${t.reset?(()=>{const e=this._careResetPending.has(t.entity??t.reset);return q`
-                    <button class="dock-sheet-care-reset ${e?"pending":""}"
-                      title="Reset" ?disabled=${e} @click=${r(t)}>
-                      <ha-icon icon=${e?"mdi:loading":"mdi:refresh"}></ha-icon>
-                    </button>`})():G}
+                <span class="dock-sheet-care-label">${e.label}</span>
+                ${e.binary?te`<span class="dock-sheet-care-badge ${"on"===this.hass.states[e.binary]?.state?"warn":""}">
+                      ${"on"===this.hass.states[e.binary]?.state?"⚠":"OK"}
+                    </span>`:te`<span class="dock-sheet-care-value">${this._careValue(e)}</span>`}
+                ${e.reset?(()=>{const t=this._careResetPending.has(e.entity??e.reset);return te`
+                    <button class="dock-sheet-care-reset ${t?"pending":""}"
+                      title="Reset" ?disabled=${t} @click=${reset(e)}>
+                      <ha-icon icon=${t?"mdi:loading":"mdi:refresh"}></ha-icon>
+                    </button>`})():ae}
               </div>`)}
-          </div>`:G}
+          </div>`:ae}
       </div>
-    `}_renderModeSheet(){if(!this._modeSheetOpen)return G;const t=this._planMode,e=t=>e=>{e.stopPropagation(),this._planMode=t,this._modeSheetOpen=!1},o=(o,i,s)=>q`
-      <button class="dock-mode ${t===o?"on":""}" @click=${e(o)}>
-        <ha-icon icon=${i}></ha-icon><span>${s}</span>
-      </button>`;return q`
+    `}_renderModeSheet(){if(!this._modeSheetOpen)return ae;const e=this._planMode,pick=e=>t=>{t.stopPropagation(),this._planMode=e,this._modeSheetOpen=!1},modeBtn=(t,o,s)=>te`
+      <button class="dock-mode ${e===t?"on":""}" @click=${pick(t)}>
+        <ha-icon icon=${o}></ha-icon><span>${s}</span>
+      </button>`;return te`
       <div class="dock-sheet">
         <div class="dock-head">
-          ${o("dry","mdi:broom","Dry")}${o("wet","mdi:water","Wet")}${o("both","mdi:water-plus","Both")}
+          ${modeBtn("dry","mdi:broom","Dry")}${modeBtn("wet","mdi:water","Wet")}${modeBtn("both","mdi:water-plus","Both")}
         </div>
       </div>
-    `}_renderStartBar(){const t=this._config.vacuums,e=t.some(t=>this._intAttrs(t)),o=this._allRoomKeys().filter(e=>this._isRoomSelectedAny(e,t)),i=o.length?o:this._allRoomKeys(),s=t.some(t=>this._isCleaning(t)),n="startbar",a={dry:"mdi:broom",wet:"mdi:water",both:"mdi:water-plus"}[this._planMode],r={dry:"Dry",wet:"Wet",both:"Both"}[this._planMode],l=q`
+    `}_renderStartBar(){const e=this._config.vacuums,t=e.some(e=>this._intAttrs(e)),o=this._allRoomKeys().filter(t=>this._isRoomSelectedAny(t,e)),s=o.length?o:this._allRoomKeys(),l=e.some(e=>this._isCleaning(e)),d="startbar",h={dry:"mdi:broom",wet:"mdi:water",both:"mdi:water-plus"}[this._planMode],p={dry:"Dry",wet:"Wet",both:"Both"}[this._planMode],m=te`
       <button class="start-seg start-seg--mode ${this._modeSheetOpen?"on":""}"
         title="Clean type — tap to change"
-        @click=${t=>{t.stopPropagation(),this._dockSheetOpen=!1,this._modeSheetOpen=!this._modeSheetOpen}}>
-        <ha-icon icon=${a}></ha-icon>
-        <span>${r}</span>
-      </button>`,c=t.some(t=>"none"!==this._dockTier(t)||this._careItems(t).length>0),d=c?q`
+        @click=${e=>{e.stopPropagation(),this._dockSheetOpen=!1,this._modeSheetOpen=!this._modeSheetOpen}}>
+        <ha-icon icon=${h}></ha-icon>
+        <span>${p}</span>
+      </button>`,u=e.some(e=>"none"!==this._dockTier(e)||this._careItems(e).length>0),_=u?te`
       <button class="start-seg start-seg--dock ${this._dockSheetOpen?"on":""}"
         title="Dock control"
-        @click=${t=>{t.stopPropagation(),this._modeSheetOpen=!1,this._dockSheetOpen=!this._dockSheetOpen}}>
+        @click=${e=>{e.stopPropagation(),this._modeSheetOpen=!1,this._dockSheetOpen=!this._dockSheetOpen}}>
         <ha-icon icon="mdi:home-outline"></ha-icon>
-        ${this._dockNeedsAttention()?q`<span class="dock-mode-dot"></span>`:G}
-      </button>`:G;if(s)return q`
+        ${this._dockNeedsAttention()?te`<span class="dock-mode-dot"></span>`:ae}
+      </button>`:ae;if(l)return te`
         <div class="start-row">
-          ${l}
-          <button class="start-bar start-bar--cancel ${this._holdId===n?"action-btn--holding":""}"
-            @pointerdown=${this._holdStart(n,()=>{if(e)this._call("anyvac","cancel",{});else for(const e of t)this._isCleaning(e)&&this._pause(e)})}
+          ${m}
+          <button class="start-bar start-bar--cancel ${this._holdId===d?"action-btn--holding":""}"
+            @pointerdown=${this._holdStart(d,()=>{if(t)this._call("anyvac","cancel",{});else for(const t of e)this._isCleaning(t)&&this._pause(t)})}
             @pointermove=${this._holdMove}
             @pointerup=${this._holdEnd} @pointerleave=${this._holdEnd} @pointercancel=${this._holdEnd}>
             <div class="hold-ring"></div>
             <ha-icon icon="mdi:stop"></ha-icon>
             <span>CANCEL · hold</span>
           </button>
-          ${d}
-        </div>`;const h=e&&i.length>0,p=this._etaFor(i,this._planMode,e),m=o.length?o.length+(1===o.length?" room":" rooms"):"whole home";return q`
+          ${_}
+        </div>`;const b=t&&s.length>0,v=this._etaFor(s,this._planMode,t),f=o.length?o.length+(1===o.length?" room":" rooms"):"whole home";return te`
       <div class="start-row">
-        ${l}
-        <button class="start-bar ${h&&this._holdId===n?"action-btn--holding":""}"
-          ?disabled=${!h}
-          title=${e?"":"Requires the AnyVac integration"}
-          @pointerdown=${h?this._holdStart(n,()=>this._runOrchestrated(i,this._planMode)):G}
+        ${m}
+        <button class="start-bar ${b&&this._holdId===d?"action-btn--holding":""}"
+          ?disabled=${!b}
+          title=${t?"":"Requires the AnyVac integration"}
+          @pointerdown=${b?this._holdStart(d,()=>this._runOrchestrated(s,this._planMode)):ae}
           @pointermove=${this._holdMove}
           @pointerup=${this._holdEnd} @pointerleave=${this._holdEnd} @pointercancel=${this._holdEnd}>
           <div class="hold-ring"></div>
           <ha-icon icon="mdi:play"></ha-icon>
-          <span>START · ${m}${p?" · ~"+p+" min":""}</span>
+          <span>START · ${f}${v?" · ~"+v+" min":""}</span>
         </button>
-        ${d}
-      </div>`}_settingPresets(t){if(t.presets&&t.presets.length)return t.presets;const e=t.clean_action;return[{id:"default",label:"Default",suction_level:e?.suction_level,mop_mode:e?.mop_mode,mop_intensity:e?.mop_intensity,repeat:e?.repeat}]}_activePresetId(t){const e=this._settingPresets(t),o=this._activePresets.get(t.entity);return o&&e.some(t=>t.id===o)?o:e[0]?.id??"default"}_activePreset(t){const e=this._settingPresets(t),o=this._activePresetId(t);return e.find(t=>t.id===o)??e[0]}_setActivePreset(t,e){const o=new Map(this._activePresets);o.set(t.entity,e),this._activePresets=o}_renderPresetChips(t){const e=this._settingPresets(t);if(e.length<2)return G;const o=this._activePresetId(t),i=this._color(t);return q`
+        ${_}
+      </div>`}_settingPresets(e){if(e.presets&&e.presets.length)return e.presets;const t=e.clean_action;return[{id:"default",label:"Default",suction_level:t?.suction_level,mop_mode:t?.mop_mode,mop_intensity:t?.mop_intensity,repeat:t?.repeat}]}_activePresetId(e){const t=this._settingPresets(e),o=this._activePresets.get(e.entity);return o&&t.some(e=>e.id===o)?o:t[0]?.id??"default"}_activePreset(e){const t=this._settingPresets(e),o=this._activePresetId(e);return t.find(e=>e.id===o)??t[0]}_setActivePreset(e,t){const o=new Map(this._activePresets);o.set(e.entity,t),this._activePresets=o}_renderPresetChips(e){const t=this._settingPresets(e);if(t.length<2)return ae;const o=this._activePresetId(e),s=this._color(e);return te`
       <div class="preset-chip-row">
-        ${e.map(e=>{const s=e.id===o;return q`<button
-            @click=${o=>{o.stopPropagation(),this._setActivePreset(t,e.id)}}
-            style=${vt({display:"inline-flex",alignItems:"center",gap:"4px",flexShrink:"0",padding:"4px 10px",borderRadius:"14px",cursor:"pointer",fontSize:"12px",lineHeight:"1",border:"1px solid "+(s?i:"rgba(255,255,255,0.15)"),background:s?this._colorBg(t):"rgba(255,255,255,0.04)",color:s?"white":"rgba(255,255,255,0.55)"})}
+        ${t.map(t=>{const l=t.id===o;return te`<button
+            @click=${o=>{o.stopPropagation(),this._setActivePreset(e,t.id)}}
+            style=${_e({display:"inline-flex",alignItems:"center",gap:"4px",flexShrink:"0",padding:"4px 10px",borderRadius:"14px",cursor:"pointer",fontSize:"12px",lineHeight:"1",border:"1px solid "+(l?s:"rgba(var(--avc-ink-rgb),0.15)"),background:l?this._colorBg(e):"rgba(var(--avc-ink-rgb),0.04)",color:l?"rgb(var(--avc-ink-rgb))":"rgba(var(--avc-ink-rgb),0.55)"})}
           >
-            ${e.icon?q`<ha-icon icon=${e.icon} style="--mdc-icon-size:14px"></ha-icon>`:G}
-            <span>${e.label}</span>
+            ${t.icon?te`<ha-icon icon=${t.icon} style="--mdc-icon-size:14px"></ha-icon>`:ae}
+            <span>${t.label}</span>
           </button>`})}
       </div>
-    `}async _startClean(t){const e=this._roomsFor(t).filter(e=>this._isRoomSelected(e,t));if(0===e.length)return;if(this._intAttrs(t)){const o=this._activePreset(t),i=this._liveCleanType(t),s={};return o.suction_level&&(s.fan_speed=o.suction_level),"wet"===i&&o.mop_mode&&(s.mop_mode=o.mop_mode),"wet"===i&&o.mop_intensity&&(s.mop_intensity=o.mop_intensity),o.repeat&&o.repeat>1&&(s.repeat=o.repeat),void await this._call("anyvac","clean",{rooms:e.map(t=>t.key),mode:i,vacuums:[t.entity],...Object.keys(s).length?{settings:{[i]:{[t.entity]:s}}}:{}})}if(!t.clean_action)return;if("script"===t.clean_action.type){const o=t.clean_action,i={};for(const[s,n]of Object.entries(o.variables??{}))i[s]=n.replace("{{ entity }}",t.entity).replace("{{ selected_segments }}",JSON.stringify(e.map(t=>t.segment_id).filter(Boolean))).replace("{{ selected_room_keys }}",JSON.stringify(e.map(t=>t.key))).replace("{{ selected_area_ids }}",JSON.stringify(e.map(t=>t.area_id).filter(Boolean)));return void await this._call("script","turn_on",{entity_id:o.entity_id,variables:i})}const o=t.clean_action,i=this._activePreset(t),s=i.mop_mode??o.mop_mode,n=i.mop_intensity??o.mop_intensity,a=i.suction_level??o.suction_level;if(o.mop_mode_entity&&s&&await this._call("select","select_option",{entity_id:o.mop_mode_entity,option:s}),o.mop_intensity_entity&&n&&await this._call("select","select_option",{entity_id:o.mop_intensity_entity,option:n}),a&&await this._call("vacuum","set_fan_speed",{entity_id:t.entity,fan_speed:a}),"native-area"===t.clean_action.type)try{await this.hass.callService("vacuum","clean_area",{cleaning_area_id:e.map(t=>t.area_id??this._config.area_mappings?.[t.key]??t.key)},{entity_id:t.entity})}catch(t){console.error("[anyvac-card] vacuum.clean_area failed:",t)}else{const o=t.clean_action,i=e.map(t=>t.segment_id).filter(t=>void 0!==t);if(!i.length)return void console.error("[anyvac-card] no configured segment_ids for the selection; aborting");await this._call("vacuum","send_command",{entity_id:t.entity,command:"app_segment_clean",params:[{segments:i,repeat:o.repeat??1}]})}}_renderBadge(t,e){const o=this._shownSet.has(e),i=this._isCleaning(t),s=this._color(t),n=t.name??t.entity.split(".")[1]??t.entity,a=this._holdId==="badge-"+e,r=this._statusInfo(t)[1],l=i?this._colorBgActive(t):o?this._colorBg(t):"rgba(30,30,30,0.85)";return q`
+    `}async _startClean(e){const t=this._roomsFor(e).filter(t=>this._isRoomSelected(t,e));if(0===t.length)return;if(this._intAttrs(e)){const o=this._activePreset(e),s=this._liveCleanType(e),l={};return o.suction_level&&(l.fan_speed=o.suction_level),"wet"===s&&o.mop_mode&&(l.mop_mode=o.mop_mode),"wet"===s&&o.mop_intensity&&(l.mop_intensity=o.mop_intensity),o.repeat&&o.repeat>1&&(l.repeat=o.repeat),void await this._call("anyvac","clean",{rooms:t.map(e=>e.key),mode:s,vacuums:[e.entity],...Object.keys(l).length?{settings:{[s]:{[e.entity]:l}}}:{}})}if(!e.clean_action)return;if("script"===e.clean_action.type){const o=e.clean_action,s={};for(const[l,d]of Object.entries(o.variables??{}))s[l]=d.replace("{{ entity }}",e.entity).replace("{{ selected_segments }}",JSON.stringify(t.map(e=>e.segment_id).filter(Boolean))).replace("{{ selected_room_keys }}",JSON.stringify(t.map(e=>e.key))).replace("{{ selected_area_ids }}",JSON.stringify(t.map(e=>e.area_id).filter(Boolean)));return void await this._call("script","turn_on",{entity_id:o.entity_id,variables:s})}const o=e.clean_action,s=this._activePreset(e),l=s.mop_mode??o.mop_mode,d=s.mop_intensity??o.mop_intensity,h=s.suction_level??o.suction_level;if(o.mop_mode_entity&&l&&await this._call("select","select_option",{entity_id:o.mop_mode_entity,option:l}),o.mop_intensity_entity&&d&&await this._call("select","select_option",{entity_id:o.mop_intensity_entity,option:d}),h&&await this._call("vacuum","set_fan_speed",{entity_id:e.entity,fan_speed:h}),"native-area"===e.clean_action.type)try{await this.hass.callService("vacuum","clean_area",{cleaning_area_id:t.map(e=>e.area_id??this._config.area_mappings?.[e.key]??e.key)},{entity_id:e.entity})}catch(e){console.error("[anyvac-card] vacuum.clean_area failed:",e)}else{const o=e.clean_action,s=t.map(e=>e.segment_id).filter(e=>void 0!==e);if(!s.length)return void console.error("[anyvac-card] no configured segment_ids for the selection; aborting");await this._call("vacuum","send_command",{entity_id:e.entity,command:"app_segment_clean",params:[{segments:s,repeat:o.repeat??1}]})}}_renderBadge(e,t){const o=this._shownSet.has(t),s=this._isCleaning(e),l=this._color(e),d=e.name??e.entity.split(".")[1]??e.entity,h=this._holdId==="badge-"+t,p=this._statusInfo(e)[1],m=s?this._colorBgActive(e):o?this._colorBg(e):"rgba(30,30,30,0.85)";return te`
       <button
-        class="badge ${a?"badge--holding":""}"
-        style=${vt({background:l,border:i?"3px solid "+r:o?"2px solid "+r:"2px solid rgba(255,255,255,0.18)",boxShadow:i?"0 0 18px "+r:o?"0 0 6px "+r:"none"})}
-        @pointerdown=${t=>{t.preventDefault(),this._cancelHold(),this._holdId="badge-"+e,this._holdTimer=setTimeout(()=>{this._holdTimer=null,this._holdId=null,this._toggleShown(e)},kt)}}
-        @pointerup=${()=>{null!==this._holdTimer?(this._cancelHold(),this._shownSet=new Set([e]),this._saveShown()):this._holdId=null}}
+        class="badge ${h?"badge--holding":""}"
+        style=${_e({background:m,border:s?"3px solid "+p:o?"2px solid "+p:"2px solid rgba(var(--avc-ink-rgb),0.18)",boxShadow:s?"0 0 18px "+p:o?"0 0 6px "+p:"none"})}
+        @pointerdown=${e=>{e.preventDefault(),this._cancelHold(),this._holdId="badge-"+t,this._holdTimer=setTimeout(()=>{this._holdTimer=null,this._holdId=null,this._toggleShown(t)},ye)}}
+        @pointerup=${()=>{null!==this._holdTimer?(this._cancelHold(),this._shownSet=new Set([t]),this._saveShown()):this._holdId=null}}
         @pointerleave=${this._holdEnd}
         @pointercancel=${this._holdEnd}
         aria-pressed=${o?"true":"false"}
-        aria-label=${n}
+        aria-label=${d}
       >
         <div class="hold-ring"></div>
-        ${t.image?q`<img class="badge-img" src=${t.image} alt=${n} />`:q`<ha-icon class="badge-icon" icon="mdi:robot-vacuum" style=${vt({color:s})}></ha-icon>`}
-        <span class="badge-name" style=${vt({color:o?"white":"rgba(255,255,255,0.55)"})}>
-          ${n}
+        ${e.image?te`<img class="badge-img" src=${e.image} alt=${d} />`:te`<ha-icon class="badge-icon" icon="mdi:robot-vacuum" style=${_e({color:l})}></ha-icon>`}
+        <span class="badge-name" style=${_e({color:o?"rgb(var(--avc-ink-rgb))":"rgba(var(--avc-ink-rgb),0.55)"})}>
+          ${d}
         </span>
       </button>
-    `}_renderVacuumPicker(){const t=this._config.vacuums;return t.length?q`<div class="vac-picker">${t.map((t,e)=>this._renderBadge(t,e))}</div>`:G}_renderGlobalBadge(t,e){const o=this._isGlobalActive(t),i=this._resolveColor(t.color,"orange"),s="global-"+e,n=this._holdId===s,a=o?this._resolveBg(t.color,"orange",!0):"rgba(30,30,30,0.85)";return q`
+    `}_renderVacuumPicker(){const e=this._config.vacuums;return e.length?te`<div class="vac-picker">${e.map((e,t)=>this._renderBadge(e,t))}</div>`:ae}_renderGlobalBadge(e,t){const o=this._isGlobalActive(e),s=this._resolveColor(e.color,"orange"),l="global-"+t,d=this._holdId===l,h=o?this._resolveBg(e.color,"orange",!0):"rgba(30,30,30,0.85)";return te`
       <button
-        class="badge badge--global ${n?"badge--holding":""}"
-        style=${vt({background:a,border:o?"3px solid "+i:"2px solid rgba(255,255,255,0.18)",boxShadow:o?"0 0 18px "+i+"B0":"none"})}
-        @pointerdown=${this._holdStart(s,()=>this._triggerGlobal(t))}
+        class="badge badge--global ${d?"badge--holding":""}"
+        style=${_e({background:h,border:o?"3px solid "+s:"2px solid rgba(var(--avc-ink-rgb),0.18)",boxShadow:o?"0 0 18px "+s+"B0":"none"})}
+        @pointerdown=${this._holdStart(l,()=>this._triggerGlobal(e))}
         @pointermove=${this._holdMove}
         @pointerup=${this._holdEnd}
         @pointerleave=${this._holdEnd}
         @pointercancel=${this._holdEnd}
-        aria-label=${t.name}
-        title=${"Hold to trigger: "+t.name}
+        aria-label=${e.name}
+        title=${"Hold to trigger: "+e.name}
       >
         <div class="hold-ring"></div>
-        ${t.image?q`<img class="badge-img" src=${t.image} alt=${t.name} />`:q`<ha-icon class="badge-icon" icon="mdi:home-floor-a" style=${vt({color:i})}></ha-icon>`}
-        <span class="badge-name" style=${vt({color:o?"white":"rgba(255,255,255,0.55)"})}>
-          ${t.name}
+        ${e.image?te`<img class="badge-img" src=${e.image} alt=${e.name} />`:te`<ha-icon class="badge-icon" icon="mdi:home-floor-a" style=${_e({color:s})}></ha-icon>`}
+        <span class="badge-name" style=${_e({color:o?"rgb(var(--avc-ink-rgb))":"rgba(var(--avc-ink-rgb),0.55)"})}>
+          ${e.name}
         </span>
       </button>
-    `}_toggleMode(t,e){this._mapMode===e&&this._modeEntity===t?(this._mapMode="normal",this._modeEntity=null):(this._mapMode=e,this._modeEntity=t)}_armMode(t){this._mapMode===t&&"*"===this._modeEntity?(this._mapMode="normal",this._modeEntity=null):(this._mapMode=t,this._modeEntity="*",this._pinPending=null,this._zonePending=null,this._zoneRectShown=null,this._zoneEdit=null)}_modeCandidates(){return this._config.vacuums.filter(t=>this._intAttrs(t)&&this._mapEntityFor(t))}_isModeCandidate(t){return this._modeEntity===t.entity||"*"===this._modeEntity&&!!this._intAttrs(t)&&!!this._mapEntityFor(t)}_hasZoneEditTarget(t){return this._isModeCandidate(t)||!!this._zonePending?.[t.entity]}_zoneHit(t,e,o){const i=Math.min(t.x0,t.x1),s=Math.max(t.x0,t.x1),n=Math.min(t.y0,t.y1),a=Math.max(t.y0,t.y1),r=[["nw",i,n],["ne",s,n],["sw",i,a],["se",s,a]];for(const[t,i,s]of r)if(Math.abs(e-i)<=4&&Math.abs(o-s)<=4)return t;return e>=i&&e<=s&&o>=n&&o<=a?"move":null}_renderZoneHandles(){return q`
+    `}_toggleMode(e,t){this._mapMode===t&&this._modeEntity===e?(this._mapMode="normal",this._modeEntity=null):(this._mapMode=t,this._modeEntity=e)}_armMode(e){this._mapMode===e&&"*"===this._modeEntity?(this._mapMode="normal",this._modeEntity=null):(this._mapMode=e,this._modeEntity="*",this._pinPending=null,this._zonePending=null,this._zoneRectShown=null,this._zoneEdit=null)}_modeCandidates(){return this._config.vacuums.filter(e=>this._intAttrs(e)&&this._mapEntityFor(e))}_isModeCandidate(e){return this._modeEntity===e.entity||"*"===this._modeEntity&&!!this._intAttrs(e)&&!!this._mapEntityFor(e)}_hasZoneEditTarget(e){return this._isModeCandidate(e)||!!this._zonePending?.[e.entity]}_zoneHit(e,t,o){const s=Math.min(e.x0,e.x1),l=Math.max(e.x0,e.x1),d=Math.min(e.y0,e.y1),h=Math.max(e.y0,e.y1),p=[["nw",s,d],["ne",l,d],["sw",s,h],["se",l,h]];for(const[e,s,l]of p)if(Math.abs(t-s)<=4&&Math.abs(o-l)<=4)return e;return t>=s&&t<=l&&o>=d&&o<=h?"move":null}_renderZoneHandles(){return te`
       <div class="zone-handle zone-handle--nw"></div>
       <div class="zone-handle zone-handle--ne"></div>
       <div class="zone-handle zone-handle--sw"></div>
       <div class="zone-handle zone-handle--se"></div>
-    `}_zoneRectFor(t,e){return"zone"===this._mapMode&&this._isModeCandidate(t)&&this._zoneDrag?this._zoneDrag:this._zoneRectShown?"merged"===this._config.map_mode?e?this._zoneRectShown:null:this._zonePending?.[t.entity]?this._zoneRectShown:null:null}_refreshMap(t){const e=this._mapEntityFor(t);e&&this.hass.callService("homeassistant","update_entity",{entity_id:e})}_clampPct(t){return Math.min(100,Math.max(0,t))}_onMapClick(t,e){if("pin"!==this._mapMode)return;if(!this._isModeCandidate(t))return;if("*"===this._modeEntity&&"merged"===this._config.map_mode){const t={};for(const o of this._modeCandidates()){const i=this._clickToContent(o,e.clientX,e.clientY);i&&(t[o.entity]={x:this._clampPct(i.x),y:this._clampPct(i.y)})}return this._pinPending=Object.keys(t).length?t:null,this._mapMode="normal",void(this._modeEntity=null)}const o=this._clickToContent(t,e.clientX,e.clientY);this._dbg=o?"goto "+o.x.toFixed(1)+"%, "+o.y.toFixed(1)+"%":"(map element not found)",o&&this._call("anyvac","goto",{entity_id:t.entity,x_pct:this._clampPct(o.x),y_pct:this._clampPct(o.y)}),this._mapMode="normal",this._modeEntity=null}_clickToContent(t,e,o){const i=this._mapEntityFor(t)?this.renderRoot?.querySelector(`.map-img[data-entity="${t.entity.replace(/"/g,'\\"')}"]`):null;if(!i)return null;const s=i.getBoundingClientRect(),n=(s.left+s.right)/2,a=(s.top+s.bottom)/2,r=getComputedStyle(i).transform,l=new DOMMatrix("none"===r?void 0:r),c=l.a*l.d-l.b*l.c;if(Math.abs(c)<1e-9)return null;const d=e-n,h=o-a,p=(l.d*d-l.c*h)/c,m=(-l.b*d+l.a*h)/c;return{x:100*(p/(i.offsetWidth||1)+.5),y:100*(m/(i.offsetHeight||1)+.5)}}_onZoneDown(t,e){if(!(!!this._zoneRectShown&&this._hasZoneEditTarget(t)||"zone"===this._mapMode&&this._isModeCandidate(t)))return;const o=e.currentTarget;o.setPointerCapture?.(e.pointerId);const i=o.getBoundingClientRect(),s=(e.clientX-i.left)/i.width*100,n=(e.clientY-i.top)/i.height*100;if(this._zoneRectShown){const t=this._zoneHit(this._zoneRectShown,s,n);if(t){const e=this._zoneRectShown,o=Math.min(e.x0,e.x1),i=Math.max(e.x0,e.x1),a=Math.min(e.y0,e.y1),r=Math.max(e.y0,e.y1);return this._zoneRectShown={x0:o,y0:a,x1:i,y1:r},void(this._zoneEdit="move"===t?{type:"move",offsetX:s-o,offsetY:n-a,width:i-o,height:r-a}:{type:t})}if("zone"!==this._mapMode)return}this._zonePending=null,this._zoneRectShown=null,this._zoneEdit=null,this._zoneMulti="*"===this._modeEntity&&"merged"===this._config.map_mode,this._zoneDrag={x0:s,y0:n,x1:s,y1:n}}_onZoneMove(t,e){if(this._zoneEdit&&this._zoneRectShown){const t=e.currentTarget.getBoundingClientRect(),o=(e.clientX-t.left)/t.width*100,i=(e.clientY-t.top)/t.height*100,s=3,n=this._zoneEdit;if("move"===n.type){const{offsetX:t,offsetY:e,width:s,height:a}=n,r=Math.min(100-s,Math.max(0,o-t)),l=Math.min(100-a,Math.max(0,i-e));this._zoneRectShown={x0:r,y0:l,x1:r+s,y1:l+a}}else{let{x0:t,y0:e,x1:a,y1:r}=this._zoneRectShown;const l=this._clampPct(o),c=this._clampPct(i);"nw"===n.type?(t=Math.min(l,a-s),e=Math.min(c,r-s)):"ne"===n.type?(a=Math.max(l,t+s),e=Math.min(c,r-s)):"sw"===n.type?(t=Math.min(l,a-s),r=Math.max(c,e+s)):(a=Math.max(l,t+s),r=Math.max(c,e+s)),this._zoneRectShown={x0:t,y0:e,x1:a,y1:r}}return}if(!this._zoneDrag||"zone"!==this._mapMode||!this._isModeCandidate(t))return;const o=e.currentTarget.getBoundingClientRect();this._zoneDrag={x0:this._zoneDrag.x0,y0:this._zoneDrag.y0,x1:(e.clientX-o.left)/o.width*100,y1:(e.clientY-o.top)/o.height*100}}_onZoneUp(t,e){const o=e.currentTarget;if(this._zoneEdit)return this._zoneEdit=null,void this._commitZoneRect(t,o);if(!this._zoneDrag||"zone"!==this._mapMode||!this._isModeCandidate(t))return;const i=Math.abs(this._zoneDrag.x1-this._zoneDrag.x0)>2||Math.abs(this._zoneDrag.y1-this._zoneDrag.y0)>2;if(this._zoneRectShown=i?this._zoneDrag:null,this._zoneDrag=null,!i)return;this._zoneMulti&&(this._mapMode="normal",this._modeEntity=null),this._commitZoneRect(t,o)}_commitZoneRect(t,e){const o=this._zoneRectShown;if(!o)return;const i=e.getBoundingClientRect(),s=i.left+Math.min(o.x0,o.x1)/100*i.width,n=i.top+Math.min(o.y0,o.y1)/100*i.height,a=i.left+Math.max(o.x0,o.x1)/100*i.width,r=i.top+Math.max(o.y0,o.y1)/100*i.height;if(this._zoneMulti){const t={};for(const e of this._modeCandidates()){const o=this._clickToContent(e,s,n),i=this._clickToContent(e,a,r);o&&i&&(t[e.entity]={x1:this._clampPct(Math.min(o.x,i.x)),y1:this._clampPct(Math.min(o.y,i.y)),x2:this._clampPct(Math.max(o.x,i.x)),y2:this._clampPct(Math.max(o.y,i.y))})}return void(this._zonePending=Object.keys(t).length?t:null)}const l=this._clickToContent(t,s,n),c=this._clickToContent(t,a,r);l&&c&&(this._zonePending={[t.entity]:{x1:this._clampPct(Math.min(l.x,c.x)),y1:this._clampPct(Math.min(l.y,c.y)),x2:this._clampPct(Math.max(l.x,c.x)),y2:this._clampPct(Math.max(l.y,c.y))}})}_confirmZone(t){const e=this._zonePending?.[t.entity];if(!e)return;const o=t.clean_action;if(this._call("anyvac","zone_clean",{entity_id:t.entity,x1_pct:e.x1,y1_pct:e.y1,x2_pct:e.x2,y2_pct:e.y2,repeat:o?.repeat??1}),this._zonePending){const e={...this._zonePending};delete e[t.entity],this._zonePending=Object.keys(e).length?e:null,this._zonePending||(this._zoneRectShown=null)}this._zoneDrag=null,this._zoneEdit=null,this._mapMode="normal",this._modeEntity=null}_confirmPin(t){const e=this._pinPending?.[t.entity];if(e&&(this._call("anyvac","goto",{entity_id:t.entity,x_pct:e.x,y_pct:e.y}),this._pinPending)){const e={...this._pinPending};delete e[t.entity],this._pinPending=Object.keys(e).length?e:null}}_cancelPin(){this._pinPending=null}_cancelZone(){this._zonePending=null,this._zoneDrag=null,this._zoneRectShown=null,this._zoneEdit=null}_renderMetaBar(t){const e=t.filter(t=>this._mapEntityFor(t));if(!e.length)return G;const o=this._modeCandidates().length>0&&!this._narrow,i=this._narrow?"Not available while the map is rotated":o?"":"Requires the AnyVac integration (≥ 0.18) + map entity",s="*"===this._modeEntity?this._mapMode:"normal",n=this._allRoomKeys().filter(e=>this._isRoomSelectedAny(e,t)),a=n.length?n:this._allRoomKeys(),r=t.some(t=>this._intAttrs(t));r&&a.length&&this._fetchPlan(a,this._planMode);const l=r?this._planPreview?.unsequenced??[]:[],c=this._unassignedRooms(a,this._planMode,r),d=this._pinPending?Object.keys(this._pinPending).length:0,h=this._zonePending?Object.keys(this._zonePending).length:0;return q`
+    `}_zoneRectFor(e,t){return"zone"===this._mapMode&&this._isModeCandidate(e)&&this._zoneDrag?this._zoneDrag:this._zoneRectShown?"merged"===this._config.map_mode?t?this._zoneRectShown:null:this._zonePending?.[e.entity]?this._zoneRectShown:null:null}_refreshMap(e){const t=this._mapEntityFor(e);t&&this.hass.callService("homeassistant","update_entity",{entity_id:t})}_clampPct(e){return Math.min(100,Math.max(0,e))}_onMapClick(e,t){if("pin"!==this._mapMode)return;if(!this._isModeCandidate(e))return;if("*"===this._modeEntity&&"merged"===this._config.map_mode){const e={};for(const o of this._modeCandidates()){const s=this._clickToContent(o,t.clientX,t.clientY);s&&(e[o.entity]={x:this._clampPct(s.x),y:this._clampPct(s.y)})}return this._pinPending=Object.keys(e).length?e:null,this._mapMode="normal",void(this._modeEntity=null)}const o=this._clickToContent(e,t.clientX,t.clientY);this._dbg=o?"goto "+o.x.toFixed(1)+"%, "+o.y.toFixed(1)+"%":"(map element not found)",o&&this._call("anyvac","goto",{entity_id:e.entity,x_pct:this._clampPct(o.x),y_pct:this._clampPct(o.y)}),this._mapMode="normal",this._modeEntity=null}_clickToContent(e,t,o){const s=this._mapEntityFor(e)?this.renderRoot?.querySelector(`.map-img[data-entity="${e.entity.replace(/"/g,'\\"')}"]`):null;if(!s)return null;const l=s.getBoundingClientRect(),d=(l.left+l.right)/2,h=(l.top+l.bottom)/2,p=getComputedStyle(s).transform,m=new DOMMatrix("none"===p?void 0:p),u=m.a*m.d-m.b*m.c;if(Math.abs(u)<1e-9)return null;const _=t-d,b=o-h,v=(m.d*_-m.c*b)/u,f=(-m.b*_+m.a*b)/u;return{x:100*(v/(s.offsetWidth||1)+.5),y:100*(f/(s.offsetHeight||1)+.5)}}_onZoneDown(e,t){if(!(!!this._zoneRectShown&&this._hasZoneEditTarget(e)||"zone"===this._mapMode&&this._isModeCandidate(e)))return;const o=t.currentTarget;o.setPointerCapture?.(t.pointerId);const s=o.getBoundingClientRect(),l=(t.clientX-s.left)/s.width*100,d=(t.clientY-s.top)/s.height*100;if(this._zoneRectShown){const e=this._zoneHit(this._zoneRectShown,l,d);if(e){const t=this._zoneRectShown,o=Math.min(t.x0,t.x1),s=Math.max(t.x0,t.x1),h=Math.min(t.y0,t.y1),p=Math.max(t.y0,t.y1);return this._zoneRectShown={x0:o,y0:h,x1:s,y1:p},void(this._zoneEdit="move"===e?{type:"move",offsetX:l-o,offsetY:d-h,width:s-o,height:p-h}:{type:e})}if("zone"!==this._mapMode)return}this._zonePending=null,this._zoneRectShown=null,this._zoneEdit=null,this._zoneMulti="*"===this._modeEntity&&"merged"===this._config.map_mode,this._zoneDrag={x0:l,y0:d,x1:l,y1:d}}_onZoneMove(e,t){if(this._zoneEdit&&this._zoneRectShown){const e=t.currentTarget.getBoundingClientRect(),o=(t.clientX-e.left)/e.width*100,s=(t.clientY-e.top)/e.height*100,l=3,d=this._zoneEdit;if("move"===d.type){const{offsetX:e,offsetY:t,width:l,height:h}=d,p=Math.min(100-l,Math.max(0,o-e)),m=Math.min(100-h,Math.max(0,s-t));this._zoneRectShown={x0:p,y0:m,x1:p+l,y1:m+h}}else{let{x0:e,y0:t,x1:h,y1:p}=this._zoneRectShown;const m=this._clampPct(o),u=this._clampPct(s);"nw"===d.type?(e=Math.min(m,h-l),t=Math.min(u,p-l)):"ne"===d.type?(h=Math.max(m,e+l),t=Math.min(u,p-l)):"sw"===d.type?(e=Math.min(m,h-l),p=Math.max(u,t+l)):(h=Math.max(m,e+l),p=Math.max(u,t+l)),this._zoneRectShown={x0:e,y0:t,x1:h,y1:p}}return}if(!this._zoneDrag||"zone"!==this._mapMode||!this._isModeCandidate(e))return;const o=t.currentTarget.getBoundingClientRect();this._zoneDrag={x0:this._zoneDrag.x0,y0:this._zoneDrag.y0,x1:(t.clientX-o.left)/o.width*100,y1:(t.clientY-o.top)/o.height*100}}_onZoneUp(e,t){const o=t.currentTarget;if(this._zoneEdit)return this._zoneEdit=null,void this._commitZoneRect(e,o);if(!this._zoneDrag||"zone"!==this._mapMode||!this._isModeCandidate(e))return;const s=Math.abs(this._zoneDrag.x1-this._zoneDrag.x0)>2||Math.abs(this._zoneDrag.y1-this._zoneDrag.y0)>2;if(this._zoneRectShown=s?this._zoneDrag:null,this._zoneDrag=null,!s)return;this._zoneMulti&&(this._mapMode="normal",this._modeEntity=null),this._commitZoneRect(e,o)}_commitZoneRect(e,t){const o=this._zoneRectShown;if(!o)return;const s=t.getBoundingClientRect(),l=s.left+Math.min(o.x0,o.x1)/100*s.width,d=s.top+Math.min(o.y0,o.y1)/100*s.height,h=s.left+Math.max(o.x0,o.x1)/100*s.width,p=s.top+Math.max(o.y0,o.y1)/100*s.height;if(this._zoneMulti){const e={};for(const t of this._modeCandidates()){const o=this._clickToContent(t,l,d),s=this._clickToContent(t,h,p);o&&s&&(e[t.entity]={x1:this._clampPct(Math.min(o.x,s.x)),y1:this._clampPct(Math.min(o.y,s.y)),x2:this._clampPct(Math.max(o.x,s.x)),y2:this._clampPct(Math.max(o.y,s.y))})}return void(this._zonePending=Object.keys(e).length?e:null)}const m=this._clickToContent(e,l,d),u=this._clickToContent(e,h,p);m&&u&&(this._zonePending={[e.entity]:{x1:this._clampPct(Math.min(m.x,u.x)),y1:this._clampPct(Math.min(m.y,u.y)),x2:this._clampPct(Math.max(m.x,u.x)),y2:this._clampPct(Math.max(m.y,u.y))}})}_confirmZone(e){const t=this._zonePending?.[e.entity];if(!t)return;const o=e.clean_action;if(this._call("anyvac","zone_clean",{entity_id:e.entity,x1_pct:t.x1,y1_pct:t.y1,x2_pct:t.x2,y2_pct:t.y2,repeat:o?.repeat??1}),this._zonePending){const t={...this._zonePending};delete t[e.entity],this._zonePending=Object.keys(t).length?t:null,this._zonePending||(this._zoneRectShown=null)}this._zoneDrag=null,this._zoneEdit=null,this._mapMode="normal",this._modeEntity=null}_confirmPin(e){const t=this._pinPending?.[e.entity];if(t&&(this._call("anyvac","goto",{entity_id:e.entity,x_pct:t.x,y_pct:t.y}),this._pinPending)){const t={...this._pinPending};delete t[e.entity],this._pinPending=Object.keys(t).length?t:null}}_cancelPin(){this._pinPending=null}_cancelZone(){this._zonePending=null,this._zoneDrag=null,this._zoneRectShown=null,this._zoneEdit=null}_renderMetaBar(e){const t=e.filter(e=>this._mapEntityFor(e));if(!t.length)return ae;const o=this._modeCandidates().length>0&&!this._narrow,s=this._narrow?"Not available while the map is rotated":o?"":"Requires the AnyVac integration (≥ 0.18) + map entity",l="*"===this._modeEntity?this._mapMode:"normal",d=this._allRoomKeys().filter(t=>this._isRoomSelectedAny(t,e)),h=d.length?d:this._allRoomKeys(),p=e.some(e=>this._intAttrs(e));p&&h.length&&this._fetchPlan(h,this._planMode);const m=p?this._planPreview?.unsequenced??[]:[],u=this._unassignedRooms(h,this._planMode,p),_=this._pinPending?Object.keys(this._pinPending).length:0,b=this._zonePending?Object.keys(this._zonePending).length:0;return te`
       <div class="meta-bar">
         <div class="meta-bar-cluster">
-          <button class="mtbtn ${"pin"===s?"on":""}" ?disabled=${!o}
-            @click=${()=>this._armMode("pin")} title=${i||"Pin & Go"}>
+          <button class="mtbtn ${"pin"===l?"on":""}" ?disabled=${!o}
+            @click=${()=>this._armMode("pin")} title=${s||"Pin & Go"}>
             <ha-icon icon="mdi:map-marker-radius"></ha-icon><span>Pin &amp; Go</span>
           </button>
-          <button class="mtbtn ${"zone"===s?"on":""}" ?disabled=${!o}
-            @click=${()=>this._armMode("zone")} title=${i||"Zone clean"}>
+          <button class="mtbtn ${"zone"===l?"on":""}" ?disabled=${!o}
+            @click=${()=>this._armMode("zone")} title=${s||"Zone clean"}>
             <ha-icon icon="mdi:select-drag"></ha-icon><span>Zone</span>
           </button>
         </div>
         <div class="meta-bar-spacer"></div>
         <div class="meta-bar-cluster meta-bar-cluster--right">
-          ${c.length?q`<span class="mtbtn mtbtn--stat mtbtn--err"
-              title="${c.length} selected room${c.length>1?"s have":" has"} no available robot for the ${this._planMode} pass — it/they will be silently skipped. Check vacuum roles/config.">
-            <ha-icon icon="mdi:robot-off"></ha-icon><b>${c.length}</b>
-          </span>`:G}
-          ${l.length?q`<span class="mtbtn mtbtn--stat mtbtn--warn"
-              title="${l.length} selected room${l.length>1?"s have":" has"} no cleaning order set — the time may be off. Set the order in the card editor's Maps tab.">
-            <ha-icon icon="mdi:sort-variant-off"></ha-icon><b>${l.length}</b>
-          </span>`:G}
-          ${this._renderLayerToggleCompact(t)}
-          ${this._config.layout?q`<button class="mtbtn ${this._flipEff?"on":""}"
+          ${u.length?te`<span class="mtbtn mtbtn--stat mtbtn--err"
+              title="${u.length} selected room${u.length>1?"s have":" has"} no available robot for the ${this._planMode} pass — it/they will be silently skipped. Check vacuum roles/config.">
+            <ha-icon icon="mdi:robot-off"></ha-icon><b>${u.length}</b>
+          </span>`:ae}
+          ${m.length?te`<span class="mtbtn mtbtn--stat mtbtn--warn"
+              title="${m.length} selected room${m.length>1?"s have":" has"} no cleaning order set — the time may be off. Set the order in the card editor's Maps tab.">
+            <ha-icon icon="mdi:sort-variant-off"></ha-icon><b>${m.length}</b>
+          </span>`:ae}
+          ${this._renderLayerToggleCompact(e)}
+          ${this._config.layout?te`<button class="mtbtn ${this._flipEff?"on":""}"
               title="Flip map 180° for this screen (this session only — the card editor's Layout section sets a permanent default)"
               @click=${()=>this._toggleFlipLive()}>
             <ha-icon icon="mdi:flip-vertical"></ha-icon>
-          </button>`:G}
+          </button>`:ae}
           <div class="meta-bar-divider"></div>
-          <button class="mtbtn mtbtn--ghost" title="Refresh maps" @click=${t=>{const o=t.currentTarget;o.classList.remove("mtbtn--spin"),o.offsetWidth,o.classList.add("mtbtn--spin");for(const t of e)this._refreshMap(t)}}>
+          <button class="mtbtn mtbtn--ghost" title="Refresh maps" @click=${e=>{const o=e.currentTarget;o.classList.remove("mtbtn--spin"),o.offsetWidth,o.classList.add("mtbtn--spin");for(const e of t)this._refreshMap(e)}}>
             <ha-icon icon="mdi:refresh"></ha-icon>
           </button>
         </div>
       </div>
-      ${h?q`<div class="calib-panel">
-          <div>Zone ready for ${h} vacuum${h>1?"s":""} — drag the box or its corners to adjust, then pick one on its status card below.</div>
+      ${b?te`<div class="calib-panel">
+          <div>Zone ready for ${b} vacuum${b>1?"s":""} — drag the box or its corners to adjust, then pick one on its status card below.</div>
           <div class="calib-actions"><button class="mtbtn" @click=${()=>this._cancelZone()}>Cancel</button></div>
-        </div>`:"zone"===s?q`<div class="calib-panel">Drag a rectangle on the map to set a cleaning zone.</div>`:G}
-      ${d?q`<div class="calib-panel">
-          <div>Pin ready for ${d} vacuum${d>1?"s":""} — pick one on its status card below.</div>
+        </div>`:"zone"===l?te`<div class="calib-panel">Drag a rectangle on the map to set a cleaning zone.</div>`:ae}
+      ${_?te`<div class="calib-panel">
+          <div>Pin ready for ${_} vacuum${_>1?"s":""} — pick one on its status card below.</div>
           <div class="calib-actions"><button class="mtbtn" @click=${()=>this._cancelPin()}>Cancel</button></div>
-        </div>`:"pin"===s?q`<div class="calib-panel">Tap the map to drop a pin.</div>`:G}
-    `}_renderMapTools(t){if(!t.map&&!t.image_base&&!this._mapEntityFor(t))return G;const e=this._mapEntityFor(t),o=!!this._intAttrs(t)&&!!e&&!this._narrow,i=this._narrow?"Not available while the map is rotated":this._intAttrs(t)&&e?"":"Requires the AnyVac integration (≥ 0.18) + map entity",s=this._modeEntity===t.entity?this._mapMode:"normal";return q`
+        </div>`:"pin"===l?te`<div class="calib-panel">Tap the map to drop a pin.</div>`:ae}
+    `}_renderMapTools(e){if(!e.map&&!e.image_base&&!this._mapEntityFor(e))return ae;const t=this._mapEntityFor(e),o=!!this._intAttrs(e)&&!!t&&!this._narrow,s=this._narrow?"Not available while the map is rotated":this._intAttrs(e)&&t?"":"Requires the AnyVac integration (≥ 0.18) + map entity",l=this._modeEntity===e.entity?this._mapMode:"normal";return te`
       <div class="map-tools">
-        ${this._config.layout&&this._config.vacuums.length>1?q`<span class="map-tools-label">${t.name??t.entity}</span>`:G}
-        ${e?q`<button class="mtbtn" @click=${()=>this._refreshMap(t)} title="Refresh map">
+        ${this._config.layout&&this._config.vacuums.length>1?te`<span class="map-tools-label">${e.name??e.entity}</span>`:ae}
+        ${t?te`<button class="mtbtn" @click=${()=>this._refreshMap(e)} title="Refresh map">
           <ha-icon icon="mdi:refresh"></ha-icon><span>Refresh</span>
-        </button>`:G}
-        <button class="mtbtn ${"pin"===s?"on":""}" ?disabled=${!o}
-          @click=${()=>this._toggleMode(t.entity,"pin")} title=${i||"Pin & Go"}>
+        </button>`:ae}
+        <button class="mtbtn ${"pin"===l?"on":""}" ?disabled=${!o}
+          @click=${()=>this._toggleMode(e.entity,"pin")} title=${s||"Pin & Go"}>
           <ha-icon icon="mdi:map-marker-radius"></ha-icon><span>Pin &amp; Go</span>
         </button>
-        <button class="mtbtn ${"zone"===s?"on":""}" ?disabled=${!o}
-          @click=${()=>this._toggleMode(t.entity,"zone")} title=${i||"Zone clean"}>
+        <button class="mtbtn ${"zone"===l?"on":""}" ?disabled=${!o}
+          @click=${()=>this._toggleMode(e.entity,"zone")} title=${s||"Zone clean"}>
           <ha-icon icon="mdi:select-drag"></ha-icon><span>Zone</span>
         </button>
-        ${!this._dbg||!this._config.debug&&this._config.layout?G:q`<span style="font-size:11px;opacity:0.65;align-self:center;font-family:monospace">${this._dbg}</span>`}
+        ${!this._dbg||!this._config.debug&&this._config.layout?ae:te`<span style="font-size:11px;opacity:0.65;align-self:center;font-family:monospace">${this._dbg}</span>`}
       </div>
-      ${"pin"===s?q`<div class="calib-panel">Tap the map to send the robot there.</div>`:G}
-      ${"zone"===s?q`<div class="calib-panel">
-        ${this._zonePending?.[t.entity]?q`<div>Clean this zone? Drag the box or its corners to adjust.</div>
+      ${"pin"===l?te`<div class="calib-panel">Tap the map to send the robot there.</div>`:ae}
+      ${"zone"===l?te`<div class="calib-panel">
+        ${this._zonePending?.[e.entity]?te`<div>Clean this zone? Drag the box or its corners to adjust.</div>
               <div class="calib-actions">
-                <button class="mtbtn on" @click=${()=>this._confirmZone(t)}>Clean zone</button>
+                <button class="mtbtn on" @click=${()=>this._confirmZone(e)}>Clean zone</button>
                 <button class="mtbtn" @click=${()=>this._cancelZone()}>Cancel</button>
-              </div>`:q`Drag a rectangle on the map to set a cleaning zone.`}
-      </div>`:G}
-    `}_baseHeightFor(t){return"merged"===this._config.map_mode?this._config.base_height??this._config.vacuums.find(t=>t.base_height)?.base_height:t.base_height}_wrapAspect(t){return"number"==typeof t&&t>0&&this._cardW>0?Math.max(.2,(this._cardW-16)/t):this._mapAR>.1?this._mapAR:3.636}_effectiveSeat(t){this._memoSync();const e=this._seatMemo.get(t.entity);if(e)return e;const o=Dt(this._config,t,this._intAttrs(t),this._wrapAspect(this._baseHeightFor(t)));return this._seatMemo.set(t.entity,o),o}_renderIntegrationOverlay(t,e,o="both"){const i=this._intAttrs(t);if(!i)return G;const s=i.image_dims;if(!s)return G;const n=s.scale??1;let a=(s.width??0)*n,r=(s.height??0)*n;const l=s.rotation??0;if(90===l||270===l){const t=a;a=r,r=t}if(!a||!r)return G;const c=this._color(t),d=Math.max(a,r)/55,h=t=>(Array.isArray(t)?t:[]).map(t=>t.x.toFixed(1)+","+t.y.toFixed(1)).join(" "),p=this._vacCleanType(t),m=this._layersEff(),u=m.dry&&p.dry,_=m.wet&&p.wet,g=u&&Array.isArray(i.path_dry_px)?i.path_dry_px.map(t=>h(t)).filter(t=>t.length>0):[],f=_&&Array.isArray(i.path_wet_px)?i.path_wet_px.map(t=>h(t)).filter(t=>t.length>0):[],b=i.vacuum_position_px,y=b?{x:b.x,y:b.y}:null;let v=null;if(y&&null!=b.a){const t=b.a*Math.PI/180;v={x:y.x+1.3*d*Math.cos(t),y:y.y-1.3*d*Math.sin(t)}}const x={left:50+(e?.offset_x??0)+"%",top:50+(e?.offset_y??0)+"%",width:(e?.scale??100)+"%",aspectRatio:a+" / "+r,transform:"translate(-50%,-50%) rotate("+(e?.rotation??0)+"deg)"},w=.35*d*((t.path_width??100)/100),$=w.toFixed(2),k=(2.6*w*((t.mop_band_width??100)/100)).toFixed(2),S=((t.mop_band_opacity??28)/100).toFixed(2),R=t.mop_path_color||"#40a9ff",M=f.length?L`${f.map(t=>L`<polyline points=${t} fill="none" stroke=${R} stroke-width=${k} stroke-linejoin="round" stroke-linecap="round" opacity=${S}></polyline>`)}`:G,A=f.length?L`${f.map(t=>L`<polyline points=${t} fill="none" stroke=${R} stroke-width=${$} stroke-linejoin="round" stroke-linecap="round" opacity="0.9"></polyline>`)}`:G,z=g.length?L`${g.map(e=>L`<polyline points=${e} fill="none" stroke=${t.path_color||c} stroke-width=${$} stroke-linejoin="round" stroke-linecap="round" opacity="0.85"></polyline>`)}`:G,P=!(!t.robot_image_on_map||!t.image),C=2.6*d*((t.robot_size??100)/100),E=(b&&null!=b.a?b.a:0)+(t.robot_image_rotation??0),T=y?P?L`<image href=${t.image} x=${(y.x-C/2).toFixed(1)} y=${(y.y-C/2).toFixed(1)} width=${C.toFixed(1)} height=${C.toFixed(1)} preserveAspectRatio="xMidYMid meet" transform=${"rotate("+E+" "+y.x.toFixed(1)+" "+y.y.toFixed(1)+")"}></image>`:L`${v?L`<line x1=${y.x.toFixed(1)} y1=${y.y.toFixed(1)} x2=${v.x.toFixed(1)} y2=${v.y.toFixed(1)} stroke="#ffffff" stroke-width=${(.3*d).toFixed(2)} stroke-linecap="round"></line>`:G}<circle cx=${y.x.toFixed(1)} cy=${y.y.toFixed(1)} r=${d.toFixed(1)} fill=${c} stroke="#ffffff" stroke-width=${(.18*d).toFixed(2)}></circle>`:G,F=y&&this._hasError(t),D="avc-err-blur-"+t.entity.replace(/[^a-zA-Z0-9]/g,"-"),O=F?L`<defs><filter id=${D} x="-150%" y="-150%" width="400%" height="400%">
-              <feGaussianBlur stdDeviation=${(.5*d).toFixed(2)}></feGaussianBlur>
+              </div>`:te`Drag a rectangle on the map to set a cleaning zone.`}
+      </div>`:ae}
+    `}_baseHeightFor(e){return"merged"===this._config.map_mode?this._config.base_height??this._config.vacuums.find(e=>e.base_height)?.base_height:e.base_height}_wrapAspect(e){return"number"==typeof e&&e>0&&this._cardW>0?Math.max(.2,(this._cardW-16)/e):this._mapAR>.1?this._mapAR:3.636}_effectiveSeat(e){this._memoSync();const t=this._seatMemo.get(e.entity);if(t)return t;const o=resolveSeat(this._config,e,this._intAttrs(e),this._wrapAspect(this._baseHeightFor(e)));return this._seatMemo.set(e.entity,o),o}_renderIntegrationOverlay(e,t,o="both"){const s=this._intAttrs(e);if(!s)return ae;const l=s.image_dims;if(!l)return ae;const d=l.scale??1;let h=(l.width??0)*d,p=(l.height??0)*d;const m=l.rotation??0;if(90===m||270===m){const e=h;h=p,p=e}if(!h||!p)return ae;const u=this._color(e),_=Math.max(h,p)/55,toPts=e=>(Array.isArray(e)?e:[]).map(e=>e.x.toFixed(1)+","+e.y.toFixed(1)).join(" "),b=this._vacCleanType(e),v=this._layersEff(),f=v.dry&&b.dry,w=v.wet&&b.wet,$=f&&Array.isArray(s.path_dry_px)?s.path_dry_px.map(e=>toPts(e)).filter(e=>e.length>0):[],A=w&&Array.isArray(s.path_wet_px)?s.path_wet_px.map(e=>toPts(e)).filter(e=>e.length>0):[],C=s.vacuum_position_px,P=C?{x:C.x,y:C.y}:null;let E=null;if(P&&null!=C.a){const e=C.a*Math.PI/180;E={x:P.x+1.3*_*Math.cos(e),y:P.y-1.3*_*Math.sin(e)}}const T={left:50+(t?.offset_x??0)+"%",top:50+(t?.offset_y??0)+"%",width:(t?.scale??100)+"%",aspectRatio:h+" / "+p,transform:"translate(-50%,-50%) rotate("+(t?.rotation??0)+"deg)"},F=.35*_*((e.path_width??100)/100),D=F.toFixed(2),O=(2.6*F*((e.mop_band_width??100)/100)).toFixed(2),B=((e.mop_band_opacity??28)/100).toFixed(2),j=e.mop_path_color||"#40a9ff",W=A.length?oe`${A.map(e=>oe`<polyline points=${e} fill="none" stroke=${j} stroke-width=${O} stroke-linejoin="round" stroke-linecap="round" opacity=${B}></polyline>`)}`:ae,q=A.length?oe`${A.map(e=>oe`<polyline points=${e} fill="none" stroke=${j} stroke-width=${D} stroke-linejoin="round" stroke-linecap="round" opacity="0.9"></polyline>`)}`:ae,U=e.path_color||u,G="legacy"!==(this._config.theme??Re),K=(3*F).toFixed(2),X=$.length?oe`${G?$.map(e=>oe`<polyline points=${e} fill="none" stroke=${U} stroke-width=${K} stroke-linejoin="round" stroke-linecap="round" opacity="0.12"></polyline>`):ae}${$.map(e=>oe`<polyline points=${e} fill="none" stroke=${U} stroke-width=${D} stroke-linejoin="round" stroke-linecap="round" opacity="0.85"></polyline>`)}`:ae,Y=!(!e.robot_image_on_map||!e.image),J=2.6*_*((e.robot_size??100)/100),Q=(C&&null!=C.a?C.a:0)+(e.robot_image_rotation??0),ee=P?Y?oe`<image href=${e.image} x=${(P.x-J/2).toFixed(1)} y=${(P.y-J/2).toFixed(1)} width=${J.toFixed(1)} height=${J.toFixed(1)} preserveAspectRatio="xMidYMid meet" transform=${"rotate("+Q+" "+P.x.toFixed(1)+" "+P.y.toFixed(1)+")"}></image>`:oe`${E?oe`<line x1=${P.x.toFixed(1)} y1=${P.y.toFixed(1)} x2=${E.x.toFixed(1)} y2=${E.y.toFixed(1)} stroke="#ffffff" stroke-width=${(.3*_).toFixed(2)} stroke-linecap="round"></line>`:ae}<circle cx=${P.x.toFixed(1)} cy=${P.y.toFixed(1)} r=${_.toFixed(1)} fill=${u} stroke="#ffffff" stroke-width=${(.18*_).toFixed(2)}></circle>`:ae,ie=P&&this._hasError(e),se="avc-err-blur-"+e.entity.replace(/[^a-zA-Z0-9]/g,"-"),ne=ie?oe`<defs><filter id=${se} x="-150%" y="-150%" width="400%" height="400%">
+              <feGaussianBlur stdDeviation=${(.5*_).toFixed(2)}></feGaussianBlur>
             </filter></defs>
-            <circle class="avc-err-halo" cx=${y.x.toFixed(1)} cy=${y.y.toFixed(1)} r=${(2.2*d).toFixed(1)}
-              fill="#ff3b30" filter=${"url(#"+D+")"}></circle>`:G,I=L`${M}${A}${z}`,V=L`${O}${T}`,N="paths"===o?I:"marker"===o?V:L`${I}${V}`;return q`<svg class="map-vector" viewBox="0 0 ${a} ${r}" preserveAspectRatio="none" style=${vt(x)}>${N}</svg>`}_onLayerDown(t){this._layerHeld=!1,this._layerHoldTimer=window.setTimeout(()=>{this._layerHeld=!0,this._layerMenu=this._layerMenu===t?null:t},380)}_onLayerUp(){null!==this._layerHoldTimer&&(window.clearTimeout(this._layerHoldTimer),this._layerHoldTimer=null)}_onLayerClick(t){if(this._layerHeld)return void(this._layerHeld=!1);const e=this._layersEff(),o={...e,[t]:!e[t]},i=this._selSensor();i&&this.hass.states[i]?.attributes?.view_layers?this._call("anyvac","set_layers",o):this._layers=o,this._layerMenu=null}_renderLayerMenu(t,e){const o=this._mergedRoomDefs(t);return q`
+            <circle class="avc-err-halo" cx=${P.x.toFixed(1)} cy=${P.y.toFixed(1)} r=${(2.2*_).toFixed(1)}
+              fill="#ff3b30" filter=${"url(#"+se+")"}></circle>`:ae,re=oe`${W}${q}${X}`,ce=oe`${ne}${ee}`,le="paths"===o?re:"marker"===o?ce:oe`${re}${ce}`;return te`<svg class="map-vector" viewBox="0 0 ${h} ${p}" preserveAspectRatio="none" style=${_e(T)}>${le}</svg>`}_onLayerDown(e){this._layerHeld=!1,this._layerHoldTimer=window.setTimeout(()=>{this._layerHeld=!0,this._layerMenu=this._layerMenu===e?null:e},380)}_onLayerUp(){null!==this._layerHoldTimer&&(window.clearTimeout(this._layerHoldTimer),this._layerHoldTimer=null)}_onLayerClick(e){if(this._layerHeld)return void(this._layerHeld=!1);const t=this._layersEff(),o={...t,[e]:!t[e]},s=this._selSensor();s&&this.hass.states[s]?.attributes?.view_layers?this._call("anyvac","set_layers",o):this._layers=o,this._layerMenu=null}_renderLayerMenu(e,t){const o=this._mergedRoomDefs(e);return te`
       <div class="layer-menu">
         <div class="layer-menu-head">
-          <ha-icon icon=${"dry"===e?"mdi:broom":"mdi:water"}></ha-icon>
-          <span>${"dry"===e?"Dry":"Wet"} \u00b7 last cleaned</span>
+          <ha-icon icon=${"dry"===t?"mdi:broom":"mdi:water"}></ha-icon>
+          <span>${"dry"===t?"Dry":"Wet"} \u00b7 last cleaned</span>
         </div>
-        ${o.map(({r:o,v:i})=>{const s=this._intRoomRec(i,o),n=this._ageDaysFromIso(s?.[e]),a=this._isRoomSelectedAny(o.key,t);return q`
-            <button class="layer-menu-row ${a?"on":""}" @click=${()=>this._toggleRoomAcross(o.key,t)}>
+        ${o.map(({r:o,v:s})=>{const l=this._intRoomRec(s,o),d=this._ageDaysFromIso(l?.[t]),h=this._isRoomSelectedAny(o.key,e);return te`
+            <button class="layer-menu-row ${h?"on":""}" @click=${()=>this._toggleRoomAcross(o.key,e)}>
               <ha-icon icon=${o.icon??"mdi:square"}></ha-icon>
               <span class="lm-name">${o.name??o.key}</span>
-              ${this._renderProgChip(this._roomProgForType(o,t,e))}
-              <b style=${vt({color:this._colorForAgeDays(n)})}>${(t=>null===t?"—":t<1?"<1d":Math.round(t)+"d")(n)}</b>
+              ${this._renderProgChip(this._roomProgForType(o,e,t))}
+              <b style=${_e({color:this._colorForAgeDays(d)})}>${(e=>null===e?"—":e<1?"<1d":Math.round(e)+"d")(d)}</b>
             </button>
           `})}
       </div>
-    `}_oldestAgeDays(t,e){let o=null;for(const i of t){if(!this._intAttrs(i))continue;const t=this._intAttrs(i)?.rooms_last_cleaned;if(t)for(const i of Object.values(t)){const t=this._ageDaysFromIso(i?.[e]);null!==t&&(null===o||t>o)&&(o=t)}}return o}_ageBadgeStr(t){return null===t?"—":t<1?"<1d":Math.round(t)+"d"}_renderLayerToggleCompact(t){const e=t.filter(t=>this._intAttrs(t));if(!e.length)return G;const o=this._layersEff();return q`
+    `}_oldestAgeDays(e,t){let o=null;for(const s of e){if(!this._intAttrs(s))continue;const e=this._intAttrs(s)?.rooms_last_cleaned;if(e)for(const s of Object.values(e)){const e=this._ageDaysFromIso(s?.[t]);null!==e&&(null===o||e>o)&&(o=e)}}return o}_ageBadgeStr(e){return null===e?"—":e<1?"<1d":Math.round(e)+"d"}_renderLayerToggleCompact(e){const t=e.filter(e=>this._intAttrs(e));if(!t.length)return ae;const o=this._layersEff();return te`
       <button class="mtbtn ${o.dry?"on":""}" title="Dry layer visibility \u2014 tap to toggle"
         @click=${()=>this._onLayerClick("dry")}>
-        <ha-icon icon="mdi:broom"></ha-icon><span>${this._ageBadgeStr(this._oldestAgeDays(e,"dry"))}</span>
+        <ha-icon icon="mdi:broom"></ha-icon><span>${this._ageBadgeStr(this._oldestAgeDays(t,"dry"))}</span>
       </button>
       <button class="mtbtn ${o.wet?"on":""}" title="Wet layer visibility \u2014 tap to toggle"
         @click=${()=>this._onLayerClick("wet")}>
-        <ha-icon icon="mdi:water"></ha-icon><span>${this._ageBadgeStr(this._oldestAgeDays(e,"wet"))}</span>
+        <ha-icon icon="mdi:water"></ha-icon><span>${this._ageBadgeStr(this._oldestAgeDays(t,"wet"))}</span>
       </button>
-    `}_renderLayerToggles(t){const e=t.filter(t=>this._intAttrs(t));if(!e.length)return G;const o=t=>this._oldestAgeDays(e,t),i=t=>this._ageBadgeStr(t),s=this._layersEff();return q`
+    `}_renderLayerToggles(e){const t=e.filter(e=>this._intAttrs(e));if(!t.length)return ae;const oldest=e=>this._oldestAgeDays(t,e),badge=e=>this._ageBadgeStr(e),o=this._layersEff();return te`
       <div class="layer-toggles">
-        <button class="layer-btn ${s.dry?"on":""}" title="Dry \u2014 tap to toggle, hold for rooms"
+        <button class="layer-btn ${o.dry?"on":""}" title="Dry \u2014 tap to toggle, hold for rooms"
           @pointerdown=${()=>this._onLayerDown("dry")} @pointerup=${()=>this._onLayerUp()} @pointerleave=${()=>this._onLayerUp()}
           @click=${()=>this._onLayerClick("dry")}>
-          <ha-icon icon="mdi:broom"></ha-icon><span>${i(o("dry"))}</span>
+          <ha-icon icon="mdi:broom"></ha-icon><span>${badge(oldest("dry"))}</span>
         </button>
-        <button class="layer-btn ${s.wet?"on":""}" title="Wet \u2014 tap to toggle, hold for rooms"
+        <button class="layer-btn ${o.wet?"on":""}" title="Wet \u2014 tap to toggle, hold for rooms"
           @pointerdown=${()=>this._onLayerDown("wet")} @pointerup=${()=>this._onLayerUp()} @pointerleave=${()=>this._onLayerUp()}
           @click=${()=>this._onLayerClick("wet")}>
-          <ha-icon icon="mdi:water"></ha-icon><span>${i(o("wet"))}</span>
+          <ha-icon icon="mdi:water"></ha-icon><span>${badge(oldest("wet"))}</span>
         </button>
-        ${this._layerMenu?this._renderLayerMenu(e,this._layerMenu):G}
+        ${this._layerMenu?this._renderLayerMenu(t,this._layerMenu):ae}
       </div>
-    `}_mergedRoomDefs(t){const e=t[0];if(this._config.rooms?.length&&e)return this._roomsFor(e).map(t=>({r:t,v:e}));const o=new Set,i=[];for(const e of t)for(const t of this._roomsFor(e))t.key&&!o.has(t.key)&&(o.add(t.key),i.push({r:t,v:e}));return i}_renderMergedRooms(t){const e=this._mergedRoomDefs(t),o=!e.some(({r:e})=>this._isRoomSelectedAny(e.key,t));return e.map(({r:e,v:i})=>this._renderRoomOverlay(e,i,{vacs:t,wholeHome:o}))}get _narrow(){const t=this._config.mobile_rotate;if("off"===t)return!1;if("always"===t||"on"===t)return!0;if(this._config.layout){const t="portrait"===this._profile?this._config.layout.portrait:this._config.layout.landscape,e=t?.crop?.mapOrientation;if("normal"===e)return!1;if("rotated"===e)return!0;const o=function(t,e,o){if(e<=4||o<=4||t<=0)return;const i=Math.min(e/t,o);return Math.min(e,o/t)>i}(this._mapAR,this._mapRegW,this._mapRegH);return void 0!==o?(this._lastRotate=o,o):this._lastRotate}return this._cardW>0&&this._cardW<500}get _flipEff(){if(null!==this._flipLive)return this._flipLive;if(!this._config.layout)return!1;const t="portrait"===this._profile?this._config.layout.portrait:this._config.layout.landscape;return!0===t?.crop?.flip}_toggleFlipLive(){this._flipLive=!this._flipEff,this._saveFlipLive()}get _stackTopology(){if("portrait"!==this._profile||!this._config.layout)return!1;const t=this._config.layout.portrait;if("split"===t?.topology)return!1;if("stack"===t?.topology)return!0;if(t?.columns?.length||t?.rows?.length||t?.place&&Object.keys(t.place).length)return!1;const e=this._mapAR>.1?this._mapAR:3.636,o=function(t,e,o,i={}){const{dockWidthFrac:s=.28,dockHeightPx:n=150,stackBias:a=1.5}=i;if(e<=4||o<=4||t<=0)return;const r=e*(1-s),l=Math.min(r/t,o),c=Math.max(o-n,0);return!(l>Math.min(e/t,c)*a)}(this._narrow?1/e:e,this._mapAvailW,this._mapAvailH);return void 0!==o?(this._lastStack=o,o):this._lastStack}_renderResponsive(t){if(!this._config.layout){if(!this._narrow)return t;const e=this._mapAR>.1?this._mapAR:3.636,o=this._cardW||this.clientWidth||360,i=1.4*("undefined"!=typeof window?window.innerHeight:800),s=o*e,n=s>i?i/s:1,a=Math.round(o*n),r=Math.round(s*n);return q`
-        <div class="avc-rot" style="position:relative;width:${a}px;height:${r}px;margin:0 auto;overflow:hidden;--map-rot:90deg">
-          <div style="position:absolute;top:0;left:0;width:${r}px;height:${a}px;transform-origin:top left;transform:translateX(${a}px) rotate(90deg)">
-            ${t}
+    `}_mergedRoomDefs(e){const t=e[0];if(this._config.rooms?.length&&t)return this._roomsFor(t).map(e=>({r:e,v:t}));const o=new Set,s=[];for(const t of e)for(const e of this._roomsFor(t))e.key&&!o.has(e.key)&&(o.add(e.key),s.push({r:e,v:t}));return s}_renderMergedRooms(e){const t=this._mergedRoomDefs(e),o=!t.some(({r:t})=>this._isRoomSelectedAny(t.key,e));return t.map(({r:t,v:s})=>this._renderRoomOverlay(t,s,{vacs:e,wholeHome:o}))}get _narrow(){const e=this._config.mobile_rotate;if("off"===e)return!1;if("always"===e||"on"===e)return!0;if(this._config.layout){const e="portrait"===this._profile?this._config.layout.portrait:this._config.layout.landscape,t=e?.crop?.mapOrientation;if("normal"===t)return!1;if("rotated"===t)return!0;const o=function shouldRotateMap(e,t,o){if(t<=4||o<=4||e<=0)return;const s=Math.min(t/e,o);return Math.min(t,o/e)>s}(this._mapAR,this._mapRegW,this._mapRegH);return void 0!==o?(this._lastRotate=o,o):this._lastRotate}return this._cardW>0&&this._cardW<500}get _flipEff(){if(null!==this._flipLive)return this._flipLive;if(!this._config.layout)return!1;const e="portrait"===this._profile?this._config.layout.portrait:this._config.layout.landscape;return!0===e?.crop?.flip}_toggleFlipLive(){this._flipLive=!this._flipEff,this._saveFlipLive()}get _stackTopology(){if("portrait"!==this._profile||!this._config.layout)return!1;const e=this._config.layout.portrait;if("split"===e?.topology)return!1;if("stack"===e?.topology)return!0;if(e?.columns?.length||e?.rows?.length||e?.place&&Object.keys(e.place).length)return!1;const t=this._mapAR>.1?this._mapAR:3.636,o=function shouldStackLayout(e,t,o,s={}){const{dockWidthFrac:l=.28,dockHeightPx:d=150,stackBias:h=1.5}=s;if(t<=4||o<=4||e<=0)return;const p=t*(1-l),m=Math.min(p/e,o),u=Math.max(o-d,0);return!(m>Math.min(t/e,u)*h)}(this._narrow?1/t:t,this._mapAvailW,this._mapAvailH);return void 0!==o?(this._lastStack=o,o):this._lastStack}_renderResponsive(e){if(!this._config.layout){if(!this._narrow)return e;const t=this._mapAR>.1?this._mapAR:3.636,o=this._cardW||this.clientWidth||360,s=1.4*("undefined"!=typeof window?window.innerHeight:800),l=o*t,d=l>s?s/l:1,h=Math.round(o*d),p=Math.round(l*d);return te`
+        <div class="avc-rot" style="position:relative;width:${h}px;height:${p}px;margin:0 auto;overflow:hidden;--map-rot:90deg">
+          <div style="position:absolute;top:0;left:0;width:${p}px;height:${h}px;transform-origin:top left;transform:translateX(${h}px) rotate(90deg)">
+            ${e}
           </div>
         </div>
-      `}if(this._mapRegW<=4||this._mapRegH<=4)return t;const e=this._mapAR>.1?this._mapAR:3.636,o=this._narrow,i=o?1/e:e,s=this._config.layout[this._profile]?.crop,n="cover"===s?.fit,a=this._mapRegW,r=this._mapRegH;let l,c;n?(l=Math.max(a,r*i),c=Math.max(r,l/i)):(l=Math.min(a,r*i),c=Math.min(r,l/i)),l=Math.floor(l),c=Math.floor(c);const d=-(l-a)/2+(s?.offset_x??0)/100*((l-a)/2),h=-(c-r)/2+(s?.offset_y??0)/100*((c-r)/2),p=(o?90:0)+(this._flipEff?180:0);if(0!==p){o&&(this._lastPortraitFitW=l);let e;return e=90===p?"transform-origin:top left;transform:translateX("+l+"px) rotate(90deg)":180===p?"transform-origin:center;transform:rotate(180deg)":"transform-origin:top left;transform:translateY("+c+"px) rotate(270deg)",q`
-        <div class="avc-rot" style="position:relative;width:${a}px;height:${r}px;margin:0 auto;overflow:hidden;--map-rot:${p}deg">
-          <div style="position:absolute;top:0;left:0;width:100%;height:100%;transform:translate(${d}px,${h}px)">
-            <div style="position:absolute;top:0;left:0;width:${o?c:l}px;height:${o?l:c}px;${e}">
-              ${t}
+      `}if(this._mapRegW<=4||this._mapRegH<=4)return e;const t=this._mapAR>.1?this._mapAR:3.636,o=this._narrow,s=o?1/t:t,l=this._config.layout[this._profile]?.crop,d="cover"===l?.fit,h=this._mapRegW,p=this._mapRegH;let m,u;d?(m=Math.max(h,p*s),u=Math.max(p,m/s)):(m=Math.min(h,p*s),u=Math.min(p,m/s)),m=Math.floor(m),u=Math.floor(u);const _=-(m-h)/2+(l?.offset_x??0)/100*((m-h)/2),b=-(u-p)/2+(l?.offset_y??0)/100*((u-p)/2),v=(o?90:0)+(this._flipEff?180:0);if(0!==v){o&&(this._lastPortraitFitW=m);let t;return t=90===v?"transform-origin:top left;transform:translateX("+m+"px) rotate(90deg)":180===v?"transform-origin:center;transform:rotate(180deg)":"transform-origin:top left;transform:translateY("+u+"px) rotate(270deg)",te`
+        <div class="avc-rot" style="position:relative;width:${h}px;height:${p}px;margin:0 auto;overflow:hidden;--map-rot:${v}deg">
+          <div style="position:absolute;top:0;left:0;width:100%;height:100%;transform:translate(${_}px,${b}px)">
+            <div style="position:absolute;top:0;left:0;width:${o?u:m}px;height:${o?m:u}px;${t}">
+              ${e}
             </div>
           </div>
         </div>
-      `}return q`
-      <div style="position:relative;width:${a}px;height:${r}px;margin:0 auto;overflow:hidden">
-        <div style="position:absolute;top:0;left:0;width:${l}px;height:${c}px;transform:translate(${d}px,${h}px)">
-          ${t}
+      `}return te`
+      <div style="position:relative;width:${h}px;height:${p}px;margin:0 auto;overflow:hidden">
+        <div style="position:absolute;top:0;left:0;width:${m}px;height:${u}px;transform:translate(${_}px,${b}px)">
+          ${e}
         </div>
       </div>
-    `}_renderMergedMap(){const t=this._shownOrdered().map(t=>this._config.vacuums[t]);if(!t.length)return G;const e=t.find(t=>t.image_base?.src)??t[0],o=this._config.image_base??e.image_base,i=!!o?.src,s=this._config.base_height??e.base_height,n="number"==typeof s&&s>0,a=n?"map-wrap--fixed":i?"map-wrap--image":"",r=vt(n?{height:(s??0)+"px"}:{});return q`
-      <div class="map-wrap ${a}" style=${r}>
-        ${i?q`
-          <img class="${"image-base-img"+(n?" image-base-img--fit":"")}" src=${o.src} alt="Floorplan" @load=${this._onFloorplanLoad}
-            style=${vt({transform:"translate("+(o?.offset_x??0)+"%,"+(o?.offset_y??0)+"%) rotate("+(o?.rotation??0)+"deg) scale("+(o?.scale??100)/100+")"})} />
-        `:G}
-        ${t.map((t,e)=>{const o=this._mapEntityFor(t),s=o?this._mapUrl(o):null;if(!s)return G;const n=this._effectiveSeat(t),a=i||e>0;return q`<img class="map-img ${a?"map-img--overlay":""}" src=${s} alt="Vacuum map"
-            data-entity=${t.entity}
-            style=${vt({left:50+n.offset_x+"%",top:50+n.offset_y+"%",width:n.scale+"%",transform:"translate(-50%,-50%) rotate("+n.rotation+"deg)",opacity:t.hide_map?"0":String((t.overlay_opacity??(a?55:100))/100),mixBlendMode:t.overlay_blend??"normal"})} />`})}
-        ${t.map(t=>this._intAttrs(t)?this._renderIntegrationOverlay(t,this._effectiveSeat(t),"paths"):G)}
-        ${t.map(t=>this._intAttrs(t)?this._renderIntegrationOverlay(t,this._effectiveSeat(t),"marker"):G)}
-        ${this._config.layout?G:this._renderLayerToggles(t)}
-        ${this._renderMergedRooms(t)}
-        ${t.map(t=>"normal"!==this._mapMode&&this._isModeCandidate(t)||this._zoneRectShown&&this._hasZoneEditTarget(t)?q`<div class="map-clickcatch" style="touch-action:none"
-              @click=${e=>this._onMapClick(t,e)}
-              @pointerdown=${e=>this._onZoneDown(t,e)}
-              @pointermove=${e=>this._onZoneMove(t,e)}
-              @pointerup=${e=>this._onZoneUp(t,e)}></div>`:G)}
-        ${t.map((t,e)=>{const o=this._zoneRectFor(t,0===e);return o?q`<div class="zone-rect" style=${vt({left:Math.min(o.x0,o.x1)+"%",top:Math.min(o.y0,o.y1)+"%",width:Math.abs(o.x1-o.x0)+"%",height:Math.abs(o.y1-o.y0)+"%"})}>${this._renderZoneHandles()}</div>`:G})}
+    `}_renderMergedMap(){const e=this._shownOrdered().map(e=>this._config.vacuums[e]);if(!e.length)return ae;const t=e.find(e=>e.image_base?.src)??e[0],o=this._config.image_base??t.image_base,s=!!o?.src,l=this._config.base_height??t.base_height,d="number"==typeof l&&l>0,h=d?"map-wrap--fixed":s?"map-wrap--image":"",p=_e(d?{height:(l??0)+"px"}:{});return te`
+      <div class="map-wrap ${h}" style=${p}>
+        ${s?te`
+          <img class="${"image-base-img"+(d?" image-base-img--fit":"")}" src=${o.src} alt="Floorplan" @load=${this._onFloorplanLoad}
+            style=${_e({transform:"translate("+(o?.offset_x??0)+"%,"+(o?.offset_y??0)+"%) rotate("+(o?.rotation??0)+"deg) scale("+(o?.scale??100)/100+")"})} />
+        `:ae}
+        ${e.map((e,t)=>{const o=this._mapEntityFor(e),l=o?this._mapUrl(o):null;if(!l)return ae;const d=this._effectiveSeat(e),h=s||t>0;return te`<img class="map-img ${h?"map-img--overlay":""}" src=${l} alt="Vacuum map"
+            data-entity=${e.entity}
+            style=${_e({left:50+d.offset_x+"%",top:50+d.offset_y+"%",width:d.scale+"%",transform:"translate(-50%,-50%) rotate("+d.rotation+"deg)",opacity:e.hide_map?"0":String((e.overlay_opacity??(h?55:100))/100),mixBlendMode:e.overlay_blend??"normal"})} />`})}
+        ${e.map(e=>this._intAttrs(e)?this._renderIntegrationOverlay(e,this._effectiveSeat(e),"paths"):ae)}
+        ${e.map(e=>this._intAttrs(e)?this._renderIntegrationOverlay(e,this._effectiveSeat(e),"marker"):ae)}
+        ${this._config.layout?ae:this._renderLayerToggles(e)}
+        ${this._renderMergedRooms(e)}
+        ${e.map(e=>"normal"!==this._mapMode&&this._isModeCandidate(e)||this._zoneRectShown&&this._hasZoneEditTarget(e)?te`<div class="map-clickcatch" style="touch-action:none"
+              @click=${t=>this._onMapClick(e,t)}
+              @pointerdown=${t=>this._onZoneDown(e,t)}
+              @pointermove=${t=>this._onZoneMove(e,t)}
+              @pointerup=${t=>this._onZoneUp(e,t)}></div>`:ae)}
+        ${e.map((e,t)=>{const o=this._zoneRectFor(e,0===t);return o?te`<div class="zone-rect" style=${_e({left:Math.min(o.x0,o.x1)+"%",top:Math.min(o.y0,o.y1)+"%",width:Math.abs(o.x1-o.x0)+"%",height:Math.abs(o.y1-o.y0)+"%"})}>${this._renderZoneHandles()}</div>`:ae})}
       </div>
-    `}_renderMap(t){const e=t.base??(t.image_base?.src&&!t.map?.entity?"image":"map"),o=t.image_base,i=o?.src,s=this._mapEntityFor(t),n=s?this._mapUrl(s):null,a=("image"===e||"combined"===e)&&!!i,r=("map"===e||"combined"===e)&&!!n;if(!a&&!r)return G;const l=this._effectiveSeat(t),c="number"==typeof t.base_height&&t.base_height>0,d=c?"map-wrap--fixed":a?"map-wrap--image":"",h=vt(c?{height:(t.base_height??0)+"px"}:{});return q`
-      <div class="map-wrap ${d}" style=${h}>
-        ${a?q`
-          <img class="${"image-base-img"+(c?" image-base-img--fit":"")}" src=${i} alt="Floorplan" @load=${this._onFloorplanLoad}
-            style=${vt({transform:"translate("+(o?.offset_x??0)+"%,"+(o?.offset_y??0)+"%) rotate("+(o?.rotation??0)+"deg) scale("+(o?.scale??100)/100+")"})} />
-        `:G}
-        ${r?q`
-          <img class="map-img ${a?"map-img--overlay":""}" src=${n} alt="Vacuum map"
-            data-entity=${t.entity}
-            style=${vt({left:50+l.offset_x+"%",top:50+l.offset_y+"%",width:l.scale+"%",transform:"translate(-50%,-50%) rotate("+l.rotation+"deg)",...t.hide_map?{opacity:"0"}:a?{opacity:String((t.overlay_opacity??55)/100),mixBlendMode:t.overlay_blend??"normal"}:{}})} />
-        `:G}
-        ${r?this._renderIntegrationOverlay(t,l):G}
-        ${this._config.layout?G:this._renderLayerToggles([t])}
-        ${(()=>{const e=this._roomsFor(t),o=!e.some(e=>this._isRoomSelected(e,t));return e.map(e=>this._renderRoomOverlay(e,t,{wholeHome:o}))})()}
-        ${"normal"!==this._mapMode&&this._isModeCandidate(t)||this._zoneRectShown&&this._hasZoneEditTarget(t)?q`<div class="map-clickcatch" style="touch-action:none"
-              @click=${e=>this._onMapClick(t,e)}
-              @pointerdown=${e=>this._onZoneDown(t,e)}
-              @pointermove=${e=>this._onZoneMove(t,e)}
-              @pointerup=${e=>this._onZoneUp(t,e)}></div>`:G}
-        ${(()=>{const e=this._zoneRectFor(t,!0);return e?q`<div class="zone-rect" style=${vt({left:Math.min(e.x0,e.x1)+"%",top:Math.min(e.y0,e.y1)+"%",width:Math.abs(e.x1-e.x0)+"%",height:Math.abs(e.y1-e.y0)+"%"})}>${this._renderZoneHandles()}</div>`:G})()}
+    `}_renderMap(e){const t=e.base??(e.image_base?.src&&!e.map?.entity?"image":"map"),o=e.image_base,s=o?.src,l=this._mapEntityFor(e),d=l?this._mapUrl(l):null,h=("image"===t||"combined"===t)&&!!s,p=("map"===t||"combined"===t)&&!!d;if(!h&&!p)return ae;const m=this._effectiveSeat(e),u="number"==typeof e.base_height&&e.base_height>0,_=u?"map-wrap--fixed":h?"map-wrap--image":"",b=_e(u?{height:(e.base_height??0)+"px"}:{});return te`
+      <div class="map-wrap ${_}" style=${b}>
+        ${h?te`
+          <img class="${"image-base-img"+(u?" image-base-img--fit":"")}" src=${s} alt="Floorplan" @load=${this._onFloorplanLoad}
+            style=${_e({transform:"translate("+(o?.offset_x??0)+"%,"+(o?.offset_y??0)+"%) rotate("+(o?.rotation??0)+"deg) scale("+(o?.scale??100)/100+")"})} />
+        `:ae}
+        ${p?te`
+          <img class="map-img ${h?"map-img--overlay":""}" src=${d} alt="Vacuum map"
+            data-entity=${e.entity}
+            style=${_e({left:50+m.offset_x+"%",top:50+m.offset_y+"%",width:m.scale+"%",transform:"translate(-50%,-50%) rotate("+m.rotation+"deg)",...e.hide_map?{opacity:"0"}:h?{opacity:String((e.overlay_opacity??55)/100),mixBlendMode:e.overlay_blend??"normal"}:{}})} />
+        `:ae}
+        ${p?this._renderIntegrationOverlay(e,m):ae}
+        ${this._config.layout?ae:this._renderLayerToggles([e])}
+        ${(()=>{const t=this._roomsFor(e),o=!t.some(t=>this._isRoomSelected(t,e));return t.map(t=>this._renderRoomOverlay(t,e,{wholeHome:o}))})()}
+        ${"normal"!==this._mapMode&&this._isModeCandidate(e)||this._zoneRectShown&&this._hasZoneEditTarget(e)?te`<div class="map-clickcatch" style="touch-action:none"
+              @click=${t=>this._onMapClick(e,t)}
+              @pointerdown=${t=>this._onZoneDown(e,t)}
+              @pointermove=${t=>this._onZoneMove(e,t)}
+              @pointerup=${t=>this._onZoneUp(e,t)}></div>`:ae}
+        ${(()=>{const t=this._zoneRectFor(e,!0);return t?te`<div class="zone-rect" style=${_e({left:Math.min(t.x0,t.x1)+"%",top:Math.min(t.y0,t.y1)+"%",width:Math.abs(t.x1-t.x0)+"%",height:Math.abs(t.y1-t.y0)+"%"})}>${this._renderZoneHandles()}</div>`:ae})()}
       </div>
-    `}_renderRoomAgeDots(t,e){const o=this._intRoomRec(e,t);if(o){const t=this._vacCleanType(e);if(!t.dry&&!t.wet)return G;const i=this._ageDaysFromIso(o.dry),s=this._ageDaysFromIso(o.wet);return q`
+    `}_renderRoomAgeDots(e,t){const o=this._intRoomRec(t,e);if(o){const e=this._vacCleanType(t);if(!e.dry&&!e.wet)return ae;const s=this._ageDaysFromIso(o.dry),l=this._ageDaysFromIso(o.wet);return te`
         <span class="room-age-dots">
-          ${t.dry?q`<span class="room-age-dot" style=${vt({background:this._colorForAgeDays(i)})}></span>`:G}
-          ${t.wet?q`<span class="room-age-dot" style=${vt({background:this._colorForAgeDays(s)})}></span>`:G}
+          ${e.dry?te`<span class="room-age-dot" style=${_e({background:this._colorForAgeDays(s)})}></span>`:ae}
+          ${e.wet?te`<span class="room-age-dot" style=${_e({background:this._colorForAgeDays(l)})}></span>`:ae}
         </span>
-      `}return t.last_clean_entity?q`
+      `}return e.last_clean_entity?te`
       <span class="room-age-dots">
-        <span class="room-age-dot" style=${vt({background:this._colorForAgeDays(this._roomAgeDays(t))})}></span>
+        <span class="room-age-dot" style=${_e({background:this._colorForAgeDays(this._roomAgeDays(e))})}></span>
       </span>
-    `:G}_onRoomPointerDown(t,e){return o=>{e||(o.preventDefault(),this._cancelHold(),this._holdId="room-"+t.key,this._holdTimer=setTimeout(()=>{this._holdTimer=null,this._holdId=null,this._inspectKey=this._inspectKey===t.key?null:t.key},kt))}}_onRoomPointerUp(t,e,o,i){return()=>{if(!i)if(null!==this._holdTimer){if(this._cancelHold(),null!==this._inspectKey)return void(this._inspectKey=null);o?this._toggleRoomAcross(t.key,o):this._toggleRoom(t,e)}else this._holdId=null}}_renderRoomInspect(t,e,o,i){const s=this._intRoomRec(e,t),n=this._ageDaysFromIso(s?.dry),a=this._ageDaysFromIso(s?.wet),r=t=>null===t?"—":t<1?"<1d":Math.round(t)+"d",l=o?this._planPreview?.dry.get(t.key):void 0,c=o?this._planPreview?.wet.get(t.key):void 0,d=this._pinCandidates(t.key,"dry").length>1,h=this._pinCandidates(t.key,"wet").length>1,p=(e,o)=>("dry"===e?d:h)?i=>{i.stopPropagation(),this._cycleRoomPin(t.key,e,o)}:void 0;return q`
-      <div class="room-inspect" style=${vt({left:(t.map_x??0)+"%",top:(t.map_y??0)+"%"})}
-        @click=${t=>t.stopPropagation()}>
+    `:ae}_onRoomPointerDown(e,t){return o=>{t||(o.preventDefault(),this._cancelHold(),this._holdId="room-"+e.key,this._holdTimer=setTimeout(()=>{this._holdTimer=null,this._holdId=null,this._inspectKey=this._inspectKey===e.key?null:e.key},ye))}}_onRoomPointerUp(e,t,o,s){return()=>{if(!s)if(null!==this._holdTimer){if(this._cancelHold(),null!==this._inspectKey)return void(this._inspectKey=null);o?this._toggleRoomAcross(e.key,o):this._toggleRoom(e,t)}else this._holdId=null}}_renderRoomInspect(e,t,o,s){const l=this._intRoomRec(t,e),d=this._ageDaysFromIso(l?.dry),h=this._ageDaysFromIso(l?.wet),badge=e=>null===e?"—":e<1?"<1d":Math.round(e)+"d",p=o?this._planPreview?.dry.get(e.key):void 0,m=o?this._planPreview?.wet.get(e.key):void 0,u=this._pinCandidates(e.key,"dry").length>1,_=this._pinCandidates(e.key,"wet").length>1,pinTap=(t,o)=>("dry"===t?u:_)?s=>{s.stopPropagation(),this._cycleRoomPin(e.key,t,o)}:void 0;return te`
+      <div class="room-inspect" style=${_e({left:(e.map_x??0)+"%",top:(e.map_y??0)+"%"})}
+        @click=${e=>e.stopPropagation()}>
         <div class="room-inspect-inner">
-          <div class="room-inspect-name">${t.name??t.key}</div>
+          <div class="room-inspect-name">${e.name??e.key}</div>
           <div class="room-inspect-ages">
-            <span class="dock-age"><ha-icon icon="mdi:broom"></ha-icon><b style=${vt({color:this._colorForAgeDays(n)})}>${r(n)}</b></span>
-            <span class="dock-age"><ha-icon icon="mdi:water"></ha-icon><b style=${vt({color:this._colorForAgeDays(a)})}>${r(a)}</b></span>
+            <span class="dock-age"><ha-icon icon="mdi:broom"></ha-icon><b style=${_e({color:this._colorForAgeDays(d)})}>${badge(d)}</b></span>
+            <span class="dock-age"><ha-icon icon="mdi:water"></ha-icon><b style=${_e({color:this._colorForAgeDays(h)})}>${badge(h)}</b></span>
           </div>
-          ${l||c?q`
+          ${p||m?te`
             <div class="dock-avatars">
-              ${l?this._vacChip(l,p("dry",l)):G}
-              ${c?this._vacChip(c,p("wet",c)):G}
-            </div>`:G}
+              ${p?this._vacChip(p,pinTap("dry",p)):ae}
+              ${m?this._vacChip(m,pinTap("wet",m)):ae}
+            </div>`:ae}
         </div>
       </div>
-    `}_renderRoomOverlay(t,e,o){const i=o?.vacs?this._isRoomSelectedAny(t.key,o.vacs):this._isRoomSelected(t,e),s=!i&&!!o?.wholeHome,n="rgba(255,255,255,0.22)",a=t.icon_anchor??"c",r="normal"!==this._mapMode,l="#ffffff",c="linear-gradient(135deg, #ffffff 0%, #ffffff 46%, #8ecbff 50%, #ffffff 54%, #ffffff 100%) 1";if(void 0!==t.map_w&&void 0!==t.map_h){const d={tl:["flex-start","flex-start"],t:["center","flex-start"],tr:["flex-end","flex-start"],l:["flex-start","center"],c:["center","center"],r:["flex-end","center"],bl:["flex-start","flex-end"],b:["center","flex-end"],br:["flex-end","flex-end"]},[h,p]=d[a]??["center","center"],m=(i?this._config.room_border_selected??4:s?Math.max(3,this._config.room_border_normal??2):this._config.room_border_normal??2)+"px",u=i?l+"E0":s?"rgba(255,255,255,0.75)":n,_=i?l+"22":s?"rgba(255,255,255,0.16)":"rgba(0,0,0,0.06)",g=i?"0 0 18px rgba(255,255,255,0.7)":s?"0 0 10px rgba(255,255,255,0.4)":"none",f=i?this._planPreview?.dry.get(t.key):void 0,b=i?this._planPreview?.wet.get(t.key):void 0,y="room-"+t.key;return q`
+    `}_renderRoomOverlay(e,t,o){const s=o?.vacs?this._isRoomSelectedAny(e.key,o.vacs):this._isRoomSelected(e,t),l=!s&&!!o?.wholeHome,d="rgba(255,255,255,0.22)",h=e.icon_anchor??"c",p="normal"!==this._mapMode,m="#ffffff",u="linear-gradient(135deg, #ffffff 0%, #ffffff 46%, #8ecbff 50%, #ffffff 54%, #ffffff 100%) 1";if(void 0!==e.map_w&&void 0!==e.map_h){const _={tl:["flex-start","flex-start"],t:["center","flex-start"],tr:["flex-end","flex-start"],l:["flex-start","center"],c:["center","center"],r:["flex-end","center"],bl:["flex-start","flex-end"],b:["center","flex-end"],br:["flex-end","flex-end"]},[b,v]=_[h]??["center","center"],f=(s?this._config.room_border_selected??4:l?Math.max(3,this._config.room_border_normal??2):this._config.room_border_normal??2)+"px",w=s?m+"E0":l?"rgba(255,255,255,0.75)":d,$=s?m+"22":l?"rgba(255,255,255,0.16)":"rgba(0,0,0,0.06)",A=s?"0 0 18px rgba(255,255,255,0.7)":l?"0 0 10px rgba(255,255,255,0.4)":"none",C=s?this._planPreview?.dry.get(e.key):void 0,P=s?this._planPreview?.wet.get(e.key):void 0,E="room-"+e.key;return te`
         <button
-          class="room-overlay ${r?"room-overlay--locked":""} ${this._holdId===y?"room-overlay--holding":""}"
-          ?disabled=${r}
-          style=${vt({left:(t.map_x??0)+"%",top:(t.map_y??0)+"%",width:t.map_w+"%",height:t.map_h+"%",border:m+" solid "+u,borderImage:i?c:"none",background:_,boxShadow:g,justifyContent:h,alignItems:p})}
-          @pointerdown=${this._onRoomPointerDown(t,r)}
-          @pointerup=${this._onRoomPointerUp(t,e,o?.vacs,r)}
+          class="room-overlay ${p?"room-overlay--locked":""} ${this._holdId===E?"room-overlay--holding":""}"
+          ?disabled=${p}
+          style=${_e({left:(e.map_x??0)+"%",top:(e.map_y??0)+"%",width:e.map_w+"%",height:e.map_h+"%",border:f+" solid "+w,borderImage:s?u:"none",background:$,boxShadow:A,justifyContent:b,alignItems:v})}
+          @pointerdown=${this._onRoomPointerDown(e,p)}
+          @pointerup=${this._onRoomPointerUp(e,t,o?.vacs,p)}
           @pointerleave=${this._holdEnd}
           @pointercancel=${this._holdEnd}
-          title=${r?"Room selection is off while placing a pin/zone":t.name} aria-label=${t.name}
-          aria-pressed=${i?"true":"false"}
+          title=${p?"Room selection is off while placing a pin/zone":e.name} aria-label=${e.name}
+          aria-pressed=${s?"true":"false"}
         >
           <div class="hold-ring"></div>
-          ${!this._config.room_icon_hidden&&"none"!==a&&t.icon?q`
-            <ha-icon icon=${t.icon}
-              style=${vt({color:i?"white":"rgba(255,255,255,0.55)","--mdc-icon-size":"16px"})}>
+          ${!this._config.room_icon_hidden&&"none"!==h&&e.icon?te`
+            <ha-icon icon=${e.icon}
+              style=${_e({color:s?"white":"rgba(255,255,255,0.55)","--mdc-icon-size":"16px"})}>
             </ha-icon>
-          `:G}
-          ${this._renderRoomAgeDots(t,e)}
-          ${f||b?(()=>{const t=(this._narrow?90:0)+(this._flipEff?180:0),e=90===t?{top:"0%",left:"100%"}:180===t?{top:"0%",left:"0%"}:270===t?{top:"100%",left:"0%"}:{top:"100%",left:"100%"},o=t*Math.PI/180,i=(-2*(Math.cos(o)+Math.sin(o))).toFixed(2),s=(-2*(Math.cos(o)-Math.sin(o))).toFixed(2);return q`
-                <span class="room-overlay-assign-anchor" style=${vt(e)}>
+          `:ae}
+          ${this._renderRoomAgeDots(e,t)}
+          ${C||P?(()=>{const e=(this._narrow?90:0)+(this._flipEff?180:0),t=90===e?{top:"0%",left:"100%"}:180===e?{top:"0%",left:"0%"}:270===e?{top:"100%",left:"0%"}:{top:"100%",left:"100%"},o=e*Math.PI/180,s=(-2*(Math.cos(o)+Math.sin(o))).toFixed(2),l=(-2*(Math.cos(o)-Math.sin(o))).toFixed(2);return te`
+                <span class="room-overlay-assign-anchor" style=${_e(t)}>
                   <span class="room-overlay-assign"
-                    style=${vt({transform:`translate(${i}px, ${s}px) rotate(calc(-1 * var(--map-rot)))`})}>
-                    ${f?this._vacChip(f):G}
-                    ${b?this._vacChip(b):G}
+                    style=${_e({transform:`translate(${s}px, ${l}px) rotate(calc(-1 * var(--map-rot)))`})}>
+                    ${C?this._vacChip(C):ae}
+                    ${P?this._vacChip(P):ae}
                   </span>
                 </span>
-              `})():G}
-          ${this._renderRoomGauge(o?.vacs??[e],t)}
+              `})():ae}
+          ${this._renderRoomGauge(o?.vacs??[t],e)}
         </button>
-        ${this._inspectKey===t.key?this._renderRoomInspect(t,e,i,o):G}
-      `}const d=i?l+"A8":s?"rgba(255,255,255,0.32)":"rgba(0,0,0,0.55)",h=i?"0 0 12px rgba(255,255,255,0.8)":s?"0 0 8px rgba(255,255,255,0.45)":"none",p="room-"+t.key;return q`
+        ${this._inspectKey===e.key?this._renderRoomInspect(e,t,s,o):ae}
+      `}const _=s?m+"A8":l?"rgba(255,255,255,0.32)":"rgba(0,0,0,0.55)",b=s?"0 0 12px rgba(255,255,255,0.8)":l?"0 0 8px rgba(255,255,255,0.45)":"none",v="room-"+e.key;return te`
       <button
-        class="room-btn ${r?"room-overlay--locked":""} ${this._holdId===p?"room-overlay--holding":""}"
-        ?disabled=${r}
-        style=${vt({left:(t.map_x??0)+"%",top:(t.map_y??0)+"%",background:d,border:"4px solid "+(i?l:s?"rgba(255,255,255,0.7)":n),borderImage:i?c:"none",boxShadow:h})}
-        @pointerdown=${this._onRoomPointerDown(t,r)}
-        @pointerup=${this._onRoomPointerUp(t,e,o?.vacs,r)}
+        class="room-btn ${p?"room-overlay--locked":""} ${this._holdId===v?"room-overlay--holding":""}"
+        ?disabled=${p}
+        style=${_e({left:(e.map_x??0)+"%",top:(e.map_y??0)+"%",background:_,border:"4px solid "+(s?m:l?"rgba(255,255,255,0.7)":d),borderImage:s?u:"none",boxShadow:b})}
+        @pointerdown=${this._onRoomPointerDown(e,p)}
+        @pointerup=${this._onRoomPointerUp(e,t,o?.vacs,p)}
         @pointerleave=${this._holdEnd}
         @pointercancel=${this._holdEnd}
-        title=${r?"Room selection is off while placing a pin/zone":t.name} aria-label=${t.name}
-        aria-pressed=${i?"true":"false"}
+        title=${p?"Room selection is off while placing a pin/zone":e.name} aria-label=${e.name}
+        aria-pressed=${s?"true":"false"}
       >
         <div class="hold-ring"></div>
-        ${this._config.room_icon_hidden?G:q`
-          <ha-icon icon=${t.icon||"mdi:square"}
-            style=${vt({color:i?"white":"rgba(255,255,255,0.5)"})}>
+        ${this._config.room_icon_hidden?ae:te`
+          <ha-icon icon=${e.icon||"mdi:square"}
+            style=${_e({color:s?"white":"rgba(255,255,255,0.5)"})}>
           </ha-icon>
         `}
-        ${this._renderRoomAgeDots(t,e)}
-        ${this._renderRoomGauge(o?.vacs??[e],t)}
+        ${this._renderRoomAgeDots(e,t)}
+        ${this._renderRoomGauge(o?.vacs??[t],e)}
       </button>
-      ${this._inspectKey===t.key?this._renderRoomInspect(t,e,i,o):G}
-    `}_renderStatusRow(t){const[e,o]=this._statusInfo(t),i=this._battery(t),s=this._lastCleanStr(t),n=t.name??t.entity.split(".")[1]??t.entity,a=this._progress(t),r=this._ent(t,"current_room"),l=r?this.hass.states[r]?.state:null,c=l&&"unknown"!==l&&"unavailable"!==l?l:null,d=this._ent(t,"error"),h=d?this.hass.states[d]?.state:null,p=this._hasError(t);return q`
-      ${p?q`
+      ${this._inspectKey===e.key?this._renderRoomInspect(e,t,s,o):ae}
+    `}_renderStatusRow(e){const[t,o]=this._statusInfo(e),s=this._battery(e),l=this._lastCleanStr(e),d=e.name??e.entity.split(".")[1]??e.entity,h=this._progress(e),p=this._ent(e,"current_room"),m=p?this.hass.states[p]?.state:null,u=m&&"unknown"!==m&&"unavailable"!==m?m:null,_=this._ent(e,"error"),b=_?this.hass.states[_]?.state:null,v=this._hasError(e);return te`
+      ${v?te`
         <div class="error-row">
           <ha-icon icon="mdi:alert-circle" style="color:#ff4d4f"></ha-icon>
-          <span style="color:#ff4d4f;font-size:11px;font-weight:600">${h}</span>
+          <span style="color:#ff4d4f;font-size:11px;font-weight:600">${b}</span>
         </div>
-      `:G}
+      `:ae}
       <div class="status-line1">
-        <span class="model-label">${n}</span>
-        <span class="status-label" style=${vt({color:o})}>
-          ${e}${null!==a?q` &middot; ${a}&thinsp;%`:G}
+        <span class="model-label">${d}</span>
+        <span class="status-label" style=${_e({color:o})}>
+          ${t}${null!==h?te` &middot; ${h}&thinsp;%`:ae}
         </span>
       </div>
       <div class="status-line2">
-        ${c?q`
+        ${u?te`
           <span class="current-room">
-            <ha-icon icon="mdi:map-marker" style="--mdc-icon-size:12px;color:rgba(255,255,255,0.4)"></ha-icon>
-            ${c}
+            <ha-icon icon="mdi:map-marker" style="--mdc-icon-size:12px;color:rgba(var(--avc-ink-rgb),0.4)"></ha-icon>
+            ${u}
           </span>
-        `:q`<span></span>`}
+        `:te`<span></span>`}
         <span class="status-meta">
-          ${null!==i?q`
+          ${null!==s?te`
             <span class="battery">
-              <ha-icon icon=${this._batIcon(i)} style=${vt({color:this._batColor(i)})}></ha-icon>
-              <span style=${vt({color:this._batColor(i)})}>${i}&thinsp;%</span>
+              <ha-icon icon=${this._batIcon(s)} style=${_e({color:this._batColor(s)})}></ha-icon>
+              <span style=${_e({color:this._batColor(s)})}>${s}&thinsp;%</span>
             </span>
-          `:G}
+          `:ae}
           <span class="last-clean">
             <ha-icon icon="mdi:history"></ha-icon>
-            <span>${s}</span>
+            <span>${l}</span>
           </span>
         </span>
       </div>
-    `}_renderProgress(t){const e=this._progress(t);if(null===e)return G;const o=this._color(t);return q`
+    `}_renderProgress(e){const t=this._progress(e);if(null===t)return ae;const o=this._color(e);return te`
       <div class="progress">
         <div class="progress-track">
-          <div class="progress-fill" style=${vt({width:e+"%",background:o})}></div>
+          <div class="progress-fill" style=${_e({width:t+"%",background:o})}></div>
         </div>
-        <span class="progress-label" style=${vt({color:o})}>${e}&thinsp;%</span>
+        <span class="progress-label" style=${_e({color:o})}>${t}&thinsp;%</span>
       </div>
-    `}_renderActions(t,e){const o=this._color(t),i=this._pinPending?.[t.entity],s=this._zonePending?.[t.entity];if(i||s){const i="modeaction-"+e,n=s?"Clean zone":"Send here",a=s?"mdi:select-drag":"mdi:map-marker-radius",r=()=>{s?this._confirmZone(t):this._confirmPin(t)};return q`
+    `}_renderActions(e,t){const o=this._color(e),s=this._pinPending?.[e.entity],l=this._zonePending?.[e.entity];if(s||l){const s="modeaction-"+t,d=l?"Clean zone":"Send here",h=l?"mdi:select-drag":"mdi:map-marker-radius",action=()=>{l?this._confirmZone(e):this._confirmPin(e)};return te`
         <div class="actions">
           <button
-            class="action-btn ${this._holdId===i?"action-btn--holding":""}"
-            style=${vt({background:this._colorBg(t),border:"1px solid "+o+"80"})}
-            @pointerdown=${this._holdStart(i,r)}
+            class="action-btn ${this._holdId===s?"action-btn--holding":""}"
+            style=${_e({background:this._colorBg(e),border:"1px solid "+o+"80"})}
+            @pointerdown=${this._holdStart(s,action)}
             @pointermove=${this._holdMove}
             @pointerup=${this._holdEnd}
             @pointerleave=${this._holdEnd}
             @pointercancel=${this._holdEnd}
           >
             <div class="hold-ring"></div>
-            <ha-icon icon=${a} style=${vt({color:o})}></ha-icon>
-            <span>${n}</span>
+            <ha-icon icon=${h} style=${_e({color:o})}></ha-icon>
+            <span>${d}</span>
           </button>
         </div>
-      `}const n=this._isCleaning(t),a=this._isPaused(t),r=this._hasSelectedRooms(t),l=this._totalCleanMins(t),c=this._timeStr(l);if(a){const i="resume-"+e;return q`
+      `}const d=this._isCleaning(e),h=this._isPaused(e),p=this._hasSelectedRooms(e),m=this._totalCleanMins(e),u=this._timeStr(m);if(h){const s="resume-"+t;return te`
         <div class="actions">
           <button
-            class="action-btn ${this._holdId===i?"action-btn--holding":""}"
-            style=${vt({background:this._colorBg(t),border:"1px solid "+o+"80"})}
-            @pointerdown=${this._holdStart(i,()=>this._resume(t))}
+            class="action-btn ${this._holdId===s?"action-btn--holding":""}"
+            style=${_e({background:this._colorBg(e),border:"1px solid "+o+"80"})}
+            @pointerdown=${this._holdStart(s,()=>this._resume(e))}
             @pointermove=${this._holdMove}
             @pointerup=${this._holdEnd}
             @pointerleave=${this._holdEnd}
             @pointercancel=${this._holdEnd}
           >
             <div class="hold-ring"></div>
-            <ha-icon icon="mdi:play" style=${vt({color:o})}></ha-icon>
+            <ha-icon icon="mdi:play" style=${_e({color:o})}></ha-icon>
             <span>Resume</span>
           </button>
           <button
             class="action-btn action-btn--secondary"
-            @click=${()=>this._dock(t)}
+            @click=${()=>this._dock(e)}
           >
             <ha-icon icon="mdi:home" style="color:rgba(64,169,255,0.6)"></ha-icon>
             <span>Dock</span>
           </button>
         </div>
-      `}if(n){const o="pause-"+e;return q`
+      `}if(d){const o="pause-"+t;return te`
         <div class="actions">
           <button
             class="action-btn action-btn--warn ${this._holdId===o?"action-btn--holding":""}"
-            @pointerdown=${this._holdStart(o,()=>this._pause(t))}
+            @pointerdown=${this._holdStart(o,()=>this._pause(e))}
             @pointermove=${this._holdMove}
             @pointerup=${this._holdEnd}
             @pointerleave=${this._holdEnd}
@@ -682,114 +682,180 @@ const ht=t=>(e,o)=>{void 0!==o?o.addInitializer(()=>{customElements.define(t,e)}
             <span>Pause</span>
           </button>
         </div>
-      `}const d="start-"+e,h=r?this._colorBg(t):"rgba(60,60,60,0.4)",p=r?"1px solid "+o+"80":"1px solid rgba(255,255,255,0.1)",m=r?o:"rgba(255,255,255,0.2)",u=r?"white":"rgba(255,255,255,0.25)",_=this._roomsFor(t),g=_.filter(e=>this._isRoomSelected(e,t)).length,f=[_.length>0?`${g}/${_.length} rooms`:"",c].filter(Boolean).join(" · ");return q`
+      `}const _="start-"+t,b=p?this._colorBg(e):"rgba(60,60,60,0.4)",v=p?"1px solid "+o+"80":"1px solid rgba(var(--avc-ink-rgb),0.1)",f=p?o:"rgba(var(--avc-ink-rgb),0.2)",w=p?"rgb(var(--avc-ink-rgb))":"rgba(var(--avc-ink-rgb),0.25)",$=this._roomsFor(e),A=$.filter(t=>this._isRoomSelected(t,e)).length,C=[$.length>0?`${A}/${$.length} rooms`:"",u].filter(Boolean).join(" · ");return te`
       <div class="actions actions--idle">
-        ${this._renderPresetChips(t)}
+        ${this._renderPresetChips(e)}
         <button
-          class="action-btn ${r&&this._holdId===d?"action-btn--holding":""}"
-          style=${vt({background:h,border:p,flex:"1"})}
-          ?disabled=${!r}
-          @pointerdown=${r?this._holdStart(d,()=>this._startClean(t)):G}
+          class="action-btn ${p&&this._holdId===_?"action-btn--holding":""}"
+          style=${_e({background:b,border:v,flex:"1"})}
+          ?disabled=${!p}
+          @pointerdown=${p?this._holdStart(_,()=>this._startClean(e)):ae}
           @pointermove=${this._holdMove}
           @pointerup=${this._holdEnd}
           @pointerleave=${this._holdEnd}
           @pointercancel=${this._holdEnd}
         >
           <div class="hold-ring"></div>
-          <ha-icon icon="mdi:play" style=${vt({color:m})}></ha-icon>
+          <ha-icon icon="mdi:play" style=${_e({color:f})}></ha-icon>
           <div class="start-body">
-            <span style=${vt({color:u})}>${r?"START":"Select rooms"}</span>
-            ${f?q`<small style="color:rgba(255,255,255,0.4)">${f}</small>`:G}
+            <span style=${_e({color:w})}>${p?"START":"Select rooms"}</span>
+            ${C?te`<small style="color:rgba(var(--avc-ink-rgb),0.4)">${C}</small>`:ae}
           </div>
         </button>
       </div>
-    `}_renderStatusCard(t,e){const o=this._isCleaning(t),i=this._color(t),s=t.name??t.entity.split(".")[1]??t.entity,n=o?"drop-shadow(0 0 8px "+i+"D8)":"drop-shadow(0 2px 5px "+i+"33)";return q`
-      <div class="status-card" style=${vt({border:o?"2px solid "+i:"1px solid rgba(255,255,255,0.08)",boxShadow:o?"0 0 22px "+i+"40":"none"})}>
+    `}_renderStatusCard(e,t){const o=this._isCleaning(e),s=this._color(e),l=e.name??e.entity.split(".")[1]??e.entity,d=o?"drop-shadow(0 0 8px "+s+"D8)":"drop-shadow(0 2px 5px "+s+"33)";return te`
+      <div class="status-card" style=${_e({border:o?"2px solid "+s:"1px solid var(--avc-panel-line)",boxShadow:o?"0 0 22px "+s+"40":"var(--avc-elev-1)"})}>
         <div class="status-header">
-          <div class="status-avatar" style=${vt({borderColor:i})}
-            @click=${()=>this._fireMoreInfo(t.entity)}
-            title="Open ${s} info — native controls, in case this card can't do something">
-            ${t.image?q`
-              <img src=${t.image} alt=${s}
-                style=${vt({opacity:o?"0.9":"0.6",filter:n})}
+          <div class="status-avatar" style=${_e({borderColor:s})}
+            @click=${()=>this._fireMoreInfo(e.entity)}
+            title="Open ${l} info — native controls, in case this card can't do something">
+            ${e.image?te`
+              <img src=${e.image} alt=${l}
+                style=${_e({opacity:o?"0.9":"0.6",filter:d})}
               />
-            `:q`
+            `:te`
               <ha-icon icon="mdi:robot-vacuum"
-                style=${vt({color:i,fontSize:"22px",opacity:o?"0.9":"0.5"})}
+                style=${_e({color:s,fontSize:"22px",opacity:o?"0.9":"0.5"})}
               ></ha-icon>
             `}
             <span class="avatar-info-badge"><ha-icon icon="mdi:information-outline"></ha-icon></span>
           </div>
           <div class="status-info">
-            ${this._renderStatusRow(t)}
+            ${this._renderStatusRow(e)}
           </div>
         </div>
-        ${this._renderProgress(t)}
-        ${this._renderActions(t,e)}
-        ${this._renderDebugProgress(t)}
+        ${this._renderProgress(e)}
+        ${this._renderActions(e,t)}
+        ${this._renderDebugProgress(e)}
       </div>
-    `}_renderMiniGauge(t,e,o,i){return q`
+    `}_renderMiniGauge(e,t,o,s){return te`
       <span class="mini-gauge-wrap">
-        <ha-icon class="mini-gauge-ico" icon=${o} style=${vt({color:e})}></ha-icon>
-        <span class="mini-gauge" style=${vt({background:`conic-gradient(${e} ${3.6*t}deg, rgba(255,255,255,0.12) 0)`})}>
-          <span>${t}${i?"~":""}</span>
+        <ha-icon class="mini-gauge-ico" icon=${o} style=${_e({color:t})}></ha-icon>
+        <span class="mini-gauge" style=${_e({background:`conic-gradient(${t} ${3.6*e}deg, rgba(var(--avc-ink-rgb),0.12) 0)`})}>
+          <span>${e}${s?"~":""}</span>
         </span>
-      </span>`}_currentRoomName(t){return this._intAttrs(t)?.vacuum_room_name}_mmss(t){const e=Math.max(0,Math.round(t));return`${Math.floor(e/60)}:${String(e%60).padStart(2,"0")}`}_renderDebugProgress(t){if(!this._config.debug_room_progress)return G;const e=this._roomsFor(t).map(e=>({r:e,p:this._roomProgress(t,e)})).filter(t=>t.p&&(null!=t.p.dry_pct||null!=t.p.wet_pct||null!=t.p.elapsed_s));if(!e.length)return G;const o=this._color(t),i=this._intEntity(t),s=i?Date.parse(this.hass.states[i]?.last_updated??""):NaN,n=this._currentRoomName(t),a=this._isCleaning(t),r=this._isPaused(t),l=!a&&!r||isNaN(s)?0:Math.max(0,(this._now-s)/1e3);return q`
+      </span>`}_currentRoomName(e){return this._intAttrs(e)?.vacuum_room_name}_mmss(e){const t=Math.max(0,Math.round(e));return`${Math.floor(t/60)}:${String(t%60).padStart(2,"0")}`}_renderDebugProgress(e){if(!this._config.debug_room_progress)return ae;const t=this._roomsFor(e).map(t=>({r:t,p:this._roomProgress(e,t)})).filter(e=>e.p&&(null!=e.p.dry_pct||null!=e.p.wet_pct||null!=e.p.elapsed_s));if(!t.length)return ae;const o=this._color(e),s=this._intEntity(e),l=s?Date.parse(this.hass.states[s]?.last_updated??""):NaN,d=this._currentRoomName(e),h=this._isCleaning(e),p=this._isPaused(e),m=!h&&!p||isNaN(l)?0:Math.max(0,(this._now-l)/1e3);return te`
       <div class="dbg-prog">
-        ${e.map(({r:t,p:e})=>{const i=(t.key===n||t.name===n)&&(a||r),s=(e.elapsed_s??0)+(i?l:0);let c=e.est_s??null;i&&r&&null!=c&&(c+=l);const d=null!=c?`${this._mmss(s)}/${this._mmss(c)}`:this._mmss(s);return q`
-            <span class="dbg-prog-item" title=${`dry ${e.dry_pct??"—"}% · wet ${e.wet_pct??"—"}%`}>
-              ${t.icon?q`<ha-icon icon=${t.icon}></ha-icon>`:G}
-              <span class="dbg-prog-name">${t.name??t.key}</span>
-              ${null!=e.dry_pct?this._renderMiniGauge(e.dry_pct,o,"mdi:broom",!!e.dry_calibrating):G}
-              ${null!=e.wet_pct?this._renderMiniGauge(e.wet_pct,"#40a9ff","mdi:water",!!e.wet_calibrating):G}
-              ${null!=e.elapsed_s?q`<small>${d}</small>`:G}
+        ${t.map(({r:e,p:t})=>{const s=(e.key===d||e.name===d)&&(h||p),l=(t.elapsed_s??0)+(s?m:0);let u=t.est_s??null;s&&p&&null!=u&&(u+=m);const _=null!=u?`${this._mmss(l)}/${this._mmss(u)}`:this._mmss(l);return te`
+            <span class="dbg-prog-item" title=${`dry ${t.dry_pct??"—"}% · wet ${t.wet_pct??"—"}%`}>
+              ${e.icon?te`<ha-icon icon=${e.icon}></ha-icon>`:ae}
+              <span class="dbg-prog-name">${e.name??e.key}</span>
+              ${null!=t.dry_pct?this._renderMiniGauge(t.dry_pct,o,"mdi:broom",!!t.dry_calibrating):ae}
+              ${null!=t.wet_pct?this._renderMiniGauge(t.wet_pct,"#40a9ff","mdi:water",!!t.wet_calibrating):ae}
+              ${null!=t.elapsed_s?te`<small>${_}</small>`:ae}
             </span>
           `})}
       </div>
-    `}_shownOrdered(){return[...this._shownSet].filter(t=>t<this._config.vacuums.length).sort((t,e)=>t-e)}_gridShown(){const t=this._shownOrdered();return"portrait"===this._profile&&"merged"!==this._config.map_mode&&t.length>1?t.slice(0,1):t}_regionTemplate(t,e){const o=this._gridShown(),i="merged"===this._config.map_mode,s=t=>t.map(t=>this._config.vacuums[t]);switch(t){case"badges":return q`<div class="badges-row badges-row--grid">
-          ${"landscape"===this._profile?G:this._config.vacuums.map((t,e)=>this._renderBadge(t,e))}
-          ${(this._config.global_actions??[]).map((t,e)=>this._renderGlobalBadge(t,e))}
-        </div>`;case"autobar":return this._renderAutoBar();case"plan":return this._renderPlanPreview();case"picker":return this._renderVacuumPicker();case"map":return i?this._renderResponsive(this._renderMergedMap()):q`${o.map(t=>this._renderResponsive(this._renderMap(this._config.vacuums[t])))}`;case"tools":return this._renderMetaBar(s(o));case"dock":return this._renderDock(!("start"in e.place),"landscape"===this._profile&&!("picker"in e.place));case"start":return this._renderStartBar();case"status":return q`${o.map(t=>this._renderStatusCard(this._config.vacuums[t],t))}`;default:return null}}_renderGrid(t){const e="portrait"===this._profile&&this._stackTopology,o=e?Vt:function(t,e){const o=t[e]??{},i=Nt[e];return{columns:o.columns?.length?o.columns:i.columns,rows:o.rows?.length?o.rows:i.rows,place:o.place&&Object.keys(o.place).length?o.place:i.place}}(t,this._profile),i=this._schemaWarning();return q`
-      <ha-card style="padding:0;display:block">
-        ${this.editMode?q`<div class="version-chip">
-          <div>v${$t} · ${Math.round(this._cardW)}w · ${this._profile}</div>
-          ${this._config.debug?q`<div>${e?"stack":"split"} · box:${Math.round(this._mapAvailW)}x${Math.round(this._mapAvailH)}</div>`:G}
-        </div>`:G}
-        <div class="avc-grid avc-grid--${this._profile}" style=${vt(function(t,e){return{display:"grid",width:"100%",height:jt(t),alignContent:"start",gridTemplateColumns:Bt(e.columns),gridTemplateRows:Bt(e.rows),gap:t.gap??"6px",boxSizing:"border-box"}}(t,o))}>
-          ${i?q`<div class="avc-schemawarn">
-            <ha-icon icon="mdi:alert" style="--mdc-icon-size:18px"></ha-icon><span>${i}</span>
-          </div>`:G}
-          ${Object.entries(o.place).map(([t,e])=>{const i=this._regionTemplate(t,o);return null==i||i===G?G:q`<div class="avc-region avc-region--${t}" style=${vt(function(t){const e={gridRow:String(t.row??"auto"),gridColumn:String(t.col??"1"),overflow:t.overflow??"hidden",position:"relative",minWidth:"0",minHeight:"0"};return t.align&&"stretch"!==t.align&&(e.alignSelf=t.align),e}(e))}>${i}</div>`})}
+    `}_shownOrdered(){return[...this._shownSet].filter(e=>e<this._config.vacuums.length).sort((e,t)=>e-t)}_gridShown(){const e=this._shownOrdered();return"portrait"===this._profile&&"merged"!==this._config.map_mode&&e.length>1?e.slice(0,1):e}_regionTemplate(e,t){const o=this._gridShown(),s="merged"===this._config.map_mode,vacsOf=e=>e.map(e=>this._config.vacuums[e]);switch(e){case"badges":return te`<div class="badges-row badges-row--grid">
+          ${"landscape"===this._profile?ae:this._config.vacuums.map((e,t)=>this._renderBadge(e,t))}
+          ${(this._config.global_actions??[]).map((e,t)=>this._renderGlobalBadge(e,t))}
+        </div>`;case"autobar":return this._renderAutoBar();case"plan":return this._renderPlanPreview();case"picker":return this._renderVacuumPicker();case"map":return s?this._renderResponsive(this._renderMergedMap()):te`${o.map(e=>this._renderResponsive(this._renderMap(this._config.vacuums[e])))}`;case"tools":return this._renderMetaBar(vacsOf(o));case"dock":return this._renderDock(!("start"in t.place),"landscape"===this._profile&&!("picker"in t.place));case"start":return this._renderStartBar();case"status":return te`${o.map(e=>this._renderStatusCard(this._config.vacuums[e],e))}`;default:return null}}_rootClasses(){const e=this._config.theme??Re,t=[];return"legacy"!==e&&t.push("avc-theme","avc-theme--"+e),this._config.reduce_motion&&t.push("avc-still"),this._isCalm()&&t.push("avc-calm"),t.join(" ")}_rootVars(){const e=this._config.accent;if(!e)return{};const t=function hexToRgbChannel(e){const t=/^#([0-9a-f]{3}|[0-9a-f]{6})$/i.exec(e.trim());if(!t)return null;let o=t[1];return 3===o.length&&(o=o.split("").map(e=>e+e).join("")),[0,2,4].map(e=>parseInt(o.slice(e,e+2),16)).join(", ")}(e);return t?{"--avc-accent-rgb":t}:{}}_isCalm(){if(!1===this._config.calm_state)return!1;if("normal"!==this._mapMode)return!1;if(this._dockSheetOpen||this._modeSheetOpen)return!1;const e=this._config.vacuums;return!e.some(e=>this._isCleaning(e)||this._hasError(e))&&!this._allRoomKeys().some(t=>this._isRoomSelectedAny(t,e))}_renderGrid(e){const t="portrait"===this._profile&&this._stackTopology,o=t?Pe:function resolveProfile(e,t){const o=e[t]??{},s=Ee[t];return{columns:o.columns?.length?o.columns:s.columns,rows:o.rows?.length?o.rows:s.rows,place:o.place&&Object.keys(o.place).length?o.place:s.place}}(e,this._profile),s=this._schemaWarning();return te`
+      <ha-card class=${this._rootClasses()} style=${_e({padding:"0",display:"block",...this._rootVars()})}>
+        ${this.editMode?te`<div class="version-chip">
+          <div>v${fe} · ${Math.round(this._cardW)}w · ${this._profile}</div>
+          ${this._config.debug?te`<div>${t?"stack":"split"} · box:${Math.round(this._mapAvailW)}x${Math.round(this._mapAvailH)}</div>`:ae}
+        </div>`:ae}
+        <div class="avc-grid avc-grid--${this._profile}" style=${_e(function gridRootStyles(e,t){return{display:"grid",width:"100%",height:resolveHeightCss(e),alignContent:"start",gridTemplateColumns:trackList(t.columns),gridTemplateRows:trackList(t.rows),gap:e.gap??"6px",boxSizing:"border-box"}}(e,o))}>
+          ${s?te`<div class="avc-schemawarn">
+            <ha-icon icon="mdi:alert" style="--mdc-icon-size:18px"></ha-icon><span>${s}</span>
+          </div>`:ae}
+          ${Object.entries(o.place).map(([e,t])=>{const s=this._regionTemplate(e,o);return null==s||s===ae?ae:te`<div class="avc-region avc-region--${e}" style=${_e(function regionStyles(e){const t={gridRow:String(e.row??"auto"),gridColumn:String(e.col??"1"),overflow:e.overflow??"hidden",position:"relative",minWidth:"0",minHeight:"0"};return e.align&&"stretch"!==e.align&&(t.alignSelf=e.align),t}(t))}>${s}</div>`})}
         </div>
       </ha-card>
-    `}render(){if(!this._config||!this.hass)return G;if(this._config.layout)return this._renderGrid(this._config.layout);const t=this._schemaWarning();return q`
-      <ha-card>
-        ${this.editMode?q`<div class="version-chip">v${$t} · ${Math.round(this._cardW)}w</div>`:G}
-        ${t?q`<div style="margin:0 4px;padding:8px 12px;border-radius:12px;border:1px solid rgba(250,173,20,0.55);background:rgba(250,173,20,0.12);color:#faad14;font-size:12px;display:flex;align-items:center;gap:8px">
-          <ha-icon icon="mdi:alert" style="--mdc-icon-size:18px"></ha-icon><span>${t}</span>
-        </div>`:G}
+    `}render(){if(!this._config||!this.hass)return ae;if(this._config.layout)return this._renderGrid(this._config.layout);const e=this._schemaWarning();return te`
+      <ha-card class=${this._rootClasses()} style=${_e(this._rootVars())}>
+        ${this.editMode?te`<div class="version-chip">v${fe} · ${Math.round(this._cardW)}w</div>`:ae}
+        ${e?te`<div style="margin:0 4px;padding:8px 12px;border-radius:12px;border:1px solid rgba(250,173,20,0.55);background:rgba(250,173,20,0.12);color:#faad14;font-size:12px;display:flex;align-items:center;gap:8px">
+          <ha-icon icon="mdi:alert" style="--mdc-icon-size:18px"></ha-icon><span>${e}</span>
+        </div>`:ae}
         <div class="badges-row">
-          ${this._config.vacuums.map((t,e)=>this._renderBadge(t,e))}
-          ${(this._config.global_actions??[]).map((t,e)=>this._renderGlobalBadge(t,e))}
+          ${this._config.vacuums.map((e,t)=>this._renderBadge(e,t))}
+          ${(this._config.global_actions??[]).map((e,t)=>this._renderGlobalBadge(e,t))}
         </div>
         ${this._renderAutoBar()}
         ${this._renderPlanPreview()}
-        ${"merged"===this._config.map_mode?q`
+        ${"merged"===this._config.map_mode?te`
               ${this._renderResponsive(this._renderMergedMap())}
-              ${this._shownOrdered().map(t=>q`
-                ${this._renderMapTools(this._config.vacuums[t])}
-                ${this._renderStatusCard(this._config.vacuums[t],t)}
+              ${this._shownOrdered().map(e=>te`
+                ${this._renderMapTools(this._config.vacuums[e])}
+                ${this._renderStatusCard(this._config.vacuums[e],e)}
               `)}
-            `:this._shownOrdered().map(t=>q`
-                ${this._renderResponsive(this._renderMap(this._config.vacuums[t]))}
-                ${this._renderMapTools(this._config.vacuums[t])}
-                ${this._renderStatusCard(this._config.vacuums[t],t)}
+            `:this._shownOrdered().map(e=>te`
+                ${this._renderResponsive(this._renderMap(this._config.vacuums[e]))}
+                ${this._renderMapTools(this._config.vacuums[e])}
+                ${this._renderStatusCard(this._config.vacuums[e],e)}
               `)}
       </ha-card>
-    `}};Lt.styles=a`
+    `}};De.styles=i$5`
+    /* ══ Design tokens (v1.2.0, docs/35) ═══════════════════════════════════
+     * Every colour in this stylesheet resolves through one of the channel
+     * bases below, so a theme is a handful of numbers rather than the ~130
+     * literals this file used to carry — and, more importantly, a theme can
+     * no longer MISS a spot the way a find-and-replace pass would.
+     *
+     * :host holds the LEGACY values verbatim: with no theme class applied
+     * the card renders exactly as 1.1.0 did. .avc-theme-* further down
+     * layers the real themes on top of that baseline, so theme: legacy
+     * costs nothing but the absence of a class name.
+     *
+     * The one deliberate exception is .map-wrap, which pins the ink/shade
+     * channels back to white-on-black regardless of theme — everything
+     * inside it is painted on the vacuum's own map bitmap, not on the card's
+     * surface, so a light theme must not reach in there (it would turn every
+     * on-map label invisible). Derived tokens re-resolve per element, so
+     * that one reset covers all of them without listing any.
+     */
     :host {
       display: block;
       width: 100%;
+
+      /* Channel bases */
+      --avc-ink-rgb: 255, 255, 255;
+      --avc-shade-rgb: 0, 0, 0;
+      --avc-scrim-rgb: 18, 18, 18;
+      --avc-scrim-2-rgb: 30, 30, 30;
+
+      /* Semantic palette. accent is intent (START, selection, focus);
+       * ok/warn/err/hint/tool/info are meaning and stay out of the accent's
+       * reach on purpose (docs/25 §6). */
+      --avc-accent-rgb: 111, 191, 115;
+      --avc-ok-rgb: 82, 196, 26;
+      --avc-warn-rgb: 250, 173, 20;
+      --avc-err-rgb: 255, 77, 79;
+      --avc-hint-rgb: 212, 160, 23;
+      --avc-tool-rgb: 59, 130, 246;
+      --avc-info-rgb: 64, 169, 255;
+      /* Only the CHANNELS live here, never a ready-made
+       * --avc-ink: rgb(var(--avc-ink-rgb)) alias. A custom property whose
+       * value contains var() is substituted at computed-value time on the
+       * element it is DECLARED on, and the already-substituted result is what
+       * inherits — so such an alias would freeze at the :host value and quietly
+       * ignore both the theme classes and the .map-wrap reset below. Rules
+       * therefore spell out rgb(var(--avc-x-rgb)) at the point of use, where it
+       * resolves against that element's channels. Caught by
+       * tests/theme.spec.ts, not by reading the spec. */
+
+      /* Surfaces — named separately from the raw shade channel so a theme can
+       * LIFT a panel off the background instead of only tinting it. */
+      --avc-surface: rgba(var(--avc-shade-rgb), 0.6);
+      --avc-panel: rgba(var(--avc-ink-rgb), 0.03);
+      --avc-panel-line: rgba(var(--avc-ink-rgb), 0.08);
+      --avc-panel-strong: rgba(var(--avc-ink-rgb), 0.06);
+      --avc-panel-strong-line: rgba(var(--avc-ink-rgb), 0.16);
+      --avc-sunken: rgba(var(--avc-shade-rgb), 0.25);
+      --avc-disabled: rgba(60, 60, 60, 0.4);
+
+      /* Elevation. Legacy has none: hairline borders did the whole job, which
+       * is the single loudest "instrument panel" tell in the old look. */
+      --avc-elev-1: none;
+      --avc-elev-2: none;
+
+      /* Motion. --avc-press is the scale a pressable element takes while
+       * held — 1 means no feedback at all, i.e. 1.1.0's behaviour. */
+      --avc-ease: cubic-bezier(0.2, 0.8, 0.2, 1);
+      --avc-press: 1;
+      --avc-press-ms: 0s;
+      --avc-live: none;
     }
 
     ha-card {
@@ -812,8 +878,8 @@ const ht=t=>(e,o)=>{void 0!==o?o.addInitializer(()=>{customElements.define(t,e)}
       font-size: 10px;
       line-height: 1.5;
       font-weight: 600;
-      color: rgba(255, 255, 255, 0.85);
-      background: rgba(0, 0, 0, 0.75);
+      color: rgba(var(--avc-ink-rgb), 0.85);
+      background: rgba(var(--avc-shade-rgb), 0.75);
       border-radius: 6px;
       padding: 3px 6px;
       pointer-events: none;
@@ -843,7 +909,7 @@ const ht=t=>(e,o)=>{void 0!==o?o.addInitializer(()=>{customElements.define(t,e)}
       display: flex; align-items: center; justify-content: center;
       /* docs/25 §6: thinner ring (was 2px) — reads calmer, still clearly a
        * status indicator, without competing for visual weight with START. */
-      background: rgba(255,255,255,0.05); border: 1.5px solid rgba(255,255,255,0.2); cursor: pointer;
+      background: rgba(var(--avc-ink-rgb), 0.05); border: 1.5px solid rgba(var(--avc-ink-rgb), 0.2); cursor: pointer;
       transition: opacity 0.15s ease;
       /* Mobile hold-gesture fix: without these, iOS/Android WebViews race our
        * 600ms pointerdown timer against their own long-press affordances
@@ -868,8 +934,8 @@ const ht=t=>(e,o)=>{void 0!==o?o.addInitializer(()=>{customElements.define(t,e)}
       gap: 4px;
       padding: 5px;
       box-sizing: border-box;
-      background: rgba(255, 255, 255, 0.03);
-      border: 1px solid rgba(255, 255, 255, 0.08);
+      background: var(--avc-panel);
+      border: 1px solid var(--avc-panel-line);
       border-radius: 12px;
     }
     /* v1.1.0 follow-up (2026-08-03): field feedback that the picker column's
@@ -894,8 +960,8 @@ const ht=t=>(e,o)=>{void 0!==o?o.addInitializer(()=>{customElements.define(t,e)}
       height: 100%;
       padding: 8px;
       box-sizing: border-box;
-      background: rgba(255, 255, 255, 0.03);
-      border: 1px solid rgba(255, 255, 255, 0.08);
+      background: var(--avc-panel);
+      border: 1px solid var(--avc-panel-line);
       border-radius: 12px;
     }
     /* Portrait-only dry/wet path visibility row (see _renderDock) — reuses
@@ -920,16 +986,16 @@ const ht=t=>(e,o)=>{void 0!==o?o.addInitializer(()=>{customElements.define(t,e)}
        * The .on state keeps its own distinct (bolder) weight below, so the
        * active/inactive contrast doesn't shrink. */
       font-weight: 600;
-      color: rgba(255, 255, 255, 0.5);
+      color: rgba(var(--avc-ink-rgb), 0.5);
       background: transparent;
-      border: 1px solid rgba(255, 255, 255, 0.15);
+      border: 1px solid rgba(var(--avc-ink-rgb), 0.15);
     }
     .dock-mode ha-icon { --mdc-icon-size: 15px; }
     .dock-mode.on {
-      color: #fff;
+      color: rgb(var(--avc-ink-rgb));
       font-weight: 700;
-      background: rgba(255, 255, 255, 0.12);
-      border-color: rgba(255, 255, 255, 0.5);
+      background: rgba(var(--avc-ink-rgb), 0.12);
+      border-color: rgba(var(--avc-ink-rgb), 0.5);
     }
     /* docs/25 §7 field follow-up: Dock button — same base as the mode
      * buttons (visually one row), but a flex-0 fixed width since it's an
@@ -942,15 +1008,15 @@ const ht=t=>(e,o)=>{void 0!==o?o.addInitializer(()=>{customElements.define(t,e)}
       width: 7px;
       height: 7px;
       border-radius: 50%;
-      background: #e0994a;
+      background: rgb(var(--avc-warn-rgb));
     }
     .dock-sheet {
       display: flex;
       flex-direction: column;
       gap: 8px;
       padding: 8px;
-      background: rgba(0, 0, 0, 0.25);
-      border: 1px solid rgba(255, 255, 255, 0.1);
+      background: var(--avc-sunken);
+      border: 1px solid var(--avc-panel-line);
       border-radius: 10px;
     }
     .dock-sheet-tabs { display: flex; gap: 6px; }
@@ -961,8 +1027,8 @@ const ht=t=>(e,o)=>{void 0!==o?o.addInitializer(()=>{customElements.define(t,e)}
       overflow: hidden;
       padding: 0;
       cursor: pointer;
-      background: rgba(255, 255, 255, 0.05);
-      border: 1.5px solid rgba(255, 255, 255, 0.2);
+      background: rgba(var(--avc-ink-rgb), 0.05);
+      border: 1.5px solid rgba(var(--avc-ink-rgb), 0.2);
       opacity: 0.55;
     }
     .dock-sheet-tab.on { opacity: 1; }
@@ -973,7 +1039,7 @@ const ht=t=>(e,o)=>{void 0!==o?o.addInitializer(()=>{customElements.define(t,e)}
       flex-direction: column;
       gap: 2px;
       font-size: 10px;
-      color: rgba(255, 255, 255, 0.4);
+      color: rgba(var(--avc-ink-rgb), 0.4);
     }
     .dock-sheet-actions { display: flex; flex-wrap: wrap; gap: 8px; }
     .dock-sheet-action {
@@ -987,9 +1053,9 @@ const ht=t=>(e,o)=>{void 0!==o?o.addInitializer(()=>{customElements.define(t,e)}
       cursor: pointer;
       font-family: inherit;
       font-size: 11px;
-      color: rgba(255, 255, 255, 0.8);
-      background: rgba(255, 255, 255, 0.05);
-      border: 1px solid rgba(255, 255, 255, 0.12);
+      color: rgba(var(--avc-ink-rgb), 0.8);
+      background: rgba(var(--avc-ink-rgb), 0.05);
+      border: 1px solid rgba(var(--avc-ink-rgb), 0.12);
     }
     .dock-sheet-action ha-icon { --mdc-icon-size: 18px; }
     .dock-sheet-care {
@@ -998,7 +1064,7 @@ const ht=t=>(e,o)=>{void 0!==o?o.addInitializer(()=>{customElements.define(t,e)}
       gap: 6px;
       margin-top: 10px;
       padding-top: 10px;
-      border-top: 1px solid rgba(255, 255, 255, 0.08);
+      border-top: 1px solid rgba(var(--avc-ink-rgb), 0.08);
     }
     .dock-sheet-care-row {
       display: flex;
@@ -1008,10 +1074,10 @@ const ht=t=>(e,o)=>{void 0!==o?o.addInitializer(()=>{customElements.define(t,e)}
     }
     .dock-sheet-care-label {
       flex: 1;
-      color: rgba(255, 255, 255, 0.75);
+      color: rgba(var(--avc-ink-rgb), 0.75);
     }
     .dock-sheet-care-value {
-      color: rgba(255, 255, 255, 0.5);
+      color: rgba(var(--avc-ink-rgb), 0.5);
       font-variant-numeric: tabular-nums;
     }
     .dock-sheet-care-badge {
@@ -1019,12 +1085,12 @@ const ht=t=>(e,o)=>{void 0!==o?o.addInitializer(()=>{customElements.define(t,e)}
       font-weight: 600;
       padding: 2px 7px;
       border-radius: 20px;
-      background: rgba(82, 196, 26, 0.18);
-      color: #52c41a;
+      background: rgba(var(--avc-ok-rgb), 0.18);
+      color: rgb(var(--avc-ok-rgb));
     }
     .dock-sheet-care-badge.warn {
-      background: rgba(250, 173, 20, 0.2);
-      color: #faad14;
+      background: rgba(var(--avc-warn-rgb), 0.2);
+      color: rgb(var(--avc-warn-rgb));
     }
     .dock-sheet-care-reset {
       display: flex;
@@ -1034,9 +1100,9 @@ const ht=t=>(e,o)=>{void 0!==o?o.addInitializer(()=>{customElements.define(t,e)}
       height: 26px;
       border-radius: 50%;
       cursor: pointer;
-      color: rgba(255, 255, 255, 0.6);
-      background: rgba(255, 255, 255, 0.06);
-      border: 1px solid rgba(255, 255, 255, 0.1);
+      color: rgba(var(--avc-ink-rgb), 0.6);
+      background: rgba(var(--avc-ink-rgb), 0.06);
+      border: 1px solid rgba(var(--avc-ink-rgb), 0.1);
     }
     .dock-sheet-care-reset ha-icon { --mdc-icon-size: 14px; }
     /* docs/25 §10 field-caught (2026-07-25): spinner while waiting for the
@@ -1062,15 +1128,15 @@ const ht=t=>(e,o)=>{void 0!==o?o.addInitializer(()=>{customElements.define(t,e)}
       cursor: pointer;
       font-family: inherit;
       text-align: left;
-      color: rgba(255, 255, 255, 0.85);
-      background: rgba(255, 255, 255, 0.03);
-      border: 1px solid rgba(255, 255, 255, 0.07);
+      color: rgba(var(--avc-ink-rgb), 0.85);
+      background: rgba(var(--avc-ink-rgb), 0.03);
+      border: 1px solid rgba(var(--avc-ink-rgb), 0.07);
     }
     .dock-row.on {
-      background: rgba(82, 196, 26, 0.1);
-      border-color: rgba(82, 196, 26, 0.5);
+      background: rgba(var(--avc-ok-rgb), 0.1);
+      border-color: rgba(var(--avc-ok-rgb), 0.5);
     }
-    .dock-ric { --mdc-icon-size: 16px; color: rgba(255, 255, 255, 0.55); flex-shrink: 0; }
+    .dock-ric { --mdc-icon-size: 16px; color: rgba(var(--avc-ink-rgb), 0.55); flex-shrink: 0; }
     /* docs/28 §4: wraps to a second line instead of truncating — an unusually
      * long room name stays fully readable, it just costs that one row a bit
      * more height. Deliberately NOT flex:1 (that would make this the
@@ -1091,8 +1157,8 @@ const ht=t=>(e,o)=>{void 0!==o?o.addInitializer(()=>{customElements.define(t,e)}
     }
     /* Sequence hint (docs/19 follow-up, TODO #2) — amber, not red: it's a
        heads-up about ETA accuracy, not an error blocking the clean. */
-    .dock-unseq { --mdc-icon-size: 13px; color: #d4a017; flex-shrink: 0; margin: 0 2px; }
-    .dock-unassigned { --mdc-icon-size: 13px; color: #ff4d4f; flex-shrink: 0; margin: 0 2px; }
+    .dock-unseq { --mdc-icon-size: 13px; color: rgb(var(--avc-hint-rgb)); flex-shrink: 0; margin: 0 2px; }
+    .dock-unassigned { --mdc-icon-size: 13px; color: rgb(var(--avc-err-rgb)); flex-shrink: 0; margin: 0 2px; }
     /* 2026-07-25 field feedback: the trailing warning icons + ages + avatars
      * used to be flat siblings of .dock-ric/.dock-name in the row's own
      * flex flow — with no growing element and no justify-content, they
@@ -1109,7 +1175,7 @@ const ht=t=>(e,o)=>{void 0!==o?o.addInitializer(()=>{customElements.define(t,e)}
     .dock-info { display: inline-flex; align-items: center; gap: 6px; margin-left: auto; flex-shrink: 0; }
     .dock-ages { display: inline-flex; gap: 6px; flex-shrink: 0; }
     .dock-age { display: inline-flex; align-items: center; gap: 2px; font-size: 10px; }
-    .dock-age ha-icon { --mdc-icon-size: 12px; color: rgba(255, 255, 255, 0.3); }
+    .dock-age ha-icon { --mdc-icon-size: 12px; color: rgba(var(--avc-ink-rgb), 0.3); }
     /* Persistent last-clean coverage % (docs/29) — deliberately dimmer/smaller than the
        age badge next to it: age is the primary "should I clean this?" signal, coverage
        is supporting detail. */
@@ -1129,16 +1195,16 @@ const ht=t=>(e,o)=>{void 0!==o?o.addInitializer(()=>{customElements.define(t,e)}
       border: 1px solid transparent;
       cursor: pointer;
     }
-    .dock-chip--empty { color: rgba(255, 255, 255, 0.25); border-color: rgba(255, 255, 255, 0.15); }
+    .dock-chip--empty { color: rgba(var(--avc-ink-rgb), 0.25); border-color: rgba(var(--avc-ink-rgb), 0.15); }
     .dock-foot {
       display: flex;
       align-items: center;
       justify-content: space-between;
       gap: 8px;
-      border-top: 1px solid rgba(255, 255, 255, 0.08);
+      border-top: 1px solid rgba(var(--avc-ink-rgb), 0.08);
       padding-top: 6px;
     }
-    .dock-est { font-size: 11px; color: rgba(255, 255, 255, 0.45); }
+    .dock-est { font-size: 11px; color: rgba(var(--avc-ink-rgb), 0.45); }
 
     /* START bar (portrait bottom, docs/18 §7d). docs/25 §6 (visual language
      * pass, 2026-07-24): the one thing this whole screen is FOR, so it
@@ -1179,21 +1245,21 @@ const ht=t=>(e,o)=>{void 0!==o?o.addInitializer(()=>{customElements.define(t,e)}
       font-family: inherit;
       font-size: 16px;
       font-weight: 700;
-      color: #fff;
-      background: rgba(111, 191, 115, 0.24);
-      border: 1px solid rgba(111, 191, 115, 0.65);
+      color: rgb(var(--avc-ink-rgb));
+      background: rgba(var(--avc-accent-rgb), 0.24);
+      border: 1px solid rgba(var(--avc-accent-rgb), 0.65);
     }
     .start-bar:disabled {
       cursor: default;
-      color: rgba(255, 255, 255, 0.25);
-      background: rgba(60, 60, 60, 0.4);
-      border-color: rgba(255, 255, 255, 0.1);
+      color: rgba(var(--avc-ink-rgb), 0.25);
+      background: var(--avc-disabled);
+      border-color: rgba(var(--avc-ink-rgb), 0.1);
     }
     .start-bar ha-icon { --mdc-icon-size: 22px; position: relative; z-index: 1; }
     .start-bar span { position: relative; z-index: 1; }
     .start-bar--cancel {
-      background: rgba(250, 173, 20, 0.16);
-      border-color: rgba(250, 173, 20, 0.6);
+      background: rgba(var(--avc-warn-rgb), 0.16);
+      border-color: rgba(var(--avc-warn-rgb), 0.6);
     }
     /* Side segments (mode / dock) — same family as .start-bar but a fixed
      * narrow width so the middle START segment keeps most of the bar. */
@@ -1210,23 +1276,23 @@ const ht=t=>(e,o)=>{void 0!==o?o.addInitializer(()=>{customElements.define(t,e)}
       font-family: inherit;
       font-size: 10px;
       font-weight: 600;
-      color: rgba(255, 255, 255, 0.65);
-      background: rgba(255, 255, 255, 0.05);
-      border: 1px solid rgba(255, 255, 255, 0.15);
+      color: rgba(var(--avc-ink-rgb), 0.65);
+      background: rgba(var(--avc-ink-rgb), 0.05);
+      border: 1px solid rgba(var(--avc-ink-rgb), 0.15);
     }
     .start-seg ha-icon { --mdc-icon-size: 20px; }
     .start-seg.on {
-      color: #fff;
+      color: rgb(var(--avc-ink-rgb));
       font-weight: 700;
-      background: rgba(255, 255, 255, 0.14);
-      border-color: rgba(255, 255, 255, 0.5);
+      background: rgba(var(--avc-ink-rgb), 0.14);
+      border-color: rgba(var(--avc-ink-rgb), 0.5);
     }
     .start-seg--dock { position: relative; }
 
     .map-tools-label {
       font-size: 11px;
       font-weight: 700;
-      color: rgba(255, 255, 255, 0.45);
+      color: rgba(var(--avc-ink-rgb), 0.45);
       align-self: center;
       min-width: 64px;
     }
@@ -1286,9 +1352,9 @@ const ht=t=>(e,o)=>{void 0!==o?o.addInitializer(()=>{customElements.define(t,e)}
       z-index: 5;
       padding: 8px 12px;
       border-radius: 12px;
-      border: 1px solid rgba(250, 173, 20, 0.55);
-      background: rgba(250, 173, 20, 0.12);
-      color: #faad14;
+      border: 1px solid rgba(var(--avc-warn-rgb), 0.55);
+      background: rgba(var(--avc-warn-rgb), 0.12);
+      color: rgb(var(--avc-warn-rgb));
       font-size: 12px;
       display: flex;
       align-items: center;
@@ -1360,7 +1426,7 @@ const ht=t=>(e,o)=>{void 0!==o?o.addInitializer(()=>{customElements.define(t,e)}
       position: absolute;
       inset: 0;
       border-radius: inherit;
-      background: rgba(255, 255, 255, 0.18);
+      background: rgba(var(--avc-ink-rgb), 0.18);
       transform: scaleX(0);
       transform-origin: left;
       pointer-events: none;
@@ -1400,23 +1466,23 @@ const ht=t=>(e,o)=>{void 0!==o?o.addInitializer(()=>{customElements.define(t,e)}
     .map-vector { position: absolute; transform-origin: center center; pointer-events: none; overflow: visible; }
     .avc-err-halo { animation: avc-err-pulse 1.3s ease-in-out infinite; }
     @keyframes avc-err-pulse { 0%,100% { opacity: 0.18; } 50% { opacity: 0.6; } }
-    .zone-rect { position: absolute; border: 2px solid #fff; background: rgba(255,255,255,0.15); border-radius: 4px; pointer-events: none; box-shadow: 0 0 0 1px rgba(0,0,0,0.45); }
+    .zone-rect { position: absolute; border: 2px solid rgb(var(--avc-ink-rgb)); background: rgba(var(--avc-ink-rgb), 0.15); border-radius: 4px; pointer-events: none; box-shadow: 0 0 0 1px rgba(var(--avc-shade-rgb), 0.45); }
     /* Move/resize handles (docs/19 follow-up) — decoration only, no pointer
        handlers: the overlaying .map-clickcatch does the actual hit-testing
        (_zoneHit) so a drag anywhere near a corner resizes, and inside the box
        moves the whole rectangle. */
-    .zone-handle { position: absolute; width: 12px; height: 12px; margin: -6px; border-radius: 50%; background: #fff; border: 2px solid rgba(0,0,0,0.45); pointer-events: none; }
+    .zone-handle { position: absolute; width: 12px; height: 12px; margin: -6px; border-radius: 50%; background: rgb(var(--avc-ink-rgb)); border: 2px solid rgba(var(--avc-shade-rgb), 0.45); pointer-events: none; }
     .zone-handle--nw { left: 0; top: 0; }
     .zone-handle--ne { left: 100%; top: 0; }
     .zone-handle--sw { left: 0; top: 100%; }
     .zone-handle--se { left: 100%; top: 100%; }
     .layer-toggles { position: absolute; top: 8px; right: 8px; display: flex; gap: 6px; z-index: 3; }
-    .layer-btn { display: flex; align-items: center; gap: 3px; padding: 3px 8px; border-radius: 999px; border: 1px solid rgba(255,255,255,0.2); background: rgba(0,0,0,0.45); color: rgba(255,255,255,0.55); font-size: 11px; font-weight: 600; cursor: pointer; --mdc-icon-size: 16px; user-select: none; -webkit-touch-callout: none; touch-action: manipulation; }
-    .layer-btn.on { color: #fff; border-color: rgba(255,255,255,0.55); background: rgba(0,0,0,0.7); }
-    .layer-menu { position: absolute; top: 38px; right: 0; min-width: 200px; max-width: 86vw; max-height: 60vh; overflow-y: auto; display: flex; flex-direction: column; gap: 2px; padding: 6px; border-radius: 12px; background: rgba(15,15,18,0.96); border: 1px solid rgba(255,255,255,0.15); box-shadow: 0 8px 24px rgba(0,0,0,0.5); }
-    .layer-menu-head { display: flex; align-items: center; gap: 6px; font-size: 11px; color: rgba(255,255,255,0.5); padding: 2px 6px 5px; --mdc-icon-size: 14px; }
-    .layer-menu-row { display: flex; align-items: center; gap: 8px; padding: 6px 8px; border-radius: 8px; border: 1px solid transparent; background: transparent; color: rgba(255,255,255,0.88); cursor: pointer; font-size: 13px; --mdc-icon-size: 16px; }
-    .layer-menu-row.on { background: rgba(255,255,255,0.12); border-color: rgba(255,255,255,0.4); }
+    .layer-btn { display: flex; align-items: center; gap: 3px; padding: 3px 8px; border-radius: 999px; border: 1px solid rgba(var(--avc-ink-rgb), 0.2); background: rgba(var(--avc-shade-rgb), 0.45); color: rgba(var(--avc-ink-rgb), 0.55); font-size: 11px; font-weight: 600; cursor: pointer; --mdc-icon-size: 16px; user-select: none; -webkit-touch-callout: none; touch-action: manipulation; }
+    .layer-btn.on { color: rgb(var(--avc-ink-rgb)); border-color: rgba(var(--avc-ink-rgb), 0.55); background: rgba(var(--avc-shade-rgb), 0.7); }
+    .layer-menu { position: absolute; top: 38px; right: 0; min-width: 200px; max-width: 86vw; max-height: 60vh; overflow-y: auto; display: flex; flex-direction: column; gap: 2px; padding: 6px; border-radius: 12px; background: rgba(var(--avc-scrim-rgb), 0.96); border: 1px solid rgba(var(--avc-ink-rgb), 0.15); box-shadow: 0 8px 24px rgba(var(--avc-shade-rgb), 0.5); }
+    .layer-menu-head { display: flex; align-items: center; gap: 6px; font-size: 11px; color: rgba(var(--avc-ink-rgb), 0.5); padding: 2px 6px 5px; --mdc-icon-size: 14px; }
+    .layer-menu-row { display: flex; align-items: center; gap: 8px; padding: 6px 8px; border-radius: 8px; border: 1px solid transparent; background: transparent; color: rgba(var(--avc-ink-rgb), 0.88); cursor: pointer; font-size: 13px; --mdc-icon-size: 16px; }
+    .layer-menu-row.on { background: rgba(var(--avc-ink-rgb), 0.12); border-color: rgba(var(--avc-ink-rgb), 0.4); }
     .lm-name { flex: 1; text-align: left; }
     .layer-menu-row b { font-weight: 700; }
     /* .rl-prog is the live coverage chip (_renderProgChip) and is still used —
@@ -1483,7 +1549,7 @@ const ht=t=>(e,o)=>{void 0!==o?o.addInitializer(()=>{customElements.define(t,e)}
        around the whole room was tried and rejected (splits into one blurry
        edge at real room size, field-tested). */
     .room-age-dots { position: absolute; top: -3px; right: -3px; display: flex; gap: 1.5px; }
-    .room-age-dot { width: 7px; height: 7px; border-radius: 50%; border: 1px solid rgba(0,0,0,0.5); }
+    .room-age-dot { width: 7px; height: 7px; border-radius: 50%; border: 1px solid rgba(var(--avc-shade-rgb), 0.5); }
     /* Who's assigned to a selected room (docs/19 A1) — small chips, not area
        tinting, so assignment doesn't fight with the selection highlight or the
        age-gradient colors. */
@@ -1520,7 +1586,7 @@ const ht=t=>(e,o)=>{void 0!==o?o.addInitializer(()=>{customElements.define(t,e)}
       pointer-events: none;
       z-index: 4;
     }
-    .room-overlay-assign .dock-chip { box-shadow: 0 1px 4px rgba(0,0,0,0.7); }
+    .room-overlay-assign .dock-chip { box-shadow: 0 1px 4px rgba(var(--avc-shade-rgb), 0.7); }
 
     /* docs/25 §7b: hold-to-inspect popup — per-room detail moved out of the
        (now hidden-by-default) portrait dock room list. cursor:default plus
@@ -1558,16 +1624,16 @@ const ht=t=>(e,o)=>{void 0!==o?o.addInitializer(()=>{customElements.define(t,e)}
        * even though the popup is already the topmost paint layer
        * (z-index: 20). Bumped near-opaque + isolation:isolate so no
        * ancestor glow/blend can show through at all. */
-      background: rgba(18, 18, 18, 0.99);
-      border: 1px solid rgba(255, 255, 255, 0.25);
+      background: rgba(var(--avc-scrim-rgb), 0.99);
+      border: 1px solid rgba(var(--avc-ink-rgb), 0.25);
       border-radius: 8px;
       padding: 6px 8px;
       font-size: 11px;
       white-space: nowrap;
-      box-shadow: 0 4px 14px rgba(0, 0, 0, 0.45);
+      box-shadow: 0 4px 14px rgba(var(--avc-shade-rgb), 0.45);
       isolation: isolate;
     }
-    .room-inspect-name { font-weight: 600; margin-bottom: 4px; color: #fff; }
+    .room-inspect-name { font-weight: 600; margin-bottom: 4px; color: rgb(var(--avc-ink-rgb)); }
     .room-inspect-ages { display: flex; gap: 8px; margin-bottom: 4px; }
     /* Unlike the small icon/gauges, a whole popup of TEXT read sideways is
        genuinely unreadable, not just a minor legibility ding — worth the
@@ -1600,8 +1666,8 @@ const ht=t=>(e,o)=>{void 0!==o?o.addInitializer(()=>{customElements.define(t,e)}
       width: 19px;
       height: 19px;
       border-radius: 50%;
-      background: rgba(0, 0, 0, 0.82);
-      color: #fff;
+      background: rgba(var(--avc-shade-rgb), 0.82);
+      color: rgb(var(--avc-ink-rgb));
       font-size: 9px;
       font-weight: 700;
       display: flex;
@@ -1615,7 +1681,7 @@ const ht=t=>(e,o)=>{void 0!==o?o.addInitializer(()=>{customElements.define(t,e)}
       flex-direction: column;
       gap: 4px;
       padding: 10px 12px;
-      background: rgba(0, 0, 0, 0.6);
+      background: var(--avc-surface);
       backdrop-filter: blur(12px);
       -webkit-backdrop-filter: blur(12px);
       border-radius: 16px;
@@ -1636,8 +1702,8 @@ const ht=t=>(e,o)=>{void 0!==o?o.addInitializer(()=>{customElements.define(t,e)}
       flex-shrink: 0;
       width: 44px; height: 44px;
       border-radius: 50%;
-      border: 1.5px solid rgba(255,255,255,0.2);
-      background: rgba(255,255,255,0.05);
+      border: 1.5px solid rgba(var(--avc-ink-rgb), 0.2);
+      background: rgba(var(--avc-ink-rgb), 0.05);
       display: flex; align-items: center; justify-content: center;
       overflow: hidden;
       cursor: pointer;
@@ -1649,10 +1715,10 @@ const ht=t=>(e,o)=>{void 0!==o?o.addInitializer(()=>{customElements.define(t,e)}
     .avatar-info-badge {
       position: absolute; bottom: -2px; right: -2px;
       width: 14px; height: 14px; border-radius: 50%;
-      background: rgba(30,30,30,0.95); border: 1px solid rgba(0,0,0,0.6);
+      background: rgba(var(--avc-scrim-2-rgb), 0.95); border: 1px solid rgba(var(--avc-shade-rgb), 0.6);
       display: flex; align-items: center; justify-content: center;
     }
-    .avatar-info-badge ha-icon { --mdc-icon-size: 9px; color: rgba(255,255,255,0.6); }
+    .avatar-info-badge ha-icon { --mdc-icon-size: 9px; color: rgba(var(--avc-ink-rgb), 0.6); }
 
     .status-info { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 2px; }
 
@@ -1663,37 +1729,37 @@ const ht=t=>(e,o)=>{void 0!==o?o.addInitializer(()=>{customElements.define(t,e)}
     @keyframes pulse-error { 0%,100% { opacity:1; } 50% { opacity:0.6; } }
 
     .status-line1 { display: flex; align-items: baseline; justify-content: space-between; gap: 8px; }
-    .model-label { font-size: 13px; font-weight: 500; color: rgba(255,255,255,0.85); }
+    .model-label { font-size: 13px; font-weight: 500; color: rgba(var(--avc-ink-rgb), 0.85); }
     .status-label { font-size: 12px; font-weight: 600; text-align: right; }
 
     .status-line2 { display: flex; align-items: center; justify-content: space-between; gap: 8px; }
-    .current-room { display: flex; align-items: center; gap: 3px; font-size: 11px; color: rgba(255,255,255,0.45); }
+    .current-room { display: flex; align-items: center; gap: 3px; font-size: 11px; color: rgba(var(--avc-ink-rgb), 0.45); }
 
     .status-meta { display: flex; align-items: center; gap: 8px; flex-shrink: 0; }
     .battery { display: flex; align-items: center; gap: 3px; font-size: 11px; font-weight: 600; }
     .battery ha-icon { --mdc-icon-size: 13px; }
-    .last-clean { display: flex; align-items: center; gap: 3px; font-size: 11px; color: rgba(255, 255, 255, 0.45); }
-    .last-clean ha-icon { --mdc-icon-size: 11px; color: rgba(255, 255, 255, 0.25); }
+    .last-clean { display: flex; align-items: center; gap: 3px; font-size: 11px; color: rgba(var(--avc-ink-rgb), 0.45); }
+    .last-clean ha-icon { --mdc-icon-size: 11px; color: rgba(var(--avc-ink-rgb), 0.25); }
 
     /* ── Progress bar ────────────────────────────────────────────────── */
     .progress { display: flex; align-items: center; gap: 8px; }
     .progress-track {
       flex: 1; height: 3px;
-      background: rgba(255, 255, 255, 0.08); border-radius: 2px; overflow: hidden;
+      background: rgba(var(--avc-ink-rgb), 0.08); border-radius: 2px; overflow: hidden;
     }
     .progress-fill { height: 100%; border-radius: 2px; transition: width 0.5s ease; }
     .progress-label { font-size: 11px; font-weight: 600; flex-shrink: 0; }
 
     /* ── Debug per-room progress strip ───────────────────────────────── */
     .dbg-prog { display: flex; flex-wrap: wrap; gap: 6px 12px; padding-top: 2px; }
-    .dbg-prog-item { display: flex; align-items: center; gap: 3px; font-size: 11px; color: rgba(255,255,255,0.55); --mdc-icon-size: 14px; }
-    .dbg-prog-name { color: rgba(255,255,255,0.45); }
+    .dbg-prog-item { display: flex; align-items: center; gap: 3px; font-size: 11px; color: rgba(var(--avc-ink-rgb), 0.55); --mdc-icon-size: 14px; }
+    .dbg-prog-name { color: rgba(var(--avc-ink-rgb), 0.45); }
     .dbg-prog-item b { font-weight: 700; }
-    .dbg-prog-item small { color: rgba(255,255,255,0.4); font-size: 10px; }
+    .dbg-prog-item small { color: rgba(var(--avc-ink-rgb), 0.4); font-size: 10px; }
     .mini-gauge-wrap { display: inline-flex; align-items: center; gap: 2px; }
     .mini-gauge-ico { --mdc-icon-size: 12px; opacity: 0.8; }
     .mini-gauge { width: 22px; height: 22px; border-radius: 50%; display: inline-flex; align-items: center; justify-content: center; }
-    .mini-gauge span { width: 16px; height: 16px; border-radius: 50%; background: rgba(0,0,0,0.82); color: #fff; font-size: 8px; font-weight: 700; display: flex; align-items: center; justify-content: center; }
+    .mini-gauge span { width: 16px; height: 16px; border-radius: 50%; background: rgba(var(--avc-shade-rgb), 0.82); color: rgb(var(--avc-ink-rgb)); font-size: 8px; font-weight: 700; display: flex; align-items: center; justify-content: center; }
 
     /* ── Action buttons ──────────────────────────────────────────────── */
     .actions { display: flex; gap: 8px; }
@@ -1731,13 +1797,13 @@ const ht=t=>(e,o)=>{void 0!==o?o.addInitializer(()=>{customElements.define(t,e)}
     .action-btn span { font-size: 13px; font-weight: 700; color: white; position: relative; z-index: 1; }
 
     .action-btn--secondary {
-      background: rgba(64, 169, 255, 0.08);
-      border: 1px solid rgba(64, 169, 255, 0.2) !important;
+      background: rgba(var(--avc-info-rgb), 0.08);
+      border: 1px solid rgba(var(--avc-info-rgb), 0.2) !important;
     }
 
     .action-btn--warn {
-      background: rgba(250, 173, 20, 0.18);
-      border: 1px solid rgba(250, 173, 20, 0.5) !important;
+      background: rgba(var(--avc-warn-rgb), 0.18);
+      border: 1px solid rgba(var(--avc-warn-rgb), 0.5) !important;
     }
 
     /* ── Start button body ───────────────────────────────────────────── */
@@ -1754,8 +1820,8 @@ const ht=t=>(e,o)=>{void 0!==o?o.addInitializer(()=>{customElements.define(t,e)}
 
     .map-clickcatch { position: absolute; inset: 0; cursor: crosshair; z-index: 5; }
     .map-tools { display: flex; gap: 6px; margin: 6px 0 0; }
-    .mtbtn { display: inline-flex; align-items: center; gap: 4px; padding: 5px 10px; border-radius: 8px; border: 1px solid rgba(255,255,255,0.18); background: rgba(255,255,255,0.06); color: inherit; cursor: pointer; font-size: 12px; font-weight: 600; }
-    .mtbtn.on { background: rgba(59,130,246,0.25); border-color: #3b82f6; }
+    .mtbtn { display: inline-flex; align-items: center; gap: 4px; padding: 5px 10px; border-radius: 8px; border: 1px solid rgba(var(--avc-ink-rgb), 0.18); background: rgba(var(--avc-ink-rgb), 0.06); color: inherit; cursor: pointer; font-size: 12px; font-weight: 600; }
+    .mtbtn.on { background: rgba(var(--avc-tool-rgb), 0.25); border-color: rgb(var(--avc-tool-rgb)); }
     .mtbtn:disabled { opacity: 0.4; cursor: default; }
     .mtbtn ha-icon { --mdc-icon-size: 16px; }
     .mtbtn--stat { cursor: default; background: transparent; border-color: transparent; gap: 3px; padding: 5px 6px; }
@@ -1763,10 +1829,10 @@ const ht=t=>(e,o)=>{void 0!==o?o.addInitializer(()=>{customElements.define(t,e)}
     .mtbtn--stat small { opacity: 0.7; font-weight: 500; }
     /* Sequence hint (docs/19 follow-up, TODO #2) — amber to read as "heads up",
        distinct from the neutral stat pills either side of it. */
-    .mtbtn--warn { color: #d4a017; }
-    .mtbtn--warn ha-icon { color: #d4a017; }
-    .mtbtn--err { color: #ff4d4f; }
-    .mtbtn--err ha-icon { color: #ff4d4f; }
+    .mtbtn--warn { color: rgb(var(--avc-hint-rgb)); }
+    .mtbtn--warn ha-icon { color: rgb(var(--avc-hint-rgb)); }
+    .mtbtn--err { color: rgb(var(--avc-err-rgb)); }
+    .mtbtn--err ha-icon { color: rgb(var(--avc-err-rgb)); }
     /* docs/28 §2: own panel (was transparent, flush with the map above and the
      * dock below) — background + radius visually lifts it off both neighbors
      * instead of reading as a loose row of same-weight buttons. */
@@ -1778,330 +1844,627 @@ const ht=t=>(e,o)=>{void 0!==o?o.addInitializer(()=>{customElements.define(t,e)}
      * distinct panel at all — the specific goal this section was built for.
      * Bumped just for .meta-bar/.meta-bar-divider, not the other panels,
      * which weren't reported as a problem. */
-    .meta-bar { display: flex; align-items: center; gap: 4px; flex-wrap: wrap; padding: 6px 8px; background: rgba(255, 255, 255, 0.06); border: 1px solid rgba(255, 255, 255, 0.16); border-radius: 12px; }
+    .meta-bar { display: flex; align-items: center; gap: 4px; flex-wrap: wrap; padding: 6px 8px; background: var(--avc-panel-strong); border: 1px solid var(--avc-panel-strong-line); border-radius: 12px; }
     .meta-bar-cluster { display: flex; align-items: center; gap: 4px; }
     .meta-bar-spacer { flex: 1 1 auto; }
-    .meta-bar-divider { width: 0.5px; align-self: stretch; background: rgba(255, 255, 255, 0.22); margin: 0 4px; }
+    .meta-bar-divider { width: 0.5px; align-self: stretch; background: rgba(var(--avc-ink-rgb), 0.22); margin: 0 4px; }
     /* Refresh: a quiet icon, not a bordered button on par with Pin & Go/Zone —
      * it shouldn't compete with the actual map-interaction tools for attention. */
-    .mtbtn--ghost { border: none; background: transparent; color: rgba(255, 255, 255, 0.45); padding: 5px; }
-    .mtbtn--ghost:hover { color: rgba(255, 255, 255, 0.75); }
+    .mtbtn--ghost { border: none; background: transparent; color: rgba(var(--avc-ink-rgb), 0.45); padding: 5px; }
+    .mtbtn--ghost:hover { color: rgba(var(--avc-ink-rgb), 0.75); }
     .mtbtn--spin ha-icon { animation: avc-refresh-spin 0.6s ease; }
     @keyframes avc-refresh-spin { from { transform: rotate(0deg); } to { transform: rotate(360deg); } }
     .mode-action { display: flex; flex-wrap: wrap; gap: 6px; margin-bottom: 6px; }
     .mode-action .mtbtn { width: 100%; justify-content: center; box-sizing: border-box; animation: avc-mode-action-pulse 1.6s ease-in-out infinite; }
-    @keyframes avc-mode-action-pulse { 0%,100% { box-shadow: 0 0 0 rgba(59,130,246,0); } 50% { box-shadow: 0 0 12px rgba(59,130,246,0.55); } }
-    .calib-panel { margin-top: 4px; font-size: 12px; opacity: 0.9; padding: 6px 8px; background: rgba(59,130,246,0.12); border-radius: 8px; }
+    @keyframes avc-mode-action-pulse { 0%,100% { box-shadow: 0 0 0 rgba(var(--avc-tool-rgb), 0); } 50% { box-shadow: 0 0 12px rgba(var(--avc-tool-rgb), 0.55); } }
+    .calib-panel { margin-top: 4px; font-size: 12px; opacity: 0.9; padding: 6px 8px; background: rgba(var(--avc-tool-rgb), 0.12); border-radius: 8px; }
     .calib-panel > div { margin-bottom: 4px; }
     .calib-actions { display: flex; gap: 6px; flex-wrap: wrap; }
-  `,t([ut({attribute:!1})],Lt.prototype,"hass",void 0),t([ut({attribute:!1})],Lt.prototype,"editMode",void 0),t([_t()],Lt.prototype,"_config",void 0),t([_t()],Lt.prototype,"_shownSet",void 0),t([_t()],Lt.prototype,"_holdId",void 0),t([_t()],Lt.prototype,"_mapMode",void 0),t([_t()],Lt.prototype,"_inspectKey",void 0),t([_t()],Lt.prototype,"_dockSheetOpen",void 0),t([_t()],Lt.prototype,"_dockSheetIdx",void 0),t([_t()],Lt.prototype,"_modeSheetOpen",void 0),t([_t()],Lt.prototype,"_careResetPending",void 0),t([_t()],Lt.prototype,"_modeEntity",void 0),t([_t()],Lt.prototype,"_dbg",void 0),t([_t()],Lt.prototype,"_zoneDrag",void 0),t([_t()],Lt.prototype,"_zoneRectShown",void 0),t([_t()],Lt.prototype,"_zonePending",void 0),t([_t()],Lt.prototype,"_zoneEdit",void 0),t([_t()],Lt.prototype,"_pinPending",void 0),t([_t()],Lt.prototype,"_layers",void 0),t([_t()],Lt.prototype,"_layerMenu",void 0),t([_t()],Lt.prototype,"_localRoomSel",void 0),t([_t()],Lt.prototype,"_activePresets",void 0),t([_t()],Lt.prototype,"_planMode",void 0),t([_t()],Lt.prototype,"_activeGlobalPreset",void 0),t([_t()],Lt.prototype,"_cardW",void 0),t([_t()],Lt.prototype,"_mapAR",void 0),t([_t()],Lt.prototype,"_profile",void 0),t([_t()],Lt.prototype,"_mapRegW",void 0),t([_t()],Lt.prototype,"_mapRegH",void 0),t([_t()],Lt.prototype,"_mapAvailW",void 0),t([_t()],Lt.prototype,"_mapAvailH",void 0),t([_t()],Lt.prototype,"_flipLive",void 0),t([_t()],Lt.prototype,"_now",void 0),t([_t()],Lt.prototype,"_planPreview",void 0),Lt=t([ht(xt)],Lt);const Ut=(Wt=window).customCards??(Wt.customCards=[]);Ut.some(t=>t.type===xt)||Ut.push({type:xt,name:"AnyVac Card",description:"Feature-rich card for Roborock vacuums — map, room selection, multi-vacuum tabs, global actions.",preview:!1,documentationURL:"https://github.com/Michailjovic/anyvac-card"});const Gt={entity:"",name:"",color:"green",rooms:[],clean_action:{type:"native"}},Zt={key:"",name:"",icon:"mdi:square",map_x:50,map_y:50},Kt=["mdi:numeric-1-circle","mdi:numeric-2-circle","mdi:numeric-3-circle","mdi:numeric-4-circle","mdi:numeric-5-circle","mdi:numeric-6-circle","mdi:numeric-7-circle","mdi:numeric-8-circle","mdi:numeric-9-circle","mdi:numeric-9-plus-circle"];function Yt(t){return Kt[Math.min(t,Kt.length-1)]}const Xt={entity:"",rotation:0,scale:100,offset_x:0,offset_y:0},Jt={name:"Whole flat",color:"orange",watch_entities:[],action:{type:"script",entity_id:""}},Qt=[{days:2,color:"#2ecc71"},{days:5,color:"#faad14"},{days:10,color:"#ff9800"}];function te(t){return Math.min(100,Math.max(0,t))}let ee=class extends ct{constructor(){super(...arguments),this._tab="vacuums",this._dragRoom=null,this._dragSeq=null,this._openVac=new Set,this._openSensors=new Set,this._openPresets=new Set,this._openAction=new Set,this._openGlobal=new Set,this._openRoom=new Map,this._mapVac=0,this._mapRoom=null,this._pvAR=0,this._refMapUrl="",this._refMapVac=-1,this._floorplanSnapshotBusy=!1,this._floorplanSnapshotError="",this._rectDrag=null,this._initialized=!1}setConfig(t){this._config=t,this._initialized||(this._initialized=!0,this._openVac=new Set((t.vacuums??[]).map((t,e)=>e)))}updated(t){if(t.has("hass")&&this.hass){const t=this.shadowRoot?.getElementById("ha-entities");t&&!t.options.length&&(t.innerHTML=Object.keys(this.hass.states).sort().map(t=>'<option value="'+t+'">').join(""))}"maps"===this._tab&&(t.has("_tab")||t.has("_mapVac"))&&this._snapshotRefMap()}_snapshotRefMap(){const t=this._config.vacuums;if(!t.length)return this._refMapUrl="",void(this._refMapVac=-1);const e=Math.min(this._mapVac,t.length-1),o=this._mapEntityFor(t[e]);this._refMapUrl=o?this.hass.states[o]?.attributes.entity_picture??"":"",this._refMapVac=e}async _snapshotFloorplan(t){const e=this._mapEntityFor(t);if(e){this._floorplanSnapshotBusy=!0,this._floorplanSnapshotError="";try{const o=await this.hass.callService("anyvac","snapshot_map_as_floorplan",{image_entity:e,name:t.name||t.entity},void 0,!1,!0),i=o?.response?.path;if(!i)throw new Error("no path in service response");if(this._setEditedImageBase({src:i}),this._mergedEdit){const t=this._config.vacuums.map(t=>({...t,hide_map:!0}));this._setConfig({vacuums:t})}else{const e=this._config.vacuums.findIndex(e=>e.entity===t.entity);e>=0&&this._setVacuum(e,{hide_map:!0})}const s=o?.response?.crop;if(s){const e=this._config.vacuums.findIndex(e=>e.entity===t.entity);e>=0&&this._autoPlaceOwnRooms(e,s)}}catch(t){this._floorplanSnapshotError="Couldn't snapshot this vacuum's map — make sure the anyvac integration is updated to at least 0.88.0, then try again.",console.error("[anyvac-card] snapshot_map_as_floorplan failed:",t)}finally{this._floorplanSnapshotBusy=!1}}}_fire(t){this.dispatchEvent(new CustomEvent("config-changed",{detail:{config:t},bubbles:!0,composed:!0}))}_setConfig(t){const e={...this._config,...t};this._config=e,this._fire(e)}_setVacuum(t,e){const o=[...this._config.vacuums];o[t]={...o[t],...e};const i={...this._config,vacuums:o};this._config=i,this._fire(i)}_setMap(t,e){const o=this._config.vacuums[t].map??{...Xt};this._setVacuum(t,{map:{...o,...e}})}_setImageBase(t,e){const o=this._config.vacuums[t].image_base??{src:""};this._setVacuum(t,{image_base:{...o,...e}})}get _mergedEdit(){return"merged"===this._config.map_mode}_editRooms(){if(this._mergedEdit)return this._config.rooms??[];const t=this._config.vacuums[Math.min(this._mapVac,this._config.vacuums.length-1)];return t?.rooms??[]}_setEditedRoom(t,e){if(this._mergedEdit){const o=[...this._config.rooms??[]];o[t]={...o[t],...e},this._setConfig({rooms:o})}else this._setRoom(Math.min(this._mapVac,this._config.vacuums.length-1),t,e)}_onRoomPointerDown(t,e,o,i){i.stopPropagation();const s=i.currentTarget.closest(".map-pos-container");if(!s)return;const n=s.getBoundingClientRect(),a=this._mapRoom===t;this._mapRoom=t;let r=e;if("move"===e&&null!=o.map_w){const t=(i.clientX-n.left)/n.width*100,e=(i.clientY-n.top)/n.height*100,s=o.map_x??50,a=o.map_y??50,l=o.map_w/2,c=(o.map_h??15)/2,d=16/n.width*100,h=16/n.height*100,p=Math.abs(t-(s-l))<=d,m=Math.abs(t-(s+l))<=d,u=Math.abs(e-(a-c))<=h,_=Math.abs(e-(a+c))<=h;p&&u?r="resize-nw":m&&u?r="resize-ne":p&&_?r="resize-sw":m&&_&&(r="resize-se")}this._rectDrag={ri:t,mode:r,container:n,orig:{x:o.map_x??50,y:o.map_y??50,w:o.map_w??0,h:o.map_h??0},startClientX:i.clientX,startClientY:i.clientY,moved:!1,wasSelected:a},i.currentTarget.setPointerCapture(i.pointerId)}_onRoomPointerMove(t){const e=this._rectDrag;if(!e)return;if(!e.moved){if(Math.hypot(t.clientX-e.startClientX,t.clientY-e.startClientY)<3)return;e.moved=!0}const o=e.container,i=te((t.clientX-o.left)/o.width*100),s=te((t.clientY-o.top)/o.height*100);if("move"===e.mode)return void this._setEditedRoom(e.ri,{map_x:Math.round(i),map_y:Math.round(s)});const n=e.orig.w/2,a=e.orig.h/2,r={"resize-nw":{ox:e.orig.x+n,oy:e.orig.y+a},"resize-ne":{ox:e.orig.x-n,oy:e.orig.y+a},"resize-sw":{ox:e.orig.x+n,oy:e.orig.y-a},"resize-se":{ox:e.orig.x-n,oy:e.orig.y-a}}[e.mode],l=Math.max(2,Math.min(100,Math.abs(i-r.ox))),c=Math.max(2,Math.min(100,Math.abs(s-r.oy)));this._setEditedRoom(e.ri,{map_x:Math.round(te((i+r.ox)/2)),map_y:Math.round(te((s+r.oy)/2)),map_w:Math.round(l),map_h:Math.round(c)})}_onRoomPointerUp(){const t=this._rectDrag;t&&!t.moved&&t.wasSelected&&(this._mapRoom=null),this._rectDrag=null}_addEditedRoom(){if(this._mergedEdit){const t=this._config.rooms??[],e=[...t,{...Zt,icon:Yt(t.length)}];this._setConfig({rooms:e}),this._mapRoom=e.length-1}else this._addRoom(Math.min(this._mapVac,this._config.vacuums.length-1)),this._mapRoom=(this._config.vacuums[this._mapVac]?.rooms?.length??1)-1}_deleteEditedRoom(t){if(this._mergedEdit){const e=(this._config.rooms??[]).filter((e,o)=>o!==t);this._setConfig({rooms:e}),this._mapRoom===t&&(this._mapRoom=null)}else this._deleteRoom(Math.min(this._mapVac,this._config.vacuums.length-1),t)}_setLayoutFlip(t,e){const o=this._config.layout??{},i=o[t]??{},s={...i.crop??{},flip:!!e||void 0};this._setConfig({layout:{...o,[t]:{...i,crop:s}}})}_setEditedImageBase(t){this._mergedEdit?this._setConfig({image_base:{...this._config.image_base??{src:""},...t}}):this._setImageBase(Math.min(this._mapVac,this._config.vacuums.length-1),t)}_editorAR(){return this._pvAR>.1?this._pvAR:3.636}_intEntityFor(t){if(!t)return;if(t.integration_entity)return t.integration_entity;const e=this.hass?.entities,o=e?.[t.entity]?.device_id;return o?Object.keys(e).find(t=>e[t]?.device_id===o&&"anyvac"===e[t]?.platform&&t.startsWith("sensor.")):void 0}_mapEntityFor(t){if(!t)return;if(t.map?.entity)return t.map.entity;const e=this.hass?.entities,o=e?.[t.entity]?.device_id;if(!o)return;const i=Object.keys(e).filter(t=>e[t]?.device_id===o&&t.startsWith("image.")),s=i.filter(t=>{const e=this.hass.states[t];return!!e&&"unavailable"!==e.state&&"unknown"!==e.state&&!!e.attributes.entity_picture});return 1===s.length?s[0]:1===i.length?i[0]:void 0}_roomSequence(t){const e=this._intEntityFor(t),o=e?this.hass?.states?.[e]?.attributes:void 0;return o?.room_sequence??{}}_roomsInSequenceOrder(t,e){return t.map((t,o)=>({r:t,i:o,s:t.key?e[t.key]??1/0:1/0})).sort((t,e)=>t.s!==e.s?t.s-e.s:t.i-e.i).map(t=>t.r)}_moveSequence(t,e,o,i){if(o===i)return;const s=e.map(t=>t.key).filter(t=>!!t);if(o<0||o>=s.length||i<0||i>=s.length)return;const[n]=s.splice(o,1);s.splice(i,0,n),this.hass.callService("anyvac","set_room_sequence",{rooms:s})}_editorSeat(t){const e=this._config.vacuums[t],o=this._intEntityFor(e),i=o?this.hass?.states?.[o]?.attributes:void 0,s=i&&(i.schema_version??0)>=2?i:void 0;return Dt(this._config,e,s,this._editorAR())}_importRooms(t){const e=this._config.vacuums[t],o=this._intEntityFor(e),i=o?this.hass.states[o]?.attributes:void 0,s=Array.isArray(i?.rooms)?i.rooms:[];if(!i||(i.schema_version??0)<2||!s.length)return;const n=this._editorAR(),a=this._editorSeat(t),r=this._mergedEdit?[...this._config.rooms??[]]:[...e.rooms??[]],l=new Set(r.map(t=>t.key));let c=0;for(const t of s){const e=t?.name;if(!e||l.has(e))continue;const o=It(t,i,a,n);o&&(r.push({key:e,name:e,icon:Yt(r.length),...o}),l.add(e),c++)}c&&(this._mergedEdit?this._setConfig({rooms:r}):this._setVacuum(t,{rooms:r}))}_autoPlaceOwnRooms(t,e){const o=this._config.vacuums[t],i=this._intEntityFor(o),s=i?this.hass.states[i]?.attributes:void 0,n=Array.isArray(s?.rooms)?s.rooms:[];if(!n.length)return;const a=this._mergedEdit?[...this._config.rooms??[]]:[...o.rooms??[]],r=new Set(a.map(t=>t.key));let l=0;for(const t of n){const o=t?.name,i=t?.bbox_px;if(!o||r.has(o)||!i)continue;const s=Ot(i,e);s&&(a.push({key:o,name:o,icon:Yt(a.length),...s}),r.add(o),l++)}l&&(this._mergedEdit?this._setConfig({rooms:a}):this._setVacuum(t,{rooms:a}))}_unmatchedOwnRoomNames(t){const e=this._config.vacuums[t],o=this._intEntityFor(e),i=o?this.hass.states[o]?.attributes:void 0,s=Array.isArray(i?.rooms)?i.rooms:[];if(!s.length)return[];const n=new Set(this._editRooms().map(t=>t.key)),a=[];for(const t of s){const e=t?.name;e&&!n.has(e)&&a.push(e)}return a}_setRoom(t,e,o){const i=[...this._config.vacuums[t].rooms??[]];i[e]={...i[e],...o},this._setVacuum(t,{rooms:i})}_setCleanAction(t,e){const o=this._config.vacuums[t].clean_action??{type:"native"};this._setVacuum(t,{clean_action:{...o,...e}})}_togglePresets(t){const e=new Set(this._openPresets);e.has(t)?e.delete(t):e.add(t),this._openPresets=e}_setPreset(t,e,o){const i=[...this._config.vacuums[t].presets??[]];i[e]={...i[e],...o},this._setVacuum(t,{presets:i})}_addPreset(t){const e=this._config.vacuums[t].presets??[],o=[...e,{id:"preset"+(e.length+1),label:"New preset"}];this._setVacuum(t,{presets:o}),this._openPresets=new Set([...this._openPresets,t])}_deletePreset(t,e){const o=(this._config.vacuums[t].presets??[]).filter((t,o)=>o!==e);this._setVacuum(t,{presets:o})}_setGlobal(t,e){const o=[...this._config.global_actions??[]];o[t]={...o[t],...e};const i={...this._config,global_actions:o};this._config=i,this._fire(i)}_setGlobalAction(t,e){const o=this._config.global_actions?.[t]?.action??{type:"script",entity_id:""};this._setGlobal(t,{action:{...o,...e}})}_moveVacuum(t,e){const o=t+e,i=[...this._config.vacuums];if(o<0||o>=i.length)return;[i[t],i[o]]=[i[o],i[t]];const s={...this._config,vacuums:i};this._config=s,this._fire(s)}_addVacuum(){const t=[...this._config.vacuums,{...Gt}],e={...this._config,vacuums:t};this._config=e,this._fire(e);const o=t.length-1;this._openVac=new Set([...this._openVac,o])}_deleteVacuum(t){const e=this._config.vacuums.filter((e,o)=>o!==t),o={...this._config,vacuums:e};this._config=o,this._fire(o);const i=new Set(this._openVac);i.delete(t),this._openVac=i}_addRoom(t){const e=this._config.vacuums[t].rooms??[],o=[...e,{...Zt,icon:Yt(e.length)}];this._setVacuum(t,{rooms:o});const i=new Map(this._openRoom);i.set(t,o.length-1),this._openRoom=i}_moveRoom(t,e,o){if(e===o)return;const i=[...this._config.vacuums[t].rooms??[]];if(e<0||e>=i.length||o<0||o>=i.length)return;const[s]=i.splice(e,1);i.splice(o,0,s),this._setVacuum(t,{rooms:i})}_deleteRoom(t,e){const o=(this._config.vacuums[t].rooms??[]).filter((t,o)=>o!==e);this._setVacuum(t,{rooms:o});if(this._openRoom.get(t)===e){const e=new Map(this._openRoom);e.set(t,null),this._openRoom=e}this._mapRoom===e&&(this._mapRoom=null)}_setGlobalPreset(t,e){const o=[...this._config.global_presets??[]];o[t]={...o[t],...e},this._setConfig({global_presets:o})}_addGlobalPreset(){const t=this._config.global_presets??[],e=[...t,{id:"gp"+(t.length+1),label:"New clean",scope:"select"}];this._setConfig({global_presets:e})}_deleteGlobalPreset(t){const e=(this._config.global_presets??[]).filter((e,o)=>o!==t);this._setConfig({global_presets:e})}_addGlobal(){const t=[...this._config.global_actions??[],{...Jt}],e={...this._config,global_actions:t};this._config=e,this._fire(e);const o=t.length-1;this._openGlobal=new Set([...this._openGlobal,o])}_deleteGlobal(t){const e=(this._config.global_actions??[]).filter((e,o)=>o!==t),o={...this._config,global_actions:e};this._config=o,this._fire(o);const i=new Set(this._openGlobal);i.delete(t),this._openGlobal=i}_toggleVac(t){const e=new Set(this._openVac);e.has(t)?e.delete(t):e.add(t),this._openVac=e}_toggleRoom(t,e){const o=new Map(this._openRoom),i=o.get(t)??null;o.set(t,i===e?null:e),this._openRoom=o}_toggleSensors(t){const e=new Set(this._openSensors);e.has(t)?e.delete(t):e.add(t),this._openSensors=e}_toggleAction(t){const e=new Set(this._openAction);e.has(t)?e.delete(t):e.add(t),this._openAction=e}_toggleGlobal(t){const e=new Set(this._openGlobal);e.has(t)?e.delete(t):e.add(t),this._openGlobal=e}_entityPicker(t,e,o,i,s=!1){const n=o.length?o.join(" / "):"entity_id",a=1===o.length,r=a?"ha-ents-"+o[0]:"ha-entities",l=a?Object.keys(this.hass?.states??{}).filter(t=>t.startsWith(o[0]+".")).sort():null;return q`
-      ${l?q`<datalist id=${r}>${l.map(t=>q`<option value=${t}>`)}</datalist>`:G}
+
+    /* ══ On-map channel reset ══════════════════════════════════════════════
+     * Everything inside .map-wrap is painted on the vacuum's own map bitmap,
+     * not on the card's surface, so it must keep white-on-black regardless of
+     * the card's theme — a light theme reaching in here would erase every
+     * on-map label. Derived tokens (--avc-ink, the panel/surface set) re-
+     * resolve per element against these, so resetting the three channel bases
+     * is enough; nothing has to be listed individually. */
+    .map-wrap {
+      --avc-ink-rgb: 255, 255, 255;
+      --avc-shade-rgb: 0, 0, 0;
+      --avc-scrim-rgb: 18, 18, 18;
+    }
+
+    /* ══ Theme: dark (the v1.2.0 default) ══════════════════════════════════
+     * Off pure black and off pure white: a near-black surface swallows any
+     * low-alpha accent laid over it, which is exactly why docs/25 §6's sage
+     * START read as "no change" in the field. Surfaces are lifted, the ink is
+     * very slightly cool, and the semantic palette steps down from the Ant
+     * Design defaults it inherited — same hues, same meanings, less shout. */
+    .avc-theme--dark,
+    .avc-theme--auto {
+      --avc-ink-rgb: 234, 238, 245;
+      --avc-shade-rgb: 5, 7, 12;
+      --avc-scrim-rgb: 24, 26, 33;
+      --avc-scrim-2-rgb: 38, 41, 51;
+
+      --avc-ok-rgb: 108, 197, 118;
+      --avc-warn-rgb: 226, 170, 82;
+      --avc-err-rgb: 230, 110, 116;
+      --avc-hint-rgb: 208, 168, 96;
+      --avc-tool-rgb: 116, 158, 232;
+      --avc-info-rgb: 112, 176, 224;
+
+      --avc-surface: rgba(30, 33, 42, 0.78);
+      --avc-panel: rgba(var(--avc-ink-rgb), 0.05);
+      --avc-panel-line: transparent;
+      --avc-panel-strong: rgba(var(--avc-ink-rgb), 0.075);
+      --avc-panel-strong-line: transparent;
+      --avc-sunken: rgba(var(--avc-shade-rgb), 0.45);
+      --avc-disabled: rgba(var(--avc-ink-rgb), 0.07);
+
+      --avc-elev-1: 0 1px 2px rgba(0, 0, 0, 0.45), 0 8px 22px rgba(0, 0, 0, 0.3);
+      --avc-elev-2: 0 2px 6px rgba(0, 0, 0, 0.5), 0 18px 44px rgba(0, 0, 0, 0.38);
+
+      --avc-press: 0.972;
+      --avc-press-ms: 0.12s;
+      --avc-live: avc-live-breathe 3.4s ease-in-out infinite;
+    }
+
+    /* ══ Theme: light ══════════════════════════════════════════════════════
+     * Before 1.2.0 the card painted white text and white-alpha panels
+     * unconditionally, so on a light HA theme it was not merely ugly but
+     * unreadable. The palette darkens rather than just inverting: the same
+     * hue at the same lightness that reads as "calm" on near-black reads as
+     * "washed out" on porcelain. */
+    .avc-theme--light {
+      --avc-ink-rgb: 26, 29, 37;
+      --avc-shade-rgb: 30, 36, 48;
+      --avc-scrim-rgb: 252, 252, 253;
+      --avc-scrim-2-rgb: 244, 245, 248;
+
+      --avc-ok-rgb: 56, 142, 76;
+      --avc-warn-rgb: 176, 122, 24;
+      --avc-err-rgb: 197, 58, 66;
+      --avc-hint-rgb: 158, 118, 30;
+      --avc-tool-rgb: 42, 104, 210;
+      --avc-info-rgb: 34, 122, 186;
+
+      --avc-surface: rgba(255, 255, 255, 0.93);
+      --avc-panel: rgba(255, 255, 255, 0.68);
+      --avc-panel-line: rgba(var(--avc-ink-rgb), 0.07);
+      --avc-panel-strong: rgba(255, 255, 255, 0.94);
+      --avc-panel-strong-line: rgba(var(--avc-ink-rgb), 0.09);
+      --avc-sunken: rgba(var(--avc-ink-rgb), 0.045);
+      --avc-disabled: rgba(var(--avc-ink-rgb), 0.06);
+
+      --avc-elev-1: 0 1px 2px rgba(24, 30, 45, 0.06), 0 8px 20px rgba(24, 30, 45, 0.08);
+      --avc-elev-2: 0 2px 6px rgba(24, 30, 45, 0.08), 0 18px 40px rgba(24, 30, 45, 0.12);
+
+      --avc-press: 0.972;
+      --avc-press-ms: 0.12s;
+      --avc-live: avc-live-breathe 3.4s ease-in-out infinite;
+    }
+
+    /* auto = dark, flipped by the OS/browser preference. The light values
+     * are restated rather than shared because CSS custom properties have no
+     * conditional aliasing — a media query can only re-declare them. Kept
+     * adjacent to the block above so the two never drift apart unnoticed. */
+    @media (prefers-color-scheme: light) {
+      .avc-theme--auto {
+        --avc-ink-rgb: 26, 29, 37;
+        --avc-shade-rgb: 30, 36, 48;
+        --avc-scrim-rgb: 252, 252, 253;
+        --avc-scrim-2-rgb: 244, 245, 248;
+
+        --avc-ok-rgb: 56, 142, 76;
+        --avc-warn-rgb: 176, 122, 24;
+        --avc-err-rgb: 197, 58, 66;
+        --avc-hint-rgb: 158, 118, 30;
+        --avc-tool-rgb: 42, 104, 210;
+        --avc-info-rgb: 34, 122, 186;
+
+        --avc-surface: rgba(255, 255, 255, 0.93);
+        --avc-panel: rgba(255, 255, 255, 0.68);
+        --avc-panel-line: rgba(var(--avc-ink-rgb), 0.07);
+        --avc-panel-strong: rgba(255, 255, 255, 0.94);
+        --avc-panel-strong-line: rgba(var(--avc-ink-rgb), 0.09);
+        --avc-sunken: rgba(var(--avc-ink-rgb), 0.045);
+        --avc-disabled: rgba(var(--avc-ink-rgb), 0.06);
+
+        --avc-elev-1: 0 1px 2px rgba(24, 30, 45, 0.06), 0 8px 20px rgba(24, 30, 45, 0.08);
+        --avc-elev-2: 0 2px 6px rgba(24, 30, 45, 0.08), 0 18px 40px rgba(24, 30, 45, 0.12);
+      }
+    }
+
+    /* ══ Structural pass — every theme except legacy ═════════════════════
+     * The token flip above only changes colour. This is the part that changes
+     * the card's genre: panels carry elevation instead of a hairline outline,
+     * and corners step up one notch. legacy simply never gets the
+     * .avc-theme class, so none of this applies to it. */
+    .avc-theme .status-card { border-radius: 20px; box-shadow: var(--avc-elev-1); }
+    .avc-theme .dock,
+    .avc-theme .vac-picker { border-radius: 18px; box-shadow: var(--avc-elev-1); }
+    .avc-theme .meta-bar { border-radius: 16px; box-shadow: var(--avc-elev-1); }
+    .avc-theme .map-wrap { border-radius: 18px; box-shadow: var(--avc-elev-1); }
+    .avc-theme .dock-sheet { border-radius: 14px; }
+    .avc-theme .dock-row,
+    .avc-theme .dock-mode,
+    .avc-theme .dock-sheet-action { border-radius: 12px; }
+    .avc-theme .action-btn { border-radius: 14px; }
+    .avc-theme .mtbtn { border-radius: 10px; }
+    .avc-theme .start-bar { border-radius: 22px; }
+    .avc-theme .start-seg { border-radius: 18px; }
+    .avc-theme .room-inspect-inner { border-radius: 12px; box-shadow: var(--avc-elev-2); }
+    .avc-theme .layer-menu { border-radius: 16px; box-shadow: var(--avc-elev-2); }
+    /* Rounder rooms read softer without touching the field-tuned selection
+     * ring itself (0.52/0.53 spent real effort landing that gradient). */
+    .avc-theme .room-overlay { border-radius: 10px; }
+    .avc-theme .room-btn { border-radius: 14px; }
+    /* The age dots were the most instrument-like detail on the map: two 7px
+     * discs with a hard 1px black stroke. Same information, softer edge. */
+    .avc-theme .room-age-dot {
+      width: 8px; height: 8px; border: none;
+      box-shadow: 0 0 0 1.5px rgba(0, 0, 0, 0.5), 0 1px 3px rgba(0, 0, 0, 0.45);
+    }
+
+    /* START is the one thing the whole screen exists for. docs/25 §6 gave it
+     * its own sage green but at 24% over near-black, where the hue simply
+     * disappeared (the user's verdict at the time: "looks unchanged"). On the
+     * lifted surface it can finally carry a gradient, a stronger edge and a
+     * soft cast without shouting. */
+    .avc-theme .start-bar:not(:disabled) {
+      background: linear-gradient(180deg, rgba(var(--avc-accent-rgb), 0.34), rgba(var(--avc-accent-rgb), 0.2));
+      border-color: rgba(var(--avc-accent-rgb), 0.55);
+      box-shadow: 0 6px 18px rgba(var(--avc-accent-rgb), 0.14);
+      letter-spacing: 0.2px;
+    }
+    .avc-theme .start-bar--cancel:not(:disabled) {
+      background: linear-gradient(180deg, rgba(var(--avc-warn-rgb), 0.28), rgba(var(--avc-warn-rgb), 0.16));
+      border-color: rgba(var(--avc-warn-rgb), 0.55);
+      box-shadow: 0 6px 18px rgba(var(--avc-warn-rgb), 0.14);
+      animation: var(--avc-live);
+    }
+    .avc-theme .dock-row.on {
+      background: rgba(var(--avc-accent-rgb), 0.14);
+      border-color: rgba(var(--avc-accent-rgb), 0.5);
+    }
+
+    /* Type floor (docs/35 §4). 8–10px is instrument sizing; nothing sits
+     * below 10px any more, and everything whose value ticks gets tabular
+     * figures so a live ETA or battery reading stops shoving its neighbours
+     * sideways on every poll. */
+    .avc-theme .dock-age,
+    .avc-theme .dock-chip,
+    .avc-theme .start-seg,
+    .avc-theme .dock-sheet-debug,
+    .avc-theme .dock-sheet-care-badge,
+    .avc-theme .start-body small,
+    .avc-theme .dbg-prog-item small,
+    .avc-theme .version-chip { font-size: 11px; }
+    .avc-theme .dock-cov { font-size: 10px; }
+    .avc-theme .rl-prog small { font-size: 9px; }
+    .avc-theme .room-gauge span { font-size: 10px; }
+    .avc-theme .mini-gauge span { font-size: 9px; }
+    /* Portrait keeps its own tighter scale, just lifted off the floor too —
+     * these need one more class than the .avc-grid--portrait rules above to
+     * win, hence the doubled prefix rather than a plain override. */
+    .avc-theme .avc-grid--portrait .dock-age { font-size: 10px; }
+    .avc-theme .avc-grid--portrait .dock-cov { font-size: 9px; }
+    .avc-theme .avc-grid--portrait .badge-name { font-size: 12px; }
+    .avc-theme .dock-age,
+    .avc-theme .dock-est,
+    .avc-theme .dock-cov,
+    .avc-theme .battery,
+    .avc-theme .status-label,
+    .avc-theme .progress-label,
+    .avc-theme .last-clean,
+    .avc-theme .rl-prog,
+    .avc-theme .mtbtn--stat { font-variant-numeric: tabular-nums; }
+
+    /* ══ Micro-interactions (docs/35 §5) ═══════════════════════════════════
+     * Transform/opacity only, declarative only — no JS, nothing per frame.
+     * The mobile companion app has real crash history around anything that
+     * takes imperative ownership of layout (docs/21 §5b), so this stays
+     * entirely in CSS.
+     *
+     * Deliberately NOT applied to .room-btn / .room-overlay: those carry a
+     * positioning transform of their own (translate(-50%, -50%)), and a
+     * scale() here would replace it and throw the room off its anchor. */
+    .avc-theme .action-btn,
+    .avc-theme .start-bar,
+    .avc-theme .start-seg,
+    .avc-theme .dock-mode,
+    .avc-theme .dock-row,
+    .avc-theme .dock-sheet-action,
+    .avc-theme .dock-sheet-tab,
+    .avc-theme .dock-sheet-care-reset,
+    .avc-theme .mtbtn,
+    .avc-theme .badge,
+    .avc-theme .vac-icon-btn,
+    .avc-theme .layer-btn {
+      transition: transform var(--avc-press-ms) var(--avc-ease),
+                  opacity 0.15s ease,
+                  background 0.25s var(--avc-ease),
+                  border-color 0.25s var(--avc-ease),
+                  box-shadow 0.25s var(--avc-ease);
+    }
+    .avc-theme .action-btn:active:not(:disabled),
+    .avc-theme .start-bar:active:not(:disabled),
+    .avc-theme .start-seg:active,
+    .avc-theme .dock-mode:active,
+    .avc-theme .dock-row:active:not(:disabled),
+    .avc-theme .dock-sheet-action:active,
+    .avc-theme .dock-sheet-tab:active,
+    .avc-theme .dock-sheet-care-reset:active:not(.pending),
+    .avc-theme .mtbtn:active:not(:disabled),
+    .avc-theme .badge:active,
+    .avc-theme .vac-icon-btn:active,
+    .avc-theme .layer-btn:active { transform: scale(var(--avc-press)); }
+
+    @keyframes avc-live-breathe {
+      0%, 100% { box-shadow: 0 6px 18px rgba(var(--avc-warn-rgb), 0.12); }
+      50%      { box-shadow: 0 6px 26px rgba(var(--avc-warn-rgb), 0.3); }
+    }
+
+    /* A slow highlight travelling along the progress bar — the difference
+     * between "a bar that happens to be partly filled" and "something is
+     * happening right now". White on purpose: it is a specular highlight on
+     * a coloured bar, not ink, so it does not follow the theme. */
+    .avc-theme .progress-track { height: 4px; border-radius: 3px; }
+    .avc-theme .progress-fill { position: relative; overflow: hidden; }
+    .avc-theme .progress-fill::after {
+      content: "";
+      position: absolute;
+      inset: 0;
+      background: linear-gradient(90deg, transparent, rgba(255, 255, 255, 0.45), transparent);
+      transform: translateX(-100%);
+      animation: avc-sheen 2.6s ease-in-out infinite;
+    }
+    @keyframes avc-sheen {
+      0%        { transform: translateX(-100%); }
+      60%, 100% { transform: translateX(100%); }
+    }
+
+    /* ══ Calm resting state (docs/35 §7) ═══════════════════════════════════
+     * Applied when nothing is running, nothing is selected and no map tool is
+     * armed — which is most of the time. Purely de-emphasis: every control
+     * stays present, tappable and in place, the leftover trace and the
+     * secondary metadata just stop competing with the one thing worth
+     * touching. calm_state: false opts out. */
+    .avc-calm .map-vector { opacity: 0.5; }
+    .avc-calm .room-age-dots { opacity: 0.55; }
+    .avc-calm .dock-cov { opacity: 0.35; }
+    .avc-calm .dbg-prog { opacity: 0.55; }
+    .avc-theme.avc-calm .meta-bar { background: var(--avc-panel); box-shadow: none; }
+    .avc-theme.avc-calm .start-bar:not(:disabled) {
+      box-shadow: 0 0 0 1px rgba(var(--avc-accent-rgb), 0.4),
+                  0 10px 26px rgba(var(--avc-accent-rgb), 0.16);
+    }
+    .avc-theme .map-vector,
+    .avc-theme .room-age-dots { transition: opacity 0.6s var(--avc-ease); }
+
+    /* Motion opt-outs. The OS preference wins unconditionally; .avc-still
+     * is the config-level equivalent (reduce_motion: true) for people who
+     * want them off without changing an OS setting. */
+    .avc-still,
+    .avc-still .start-bar--cancel { --avc-press: 1; --avc-press-ms: 0s; --avc-live: none; }
+    .avc-still .progress-fill::after { display: none; }
+    @media (prefers-reduced-motion: reduce) {
+      .avc-theme,
+      .avc-theme .start-bar--cancel { --avc-press: 1; --avc-press-ms: 0s; --avc-live: none; }
+      .avc-theme .progress-fill::after { display: none; }
+      .avc-theme .avc-err-halo { animation: none; opacity: 0.45; }
+      .avc-theme .error-row { animation: none; }
+      .avc-theme .mode-action .mtbtn { animation: none; }
+    }
+  `,__decorate([n$1({attribute:!1})],De.prototype,"hass",void 0),__decorate([n$1({attribute:!1})],De.prototype,"editMode",void 0),__decorate([r()],De.prototype,"_config",void 0),__decorate([r()],De.prototype,"_shownSet",void 0),__decorate([r()],De.prototype,"_holdId",void 0),__decorate([r()],De.prototype,"_mapMode",void 0),__decorate([r()],De.prototype,"_inspectKey",void 0),__decorate([r()],De.prototype,"_dockSheetOpen",void 0),__decorate([r()],De.prototype,"_dockSheetIdx",void 0),__decorate([r()],De.prototype,"_modeSheetOpen",void 0),__decorate([r()],De.prototype,"_careResetPending",void 0),__decorate([r()],De.prototype,"_modeEntity",void 0),__decorate([r()],De.prototype,"_dbg",void 0),__decorate([r()],De.prototype,"_zoneDrag",void 0),__decorate([r()],De.prototype,"_zoneRectShown",void 0),__decorate([r()],De.prototype,"_zonePending",void 0),__decorate([r()],De.prototype,"_zoneEdit",void 0),__decorate([r()],De.prototype,"_pinPending",void 0),__decorate([r()],De.prototype,"_layers",void 0),__decorate([r()],De.prototype,"_layerMenu",void 0),__decorate([r()],De.prototype,"_localRoomSel",void 0),__decorate([r()],De.prototype,"_activePresets",void 0),__decorate([r()],De.prototype,"_planMode",void 0),__decorate([r()],De.prototype,"_activeGlobalPreset",void 0),__decorate([r()],De.prototype,"_cardW",void 0),__decorate([r()],De.prototype,"_mapAR",void 0),__decorate([r()],De.prototype,"_profile",void 0),__decorate([r()],De.prototype,"_mapRegW",void 0),__decorate([r()],De.prototype,"_mapRegH",void 0),__decorate([r()],De.prototype,"_mapAvailW",void 0),__decorate([r()],De.prototype,"_mapAvailH",void 0),__decorate([r()],De.prototype,"_flipLive",void 0),__decorate([r()],De.prototype,"_now",void 0),__decorate([r()],De.prototype,"_planPreview",void 0),De=__decorate([t$1(be)],De);const Oe=(Te=window).customCards??(Te.customCards=[]);Oe.some(e=>e.type===be)||Oe.push({type:be,name:"AnyVac Card",description:"Feature-rich card for Roborock vacuums — map, room selection, multi-vacuum tabs, global actions.",preview:!1,documentationURL:"https://github.com/Michailjovic/anyvac-card"});const Ie={entity:"",name:"",color:"green",rooms:[],clean_action:{type:"native"}},Ve={key:"",name:"",icon:"mdi:square",map_x:50,map_y:50},He=["mdi:numeric-1-circle","mdi:numeric-2-circle","mdi:numeric-3-circle","mdi:numeric-4-circle","mdi:numeric-5-circle","mdi:numeric-6-circle","mdi:numeric-7-circle","mdi:numeric-8-circle","mdi:numeric-9-circle","mdi:numeric-9-plus-circle"];function _roomIconFor(e){return He[Math.min(e,He.length-1)]}const Ne={entity:"",rotation:0,scale:100,offset_x:0,offset_y:0},Be={name:"Whole flat",color:"orange",watch_entities:[],action:{type:"script",entity_id:""}},je=[{days:2,color:"#2ecc71"},{days:5,color:"#faad14"},{days:10,color:"#ff9800"}];function clampPct(e){return Math.min(100,Math.max(0,e))}let Le=class AnyVacCardEditor extends le{constructor(){super(...arguments),this._tab="vacuums",this._dragRoom=null,this._dragSeq=null,this._openVac=new Set,this._openSensors=new Set,this._openPresets=new Set,this._openAction=new Set,this._openGlobal=new Set,this._openRoom=new Map,this._mapVac=0,this._mapRoom=null,this._pvAR=0,this._refMapUrl="",this._refMapVac=-1,this._floorplanSnapshotBusy=!1,this._floorplanSnapshotError="",this._rectDrag=null,this._initialized=!1}setConfig(e){this._config=e,this._initialized||(this._initialized=!0,this._openVac=new Set((e.vacuums??[]).map((e,t)=>t)))}updated(e){if(e.has("hass")&&this.hass){const e=this.shadowRoot?.getElementById("ha-entities");e&&!e.options.length&&(e.innerHTML=Object.keys(this.hass.states).sort().map(e=>'<option value="'+e+'">').join(""))}"maps"===this._tab&&(e.has("_tab")||e.has("_mapVac"))&&this._snapshotRefMap()}_snapshotRefMap(){const e=this._config.vacuums;if(!e.length)return this._refMapUrl="",void(this._refMapVac=-1);const t=Math.min(this._mapVac,e.length-1),o=this._mapEntityFor(e[t]);this._refMapUrl=o?this.hass.states[o]?.attributes.entity_picture??"":"",this._refMapVac=t}async _snapshotFloorplan(e){const t=this._mapEntityFor(e);if(t){this._floorplanSnapshotBusy=!0,this._floorplanSnapshotError="";try{const o=await this.hass.callService("anyvac","snapshot_map_as_floorplan",{image_entity:t,name:e.name||e.entity},void 0,!1,!0),s=o?.response?.path;if(!s)throw new Error("no path in service response");if(this._setEditedImageBase({src:s}),this._mergedEdit){const e=this._config.vacuums.map(e=>({...e,hide_map:!0}));this._setConfig({vacuums:e})}else{const t=this._config.vacuums.findIndex(t=>t.entity===e.entity);t>=0&&this._setVacuum(t,{hide_map:!0})}const l=o?.response?.crop;if(l){const t=this._config.vacuums.findIndex(t=>t.entity===e.entity);t>=0&&this._autoPlaceOwnRooms(t,l)}}catch(e){this._floorplanSnapshotError="Couldn't snapshot this vacuum's map — make sure the anyvac integration is updated to at least 0.88.0, then try again.",console.error("[anyvac-card] snapshot_map_as_floorplan failed:",e)}finally{this._floorplanSnapshotBusy=!1}}}_fire(e){this.dispatchEvent(new CustomEvent("config-changed",{detail:{config:e},bubbles:!0,composed:!0}))}_setConfig(e){const t={...this._config,...e};this._config=t,this._fire(t)}_setVacuum(e,t){const o=[...this._config.vacuums];o[e]={...o[e],...t};const s={...this._config,vacuums:o};this._config=s,this._fire(s)}_setMap(e,t){const o=this._config.vacuums[e].map??{...Ne};this._setVacuum(e,{map:{...o,...t}})}_setImageBase(e,t){const o=this._config.vacuums[e].image_base??{src:""};this._setVacuum(e,{image_base:{...o,...t}})}get _mergedEdit(){return"merged"===this._config.map_mode}_editRooms(){if(this._mergedEdit)return this._config.rooms??[];const e=this._config.vacuums[Math.min(this._mapVac,this._config.vacuums.length-1)];return e?.rooms??[]}_setEditedRoom(e,t){if(this._mergedEdit){const o=[...this._config.rooms??[]];o[e]={...o[e],...t},this._setConfig({rooms:o})}else this._setRoom(Math.min(this._mapVac,this._config.vacuums.length-1),e,t)}_onRoomPointerDown(e,t,o,s){s.stopPropagation();const l=s.currentTarget.closest(".map-pos-container");if(!l)return;const d=l.getBoundingClientRect(),h=this._mapRoom===e;this._mapRoom=e;let p=t;if("move"===t&&null!=o.map_w){const e=(s.clientX-d.left)/d.width*100,t=(s.clientY-d.top)/d.height*100,l=o.map_x??50,h=o.map_y??50,m=o.map_w/2,u=(o.map_h??15)/2,_=16/d.width*100,b=16/d.height*100,v=Math.abs(e-(l-m))<=_,f=Math.abs(e-(l+m))<=_,w=Math.abs(t-(h-u))<=b,$=Math.abs(t-(h+u))<=b;v&&w?p="resize-nw":f&&w?p="resize-ne":v&&$?p="resize-sw":f&&$&&(p="resize-se")}this._rectDrag={ri:e,mode:p,container:d,orig:{x:o.map_x??50,y:o.map_y??50,w:o.map_w??0,h:o.map_h??0},startClientX:s.clientX,startClientY:s.clientY,moved:!1,wasSelected:h},s.currentTarget.setPointerCapture(s.pointerId)}_onRoomPointerMove(e){const t=this._rectDrag;if(!t)return;if(!t.moved){if(Math.hypot(e.clientX-t.startClientX,e.clientY-t.startClientY)<3)return;t.moved=!0}const o=t.container,s=clampPct((e.clientX-o.left)/o.width*100),l=clampPct((e.clientY-o.top)/o.height*100);if("move"===t.mode)return void this._setEditedRoom(t.ri,{map_x:Math.round(s),map_y:Math.round(l)});const d=t.orig.w/2,h=t.orig.h/2,p={"resize-nw":{ox:t.orig.x+d,oy:t.orig.y+h},"resize-ne":{ox:t.orig.x-d,oy:t.orig.y+h},"resize-sw":{ox:t.orig.x+d,oy:t.orig.y-h},"resize-se":{ox:t.orig.x-d,oy:t.orig.y-h}}[t.mode],m=Math.max(2,Math.min(100,Math.abs(s-p.ox))),u=Math.max(2,Math.min(100,Math.abs(l-p.oy)));this._setEditedRoom(t.ri,{map_x:Math.round(clampPct((s+p.ox)/2)),map_y:Math.round(clampPct((l+p.oy)/2)),map_w:Math.round(m),map_h:Math.round(u)})}_onRoomPointerUp(){const e=this._rectDrag;e&&!e.moved&&e.wasSelected&&(this._mapRoom=null),this._rectDrag=null}_addEditedRoom(){if(this._mergedEdit){const e=this._config.rooms??[],t=[...e,{...Ve,icon:_roomIconFor(e.length)}];this._setConfig({rooms:t}),this._mapRoom=t.length-1}else this._addRoom(Math.min(this._mapVac,this._config.vacuums.length-1)),this._mapRoom=(this._config.vacuums[this._mapVac]?.rooms?.length??1)-1}_deleteEditedRoom(e){if(this._mergedEdit){const t=(this._config.rooms??[]).filter((t,o)=>o!==e);this._setConfig({rooms:t}),this._mapRoom===e&&(this._mapRoom=null)}else this._deleteRoom(Math.min(this._mapVac,this._config.vacuums.length-1),e)}_setLayoutFlip(e,t){const o=this._config.layout??{},s=o[e]??{},l={...s.crop??{},flip:!!t||void 0};this._setConfig({layout:{...o,[e]:{...s,crop:l}}})}_setEditedImageBase(e){this._mergedEdit?this._setConfig({image_base:{...this._config.image_base??{src:""},...e}}):this._setImageBase(Math.min(this._mapVac,this._config.vacuums.length-1),e)}_editorAR(){return this._pvAR>.1?this._pvAR:3.636}_intEntityFor(e){if(!e)return;if(e.integration_entity)return e.integration_entity;const t=this.hass?.entities,o=t?.[e.entity]?.device_id;return o?Object.keys(t).find(e=>t[e]?.device_id===o&&"anyvac"===t[e]?.platform&&e.startsWith("sensor.")):void 0}_mapEntityFor(e){if(!e)return;if(e.map?.entity)return e.map.entity;const t=this.hass?.entities,o=t?.[e.entity]?.device_id;if(!o)return;const s=Object.keys(t).filter(e=>t[e]?.device_id===o&&e.startsWith("image.")),l=s.filter(e=>{const t=this.hass.states[e];return!!t&&"unavailable"!==t.state&&"unknown"!==t.state&&!!t.attributes.entity_picture});return 1===l.length?l[0]:1===s.length?s[0]:void 0}_roomSequence(e){const t=this._intEntityFor(e),o=t?this.hass?.states?.[t]?.attributes:void 0;return o?.room_sequence??{}}_roomsInSequenceOrder(e,t){return e.map((e,o)=>({r:e,i:o,s:e.key?t[e.key]??1/0:1/0})).sort((e,t)=>e.s!==t.s?e.s-t.s:e.i-t.i).map(e=>e.r)}_moveSequence(e,t,o,s){if(o===s)return;const l=t.map(e=>e.key).filter(e=>!!e);if(o<0||o>=l.length||s<0||s>=l.length)return;const[d]=l.splice(o,1);l.splice(s,0,d),this.hass.callService("anyvac","set_room_sequence",{rooms:l})}_editorSeat(e){const t=this._config.vacuums[e],o=this._intEntityFor(t),s=o?this.hass?.states?.[o]?.attributes:void 0,l=s&&(s.schema_version??0)>=2?s:void 0;return resolveSeat(this._config,t,l,this._editorAR())}_importRooms(e){const t=this._config.vacuums[e],o=this._intEntityFor(t),s=o?this.hass.states[o]?.attributes:void 0,l=Array.isArray(s?.rooms)?s.rooms:[];if(!s||(s.schema_version??0)<2||!l.length)return;const d=this._editorAR(),h=this._editorSeat(e),p=this._mergedEdit?[...this._config.rooms??[]]:[...t.rooms??[]],m=new Set(p.map(e=>e.key));let u=0;for(const e of l){const t=e?.name;if(!t||m.has(t))continue;const o=roomBboxToRect(e,s,h,d);o&&(p.push({key:t,name:t,icon:_roomIconFor(p.length),...o}),m.add(t),u++)}u&&(this._mergedEdit?this._setConfig({rooms:p}):this._setVacuum(e,{rooms:p}))}_autoPlaceOwnRooms(e,t){const o=this._config.vacuums[e],s=this._intEntityFor(o),l=s?this.hass.states[s]?.attributes:void 0,d=Array.isArray(l?.rooms)?l.rooms:[];if(!d.length)return;const h=this._mergedEdit?[...this._config.rooms??[]]:[...o.rooms??[]],p=new Set(h.map(e=>e.key));let m=0;for(const e of d){const o=e?.name,s=e?.bbox_px;if(!o||p.has(o)||!s)continue;const l=placeRoomInCrop(s,t);l&&(h.push({key:o,name:o,icon:_roomIconFor(h.length),...l}),p.add(o),m++)}m&&(this._mergedEdit?this._setConfig({rooms:h}):this._setVacuum(e,{rooms:h}))}_unmatchedOwnRoomNames(e){const t=this._config.vacuums[e],o=this._intEntityFor(t),s=o?this.hass.states[o]?.attributes:void 0,l=Array.isArray(s?.rooms)?s.rooms:[];if(!l.length)return[];const d=new Set(this._editRooms().map(e=>e.key)),h=[];for(const e of l){const t=e?.name;t&&!d.has(t)&&h.push(t)}return h}_setRoom(e,t,o){const s=[...this._config.vacuums[e].rooms??[]];s[t]={...s[t],...o},this._setVacuum(e,{rooms:s})}_setCleanAction(e,t){const o=this._config.vacuums[e].clean_action??{type:"native"};this._setVacuum(e,{clean_action:{...o,...t}})}_togglePresets(e){const t=new Set(this._openPresets);t.has(e)?t.delete(e):t.add(e),this._openPresets=t}_setPreset(e,t,o){const s=[...this._config.vacuums[e].presets??[]];s[t]={...s[t],...o},this._setVacuum(e,{presets:s})}_addPreset(e){const t=this._config.vacuums[e].presets??[],o=[...t,{id:"preset"+(t.length+1),label:"New preset"}];this._setVacuum(e,{presets:o}),this._openPresets=new Set([...this._openPresets,e])}_deletePreset(e,t){const o=(this._config.vacuums[e].presets??[]).filter((e,o)=>o!==t);this._setVacuum(e,{presets:o})}_setGlobal(e,t){const o=[...this._config.global_actions??[]];o[e]={...o[e],...t};const s={...this._config,global_actions:o};this._config=s,this._fire(s)}_setGlobalAction(e,t){const o=this._config.global_actions?.[e]?.action??{type:"script",entity_id:""};this._setGlobal(e,{action:{...o,...t}})}_moveVacuum(e,t){const o=e+t,s=[...this._config.vacuums];if(o<0||o>=s.length)return;[s[e],s[o]]=[s[o],s[e]];const l={...this._config,vacuums:s};this._config=l,this._fire(l)}_addVacuum(){const e=[...this._config.vacuums,{...Ie}],t={...this._config,vacuums:e};this._config=t,this._fire(t);const o=e.length-1;this._openVac=new Set([...this._openVac,o])}_deleteVacuum(e){const t=this._config.vacuums.filter((t,o)=>o!==e),o={...this._config,vacuums:t};this._config=o,this._fire(o);const s=new Set(this._openVac);s.delete(e),this._openVac=s}_addRoom(e){const t=this._config.vacuums[e].rooms??[],o=[...t,{...Ve,icon:_roomIconFor(t.length)}];this._setVacuum(e,{rooms:o});const s=new Map(this._openRoom);s.set(e,o.length-1),this._openRoom=s}_moveRoom(e,t,o){if(t===o)return;const s=[...this._config.vacuums[e].rooms??[]];if(t<0||t>=s.length||o<0||o>=s.length)return;const[l]=s.splice(t,1);s.splice(o,0,l),this._setVacuum(e,{rooms:s})}_deleteRoom(e,t){const o=(this._config.vacuums[e].rooms??[]).filter((e,o)=>o!==t);this._setVacuum(e,{rooms:o});if(this._openRoom.get(e)===t){const t=new Map(this._openRoom);t.set(e,null),this._openRoom=t}this._mapRoom===t&&(this._mapRoom=null)}_setGlobalPreset(e,t){const o=[...this._config.global_presets??[]];o[e]={...o[e],...t},this._setConfig({global_presets:o})}_addGlobalPreset(){const e=this._config.global_presets??[],t=[...e,{id:"gp"+(e.length+1),label:"New clean",scope:"select"}];this._setConfig({global_presets:t})}_deleteGlobalPreset(e){const t=(this._config.global_presets??[]).filter((t,o)=>o!==e);this._setConfig({global_presets:t})}_addGlobal(){const e=[...this._config.global_actions??[],{...Be}],t={...this._config,global_actions:e};this._config=t,this._fire(t);const o=e.length-1;this._openGlobal=new Set([...this._openGlobal,o])}_deleteGlobal(e){const t=(this._config.global_actions??[]).filter((t,o)=>o!==e),o={...this._config,global_actions:t};this._config=o,this._fire(o);const s=new Set(this._openGlobal);s.delete(e),this._openGlobal=s}_toggleVac(e){const t=new Set(this._openVac);t.has(e)?t.delete(e):t.add(e),this._openVac=t}_toggleRoom(e,t){const o=new Map(this._openRoom),s=o.get(e)??null;o.set(e,s===t?null:t),this._openRoom=o}_toggleSensors(e){const t=new Set(this._openSensors);t.has(e)?t.delete(e):t.add(e),this._openSensors=t}_toggleAction(e){const t=new Set(this._openAction);t.has(e)?t.delete(e):t.add(e),this._openAction=t}_toggleGlobal(e){const t=new Set(this._openGlobal);t.has(e)?t.delete(e):t.add(e),this._openGlobal=t}_entityPicker(e,t,o,s,l=!1){const d=o.length?o.join(" / "):"entity_id",h=1===o.length,p=h?"ha-ents-"+o[0]:"ha-entities",m=h?Object.keys(this.hass?.states??{}).filter(e=>e.startsWith(o[0]+".")).sort():null;return te`
+      ${m?te`<datalist id=${p}>${m.map(e=>te`<option value=${e}>`)}</datalist>`:ae}
       <div class="field">
-        <label>${t}${s?q`<span class="required"> *</span>`:G}</label>
-        <input class="text-input" type="text" list=${r}
-          .value=${e??""} placeholder=${n}
-          @input=${t=>{const e=t.target.value;(""===e||this.hass.states[e])&&i(e)}}
-          @change=${t=>i(t.target.value)} />
-      </div>`}_textField(t,e,o,i=""){return q`
+        <label>${e}${l?te`<span class="required"> *</span>`:ae}</label>
+        <input class="text-input" type="text" list=${p}
+          .value=${t??""} placeholder=${d}
+          @input=${e=>{const t=e.target.value;(""===t||this.hass.states[t])&&s(t)}}
+          @change=${e=>s(e.target.value)} />
+      </div>`}_textField(e,t,o,s=""){return te`
       <div class="field">
-        <label>${t}</label>
-        <input class="text-input" type="text" .value=${e??""} placeholder=${i}
-          @change=${t=>o(t.target.value)} />
-      </div>`}_resolveColor(t,e){const o=t??e;return Rt[o]??o}_hexColorField(t,e,o,i){const s=/^#[0-9a-fA-F]{6}$/.test(e??"")?e:i;return q`
+        <label>${e}</label>
+        <input class="text-input" type="text" .value=${t??""} placeholder=${s}
+          @change=${e=>o(e.target.value)} />
+      </div>`}_resolveColor(e,t){const o=e??t;return we[o]??o}_hexColorField(e,t,o,s){const l=/^#[0-9a-fA-F]{6}$/.test(t??"")?t:s;return te`
       <div class="field">
-        <label>${t} (hex)</label>
+        <label>${e} (hex)</label>
         <div class="hex-color-row">
-          <input type="color" class="threshold-color" .value=${s}
-            @input=${t=>o(t.target.value)} />
-          <input class="text-input" type="text" .value=${e??""} placeholder=${i}
-            @change=${t=>o(t.target.value)} />
+          <input type="color" class="threshold-color" .value=${l}
+            @input=${e=>o(e.target.value)} />
+          <input class="text-input" type="text" .value=${t??""} placeholder=${s}
+            @change=${e=>o(e.target.value)} />
         </div>
-      </div>`}_numberSlider(t,e,o,i,s,n,a=""){const r=e??0;return q`
+      </div>`}_numberSlider(e,t,o,s,l,d,h=""){const p=t??0;return te`
       <div class="field field--row">
-        <label>${t}</label>
+        <label>${e}</label>
         <div class="slider-wrap">
-          <input type="range" class="slider" min=${o} max=${i} step=${s} .value=${String(r)}
-            @input=${t=>n(Number(t.target.value))} />
-          <span class="slider-val">${r}${a}</span>
+          <input type="range" class="slider" min=${o} max=${s} step=${l} .value=${String(p)}
+            @input=${e=>d(Number(e.target.value))} />
+          <span class="slider-val">${p}${h}</span>
         </div>
-      </div>`}_selectField(t,e,o,i){return q`
+      </div>`}_selectField(e,t,o,s){return te`
       <div class="field field--row">
-        <label>${t}</label>
-        <select class="select-input" @change=${t=>i(t.target.value)}>
-          ${o.map(t=>q`<option value=${t.value} ?selected=${t.value===e}>${t.label}</option>`)}
+        <label>${e}</label>
+        <select class="select-input" @change=${e=>s(e.target.value)}>
+          ${o.map(e=>te`<option value=${e.value} ?selected=${e.value===t}>${e.label}</option>`)}
         </select>
-      </div>`}_optionSelectFromList(t,e,o,i){return q`
+      </div>`}_optionSelectFromList(e,t,o,s){return te`
       <div class="field field--row">
-        <label>${t}</label>
+        <label>${e}</label>
         <select class="select-input"
-          @change=${t=>i(t.target.value)}>
+          @change=${e=>s(e.target.value)}>
           <option value="">— none —</option>
-          ${e.map(t=>q`<option value=${t} ?selected=${t===o}>${t}</option>`)}
+          ${t.map(e=>te`<option value=${e} ?selected=${e===o}>${e}</option>`)}
         </select>
-      </div>`}_optionSelect(t,e,o,i){const s=e?this.hass.states[e]?.attributes.options??[]:[];return s.length?q`
+      </div>`}_optionSelect(e,t,o,s){const l=t?this.hass.states[t]?.attributes.options??[]:[];return l.length?te`
       <div class="field field--row">
-        <label>${t}</label>
+        <label>${e}</label>
         <select class="select-input"
-          @change=${t=>i(t.target.value)}>
+          @change=${e=>s(e.target.value)}>
           <option value="">— none —</option>
-          ${s.map(t=>q`<option value=${t} ?selected=${t===o}>${t}</option>`)}
+          ${l.map(e=>te`<option value=${e} ?selected=${e===o}>${e}</option>`)}
         </select>
-      </div>`:this._textField(t,o,i,"e.g. balanced")}_iconPickerField(t,e){return q`
+      </div>`:this._textField(e,o,s,"e.g. balanced")}_iconPickerField(e,t){return te`
       <div class="field">
         <label>Icon</label>
-        <ha-icon-picker .value=${t??"mdi:square"}
-          @value-changed=${t=>e(t.detail.value)}
+        <ha-icon-picker .value=${e??"mdi:square"}
+          @value-changed=${e=>t(e.detail.value)}
         ></ha-icon-picker>
-      </div>`}_areaPicker(t,e,o){const i=Object.values(this.hass?.areas??{});return i.length?q`
+      </div>`}_areaPicker(e,t,o){const s=Object.values(this.hass?.areas??{});return s.length?te`
       <div class="field field--row">
-        <label>${t}</label>
+        <label>${e}</label>
         <select class="select-input"
-          @change=${t=>o(t.target.value)}>
+          @change=${e=>o(e.target.value)}>
           <option value="">— not mapped —</option>
-          ${[...i].sort((t,e)=>t.name.localeCompare(e.name)).map(t=>q`<option value=${t.area_id} ?selected=${t.area_id===e}>${t.name}</option>`)}
+          ${[...s].sort((e,t)=>e.name.localeCompare(t.name)).map(e=>te`<option value=${e.area_id} ?selected=${e.area_id===t}>${e.name}</option>`)}
         </select>
-      </div>`:this._textField(t,e,o,"e.g. living_room")}_renderVacuumsTab(){return q`
+      </div>`:this._textField(e,t,o,"e.g. living_room")}_renderVacuumsTab(){return te`
       <div class="tab-body">
-        ${0===this._config.vacuums.length?q`<p class="hint">No vacuums yet. Add one below.</p>`:this._config.vacuums.map((t,e)=>this._renderVacuumAccordion(t,e))}
+        ${0===this._config.vacuums.length?te`<p class="hint">No vacuums yet. Add one below.</p>`:this._config.vacuums.map((e,t)=>this._renderVacuumAccordion(e,t))}
         <button class="btn btn--add" @click=${()=>this._addVacuum()}>
           <ha-icon icon="mdi:plus"></ha-icon> Add vacuum
         </button>
-      </div>`}_renderVacuumAccordion(t,e){const o=this._resolveColor(t.color,"green"),i=this._openVac.has(e);return q`
-      <div class="acc-row" style=${vt({borderLeft:"3px solid "+o})}>
-        <div class="acc-header" @click=${()=>this._toggleVac(e)}>
-          ${t.image?q`<img class="acc-img" src=${t.image} alt=${t.name??""} />`:q`<ha-icon icon="mdi:robot-vacuum" style=${vt({color:o,width:"36px",height:"36px"})}></ha-icon>`}
+      </div>`}_renderVacuumAccordion(e,t){const o=this._resolveColor(e.color,"green"),s=this._openVac.has(t);return te`
+      <div class="acc-row" style=${_e({borderLeft:"3px solid "+o})}>
+        <div class="acc-header" @click=${()=>this._toggleVac(t)}>
+          ${e.image?te`<img class="acc-img" src=${e.image} alt=${e.name??""} />`:te`<ha-icon icon="mdi:robot-vacuum" style=${_e({color:o,width:"36px",height:"36px"})}></ha-icon>`}
           <div class="acc-info">
-            <span class="acc-name">${t.name||t.entity||"Unnamed vacuum"}</span>
-            <span class="acc-sub">${t.entity}</span>
+            <span class="acc-name">${e.name||e.entity||"Unnamed vacuum"}</span>
+            <span class="acc-sub">${e.entity}</span>
           </div>
-          <button class="icon-btn" ?disabled=${0===e}
-            @click=${t=>{t.stopPropagation(),this._moveVacuum(e,-1)}}>
+          <button class="icon-btn" ?disabled=${0===t}
+            @click=${e=>{e.stopPropagation(),this._moveVacuum(t,-1)}}>
             <ha-icon icon="mdi:arrow-up"></ha-icon>
           </button>
-          <button class="icon-btn" ?disabled=${e===this._config.vacuums.length-1}
-            @click=${t=>{t.stopPropagation(),this._moveVacuum(e,1)}}>
+          <button class="icon-btn" ?disabled=${t===this._config.vacuums.length-1}
+            @click=${e=>{e.stopPropagation(),this._moveVacuum(t,1)}}>
             <ha-icon icon="mdi:arrow-down"></ha-icon>
           </button>
           <button class="icon-btn icon-btn--danger"
-            @click=${t=>{t.stopPropagation(),this._deleteVacuum(e)}}>
+            @click=${e=>{e.stopPropagation(),this._deleteVacuum(t)}}>
             <ha-icon icon="mdi:delete"></ha-icon>
           </button>
-          <ha-icon icon=${i?"mdi:chevron-up":"mdi:chevron-down"} class="acc-chevron"></ha-icon>
+          <ha-icon icon=${s?"mdi:chevron-up":"mdi:chevron-down"} class="acc-chevron"></ha-icon>
         </div>
 
-        ${i?q`
+        ${s?te`
           <div class="acc-body">
 
             <div class="section-title">Basic</div>
-            ${this._entityPicker("Vacuum entity",t.entity,["vacuum"],t=>this._setVacuum(e,{entity:t}),!0)}
-            ${this._textField("Display name",t.name,t=>this._setVacuum(e,{name:t}),"e.g. S8")}
-            ${this._textField("Image path",t.image,t=>this._setVacuum(e,{image:t}),"/local/...")}
-            ${this._hexColorField("Accent colour",t.color?this._resolveColor(t.color,"green"):void 0,t=>this._setVacuum(e,{color:t||void 0}),Mt[e%Mt.length])}
-            ${this._selectField("Role",t.clean_type??"auto",[{value:"auto",label:"Auto-detect from clean action"},{value:"dry",label:"Dry only"},{value:"wet",label:"Wet only"},{value:"both",label:"Both — follow live mode"}],t=>this._setVacuum(e,{clean_type:"auto"===t?void 0:t}))}
+            ${this._entityPicker("Vacuum entity",e.entity,["vacuum"],e=>this._setVacuum(t,{entity:e}),!0)}
+            ${this._textField("Display name",e.name,e=>this._setVacuum(t,{name:e}),"e.g. S8")}
+            ${this._textField("Image path",e.image,e=>this._setVacuum(t,{image:e}),"/local/...")}
+            ${this._hexColorField("Accent colour",e.color?this._resolveColor(e.color,"green"):void 0,e=>this._setVacuum(t,{color:e||void 0}),$e[t%$e.length])}
+            ${this._selectField("Role",e.clean_type??"auto",[{value:"auto",label:"Auto-detect from clean action"},{value:"dry",label:"Dry only"},{value:"wet",label:"Wet only"},{value:"both",label:"Both — follow live mode"}],e=>this._setVacuum(t,{clean_type:"auto"===e?void 0:e}))}
             <p class="hint">This vacuum's capability — controls which time estimate and which dry/wet layer it uses. Not the run-time Dry/Wet/Both choice (that's made on the controller). "Both" follows the live water mode (needs the integration sensor).</p>
 
-            ${this._renderSensorsSection(e,t)}
-            ${this._renderCleanActionSection(e,t)}
-            ${this._renderPresetsSection(e,t)}
+            ${this._renderSensorsSection(t,e)}
+            ${this._renderCleanActionSection(t,e)}
+            ${this._renderPresetsSection(t,e)}
 
-            <div class="section-title">Rooms (${(t.rooms??[]).length})</div>
-            ${this._intEntityFor(t)?q`<p class="hint">With the AnyVac integration, rooms appear automatically from
+            <div class="section-title">Rooms (${(e.rooms??[]).length})</div>
+            ${this._intEntityFor(e)?te`<p class="hint">With the AnyVac integration, rooms appear automatically from
                   this vacuum's own map — you don't need to add them here. Add a room below only to
-                  override its icon/display name, or to position it on a custom floorplan (Maps tab).</p>`:q`<p class="hint">Add one entry per room this vacuum can clean.</p>`}
-            ${(t.rooms??[]).map((t,o)=>this._renderRoomAccordion(t,e,o))}
-            <button class="btn btn--add" @click=${()=>this._addRoom(e)}>
+                  override its icon/display name, or to position it on a custom floorplan (Maps tab).</p>`:te`<p class="hint">Add one entry per room this vacuum can clean.</p>`}
+            ${(e.rooms??[]).map((e,o)=>this._renderRoomAccordion(e,t,o))}
+            <button class="btn btn--add" @click=${()=>this._addRoom(t)}>
               <ha-icon icon="mdi:plus"></ha-icon> Add room
             </button>
 
           </div>
-        `:G}
-      </div>`}_renderSensorsSection(t,e){const o=this._openSensors.has(t),i=[e.status_entity,e.battery_entity,e.last_clean_entity,e.progress_entity,e.current_room_entity,e.error_entity].filter(Boolean).length;return q`
+        `:ae}
+      </div>`}_renderSensorsSection(e,t){const o=this._openSensors.has(e),s=[t.status_entity,t.battery_entity,t.last_clean_entity,t.progress_entity,t.current_room_entity,t.error_entity].filter(Boolean).length;return te`
       <div class="collapsible">
-        <div class="collapsible-header" @click=${()=>this._toggleSensors(t)}>
+        <div class="collapsible-header" @click=${()=>this._toggleSensors(e)}>
           <span class="collapsible-title">Sensors</span>
-          ${i?q`<span class="badge">${i} configured</span>`:G}
+          ${s?te`<span class="badge">${s} configured</span>`:ae}
           <ha-icon icon=${o?"mdi:chevron-up":"mdi:chevron-down"} class="acc-chevron"></ha-icon>
         </div>
-        ${o?q`
+        ${o?te`
           <div class="collapsible-body">
             <p class="hint">Leave the sensors below blank to auto-fill them from the vacuum's device (battery, status, last clean, progress, current room, error).</p>
-            ${this._entityPicker("Status",e.status_entity,["sensor"],e=>this._setVacuum(t,{status_entity:e||void 0}))}
-            ${this._entityPicker("Battery",e.battery_entity,["sensor"],e=>this._setVacuum(t,{battery_entity:e||void 0}))}
-            ${this._entityPicker("Last clean end",e.last_clean_entity,["sensor"],e=>this._setVacuum(t,{last_clean_entity:e||void 0}))}
-            ${this._entityPicker("Progress",e.progress_entity,["sensor"],e=>this._setVacuum(t,{progress_entity:e||void 0}))}
-            ${this._entityPicker("Current room",e.current_room_entity,["sensor"],e=>this._setVacuum(t,{current_room_entity:e||void 0}))}
-            ${this._entityPicker("Error",e.error_entity,["sensor"],e=>this._setVacuum(t,{error_entity:e||void 0}))}
+            ${this._entityPicker("Status",t.status_entity,["sensor"],t=>this._setVacuum(e,{status_entity:t||void 0}))}
+            ${this._entityPicker("Battery",t.battery_entity,["sensor"],t=>this._setVacuum(e,{battery_entity:t||void 0}))}
+            ${this._entityPicker("Last clean end",t.last_clean_entity,["sensor"],t=>this._setVacuum(e,{last_clean_entity:t||void 0}))}
+            ${this._entityPicker("Progress",t.progress_entity,["sensor"],t=>this._setVacuum(e,{progress_entity:t||void 0}))}
+            ${this._entityPicker("Current room",t.current_room_entity,["sensor"],t=>this._setVacuum(e,{current_room_entity:t||void 0}))}
+            ${this._entityPicker("Error",t.error_entity,["sensor"],t=>this._setVacuum(e,{error_entity:t||void 0}))}
           </div>
-        `:G}
-      </div>`}_renderPresetsSection(t,e){const o=this._openPresets.has(t),i=e.presets??[],s=this.hass.states[e.entity]?.attributes.fan_speed_list??[],n=e.clean_action,a=n?.mop_mode_entity,r=n?.mop_intensity_entity;return q`
+        `:ae}
+      </div>`}_renderPresetsSection(e,t){const o=this._openPresets.has(e),s=t.presets??[],l=this.hass.states[t.entity]?.attributes.fan_speed_list??[],d=t.clean_action,h=d?.mop_mode_entity,p=d?.mop_intensity_entity;return te`
       <div class="collapsible">
-        <div class="collapsible-header" @click=${()=>this._togglePresets(t)}>
+        <div class="collapsible-header" @click=${()=>this._togglePresets(e)}>
           <span class="collapsible-title">Setting presets</span>
-          ${i.length?q`<span class="badge">${i.length}</span>`:G}
+          ${s.length?te`<span class="badge">${s.length}</span>`:ae}
           <ha-icon icon=${o?"mdi:chevron-up":"mdi:chevron-down"} class="acc-chevron"></ha-icon>
         </div>
-        ${o?q`
+        ${o?te`
           <div class="collapsible-body">
             <p class="hint">Named "how" bundles for Manual mode — the user picks one on the controller, then picks rooms. Mop entities come from Clean action above; presets only set the values. With fewer than 2 presets the controller shows no chips (a default from Clean action is used).</p>
-            ${i.map((e,o)=>q`
+            ${s.map((t,o)=>te`
               <div class="sub-section">
                 <div class="sub-title" style="display:flex;align-items:center;justify-content:space-between">
-                  <span>${e.label||e.id}</span>
+                  <span>${t.label||t.id}</span>
                   <button class="icon-btn icon-btn--danger" title="Delete preset"
-                    @click=${()=>this._deletePreset(t,o)}>
+                    @click=${()=>this._deletePreset(e,o)}>
                     <ha-icon icon="mdi:delete"></ha-icon>
                   </button>
                 </div>
-                ${this._textField("Label",e.label,e=>this._setPreset(t,o,{label:e}),"e.g. Dry")}
-                ${this._textField("Icon",e.icon,e=>this._setPreset(t,o,{icon:e||void 0}),"mdi:broom")}
-                ${s.length?this._optionSelectFromList("Suction",s,e.suction_level,e=>this._setPreset(t,o,{suction_level:e||void 0})):this._textField("Suction",e.suction_level,e=>this._setPreset(t,o,{suction_level:e||void 0}),"e.g. max")}
-                ${a?this._optionSelect("Mop mode",a,e.mop_mode,e=>this._setPreset(t,o,{mop_mode:e||void 0})):G}
-                ${r?this._optionSelect("Mop intensity",r,e.mop_intensity,e=>this._setPreset(t,o,{mop_intensity:e||void 0})):G}
-                ${this._numberSlider("Repeat passes",e.repeat??1,1,3,1,e=>this._setPreset(t,o,{repeat:e}))}
+                ${this._textField("Label",t.label,t=>this._setPreset(e,o,{label:t}),"e.g. Dry")}
+                ${this._textField("Icon",t.icon,t=>this._setPreset(e,o,{icon:t||void 0}),"mdi:broom")}
+                ${l.length?this._optionSelectFromList("Suction",l,t.suction_level,t=>this._setPreset(e,o,{suction_level:t||void 0})):this._textField("Suction",t.suction_level,t=>this._setPreset(e,o,{suction_level:t||void 0}),"e.g. max")}
+                ${h?this._optionSelect("Mop mode",h,t.mop_mode,t=>this._setPreset(e,o,{mop_mode:t||void 0})):ae}
+                ${p?this._optionSelect("Mop intensity",p,t.mop_intensity,t=>this._setPreset(e,o,{mop_intensity:t||void 0})):ae}
+                ${this._numberSlider("Repeat passes",t.repeat??1,1,3,1,t=>this._setPreset(e,o,{repeat:t}))}
               </div>
             `)}
-            <button class="btn btn--add" @click=${()=>this._addPreset(t)}>
+            <button class="btn btn--add" @click=${()=>this._addPreset(e)}>
               <ha-icon icon="mdi:plus"></ha-icon> Add preset
             </button>
           </div>
-        `:G}
-      </div>`}_renderCleanActionSection(t,e){const o=this._openAction.has(t),i=e.clean_action??{type:"native"};return q`
+        `:ae}
+      </div>`}_renderCleanActionSection(e,t){const o=this._openAction.has(e),s=t.clean_action??{type:"native"};return te`
       <div class="collapsible">
-        <div class="collapsible-header" @click=${()=>this._toggleAction(t)}>
+        <div class="collapsible-header" @click=${()=>this._toggleAction(e)}>
           <span class="collapsible-title">Clean action</span>
-          <span class="badge">${i.type}</span>
+          <span class="badge">${s.type}</span>
           <ha-icon icon=${o?"mdi:chevron-up":"mdi:chevron-down"} class="acc-chevron"></ha-icon>
         </div>
-        ${o?q`
+        ${o?te`
           <div class="collapsible-body">
-            ${this._renderCleanActionEditor(t,e)}
+            ${this._renderCleanActionEditor(e,t)}
           </div>
-        `:G}
-      </div>`}_renderCleanActionEditor(t,e){const o=e.clean_action??{type:"native"};return q`
-      ${this._selectField("Strategy","native-auto"===o.type?"native":o.type,[{value:"native",label:"Native (vacuum.send_command + segment IDs)"},{value:"native-area",label:"Native area (vacuum.clean_area)"},{value:"script",label:"Custom script"}],e=>{if("script"===e)return void this._setVacuum(t,{clean_action:{type:"script",entity_id:""}});const o=this._config.vacuums[t]?.clean_action,i={};if(o&&"script"!==o.type)for(const t of["repeat","suction_level","mop_mode_entity","mop_mode","mop_intensity_entity","mop_intensity"]){const e=o[t];void 0!==e&&(i[t]=e)}this._setVacuum(t,{clean_action:{type:e,...i}})})}
-      ${"script"===o.type?this._renderScriptAction(t,o):this._renderNativeOptions(t,o)}`}_renderNativeOptions(t,e){const o="native-area"===e.type?q`<p class="hint">Calls <code>vacuum.clean_area</code> (degraded mode only — with the AnyVac integration the START button sends <code>anyvac.clean</code> instead). No repeat; repeat lives server-side in <code>anyvac.clean</code>.</p>`:"native-auto"===e.type?q`<p class="hint">Legacy value, no longer offered above — behaves identically to <strong>Native</strong> (segment-based) both with and without the integration. Safe to leave as-is; re-selecting "Native" above rewrites it.</p>`:q`<p class="hint">Degraded mode only — with the AnyVac integration the START button always sends <code>anyvac.clean</code> instead, which resolves segments server-side.</p>`;return q`
+        `:ae}
+      </div>`}_renderCleanActionEditor(e,t){const o=t.clean_action??{type:"native"};return te`
+      ${this._selectField("Strategy","native-auto"===o.type?"native":o.type,[{value:"native",label:"Native (vacuum.send_command + segment IDs)"},{value:"native-area",label:"Native area (vacuum.clean_area)"},{value:"script",label:"Custom script"}],t=>{if("script"===t)return void this._setVacuum(e,{clean_action:{type:"script",entity_id:""}});const o=this._config.vacuums[e]?.clean_action,s={};if(o&&"script"!==o.type)for(const e of["repeat","suction_level","mop_mode_entity","mop_mode","mop_intensity_entity","mop_intensity"]){const t=o[e];void 0!==t&&(s[e]=t)}this._setVacuum(e,{clean_action:{type:t,...s}})})}
+      ${"script"===o.type?this._renderScriptAction(e,o):this._renderNativeOptions(e,o)}`}_renderNativeOptions(e,t){const o="native-area"===t.type?te`<p class="hint">Calls <code>vacuum.clean_area</code> (degraded mode only — with the AnyVac integration the START button sends <code>anyvac.clean</code> instead). No repeat; repeat lives server-side in <code>anyvac.clean</code>.</p>`:"native-auto"===t.type?te`<p class="hint">Legacy value, no longer offered above — behaves identically to <strong>Native</strong> (segment-based) both with and without the integration. Safe to leave as-is; re-selecting "Native" above rewrites it.</p>`:te`<p class="hint">Degraded mode only — with the AnyVac integration the START button always sends <code>anyvac.clean</code> instead, which resolves segments server-side.</p>`;return te`
       <div class="sub-section">
         ${o}
-        ${this._numberSlider("Repeat passes",e.repeat??1,1,3,1,e=>this._setCleanAction(t,{repeat:e}))}
+        ${this._numberSlider("Repeat passes",t.repeat??1,1,3,1,t=>this._setCleanAction(e,{repeat:t}))}
         <div class="sub-title">Suction level (optional)</div>
-        ${(()=>{const o=this.hass.states[this._config.vacuums[t]?.entity]?.attributes.fan_speed_list??[];return o.length?this._optionSelectFromList("Suction option",o,e.suction_level,e=>this._setCleanAction(t,{suction_level:e||void 0})):this._textField("Suction option",e.suction_level,e=>this._setCleanAction(t,{suction_level:e||void 0}),"e.g. balanced")})()}
+        ${(()=>{const o=this.hass.states[this._config.vacuums[e]?.entity]?.attributes.fan_speed_list??[];return o.length?this._optionSelectFromList("Suction option",o,t.suction_level,t=>this._setCleanAction(e,{suction_level:t||void 0})):this._textField("Suction option",t.suction_level,t=>this._setCleanAction(e,{suction_level:t||void 0}),"e.g. balanced")})()}
         <div class="sub-title">Mop mode (optional)</div>
-        ${this._entityPicker("Mop mode entity",e.mop_mode_entity,["select"],e=>this._setCleanAction(t,{mop_mode_entity:e||void 0}))}
-        ${e.mop_mode_entity?this._optionSelect("Mop mode option",e.mop_mode_entity,e.mop_mode,e=>this._setCleanAction(t,{mop_mode:e||void 0})):G}
+        ${this._entityPicker("Mop mode entity",t.mop_mode_entity,["select"],t=>this._setCleanAction(e,{mop_mode_entity:t||void 0}))}
+        ${t.mop_mode_entity?this._optionSelect("Mop mode option",t.mop_mode_entity,t.mop_mode,t=>this._setCleanAction(e,{mop_mode:t||void 0})):ae}
         <div class="sub-title">Mop intensity (optional)</div>
-        ${this._entityPicker("Mop intensity entity",e.mop_intensity_entity,["select"],e=>this._setCleanAction(t,{mop_intensity_entity:e||void 0}))}
-        ${e.mop_intensity_entity?this._optionSelect("Mop intensity option",e.mop_intensity_entity,e.mop_intensity,e=>this._setCleanAction(t,{mop_intensity:e||void 0})):G}
-      </div>`}_renderScriptAction(t,e){const o=e.variables??{},i=Object.entries(o);return q`
+        ${this._entityPicker("Mop intensity entity",t.mop_intensity_entity,["select"],t=>this._setCleanAction(e,{mop_intensity_entity:t||void 0}))}
+        ${t.mop_intensity_entity?this._optionSelect("Mop intensity option",t.mop_intensity_entity,t.mop_intensity,t=>this._setCleanAction(e,{mop_intensity:t||void 0})):ae}
+      </div>`}_renderScriptAction(e,t){const o=t.variables??{},s=Object.entries(o);return te`
       <div class="sub-section">
-        ${this._entityPicker("Script entity",e.entity_id,["script"],e=>this._setCleanAction(t,{entity_id:e}))}
+        ${this._entityPicker("Script entity",t.entity_id,["script"],t=>this._setCleanAction(e,{entity_id:t}))}
         <p class="hint">Tokens: {{ entity }}, {{ selected_segments }}, {{ selected_room_keys }}, {{ selected_area_ids }}</p>
-        ${i.map(([e,s],n)=>q`
+        ${s.map(([t,l],d)=>te`
           <div class="var-row">
-            <input class="text-input text-input--half" .value=${e} placeholder="name"
-              @change=${e=>{const o=e.target.value,s=Object.fromEntries(i.map(([t,e],i)=>[i===n?o:t,e]));this._setCleanAction(t,{variables:s})}} />
+            <input class="text-input text-input--half" .value=${t} placeholder="name"
+              @change=${t=>{const o=t.target.value,l=Object.fromEntries(s.map(([e,t],s)=>[s===d?o:e,t]));this._setCleanAction(e,{variables:l})}} />
             <span class="var-sep">&#8594;</span>
-            <input class="text-input text-input--half" .value=${s} placeholder="{{ entity }}"
-              @change=${i=>{const s={...o,[e]:i.target.value};this._setCleanAction(t,{variables:s})}} />
+            <input class="text-input text-input--half" .value=${l} placeholder="{{ entity }}"
+              @change=${s=>{const l={...o,[t]:s.target.value};this._setCleanAction(e,{variables:l})}} />
             <button class="icon-btn icon-btn--danger icon-btn--sm"
-              @click=${()=>{const e=Object.fromEntries(i.filter((t,e)=>e!==n));this._setCleanAction(t,{variables:e})}}>
+              @click=${()=>{const t=Object.fromEntries(s.filter((e,t)=>t!==d));this._setCleanAction(e,{variables:t})}}>
               <ha-icon icon="mdi:close"></ha-icon>
             </button>
           </div>`)}
         <button class="btn btn--add btn--sm"
-          @click=${()=>this._setCleanAction(t,{variables:{...o,"":""}})}>
+          @click=${()=>this._setCleanAction(e,{variables:{...o,"":""}})}>
           <ha-icon icon="mdi:plus"></ha-icon> Add variable
         </button>
-      </div>`}_renderRoomAccordion(t,e,o){const i=(this._openRoom.get(e)??null)===o;return q`
+      </div>`}_renderRoomAccordion(e,t,o){const s=(this._openRoom.get(t)??null)===o;return te`
       <div class="room-acc"
-        style=${this._dragRoom&&this._dragRoom.vac===e&&this._dragRoom.idx!==o?vt({outline:"2px dashed var(--primary-color,#3b82f6)",outlineOffset:"-2px"}):G}
-        @dragover=${t=>{this._dragRoom&&this._dragRoom.vac===e&&t.preventDefault()}}
-        @drop=${t=>{t.preventDefault(),this._dragRoom&&this._dragRoom.vac===e&&this._moveRoom(e,this._dragRoom.idx,o),this._dragRoom=null}}>
-        <div class="room-acc-header" @click=${()=>this._toggleRoom(e,o)}>
+        style=${this._dragRoom&&this._dragRoom.vac===t&&this._dragRoom.idx!==o?_e({outline:"2px dashed var(--primary-color,#3b82f6)",outlineOffset:"-2px"}):ae}
+        @dragover=${e=>{this._dragRoom&&this._dragRoom.vac===t&&e.preventDefault()}}
+        @drop=${e=>{e.preventDefault(),this._dragRoom&&this._dragRoom.vac===t&&this._moveRoom(t,this._dragRoom.idx,o),this._dragRoom=null}}>
+        <div class="room-acc-header" @click=${()=>this._toggleRoom(t,o)}>
           <ha-icon icon="mdi:drag-horizontal-variant" title="Drag to reorder"
             draggable="true" style="cursor:grab;opacity:0.5;--mdc-icon-size:18px;flex-shrink:0"
-            @click=${t=>t.stopPropagation()}
-            @dragstart=${t=>{this._dragRoom={vac:e,idx:o},t.dataTransfer&&(t.dataTransfer.effectAllowed="move")}}
+            @click=${e=>e.stopPropagation()}
+            @dragstart=${e=>{this._dragRoom={vac:t,idx:o},e.dataTransfer&&(e.dataTransfer.effectAllowed="move")}}
             @dragend=${()=>{this._dragRoom=null}}></ha-icon>
-          <ha-icon class="room-acc-icon" icon=${t.icon||"mdi:square"}></ha-icon>
+          <ha-icon class="room-acc-icon" icon=${e.icon||"mdi:square"}></ha-icon>
           <div class="room-acc-info">
-            <span class="room-acc-name">${t.name||t.key||"Unnamed room"}</span>
-            ${void 0===t.segment_id||this._intEntityFor(this._config.vacuums[e])?G:q`<span class="room-acc-meta">seg ${t.segment_id}</span>`}
+            <span class="room-acc-name">${e.name||e.key||"Unnamed room"}</span>
+            ${void 0===e.segment_id||this._intEntityFor(this._config.vacuums[t])?ae:te`<span class="room-acc-meta">seg ${e.segment_id}</span>`}
           </div>
           <button class="icon-btn icon-btn--danger icon-btn--sm"
-            @click=${t=>{t.stopPropagation(),this._deleteRoom(e,o)}}>
+            @click=${e=>{e.stopPropagation(),this._deleteRoom(t,o)}}>
             <ha-icon icon="mdi:delete"></ha-icon>
           </button>
-          <ha-icon icon=${i?"mdi:chevron-up":"mdi:chevron-down"} class="acc-chevron"></ha-icon>
+          <ha-icon icon=${s?"mdi:chevron-up":"mdi:chevron-down"} class="acc-chevron"></ha-icon>
         </div>
-        ${i?q`
+        ${s?te`
           <div class="room-acc-body">
-            ${this._textField("Key (unique ID)",t.key,t=>this._setRoom(e,o,{key:t}),"e.g. bedroom")}
+            ${this._textField("Key (unique ID)",e.key,e=>this._setRoom(t,o,{key:e}),"e.g. bedroom")}
             <p class="hint">Tip: keep this identical to the room's name in the Roborock app — the AnyVac integration matches rooms by this name (auto-seating, live positions from the integration, room pinning).</p>
-            ${this._textField("Display name",t.name,t=>this._setRoom(e,o,{name:t}),"e.g. Bedroom")}
+            ${this._textField("Display name",e.name,e=>this._setRoom(t,o,{name:e}),"e.g. Bedroom")}
             <p class="hint">Cleaning sequence moved to a shared, backend-owned reorderable
               list — see the <strong>Maps tab</strong> (requires the AnyVac integration + merged mode).</p>
-            ${this._intEntityFor(this._config.vacuums[e])?q`<p class="hint">Segment resolution, timing and clean history are handled
-                  server-side by the AnyVac integration for this vacuum — nothing to set here.</p>`:"native-area"===this._config.vacuums[e]?.clean_action?.type?q`
+            ${this._intEntityFor(this._config.vacuums[t])?te`<p class="hint">Segment resolution, timing and clean history are handled
+                  server-side by the AnyVac integration for this vacuum — nothing to set here.</p>`:"native-area"===this._config.vacuums[t]?.clean_action?.type?te`
                   <div class="field field--row">
                     <label>Effective area</label>
-                    <strong style="font-size:13px">${t.area_id??this._config.area_mappings?.[t.key]??t.key}</strong>
+                    <strong style="font-size:13px">${e.area_id??this._config.area_mappings?.[e.key]??e.key}</strong>
                   </div>
                   <p class="hint map-hint" @click=${()=>{this._tab="global"}}>
                     Set in <strong>Global tab → Area mappings</strong> →
-                  </p>`:q`
+                  </p>`:te`
                   <div class="field field--row">
                     <label>Segment ID</label>
                     <input class="text-input text-input--sm" type="number"
-                      .value=${String(t.segment_id??"")} placeholder="e.g. 16"
-                      @change=${t=>{const i=parseInt(t.target.value);this._setRoom(e,o,{segment_id:isNaN(i)?void 0:i})}} />
+                      .value=${String(e.segment_id??"")} placeholder="e.g. 16"
+                      @change=${e=>{const s=parseInt(e.target.value);this._setRoom(t,o,{segment_id:isNaN(s)?void 0:s})}} />
                   </div>
                   <p class="hint">Find IDs: Developer Tools → Actions → roborock.get_maps</p>
-                  ${this._numberSlider("Est. clean time (fallback)",t.clean_time_mins??0,0,120,1,t=>this._setRoom(e,o,{clean_time_mins:t>0?t:void 0})," min")}
-                  ${this._entityPicker("Clean time fallback (input_number, legacy)",t.clean_time_entity,["input_number"],t=>this._setRoom(e,o,{clean_time_entity:t||void 0}))}
-                  ${this._entityPicker("Last clean fallback (input_datetime, legacy)",t.last_clean_entity,["input_datetime"],t=>this._setRoom(e,o,{last_clean_entity:t||void 0}))}
+                  ${this._numberSlider("Est. clean time (fallback)",e.clean_time_mins??0,0,120,1,e=>this._setRoom(t,o,{clean_time_mins:e>0?e:void 0})," min")}
+                  ${this._entityPicker("Clean time fallback (input_number, legacy)",e.clean_time_entity,["input_number"],e=>this._setRoom(t,o,{clean_time_entity:e||void 0}))}
+                  ${this._entityPicker("Last clean fallback (input_datetime, legacy)",e.last_clean_entity,["input_datetime"],e=>this._setRoom(t,o,{last_clean_entity:e||void 0}))}
                   <p class="hint">Legacy read-only fallbacks for setups without the AnyVac
                     integration — the card never writes these helpers.</p>`}
-            <p class="hint map-hint" @click=${()=>{this._tab="maps",this._mapVac=e,this._mapRoom=o}}>
+            <p class="hint map-hint" @click=${()=>{this._tab="maps",this._mapVac=t,this._mapRoom=o}}>
               📍 Set position &amp; icon in the <strong>Maps tab</strong> →
             </p>
           </div>
-        `:G}
-      </div>`}_renderMapsTab(){const t=this._config.vacuums;if(!t.length)return q`<div class="tab-body"><p class="hint">No vacuums configured. Add one in the Vacuums tab.</p></div>`;const e=Math.min(this._mapVac,t.length-1),o=t[e],i=o.map??{...Xt},s=this._refMapVac===e?this._refMapUrl:"",n=o.base??"map",a="merged"===this._config.map_mode?this._config.image_base:o.image_base,r=("merged"===this._config.map_mode||"image"===n||"combined"===n)&&!!a?.src,l=r?a.src:s,c=r?a.rotation??0:i.rotation??0,d=r?a.scale??100:i.scale??100,h=r?a.offset_x??0:i.offset_x??0,p=r?a.offset_y??0:i.offset_y??0,m=this._editRooms(),u=this._editorSeat(e);return q`
+        `:ae}
+      </div>`}_renderMapsTab(){const e=this._config.vacuums;if(!e.length)return te`<div class="tab-body"><p class="hint">No vacuums configured. Add one in the Vacuums tab.</p></div>`;const t=Math.min(this._mapVac,e.length-1),o=e[t],s=o.map??{...Ne},l=this._refMapVac===t?this._refMapUrl:"",d=o.base??"map",h="merged"===this._config.map_mode?this._config.image_base:o.image_base,p=("merged"===this._config.map_mode||"image"===d||"combined"===d)&&!!h?.src,m=p?h.src:l,u=p?h.rotation??0:s.rotation??0,_=p?h.scale??100:s.scale??100,b=p?h.offset_x??0:s.offset_x??0,v=p?h.offset_y??0:s.offset_y??0,f=this._editRooms(),w=this._editorSeat(t);return te`
       <div class="tab-body">
 
-        ${t.length>1?q`
+        ${e.length>1?te`
           <div class="pill-row">
-            ${t.map((t,o)=>q`
-              <button class="vac-pill ${o===e?"vac-pill--active":""}"
+            ${e.map((e,o)=>te`
+              <button class="vac-pill ${o===t?"vac-pill--active":""}"
                 @click=${()=>{this._mapVac=o,this._mapRoom=null}}>
-                ${t.name||t.entity||"Vacuum "+(o+1)}
+                ${e.name||e.entity||"Vacuum "+(o+1)}
               </button>`)}
           </div>
-        `:G}
+        `:ae}
 
-        ${this._selectField("Map mode (all vacuums)",this._config.map_mode??"split",[{value:"split",label:"Split — one map per vacuum"},{value:"merged",label:"Merged — all in one map"}],t=>this._setConfig({map_mode:"merged"===t?"merged":void 0}))}
+        ${this._selectField("Map mode (all vacuums)",this._config.map_mode??"split",[{value:"split",label:"Split — one map per vacuum"},{value:"merged",label:"Merged — all in one map"}],e=>this._setConfig({map_mode:"merged"===e?"merged":void 0}))}
 
-        ${this._mergedEdit&&!this._config.image_base?.src?q`
+        ${this._mergedEdit&&!this._config.image_base?.src?te`
           <p class="hint">Merged needs a shared floorplan below or vacuums' raw maps just get laid on top of
             each other unaligned. No photo of your own? Pick a vacuum, scroll to "Shared floorplan" and use
             "Use this vacuum's current map as floorplan" — its own rooms place themselves automatically; every
             other vacuum whose room names match then auto-fits too, with nothing else to set.</p>
-        `:G}
+        `:ae}
 
-        ${this._mergedEdit?G:this._selectField("Base layer",o.base??"map",[{value:"map",label:"Vacuum map"},{value:"combined",label:"Image + map"}],t=>this._setVacuum(e,{base:t}))}
+        ${this._mergedEdit?ae:this._selectField("Base layer",o.base??"map",[{value:"map",label:"Vacuum map"},{value:"combined",label:"Image + map"}],e=>this._setVacuum(t,{base:e}))}
 
-        ${this._entityPicker("AnyVac integration sensor",o.integration_entity,["sensor"],t=>this._setVacuum(e,{integration_entity:t}))}
+        ${this._entityPicker("AnyVac integration sensor",o.integration_entity,["sensor"],e=>this._setVacuum(t,{integration_entity:e}))}
 
-        ${this._intEntityFor(o)||"merged"===this._config.map_mode?this._selectField("Hide vacuum map (show only floorplan + robot/path)",o.hide_map?"yes":"no",[{value:"no",label:"no"},{value:"yes",label:"yes"}],t=>this._setVacuum(e,{hide_map:"yes"===t})):G}
+        ${this._intEntityFor(o)||"merged"===this._config.map_mode?this._selectField("Hide vacuum map (show only floorplan + robot/path)",o.hide_map?"yes":"no",[{value:"no",label:"no"},{value:"yes",label:"yes"}],e=>this._setVacuum(t,{hide_map:"yes"===e})):ae}
 
-        ${"combined"===o.base||"merged"===this._config.map_mode?q`
-          ${this._numberSlider("Overlay opacity",o.overlay_opacity??55,0,100,5,t=>this._setVacuum(e,{overlay_opacity:t}),"%")}
-          ${this._selectField("Overlay blend",o.overlay_blend??"normal",[{value:"normal",label:"normal"},{value:"lighten",label:"lighten (isolate path)"},{value:"screen",label:"screen"},{value:"plus-lighter",label:"plus-lighter"}],t=>this._setVacuum(e,{overlay_blend:t}))}
-        `:G}
+        ${"combined"===o.base||"merged"===this._config.map_mode?te`
+          ${this._numberSlider("Overlay opacity",o.overlay_opacity??55,0,100,5,e=>this._setVacuum(t,{overlay_opacity:e}),"%")}
+          ${this._selectField("Overlay blend",o.overlay_blend??"normal",[{value:"normal",label:"normal"},{value:"lighten",label:"lighten (isolate path)"},{value:"screen",label:"screen"},{value:"plus-lighter",label:"plus-lighter"}],e=>this._setVacuum(t,{overlay_blend:e}))}
+        `:ae}
 
-        ${"image"===o.base||"combined"===o.base||"merged"===this._config.map_mode?q`
-          ${"merged"===this._config.map_mode?q`<div class="section-title">Shared floorplan (all vacuums)</div>`:G}
-          ${this._mapEntityFor(o)?q`
+        ${"image"===o.base||"combined"===o.base||"merged"===this._config.map_mode?te`
+          ${"merged"===this._config.map_mode?te`<div class="section-title">Shared floorplan (all vacuums)</div>`:ae}
+          ${this._mapEntityFor(o)?te`
             <button class="btn btn--sm" style="align-self:flex-start"
               ?disabled=${this._floorplanSnapshotBusy}
               @click=${()=>this._snapshotFloorplan(o)}>
@@ -2116,22 +2479,22 @@ const ht=t=>(e,o)=>{void 0!==o?o.addInitializer(()=>{customElements.define(t,e)}
               Pick your fullest-coverage vacuum for this step, then switch to each other vacuum below —
               any of its rooms whose name matches one already placed auto-fits with nothing else to do;
               use "Import" only for rooms exclusive to that vacuum. Requires anyvac integration ≥ 0.88.0.</p>
-            ${this._floorplanSnapshotError?q`<p class="hint" style="color:#ff6b6b">${this._floorplanSnapshotError}</p>`:G}
-          `:G}
-          ${this._textField("Image src (URL)",a?.src,t=>this._setEditedImageBase({src:t}),"/local/anyvac/flat.svg")}
-          ${this._numberSlider("Image rotation",a?.rotation??0,0,360,90,t=>this._setEditedImageBase({rotation:t}),"°")}
-          ${this._numberSlider("Image scale",a?.scale??100,50,200,5,t=>this._setEditedImageBase({scale:t}),"%")}
-          ${this._numberSlider("Image offset X",a?.offset_x??0,-50,50,1,t=>this._setEditedImageBase({offset_x:t}),"%")}
-          ${this._numberSlider("Image offset Y",a?.offset_y??0,-50,50,1,t=>this._setEditedImageBase({offset_y:t}),"%")}
-        `:G}
+            ${this._floorplanSnapshotError?te`<p class="hint" style="color:#ff6b6b">${this._floorplanSnapshotError}</p>`:ae}
+          `:ae}
+          ${this._textField("Image src (URL)",h?.src,e=>this._setEditedImageBase({src:e}),"/local/anyvac/flat.svg")}
+          ${this._numberSlider("Image rotation",h?.rotation??0,0,360,90,e=>this._setEditedImageBase({rotation:e}),"°")}
+          ${this._numberSlider("Image scale",h?.scale??100,50,200,5,e=>this._setEditedImageBase({scale:e}),"%")}
+          ${this._numberSlider("Image offset X",h?.offset_x??0,-50,50,1,e=>this._setEditedImageBase({offset_x:e}),"%")}
+          ${this._numberSlider("Image offset Y",h?.offset_y??0,-50,50,1,e=>this._setEditedImageBase({offset_y:e}),"%")}
+        `:ae}
 
-        ${this._entityPicker("Map image entity",i.entity,["image"],t=>this._setMap(e,{entity:t}))}
-        ${!i.entity&&this._mapEntityFor(o)?q`
+        ${this._entityPicker("Map image entity",s.entity,["image"],e=>this._setMap(t,{entity:e}))}
+        ${!s.entity&&this._mapEntityFor(o)?te`
           <p class="hint">Leave blank to auto-use <code>${this._mapEntityFor(o)}</code> —
             found automatically on this vacuum's device. Set it explicitly only to
             override (e.g. a multi-map vacuum where the wrong floor's image was picked).</p>
-        `:G}
-        ${this._mapEntityFor(o)?q`
+        `:ae}
+        ${this._mapEntityFor(o)?te`
           <button class="btn btn--sm" style="align-self:flex-start"
             @click=${()=>this._snapshotRefMap()}>
             <ha-icon icon="mdi:refresh"></ha-icon> Refresh reference map
@@ -2140,138 +2503,138 @@ const ht=t=>(e,o)=>{void 0!==o?o.addInitializer(()=>{customElements.define(t,e)}
             reload (and visibly flash) on every edit, since Home Assistant refreshes this
             image's URL on nearly every state update. Use this button after the robot
             explores/remaps to update it.</p>
-        `:G}
+        `:ae}
 
-        ${l?q`
+        ${m?te`
           <div class="map-pos-container ${null!==this._mapRoom?"map-pos-container--active":""}"
-            @click=${t=>{if(null===this._mapRoom)return;const e=t.currentTarget.getBoundingClientRect(),o=Math.round((t.clientX-e.left)/e.width*100),i=Math.round((t.clientY-e.top)/e.height*100);this._setEditedRoom(this._mapRoom,{map_x:o,map_y:i})}}>
+            @click=${e=>{if(null===this._mapRoom)return;const t=e.currentTarget.getBoundingClientRect(),o=Math.round((e.clientX-t.left)/t.width*100),s=Math.round((e.clientY-t.top)/t.height*100);this._setEditedRoom(this._mapRoom,{map_x:o,map_y:s})}}>
             <div class="map-preview-wrap"
-              style=${vt(this._pvAR>.1?{paddingTop:(100/this._pvAR).toFixed(2)+"%"}:{})}>
-              <img class="map-preview-img" src=${l} alt="Map preview"
-                @load=${t=>{const e=t.target;if(r&&e.naturalWidth&&e.naturalHeight){const t=e.naturalWidth/e.naturalHeight;Math.abs(t-this._pvAR)>.01&&(this._pvAR=t)}}}
-                style=${vt({left:50+h+"%",top:50+p+"%",width:d+"%",transform:"translate(-50%,-50%) rotate("+c+"deg)"})} />
-              ${this._mergedEdit&&r&&s?q`<img class="map-preview-img" src=${s} alt="Native map"
-                style=${vt({left:50+u.offset_x+"%",top:50+u.offset_y+"%",width:u.scale+"%",transform:"translate(-50%,-50%) rotate("+u.rotation+"deg)",opacity:"0.5"})} />`:G}
-              ${m.map((t,e)=>{const o=e===this._mapRoom,i=t.map_x??50,s=t.map_y??50;if(null!=t.map_w){const n=t.map_w,a=t.map_h??15;return q`
+              style=${_e(this._pvAR>.1?{paddingTop:(100/this._pvAR).toFixed(2)+"%"}:{})}>
+              <img class="map-preview-img" src=${m} alt="Map preview"
+                @load=${e=>{const t=e.target;if(p&&t.naturalWidth&&t.naturalHeight){const e=t.naturalWidth/t.naturalHeight;Math.abs(e-this._pvAR)>.01&&(this._pvAR=e)}}}
+                style=${_e({left:50+b+"%",top:50+v+"%",width:_+"%",transform:"translate(-50%,-50%) rotate("+u+"deg)"})} />
+              ${this._mergedEdit&&p&&l?te`<img class="map-preview-img" src=${l} alt="Native map"
+                style=${_e({left:50+w.offset_x+"%",top:50+w.offset_y+"%",width:w.scale+"%",transform:"translate(-50%,-50%) rotate("+w.rotation+"deg)",opacity:"0.5"})} />`:ae}
+              ${f.map((e,t)=>{const o=t===this._mapRoom,s=e.map_x??50,l=e.map_y??50;if(null!=e.map_w){const d=e.map_w,h=e.map_h??15;return te`
                     <div class="room-rect ${o?"room-rect--active":""}"
-                      style=${vt({left:i+"%",top:s+"%",width:n+"%",height:a+"%"})}
-                      @pointerdown=${o=>this._onRoomPointerDown(e,"move",t,o)}
-                      @pointermove=${t=>this._onRoomPointerMove(t)}
+                      style=${_e({left:s+"%",top:l+"%",width:d+"%",height:h+"%"})}
+                      @pointerdown=${o=>this._onRoomPointerDown(t,"move",e,o)}
+                      @pointermove=${e=>this._onRoomPointerMove(e)}
                       @pointerup=${()=>this._onRoomPointerUp()}
-                      @click=${t=>t.stopPropagation()}>
-                      <ha-icon icon=${t.icon||"mdi:square"} style="--mdc-icon-size:14px"></ha-icon>
-                      ${o?["nw","ne","sw","se"].map(o=>q`
+                      @click=${e=>e.stopPropagation()}>
+                      <ha-icon icon=${e.icon||"mdi:square"} style="--mdc-icon-size:14px"></ha-icon>
+                      ${o?["nw","ne","sw","se"].map(o=>te`
                         <div class="room-rect-handle room-rect-handle--${o}"
-                          @pointerdown=${i=>this._onRoomPointerDown(e,"resize-"+o,t,i)}
-                          @pointermove=${t=>this._onRoomPointerMove(t)}
+                          @pointerdown=${s=>this._onRoomPointerDown(t,"resize-"+o,e,s)}
+                          @pointermove=${e=>this._onRoomPointerMove(e)}
                           @pointerup=${()=>this._onRoomPointerUp()}
-                          @click=${t=>t.stopPropagation()}></div>
-                      `):G}
-                    </div>`}return q`
+                          @click=${e=>e.stopPropagation()}></div>
+                      `):ae}
+                    </div>`}return te`
                   <div class="pos-dot ${o?"pos-dot--active":""}"
-                    style=${vt({left:i+"%",top:s+"%"})}
-                    @pointerdown=${o=>this._onRoomPointerDown(e,"move",t,o)}
-                    @pointermove=${t=>this._onRoomPointerMove(t)}
+                    style=${_e({left:s+"%",top:l+"%"})}
+                    @pointerdown=${o=>this._onRoomPointerDown(t,"move",e,o)}
+                    @pointermove=${e=>this._onRoomPointerMove(e)}
                     @pointerup=${()=>this._onRoomPointerUp()}
-                    @click=${t=>t.stopPropagation()}>
-                    <ha-icon icon=${t.icon||"mdi:square"} style="--mdc-icon-size:14px"></ha-icon>
+                    @click=${e=>e.stopPropagation()}>
+                    <ha-icon icon=${e.icon||"mdi:square"} style="--mdc-icon-size:14px"></ha-icon>
                   </div>`})}
             </div>
           </div>
 
           <div class="section-title">Map seating ${this._mergedEdit?"(this vacuum)":""}</div>
-          ${this._selectField("Seating","manual"===i.seat?"manual":"auto",[{value:"auto",label:"Auto — fit from rooms"},{value:"manual",label:"Manual — sliders"}],t=>this._setMap(e,{seat:"manual"===t?"manual":void 0}))}
-          ${"manual"!==i.seat?u.auto?q`
-            <p class="hint">✅ Auto-fit from <strong>${u.anchorCount}</strong> room${(u.anchorCount??0)>1?"s":""}:
-              rot ${u.rotation}° · scale ${u.scale.toFixed(1)}% · offset ${u.offset_x.toFixed(1)}/${u.offset_y.toFixed(1)}%
-              · fit error ${(u.residual??0).toFixed(1)}%${(u.residual??0)>3?" ⚠️ check room rectangles / keys":""}${1===u.anchorCount?" (single room — orientation estimated from its shape)":""}.
+          ${this._selectField("Seating","manual"===s.seat?"manual":"auto",[{value:"auto",label:"Auto — fit from rooms"},{value:"manual",label:"Manual — sliders"}],e=>this._setMap(t,{seat:"manual"===e?"manual":void 0}))}
+          ${"manual"!==s.seat?w.auto?te`
+            <p class="hint">✅ Auto-fit from <strong>${w.anchorCount}</strong> room${(w.anchorCount??0)>1?"s":""}:
+              rot ${w.rotation}° · scale ${w.scale.toFixed(1)}% · offset ${w.offset_x.toFixed(1)}/${w.offset_y.toFixed(1)}%
+              · fit error ${(w.residual??0).toFixed(1)}%${(w.residual??0)>3?" ⚠️ check room rectangles / keys":""}${1===w.anchorCount?" (single room — orientation estimated from its shape)":""}.
               Recomputed live — self-heals after the robot remaps.</p>
-          `:q`
+          `:te`
             <p class="hint">Auto-fit inactive — it needs the integration sensor, a floorplan and at least one
               room rectangle whose key matches a room name on this robot's map. Using the manual values below.</p>
-          `:G}
-          ${t.length>1&&m.length>0?(()=>{const t=this._unmatchedOwnRoomNames(e);return t.length?q`
-              <p class="hint" style="color:#faad14">⚠️ This vacuum reports room${t.length>1?"s":""}
-                not on the shared floorplan yet: <strong>${t.join(", ")}</strong>. If any of these are the
+          `:ae}
+          ${e.length>1&&f.length>0?(()=>{const e=this._unmatchedOwnRoomNames(t);return e.length?te`
+              <p class="hint" style="color:#faad14">⚠️ This vacuum reports room${e.length>1?"s":""}
+                not on the shared floorplan yet: <strong>${e.join(", ")}</strong>. If any of these are the
                 same physical room as one already listed above under a different name, rename it to match in the
                 Roborock app (room pairing is by exact name across vacuums) — otherwise use Import below to add it.</p>
-            `:G})():G}
-          ${"manual"!==i.seat&&u.auto?G:q`
-            ${this._numberSlider("Rotation",i.rotation??0,0,360,90,t=>this._setMap(e,{rotation:t}),"°")}
-            ${this._numberSlider("Scale",i.scale??100,50,200,5,t=>this._setMap(e,{scale:t}),"%")}
-            ${this._numberSlider("Offset X",i.offset_x??0,-50,50,1,t=>this._setMap(e,{offset_x:t}),"%")}
-            ${this._numberSlider("Offset Y",i.offset_y??0,-50,50,1,t=>this._setMap(e,{offset_y:t}),"%")}
+            `:ae})():ae}
+          ${"manual"!==s.seat&&w.auto?ae:te`
+            ${this._numberSlider("Rotation",s.rotation??0,0,360,90,e=>this._setMap(t,{rotation:e}),"°")}
+            ${this._numberSlider("Scale",s.scale??100,50,200,5,e=>this._setMap(t,{scale:e}),"%")}
+            ${this._numberSlider("Offset X",s.offset_x??0,-50,50,1,e=>this._setMap(t,{offset_x:e}),"%")}
+            ${this._numberSlider("Offset Y",s.offset_y??0,-50,50,1,e=>this._setMap(t,{offset_y:e}),"%")}
           `}
-          ${this._intEntityFor(o)?q`
+          ${this._intEntityFor(o)?te`
             <button class="btn btn--add btn--sm" style="align-self:flex-start"
-              @click=${()=>this._importRooms(e)}>
+              @click=${()=>this._importRooms(t)}>
               <ha-icon icon="mdi:import"></ha-icon> Import missing rooms from this vacuum
             </button>
             <p class="hint">Adds rooms this robot's map knows that aren't on the floorplan yet
               (key = Roborock room name), placed through its current seat. Import from your
               reference (whole-home) robot first; then switch to another robot to supplement
               rooms only it has — it will be seated via the rooms you already share.</p>
-          `:G}
+          `:ae}
 
-          ${"merged"===this._config.map_mode&&this._intEntityFor(o)&&m.length?(()=>{const t=this._roomSequence(o),e=this._roomsInSequenceOrder(m,t),i=m.filter(e=>!e.key||void 0===t[e.key]).length;return q`
+          ${"merged"===this._config.map_mode&&this._intEntityFor(o)&&f.length?(()=>{const e=this._roomSequence(o),t=this._roomsInSequenceOrder(f,e),s=f.filter(t=>!t.key||void 0===e[t.key]).length;return te`
               <div class="section-title">Cleaning sequence</div>
               <p class="hint">The order configured in the Roborock app — it's dominant regardless of
                 what HA sends, so the backend needs to know it to predict wet-clean timing correctly
                 (docs/19). Drag to match your app's order. Shared across all vacuums/dashboards
                 (backend-owned, like room pinning) — not saved in this card's config.</p>
-              ${i?q`<p class="hint" style="color:#faad14">⚠ ${i}
-                room${i>1?"s":""} not yet sequenced — dragged to the end,
-                ETA will be a rough estimate for ${i>1?"them":"it"} until set.</p>`:G}
+              ${s?te`<p class="hint" style="color:#faad14">⚠ ${s}
+                room${s>1?"s":""} not yet sequenced — dragged to the end,
+                ETA will be a rough estimate for ${s>1?"them":"it"} until set.</p>`:ae}
               <div class="seq-list">
-                ${e.map((i,s)=>q`
-                  <div class="seq-row ${this._dragSeq===s?"seq-row--dragging":""}"
-                    @dragover=${t=>{null!==this._dragSeq&&t.preventDefault()}}
-                    @drop=${t=>{t.preventDefault(),null!==this._dragSeq&&this._moveSequence(o,e,this._dragSeq,s),this._dragSeq=null}}>
+                ${t.map((s,l)=>te`
+                  <div class="seq-row ${this._dragSeq===l?"seq-row--dragging":""}"
+                    @dragover=${e=>{null!==this._dragSeq&&e.preventDefault()}}
+                    @drop=${e=>{e.preventDefault(),null!==this._dragSeq&&this._moveSequence(o,t,this._dragSeq,l),this._dragSeq=null}}>
                     <ha-icon icon="mdi:drag-horizontal-variant" title="Drag to reorder"
                       draggable="true" style="cursor:grab;opacity:0.5;--mdc-icon-size:18px;flex-shrink:0"
-                      @dragstart=${t=>{this._dragSeq=s,t.dataTransfer&&(t.dataTransfer.effectAllowed="move")}}
+                      @dragstart=${e=>{this._dragSeq=l,e.dataTransfer&&(e.dataTransfer.effectAllowed="move")}}
                       @dragend=${()=>{this._dragSeq=null}}></ha-icon>
-                    <span class="seq-pos">${s+1}</span>
-                    <ha-icon icon=${i.icon||"mdi:square"} style="--mdc-icon-size:15px"></ha-icon>
-                    <span class="seq-name">${i.name||i.key||"Room "+(s+1)}</span>
-                    ${i.key&&void 0!==t[i.key]?G:q`<span class="seq-flag" title="Not yet sequenced">?</span>`}
+                    <span class="seq-pos">${l+1}</span>
+                    <ha-icon icon=${s.icon||"mdi:square"} style="--mdc-icon-size:15px"></ha-icon>
+                    <span class="seq-name">${s.name||s.key||"Room "+(l+1)}</span>
+                    ${s.key&&void 0!==e[s.key]?ae:te`<span class="seq-flag" title="Not yet sequenced">?</span>`}
                   </div>`)}
               </div>
-            `})():G}
+            `})():ae}
 
-          ${"merged"===this._config.map_mode?q`<button class="btn btn--add btn--sm" style="align-self:flex-start;margin-top:4px" @click=${()=>this._addEditedRoom()}><ha-icon icon="mdi:plus"></ha-icon> Add room</button>`:G}
-          ${m.length?q`
+          ${"merged"===this._config.map_mode?te`<button class="btn btn--add btn--sm" style="align-self:flex-start;margin-top:4px" @click=${()=>this._addEditedRoom()}><ha-icon icon="mdi:plus"></ha-icon> Add room</button>`:ae}
+          ${f.length?te`
             <div class="section-title">Room positions</div>
             <p class="hint">${null!==this._mapRoom?"Drag the dot/rectangle to move it (rectangle mode: drag a corner to resize). Tap it again to deselect, or click elsewhere on the map to jump the selected room there.":"Select a room below, then drag it on the map — or click the map to jump the selected room there."}</p>
             <div class="pill-row">
-              ${m.map((t,e)=>q`
-                <button class="room-pill ${e===this._mapRoom?"room-pill--active":""}"
-                  @click=${()=>{this._mapRoom=e===this._mapRoom?null:e}}>
-                  <ha-icon icon=${t.icon||"mdi:square"} style="--mdc-icon-size:13px"></ha-icon>
-                  ${t.name||t.key||"Room "+(e+1)}
+              ${f.map((e,t)=>te`
+                <button class="room-pill ${t===this._mapRoom?"room-pill--active":""}"
+                  @click=${()=>{this._mapRoom=t===this._mapRoom?null:t}}>
+                  <ha-icon icon=${e.icon||"mdi:square"} style="--mdc-icon-size:13px"></ha-icon>
+                  ${e.name||e.key||"Room "+(t+1)}
                 </button>`)}
             </div>
 
-            ${null!==this._mapRoom?q`
-              ${"merged"===this._config.map_mode?q`
-                ${this._textField("Key (= Roborock room name)",m[this._mapRoom]?.key,t=>this._setEditedRoom(this._mapRoom,{key:t}),"Kitchen")}
-                ${this._textField("Name",m[this._mapRoom]?.name,t=>this._setEditedRoom(this._mapRoom,{name:t}),"Kitchen")}
-                ${this._numberSlider("Dry clean time",m[this._mapRoom]?.clean_time_dry??0,0,120,1,t=>this._setEditedRoom(this._mapRoom,{clean_time_dry:t>0?t:void 0})," min")}
-                ${this._numberSlider("Wet clean time",m[this._mapRoom]?.clean_time_wet??0,0,180,1,t=>this._setEditedRoom(this._mapRoom,{clean_time_wet:t>0?t:void 0})," min")}
-              `:G}
+            ${null!==this._mapRoom?te`
+              ${"merged"===this._config.map_mode?te`
+                ${this._textField("Key (= Roborock room name)",f[this._mapRoom]?.key,e=>this._setEditedRoom(this._mapRoom,{key:e}),"Kitchen")}
+                ${this._textField("Name",f[this._mapRoom]?.name,e=>this._setEditedRoom(this._mapRoom,{name:e}),"Kitchen")}
+                ${this._numberSlider("Dry clean time",f[this._mapRoom]?.clean_time_dry??0,0,120,1,e=>this._setEditedRoom(this._mapRoom,{clean_time_dry:e>0?e:void 0})," min")}
+                ${this._numberSlider("Wet clean time",f[this._mapRoom]?.clean_time_wet??0,0,180,1,e=>this._setEditedRoom(this._mapRoom,{clean_time_wet:e>0?e:void 0})," min")}
+              `:ae}
               <div class="section-title" style="margin-top:4px">Position</div>
-              ${this._numberSlider("X",m[this._mapRoom]?.map_x??50,0,100,1,t=>this._setEditedRoom(this._mapRoom,{map_x:t}),"%")}
-              ${this._numberSlider("Y",m[this._mapRoom]?.map_y??50,0,100,1,t=>this._setEditedRoom(this._mapRoom,{map_y:t}),"%")}
+              ${this._numberSlider("X",f[this._mapRoom]?.map_x??50,0,100,1,e=>this._setEditedRoom(this._mapRoom,{map_x:e}),"%")}
+              ${this._numberSlider("Y",f[this._mapRoom]?.map_y??50,0,100,1,e=>this._setEditedRoom(this._mapRoom,{map_y:e}),"%")}
 
               <div class="section-title" style="margin-top:4px">Overlay mode</div>
-              ${(()=>{const t=m[this._mapRoom];return void 0!==t?.map_w?q`
-                  ${this._numberSlider("Width",t.map_w,1,100,1,t=>this._setEditedRoom(this._mapRoom,{map_w:t}),"%")}
-                  ${this._numberSlider("Height",t.map_h??15,1,100,1,t=>this._setEditedRoom(this._mapRoom,{map_h:t}),"%")}
+              ${(()=>{const e=f[this._mapRoom];return void 0!==e?.map_w?te`
+                  ${this._numberSlider("Width",e.map_w,1,100,1,e=>this._setEditedRoom(this._mapRoom,{map_w:e}),"%")}
+                  ${this._numberSlider("Height",e.map_h??15,1,100,1,e=>this._setEditedRoom(this._mapRoom,{map_h:e}),"%")}
                   <button class="btn btn--sm" style="align-self:flex-start"
                     @click=${()=>this._setEditedRoom(this._mapRoom,{map_w:void 0,map_h:void 0})}>
                     Switch to point mode
                   </button>
-                `:q`
+                `:te`
                   <button class="btn btn--add btn--sm" style="align-self:flex-start"
                     @click=${()=>this._setEditedRoom(this._mapRoom,{map_w:20,map_h:15})}>
                     <ha-icon icon="mdi:rectangle-outline"></ha-icon> Enable rectangle overlay
@@ -2279,16 +2642,16 @@ const ht=t=>(e,o)=>{void 0!==o?o.addInitializer(()=>{customElements.define(t,e)}
                 `})()}
 
               <div class="section-title" style="margin-top:4px">Icon</div>
-              ${this._iconPickerField(m[this._mapRoom]?.icon,t=>this._setEditedRoom(this._mapRoom,{icon:t}))}
-              ${m[this._mapRoom]?.icon?q`
+              ${this._iconPickerField(f[this._mapRoom]?.icon,e=>this._setEditedRoom(this._mapRoom,{icon:e}))}
+              ${f[this._mapRoom]?.icon?te`
                 <div class="field">
                   <label>Icon position</label>
                   <div class="anchor-picker">
-                    ${["tl","t","tr","l","c","r","bl","b","br"].map(t=>q`<button
-                        class="anchor-cell ${(m[this._mapRoom]?.icon_anchor??"c")===t?"anchor-cell--active":""}"
-                        title=${t}
-                        @click=${()=>this._setEditedRoom(this._mapRoom,{icon_anchor:t})}>
-                        ${{tl:"↖",t:"↑",tr:"↗",l:"←",c:"·",r:"→",bl:"↙",b:"↓",br:"↘"}[t]}
+                    ${["tl","t","tr","l","c","r","bl","b","br"].map(e=>te`<button
+                        class="anchor-cell ${(f[this._mapRoom]?.icon_anchor??"c")===e?"anchor-cell--active":""}"
+                        title=${e}
+                        @click=${()=>this._setEditedRoom(this._mapRoom,{icon_anchor:e})}>
+                        ${{tl:"↖",t:"↑",tr:"↗",l:"←",c:"·",r:"→",bl:"↙",b:"↓",br:"↘"}[e]}
                       </button>`)}
                   </div>
                   <button class="btn btn--sm" style="margin-top:4px;align-self:flex-start"
@@ -2296,30 +2659,30 @@ const ht=t=>(e,o)=>{void 0!==o?o.addInitializer(()=>{customElements.define(t,e)}
                     Hide icon in overlay
                   </button>
                 </div>
-              `:G}
-              ${"merged"===this._config.map_mode?q`<button class="btn btn--sm" style="align-self:flex-start;margin-top:6px" @click=${()=>this._deleteEditedRoom(this._mapRoom)}><ha-icon icon="mdi:delete"></ha-icon> Delete room</button>`:G}
-            `:G}
-          `:q`${"merged"===this._config.map_mode?q`<p class="hint">No rooms yet — use "Add room" above.</p>`:q`<p class="hint">Add rooms in the Vacuums tab to position them here.</p>`}`}
-        `:q`<p class="hint">Select a map or image above to enable the placement preview.</p>`}
+              `:ae}
+              ${"merged"===this._config.map_mode?te`<button class="btn btn--sm" style="align-self:flex-start;margin-top:6px" @click=${()=>this._deleteEditedRoom(this._mapRoom)}><ha-icon icon="mdi:delete"></ha-icon> Delete room</button>`:ae}
+            `:ae}
+          `:te`${"merged"===this._config.map_mode?te`<p class="hint">No rooms yet — use "Add room" above.</p>`:te`<p class="hint">Add rooms in the Vacuums tab to position them here.</p>`}`}
+        `:te`<p class="hint">Select a map or image above to enable the placement preview.</p>`}
 
-        ${this._intEntityFor(o)?q`
+        ${this._intEntityFor(o)?te`
           <div class="section-title" style="margin-top:4px">Appearance</div>
-          ${this._hexColorField("Path colour",o.path_color,t=>this._setVacuum(e,{path_color:t||void 0}),o.color?this._resolveColor(o.color,"green"):Mt[e%Mt.length])}
-          ${this._numberSlider("Path width",o.path_width??100,20,300,10,t=>this._setVacuum(e,{path_width:t}),"%")}
-          ${this._hexColorField("Mop band colour",o.mop_path_color,t=>this._setVacuum(e,{mop_path_color:t||void 0}),"#40a9ff")}
-          ${this._numberSlider("Mop band opacity",o.mop_band_opacity??28,0,100,5,t=>this._setVacuum(e,{mop_band_opacity:t}),"%")}
-          ${this._numberSlider("Mop band width",o.mop_band_width??100,20,400,10,t=>this._setVacuum(e,{mop_band_width:t}),"%")}
-          ${o.image?this._selectField("Robot image on map (uses status image)",o.robot_image_on_map?"yes":"no",[{value:"no",label:"no"},{value:"yes",label:"yes"}],t=>this._setVacuum(e,{robot_image_on_map:"yes"===t})):G}
-          ${o.robot_image_on_map?this._numberSlider("Robot image size",o.robot_size??100,40,220,10,t=>this._setVacuum(e,{robot_size:t}),"%"):G}
-          ${o.robot_image_on_map?this._numberSlider("Robot image rotation",o.robot_image_rotation??0,-180,180,15,t=>this._setVacuum(e,{robot_image_rotation:t}),"°"):G}
-        `:G}
+          ${this._hexColorField("Path colour",o.path_color,e=>this._setVacuum(t,{path_color:e||void 0}),o.color?this._resolveColor(o.color,"green"):$e[t%$e.length])}
+          ${this._numberSlider("Path width",o.path_width??100,20,300,10,e=>this._setVacuum(t,{path_width:e}),"%")}
+          ${this._hexColorField("Mop band colour",o.mop_path_color,e=>this._setVacuum(t,{mop_path_color:e||void 0}),"#40a9ff")}
+          ${this._numberSlider("Mop band opacity",o.mop_band_opacity??28,0,100,5,e=>this._setVacuum(t,{mop_band_opacity:e}),"%")}
+          ${this._numberSlider("Mop band width",o.mop_band_width??100,20,400,10,e=>this._setVacuum(t,{mop_band_width:e}),"%")}
+          ${o.image?this._selectField("Robot image on map (uses status image)",o.robot_image_on_map?"yes":"no",[{value:"no",label:"no"},{value:"yes",label:"yes"}],e=>this._setVacuum(t,{robot_image_on_map:"yes"===e})):ae}
+          ${o.robot_image_on_map?this._numberSlider("Robot image size",o.robot_size??100,40,220,10,e=>this._setVacuum(t,{robot_size:e}),"%"):ae}
+          ${o.robot_image_on_map?this._numberSlider("Robot image rotation",o.robot_image_rotation??0,-180,180,15,e=>this._setVacuum(t,{robot_image_rotation:e}),"°"):ae}
+        `:ae}
 
-        ${this._numberSlider("Card height (0=auto)",("merged"===this._config.map_mode?this._config.base_height:o.base_height)??0,0,700,10,t=>"merged"===this._config.map_mode?this._setConfig({base_height:t>0?t:void 0}):this._setVacuum(e,{base_height:t>0?t:void 0}),"px")}
+        ${this._numberSlider("Card height (0=auto)",("merged"===this._config.map_mode?this._config.base_height:o.base_height)??0,0,700,10,e=>"merged"===this._config.map_mode?this._setConfig({base_height:e>0?e:void 0}):this._setVacuum(t,{base_height:e>0?e:void 0}),"px")}
 
-      </div>`}_dbgRow(t,e){return q`<div class="field field--row">
-      <label>${t}</label>
-      <span style="font-size:12px;font-family:monospace;word-break:break-all">${null==e||""===e?"—":String(e)}</span>
-    </div>`}_renderDebugTab(){const t=t=>{try{return JSON.stringify(t,null,1)}catch{return String(t)}},e="font-size:11px;font-family:monospace;white-space:pre-wrap;word-break:break-all;background:rgba(127,127,127,0.12);padding:6px;border-radius:6px;margin:0;max-height:220px;overflow:auto";return q`
+      </div>`}_dbgRow(e,t){return te`<div class="field field--row">
+      <label>${e}</label>
+      <span style="font-size:12px;font-family:monospace;word-break:break-all">${null==t||""===t?"—":String(t)}</span>
+    </div>`}_renderDebugTab(){const fmt=e=>{try{return JSON.stringify(e,null,1)}catch{return String(e)}},e="font-size:11px;font-family:monospace;white-space:pre-wrap;word-break:break-all;background:rgba(127,127,127,0.12);padding:6px;border-radius:6px;margin:0;max-height:220px;overflow:auto";return te`
       <div class="tab-body">
         <p class="hint">Live values from Home Assistant, read-only — to check the integration is writing data correctly.</p>
         <div class="field field--row">
@@ -2327,7 +2690,7 @@ const ht=t=>(e,o)=>{void 0!==o?o.addInitializer(()=>{customElements.define(t,e)}
           <label class="toggle-wrap">
             <input type="checkbox" class="toggle-input"
               .checked=${this._config.debug_room_progress??!1}
-              @change=${t=>this._setConfig({debug_room_progress:t.target.checked||void 0})} />
+              @change=${e=>this._setConfig({debug_room_progress:e.target.checked||void 0})} />
             <span class="toggle-track"></span>
           </label>
         </div>
@@ -2337,50 +2700,92 @@ const ht=t=>(e,o)=>{void 0!==o?o.addInitializer(()=>{customElements.define(t,e)}
           <label class="toggle-wrap">
             <input type="checkbox" class="toggle-input"
               .checked=${this._config.debug_dense_dock??!1}
-              @change=${t=>this._setConfig({debug_dense_dock:t.target.checked||void 0})} />
+              @change=${e=>this._setConfig({debug_dense_dock:e.target.checked||void 0})} />
             <span class="toggle-track"></span>
           </label>
         </div>
         <p class="hint">Brings back the old portrait room list (name, age, pin, assigned vacuum) below the map — the minimalist cockpit (docs/25 §7c) drops it in favor of map-tap selection. Independent of the gauges toggle above — you can debug coverage % (which shows on the map either way) without this.</p>
-        ${this._config.vacuums.map(o=>{const i=this._intEntityFor(o),s=i?this.hass.states[i]:void 0,n=s?.attributes??{},a=n.mop_signal??{};return q`
-            <div class="section-title">${o.name??o.entity}</div>
+        ${this._config.vacuums.map(t=>{const o=this._intEntityFor(t),s=o?this.hass.states[o]:void 0,l=s?.attributes??{},d=l.mop_signal??{};return te`
+            <div class="section-title">${t.name??t.entity}</div>
             <div class="sub-section">
-              ${i?s?q`
-                    ${this._dbgRow("sensor",`${i} = ${s.state}`)}
-                    ${this._dbgRow("schema_version",n.schema_version)}
-                    ${this._dbgRow("pipeline_ok",n.pipeline_ok)}
-                    ${this._dbgRow("clean_type",n.clean_type)}
-                    ${this._dbgRow("in_cleaning",n.in_cleaning)}
-                    ${this._dbgRow("vacuum_room_name",n.vacuum_room_name)}
-                    ${this._dbgRow("water_mode_name",a.water_mode_name)}
-                    ${this._dbgRow("fan_speed_name",a.fan_speed_name)}
-                    ${this._dbgRow("path pts (decimated)",Array.isArray(n.path)?n.path.length:"—")}
-                    ${this._dbgRow("path pts (raw)",n.path_points)}
-                    ${this._dbgRow("mop pts (raw)",n.mop_path_points)}
+              ${o?s?te`
+                    ${this._dbgRow("sensor",`${o} = ${s.state}`)}
+                    ${this._dbgRow("schema_version",l.schema_version)}
+                    ${this._dbgRow("pipeline_ok",l.pipeline_ok)}
+                    ${this._dbgRow("clean_type",l.clean_type)}
+                    ${this._dbgRow("in_cleaning",l.in_cleaning)}
+                    ${this._dbgRow("vacuum_room_name",l.vacuum_room_name)}
+                    ${this._dbgRow("water_mode_name",d.water_mode_name)}
+                    ${this._dbgRow("fan_speed_name",d.fan_speed_name)}
+                    ${this._dbgRow("path pts (decimated)",Array.isArray(l.path)?l.path.length:"—")}
+                    ${this._dbgRow("path pts (raw)",l.path_points)}
+                    ${this._dbgRow("mop pts (raw)",l.mop_path_points)}
                     <div class="sub-title">calib — last single-room decision</div>
-                    <pre style=${e}>${t(n.calib_debug)}</pre>
+                    <pre style=${e}>${fmt(l.calib_debug)}</pre>
                     <div class="sub-title">rooms_estimate (per vacuum)</div>
-                    <pre style=${e}>${t(n.rooms_estimate)}</pre>
+                    <pre style=${e}>${fmt(l.rooms_estimate)}</pre>
                     <div class="sub-title">rooms_last_cleaned (cross-vacuum)</div>
-                    <pre style=${e}>${t(n.rooms_last_cleaned)}</pre>
+                    <pre style=${e}>${fmt(l.rooms_last_cleaned)}</pre>
                     <div class="sub-title">rooms_progress — spatial % + time ratio (live)</div>
-                    <pre style=${e}>${t(n.rooms_progress)}</pre>
+                    <pre style=${e}>${fmt(l.rooms_progress)}</pre>
                     <div class="sub-title">rooms (geometry — for spatial coverage)</div>
-                    <pre style=${e}>${t((n.rooms??[]).map(t=>({name:t.name,bbox_px:t.bbox_px,x0:t.x0,y0:t.y0,x1:t.x1,y1:t.y1})))}</pre>
-                    <details><summary class="hint" style="cursor:pointer">Raw attributes</summary><pre style=${e}>${t(n)}</pre></details>
-                  `:q`<p class="hint">Sensor <code>${i}</code> not found.</p>`:q`<p class="hint">No AnyVac integration sensor found (config or auto-resolve) — backend values unavailable.</p>`}
+                    <pre style=${e}>${fmt((l.rooms??[]).map(e=>({name:e.name,bbox_px:e.bbox_px,x0:e.x0,y0:e.y0,x1:e.x1,y1:e.y1})))}</pre>
+                    <details><summary class="hint" style="cursor:pointer">Raw attributes</summary><pre style=${e}>${fmt(l)}</pre></details>
+                  `:te`<p class="hint">Sensor <code>${o}</code> not found.</p>`:te`<p class="hint">No AnyVac integration sensor found (config or auto-resolve) — backend values unavailable.</p>`}
             </div>`})}
       </div>
-    `}_renderGlobalTab(){const t=this._config.global_actions??[],e=this._config.room_thresholds??Qt;return q`
+    `}_renderGlobalTab(){const e=this._config.global_actions??[],t=this._config.room_thresholds??je;return te`
       <div class="tab-body">
 
-        <div class="section-title">Layout</div>
+        <div class="section-title">Appearance</div>
+        ${this._selectField("Theme",this._config.theme??Re,[{value:"dark",label:"Dark — lifted surfaces, soft elevation"},{value:"light",label:"Light — for a light HA theme"},{value:"auto",label:"Auto — follow the system setting"},{value:"legacy",label:"Legacy — the pre-1.2.0 look"}],e=>this._setConfig({theme:e===Re?void 0:e}))}
+        <p class="hint">Before 1.2.0 the card was dark-only and unreadable on a light dashboard.
+          "Legacy" is the exact previous appearance, kept as a way back if a dashboard was
+          tuned around it.</p>
+
+        ${this._hexColorField("Accent colour",this._config.accent,e=>this._setConfig({accent:e||void 0}),Ae)}
+        <div class="hex-color-row" style="flex-wrap:wrap;gap:6px;margin:-4px 0 0">
+          ${Me.map(e=>{const t=(this._config.accent??Ae).toLowerCase()===e.hex.toLowerCase();return te`<button type="button" title=${e.label}
+              style=${"width:24px;height:24px;padding:0;border-radius:50%;cursor:pointer;background:"+e.hex+";border:2px solid "+(t?"#fff":"transparent")+";box-shadow:0 0 0 1px rgba(0,0,0,0.35)"}
+              @click=${()=>this._setConfig({accent:e.hex})}></button>`})}
+        </div>
+        <p class="hint">Drives the primary action (START), room selection and focus rings.
+          Status colours are deliberately left alone — their saturation carries meaning
+          (cleaning / mopping / error), not taste.</p>
+
+        <div class="field field--row">
+          <label>Calm resting state</label>
+          <label class="toggle-wrap">
+            <input type="checkbox" class="toggle-input"
+              .checked=${!1!==this._config.calm_state}
+              @change=${e=>this._setConfig({calm_state:!!e.target.checked&&void 0})} />
+            <span class="toggle-track"></span>
+          </label>
+        </div>
+        <p class="hint">When nothing is running and nothing is selected, the leftover map trace
+          and the secondary numbers step back so the one thing worth touching stands out.
+          Nothing is hidden or disabled — it's purely de-emphasis.</p>
+
+        <div class="field field--row">
+          <label>Reduce motion</label>
+          <label class="toggle-wrap">
+            <input type="checkbox" class="toggle-input"
+              .checked=${!!this._config.reduce_motion}
+              @change=${e=>this._setConfig({reduce_motion:!!e.target.checked||void 0})} />
+            <span class="toggle-track"></span>
+          </label>
+        </div>
+        <p class="hint">Turns off the press feedback and the live pulses. Your operating
+          system's own "reduce motion" setting already does this on its own — this is for
+          switching them off without changing that.</p>
+
+        <div class="section-title" style="margin-top:4px">Layout</div>
         <div class="field field--row">
           <label>Fit card to available screen space</label>
           <label class="toggle-wrap">
             <input type="checkbox" class="toggle-input"
               .checked=${!!this._config.layout}
-              @change=${t=>this._setConfig({layout:t.target.checked?this._config.layout??{}:void 0})} />
+              @change=${e=>this._setConfig({layout:e.target.checked?this._config.layout??{}:void 0})} />
             <span class="toggle-track"></span>
           </label>
         </div>
@@ -2391,13 +2796,13 @@ const ht=t=>(e,o)=>{void 0!==o?o.addInitializer(()=>{customElements.define(t,e)}
           (column/row overrides, map crop, orientation) is still YAML-only — this toggle
           turns the system on with its built-in defaults; switch to YAML mode to fine-tune.</p>
 
-        ${this._config.layout?q`
+        ${this._config.layout?te`
           <div class="field field--row">
             <label>Flip portrait map 180°</label>
             <label class="toggle-wrap">
               <input type="checkbox" class="toggle-input"
                 .checked=${!0===this._config.layout.portrait?.crop?.flip}
-                @change=${t=>this._setLayoutFlip("portrait",t.target.checked)} />
+                @change=${e=>this._setLayoutFlip("portrait",e.target.checked)} />
               <span class="toggle-track"></span>
             </label>
           </div>
@@ -2406,7 +2811,7 @@ const ht=t=>(e,o)=>{void 0!==o?o.addInitializer(()=>{customElements.define(t,e)}
             <label class="toggle-wrap">
               <input type="checkbox" class="toggle-input"
                 .checked=${!0===this._config.layout.landscape?.crop?.flip}
-                @change=${t=>this._setLayoutFlip("landscape",t.target.checked)} />
+                @change=${e=>this._setLayoutFlip("landscape",e.target.checked)} />
               <span class="toggle-track"></span>
             </label>
           </div>
@@ -2414,26 +2819,26 @@ const ht=t=>(e,o)=>{void 0!==o?o.addInitializer(()=>{customElements.define(t,e)}
             you're used to (docs/32) — a persisted default for this card. There's also a
             "Flip map" button in the running card's map toolbar for a quick, unsaved
             per-screen try-out that doesn't touch this setting.</p>
-        `:G}
+        `:ae}
 
         <div class="section-title" style="margin-top:4px">Controller</div>
-        ${this._selectField("Mode",this._config.ui_mode??"auto",[{value:"auto",label:"Auto — one orchestrated controller"},{value:"manual",label:"Manual — per-robot controllers"}],t=>this._setConfig({ui_mode:t}))}
+        ${this._selectField("Mode",this._config.ui_mode??"auto",[{value:"auto",label:"Auto — one orchestrated controller"},{value:"manual",label:"Manual — per-robot controllers"}],e=>this._setConfig({ui_mode:e}))}
 
         <div class="section-title" style="margin-top:4px">Global presets (Auto mode)</div>
         <p class="hint">Targeted whole-home cleans for Auto mode (e.g. "After dinner", "Whole home"). The integration decides which robots and the order; you pick the scope.</p>
-        ${(this._config.global_presets??[]).map((t,e)=>q`
+        ${(this._config.global_presets??[]).map((e,t)=>te`
           <div class="sub-section">
             <div class="sub-title" style="display:flex;align-items:center;justify-content:space-between">
-              <span>${t.label||t.id}</span>
+              <span>${e.label||e.id}</span>
               <button class="icon-btn icon-btn--danger" title="Delete preset"
-                @click=${()=>this._deleteGlobalPreset(e)}>
+                @click=${()=>this._deleteGlobalPreset(t)}>
                 <ha-icon icon="mdi:delete"></ha-icon>
               </button>
             </div>
-            ${this._textField("Label",t.label,t=>this._setGlobalPreset(e,{label:t}),"e.g. After dinner")}
-            ${this._textField("Icon",t.icon,t=>this._setGlobalPreset(e,{icon:t||void 0}),"mdi:silverware-fork-knife")}
-            ${this._selectField("Scope","all"===t.scope?"all":"select",[{value:"all",label:"Whole flat"},{value:"select",label:"Pick rooms on map"}],t=>this._setGlobalPreset(e,{scope:t}))}
-            ${this._selectField("Mode",t.mode??"dry",[{value:"dry",label:"Dry only"},{value:"wet",label:"Wet only"},{value:"both",label:"Dry then wet (wet follows dry)"}],t=>this._setGlobalPreset(e,{mode:t}))}
+            ${this._textField("Label",e.label,e=>this._setGlobalPreset(t,{label:e}),"e.g. After dinner")}
+            ${this._textField("Icon",e.icon,e=>this._setGlobalPreset(t,{icon:e||void 0}),"mdi:silverware-fork-knife")}
+            ${this._selectField("Scope","all"===e.scope?"all":"select",[{value:"all",label:"Whole flat"},{value:"select",label:"Pick rooms on map"}],e=>this._setGlobalPreset(t,{scope:e}))}
+            ${this._selectField("Mode",e.mode??"dry",[{value:"dry",label:"Dry only"},{value:"wet",label:"Wet only"},{value:"both",label:"Dry then wet (wet follows dry)"}],e=>this._setGlobalPreset(t,{mode:e}))}
           </div>
         `)}
         <button class="btn btn--add" @click=${()=>this._addGlobalPreset()}>
@@ -2442,7 +2847,7 @@ const ht=t=>(e,o)=>{void 0!==o?o.addInitializer(()=>{customElements.define(t,e)}
 
         <div class="section-title" style="margin-top:4px">Global actions</div>
         <p class="hint">Badges that trigger a script across all vacuums (e.g. "Clean whole flat").</p>
-        ${0===t.length?q`<p class="hint">None configured.</p>`:t.map((t,e)=>this._renderGlobalAccordion(t,e))}
+        ${0===e.length?te`<p class="hint">None configured.</p>`:e.map((e,t)=>this._renderGlobalAccordion(e,t))}
         <button class="btn btn--add" @click=${()=>this._addGlobal()}>
           <ha-icon icon="mdi:plus"></ha-icon> Add global action
         </button>
@@ -2454,38 +2859,38 @@ const ht=t=>(e,o)=>{void 0!==o?o.addInitializer(()=>{customElements.define(t,e)}
           <label class="toggle-wrap">
             <input type="checkbox" class="toggle-input"
               .checked=${this._config.room_icon_hidden??!1}
-              @change=${t=>this._setConfig({room_icon_hidden:t.target.checked||void 0})} />
+              @change=${e=>this._setConfig({room_icon_hidden:e.target.checked||void 0})} />
             <span class="toggle-track"></span>
           </label>
         </div>
-        ${this._numberSlider("Border (idle)",this._config.room_border_normal??2,0,12,1,t=>this._setConfig({room_border_normal:t}),"px")}
-        ${this._numberSlider("Border (selected)",this._config.room_border_selected??4,0,12,1,t=>this._setConfig({room_border_selected:t}),"px")}
+        ${this._numberSlider("Border (idle)",this._config.room_border_normal??2,0,12,1,e=>this._setConfig({room_border_normal:e}),"px")}
+        ${this._numberSlider("Border (selected)",this._config.room_border_selected??4,0,12,1,e=>this._setConfig({room_border_selected:e}),"px")}
 
         <div class="section-title" style="margin-top:4px">Thresholds (border colour by last clean age)</div>
         <p class="hint">Rules ascending — first match wins. Beyond the last = red.</p>
-        ${e.map((t,o)=>q`
+        ${t.map((e,o)=>te`
           <div class="var-row threshold-row">
             <span class="threshold-label">≤</span>
             <input type="number" class="text-input text-input--sm threshold-days"
-              min="0" max="365" .value=${String(t.days)}
-              @change=${t=>{const i=parseInt(t.target.value),s=e.map((t,e)=>e===o?{...t,days:isNaN(i)?t.days:i}:t);this._setConfig({room_thresholds:s})}} />
+              min="0" max="365" .value=${String(e.days)}
+              @change=${e=>{const s=parseInt(e.target.value),l=t.map((e,t)=>t===o?{...e,days:isNaN(s)?e.days:s}:e);this._setConfig({room_thresholds:l})}} />
             <span class="threshold-label">days</span>
-            <input type="color" class="threshold-color" .value=${t.color}
-              @input=${t=>{const i=t.target.value,s=e.map((t,e)=>e===o?{...t,color:i}:t);this._setConfig({room_thresholds:s})}} />
+            <input type="color" class="threshold-color" .value=${e.color}
+              @input=${e=>{const s=e.target.value,l=t.map((e,t)=>t===o?{...e,color:s}:e);this._setConfig({room_thresholds:l})}} />
             <button class="icon-btn icon-btn--danger icon-btn--sm"
-              @click=${()=>{const t=e.filter((t,e)=>e!==o);this._setConfig({room_thresholds:t.length?t:void 0})}}>
+              @click=${()=>{const e=t.filter((e,t)=>t!==o);this._setConfig({room_thresholds:e.length?e:void 0})}}>
               <ha-icon icon="mdi:close"></ha-icon>
             </button>
           </div>`)}
         <div style="display:flex;gap:8px;flex-wrap:wrap">
-          <button class="btn btn--add btn--sm" @click=${()=>this._setConfig({room_thresholds:[...e,{days:14,color:"#ff4d4f"}]})}>
+          <button class="btn btn--add btn--sm" @click=${()=>this._setConfig({room_thresholds:[...t,{days:14,color:"#ff4d4f"}]})}>
             <ha-icon icon="mdi:plus"></ha-icon> Add threshold
           </button>
-          ${this._config.room_thresholds?q`
+          ${this._config.room_thresholds?te`
             <button class="btn btn--sm" @click=${()=>this._setConfig({room_thresholds:void 0})}>
               Reset to defaults
             </button>
-          `:G}
+          `:ae}
         </div>
 
         <div class="section-title" style="margin-top:4px">Notifications</div>
@@ -2503,61 +2908,61 @@ const ht=t=>(e,o)=>{void 0!==o?o.addInitializer(()=>{customElements.define(t,e)}
           <code>anyvac_room_done</code> events, but neither has a shipped blueprint yet —
           build a custom automation on the event if you need one.</p>
 
-        ${(()=>{const t=this._config.vacuums.some(t=>"native-area"===t.clean_action?.type);if(!t)return G;const e=[...new Set(this._config.vacuums.flatMap(t=>(t.rooms??[]).map(t=>t.key)).filter(Boolean))].sort(),o=this._config.area_mappings??{};return q`
+        ${(()=>{const e=this._config.vacuums.some(e=>"native-area"===e.clean_action?.type);if(!e)return ae;const t=[...new Set(this._config.vacuums.flatMap(e=>(e.rooms??[]).map(e=>e.key)).filter(Boolean))].sort(),o=this._config.area_mappings??{};return te`
             <div class="section-title" style="margin-top:4px">Area mappings</div>
             <p class="hint">Maps room keys to HA areas for the <strong>native-area</strong> strategy (degraded mode only — irrelevant once the AnyVac integration is active for a vacuum). Set once here — applies to all vacuums.</p>
-            ${0===e.length?q`<p class="hint">No rooms configured yet.</p>`:e.map(t=>this._areaPicker(t,o[t],e=>{const i={...o};e?i[t]=e:delete i[t],this._setConfig({area_mappings:Object.keys(i).length?i:void 0})}))}
+            ${0===t.length?te`<p class="hint">No rooms configured yet.</p>`:t.map(e=>this._areaPicker(e,o[e],t=>{const s={...o};t?s[e]=t:delete s[e],this._setConfig({area_mappings:Object.keys(s).length?s:void 0})}))}
           `})()}
 
-      </div>`}_renderGlobalAccordion(t,e){const o=this._resolveColor(t.color,"orange"),i=this._openGlobal.has(e),s=t.action,n=t.watch_entities??[];return q`
-      <div class="acc-row" style=${vt({borderLeft:"3px solid "+o})}>
-        <div class="acc-header" @click=${()=>this._toggleGlobal(e)}>
-          ${t.image?q`<img class="acc-img" src=${t.image} alt=${t.name} />`:q`<ha-icon icon="mdi:home-floor-a" style=${vt({color:o,width:"36px",height:"36px"})}></ha-icon>`}
+      </div>`}_renderGlobalAccordion(e,t){const o=this._resolveColor(e.color,"orange"),s=this._openGlobal.has(t),l=e.action,d=e.watch_entities??[];return te`
+      <div class="acc-row" style=${_e({borderLeft:"3px solid "+o})}>
+        <div class="acc-header" @click=${()=>this._toggleGlobal(t)}>
+          ${e.image?te`<img class="acc-img" src=${e.image} alt=${e.name} />`:te`<ha-icon icon="mdi:home-floor-a" style=${_e({color:o,width:"36px",height:"36px"})}></ha-icon>`}
           <div class="acc-info">
-            <span class="acc-name">${t.name||"Unnamed action"}</span>
-            <span class="acc-sub">${"script"===s.type?s.entity_id:s.service}</span>
+            <span class="acc-name">${e.name||"Unnamed action"}</span>
+            <span class="acc-sub">${"script"===l.type?l.entity_id:l.service}</span>
           </div>
           <button class="icon-btn icon-btn--danger"
-            @click=${t=>{t.stopPropagation(),this._deleteGlobal(e)}}>
+            @click=${e=>{e.stopPropagation(),this._deleteGlobal(t)}}>
             <ha-icon icon="mdi:delete"></ha-icon>
           </button>
-          <ha-icon icon=${i?"mdi:chevron-up":"mdi:chevron-down"} class="acc-chevron"></ha-icon>
+          <ha-icon icon=${s?"mdi:chevron-up":"mdi:chevron-down"} class="acc-chevron"></ha-icon>
         </div>
-        ${i?q`
+        ${s?te`
           <div class="acc-body">
-            ${this._textField("Display name",t.name,t=>this._setGlobal(e,{name:t}),"e.g. Whole flat")}
-            ${this._textField("Image path",t.image,t=>this._setGlobal(e,{image:t||void 0}),"/local/...")}
-            ${this._hexColorField("Accent colour",t.color?this._resolveColor(t.color,"orange"):void 0,t=>this._setGlobal(e,{color:t||void 0}),"#faad14")}
+            ${this._textField("Display name",e.name,e=>this._setGlobal(t,{name:e}),"e.g. Whole flat")}
+            ${this._textField("Image path",e.image,e=>this._setGlobal(t,{image:e||void 0}),"/local/...")}
+            ${this._hexColorField("Accent colour",e.color?this._resolveColor(e.color,"orange"):void 0,e=>this._setGlobal(t,{color:e||void 0}),"#faad14")}
 
             <div class="sub-title">Watch entities (badge glows when any is cleaning)</div>
-            ${n.map((t,o)=>q`
+            ${d.map((e,o)=>te`
               <div class="var-row">
-                <ha-entity-picker .hass=${this.hass} .value=${t} .includeDomains=${["vacuum"]}
+                <ha-entity-picker .hass=${this.hass} .value=${e} .includeDomains=${["vacuum"]}
                   allow-custom-entity style="flex:1"
-                  @value-changed=${t=>{const i=[...n];i[o]=t.detail.value,this._setGlobal(e,{watch_entities:i.filter(Boolean)})}}></ha-entity-picker>
+                  @value-changed=${e=>{const s=[...d];s[o]=e.detail.value,this._setGlobal(t,{watch_entities:s.filter(Boolean)})}}></ha-entity-picker>
                 <button class="icon-btn icon-btn--danger icon-btn--sm"
-                  @click=${()=>this._setGlobal(e,{watch_entities:n.filter((t,e)=>e!==o)})}>
+                  @click=${()=>this._setGlobal(t,{watch_entities:d.filter((e,t)=>t!==o)})}>
                   <ha-icon icon="mdi:close"></ha-icon>
                 </button>
               </div>`)}
             <button class="btn btn--add btn--sm"
-              @click=${()=>this._setGlobal(e,{watch_entities:[...n,""]})}>
+              @click=${()=>this._setGlobal(t,{watch_entities:[...d,""]})}>
               <ha-icon icon="mdi:plus"></ha-icon> Add entity
             </button>
 
             <div class="sub-title">Action (hold-to-activate)</div>
-            ${this._selectField("Type",s.type,[{value:"script",label:"Script"},{value:"service",label:"Service call"}],t=>this._setGlobal(e,{action:"script"===t?{type:"script",entity_id:""}:{type:"service",service:""}}))}
-            ${"script"===s.type?this._entityPicker("Script entity",s.entity_id,["script"],t=>this._setGlobalAction(e,{entity_id:t})):this._textField("Service",s.service,t=>this._setGlobalAction(e,{service:t}),"e.g. script.celkovy_uklid_bytu")}
+            ${this._selectField("Type",l.type,[{value:"script",label:"Script"},{value:"service",label:"Service call"}],e=>this._setGlobal(t,{action:"script"===e?{type:"script",entity_id:""}:{type:"service",service:""}}))}
+            ${"script"===l.type?this._entityPicker("Script entity",l.entity_id,["script"],e=>this._setGlobalAction(t,{entity_id:e})):this._textField("Service",l.service,e=>this._setGlobalAction(t,{service:e}),"e.g. script.celkovy_uklid_bytu")}
           </div>
-        `:G}
-      </div>`}render(){return this._config?q`
+        `:ae}
+      </div>`}render(){return this._config?te`
       <datalist id="ha-entities"></datalist>
       <div class="editor-root">
         <div class="tabs-bar">
-          ${["vacuums","maps","global"].map(t=>q`
-            <button class="tab-btn ${this._tab===t?"tab-btn--active":""}"
-              @click=${()=>{this._tab=t}}>
-              ${{vacuums:"🤖 Vacuums",maps:"🗺 Maps",global:"⚙ Global"}[t]}
+          ${["vacuums","maps","global"].map(e=>te`
+            <button class="tab-btn ${this._tab===e?"tab-btn--active":""}"
+              @click=${()=>{this._tab=e}}>
+              ${{vacuums:"🤖 Vacuums",maps:"🗺 Maps",global:"⚙ Global"}[e]}
             </button>`)}
         </div>
         ${"vacuums"===this._tab?this._renderVacuumsTab():"maps"===this._tab?this._renderMapsTab():"debug"===this._tab?this._renderDebugTab():this._renderGlobalTab()}
@@ -2565,9 +2970,9 @@ const ht=t=>(e,o)=>{void 0!==o?o.addInitializer(()=>{customElements.define(t,e)}
           <span class="footer-link" @click=${()=>{this._tab="debug"===this._tab?"vacuums":"debug"}}>
             ${"debug"===this._tab?"← Back":"🐞 Show debug info"}
           </span>
-          <span>anyvac-card v${$t}</span>
+          <span>anyvac-card v${fe}</span>
         </div>
-      </div>`:G}};ee.styles=a`
+      </div>`:ae}};Le.styles=i$5`
     .editor-root { display:flex; flex-direction:column; }
 
     /* ── Tabs ── */
@@ -2862,5 +3267,4 @@ const ht=t=>(e,o)=>{void 0!==o?o.addInitializer(()=>{customElements.define(t,e)}
 
     .hex-color-row { display:flex; align-items:center; gap:6px; }
     .hex-color-row .text-input { flex:1; }
-  `,t([ut({attribute:!1})],ee.prototype,"hass",void 0),t([_t()],ee.prototype,"_config",void 0),t([_t()],ee.prototype,"_tab",void 0),t([_t()],ee.prototype,"_dragRoom",void 0),t([_t()],ee.prototype,"_dragSeq",void 0),t([_t()],ee.prototype,"_openVac",void 0),t([_t()],ee.prototype,"_openSensors",void 0),t([_t()],ee.prototype,"_openPresets",void 0),t([_t()],ee.prototype,"_openAction",void 0),t([_t()],ee.prototype,"_openGlobal",void 0),t([_t()],ee.prototype,"_openRoom",void 0),t([_t()],ee.prototype,"_mapVac",void 0),t([_t()],ee.prototype,"_mapRoom",void 0),t([_t()],ee.prototype,"_pvAR",void 0),t([_t()],ee.prototype,"_refMapUrl",void 0),t([_t()],ee.prototype,"_floorplanSnapshotBusy",void 0),t([_t()],ee.prototype,"_floorplanSnapshotError",void 0),ee=t([ht(wt)],ee);export{Lt as AnyVacCard,ee as AnyVacCardEditor};
-//# sourceMappingURL=anyvac-card.js.map
+  `,__decorate([n$1({attribute:!1})],Le.prototype,"hass",void 0),__decorate([r()],Le.prototype,"_config",void 0),__decorate([r()],Le.prototype,"_tab",void 0),__decorate([r()],Le.prototype,"_dragRoom",void 0),__decorate([r()],Le.prototype,"_dragSeq",void 0),__decorate([r()],Le.prototype,"_openVac",void 0),__decorate([r()],Le.prototype,"_openSensors",void 0),__decorate([r()],Le.prototype,"_openPresets",void 0),__decorate([r()],Le.prototype,"_openAction",void 0),__decorate([r()],Le.prototype,"_openGlobal",void 0),__decorate([r()],Le.prototype,"_openRoom",void 0),__decorate([r()],Le.prototype,"_mapVac",void 0),__decorate([r()],Le.prototype,"_mapRoom",void 0),__decorate([r()],Le.prototype,"_pvAR",void 0),__decorate([r()],Le.prototype,"_refMapUrl",void 0),__decorate([r()],Le.prototype,"_floorplanSnapshotBusy",void 0),__decorate([r()],Le.prototype,"_floorplanSnapshotError",void 0),Le=__decorate([t$1(ve)],Le);export{De as AnyVacCard,Le as AnyVacCardEditor};

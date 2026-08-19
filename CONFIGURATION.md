@@ -52,6 +52,10 @@ Everything is optional unless stated otherwise — the whole card boots from
 | `debug_room_progress` | boolean | `false` | Integration only | Draws a live per-room coverage gauge on the map. Testing aid, not for everyday use. |
 | `debug_dense_dock` | boolean | `false` | Always, portrait only | Restores the pre-1.0 dense portrait room list (age/pin/assigned-vacuum per row) instead of the minimalist map-tap cockpit. Landscape's dock/picker sidebar always shows the room list regardless of this flag. |
 | `layout` | `LayoutConfig` | unset | Always | Opts into the responsive percentage-grid layout. See [Layout](#layout-responsive-grid). |
+| `theme` | `"dark" \| "light" \| "auto" \| "legacy"` | `"dark"` | Always | Visual theme. `auto` follows the browser/OS `prefers-color-scheme`. `legacy` is the exact pre-1.2.0 appearance. See [Appearance](#appearance-theme-accent-calm-state). |
+| `accent` | hex string | `"#6FBF73"` | Always | Accent colour for START, room selection and focus rings. Status colours are unaffected. See [Appearance](#appearance-theme-accent-calm-state). |
+| `calm_state` | boolean | `true` | Always | Step the leftover map trace and secondary numbers back when nothing is running and nothing is selected. Purely de-emphasis — nothing is hidden or disabled. |
+| `reduce_motion` | boolean | `false` | Always | Turn off press feedback and live pulses. The OS `prefers-reduced-motion` setting already does this on its own; this is for switching them off without it. |
 | `debug` | boolean | `false` | Always | Shows raw debug readouts (geometry, plan response, etc.) in the production grid UI. |
 
 `OrchestratorPolicy`:
@@ -275,6 +279,62 @@ built-in defaults — no further YAML needed for the common case.
 | `offset_x` / `offset_y` | number (-100..100) | `0` | Only meaningful with `fit: "cover"`. |
 | `mapOrientation` | `"auto" \| "normal" \| "rotated"` | `"auto"` | Whether the floorplan rotates 90° to better fill the map region. `auto` picks whichever orientation fits bigger. |
 | `flip` | boolean | `false` | An independent further 180° on top of `mapOrientation`, for a floorplan that renders upside-down relative to how you look at the room. Exposed in the editor as **"Flip portrait/landscape map 180°"**; also toggleable live (per-browser, not saved to config) from the meta bar / dock. |
+
+---
+
+## Appearance (theme, accent, calm state)
+
+Added in card 1.2.0. All four keys are optional and available in the GUI
+editor's **Global → Appearance** section.
+
+```yaml
+type: custom:anyvac-card
+theme: dark          # dark (default) | light | auto | legacy
+accent: "#6FBF73"    # any hex
+calm_state: true     # default
+reduce_motion: false # default
+vacuums: [...]
+```
+
+### `theme`
+
+| Value | What it is |
+|---|---|
+| `dark` | Default. Lifted surfaces, soft elevation instead of hairline outlines, a softened semantic palette. |
+| `light` | The same structure on a porcelain surface, for dashboards running a light Home Assistant theme. Before 1.2.0 the card painted white text and white-alpha panels unconditionally, so it was not merely ugly there but unreadable. |
+| `auto` | `dark`, flipping to `light` under `prefers-color-scheme: light`. |
+| `legacy` | The pre-1.2.0 appearance, kept as a way back for dashboards already tuned around it. |
+
+Colours drawn **on the vacuum's own map bitmap** (room labels, gauges, the zone
+rectangle, the hold-to-inspect popup) stay white-on-dark in every theme,
+including `light` — they sit on the floorplan, not on the card's surface.
+
+### `accent`
+
+Drives the primary action (START), room selection and focus rings — the parts
+of the card that carry *intent*. Status colours (cleaning / mopping / error)
+are deliberately excluded: their saturation carries meaning, not preference.
+
+Any hex works. The editor offers six presets chosen to hold up on both the dark
+and the light surface: Sage `#6FBF73` (default), Ocean `#4FA5C7`, Terracotta
+`#D98A6A`, Plum `#A87CC0`, Amber `#D9A441`, Graphite `#8E97A8`.
+
+### `calm_state`
+
+On (default), the card enters a resting presentation whenever nothing is
+running, nothing is selected, no map tool is armed, no sheet is open and there
+is no error — which is most of the time. The leftover cleaning trace and the
+secondary metadata step back so the primary action reads clearly.
+
+It is purely de-emphasis. Every control stays present, tappable and in place;
+nothing is hidden, disabled or moved. Set `false` to keep the full presentation
+at all times.
+
+### `reduce_motion`
+
+Turns off the press feedback and the live pulses added in 1.2.0. The operating
+system's own reduce-motion preference already disables them regardless of this
+setting — this key is for switching them off without changing that.
 
 ---
 

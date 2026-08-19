@@ -8,6 +8,109 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Planned
 
+## [1.2.0] - 2026-08-19
+
+Visual language v2 — the largest purely visual change since the responsive
+rebuild, and the first release that can run on a light Home Assistant theme.
+Spec: `docs/35-vizualni-jazyk-v2.md`.
+
+Tagged as a **pre-release**: it touches every rule in the stylesheet, so it
+wants a real field test before it becomes the recommended version. `theme:
+legacy` is a one-line way back.
+
+The starting point was a measurement, not a mood. The 1.1.0 stylesheet carried
+109 hardcoded `rgba(255,255,255,…)` literals against six `var(--…)` uses in the
+whole file, no `prefers-color-scheme` and no `prefers-reduced-motion`, the
+stock Ant Design palette, nine corner radii, nine font sizes (three of them
+below 11px) and not a single shadow — panels were separated by 1px hairlines
+over near-black. That is a consistently designed instrument panel. This release
+changes the genre, not the quality.
+
+### Added
+
+- **`theme` option** — `dark` (new default), `light`, `auto` (follows
+  `prefers-color-scheme`), `legacy` (the exact pre-1.2.0 appearance). Until now
+  the card painted white text and white-alpha panels unconditionally, so on a
+  light dashboard it was not merely ugly but unreadable. That was a
+  compatibility gap, not a matter of taste.
+- **`accent` option** — any hex, with six curated presets in the GUI editor
+  (Sage, Ocean, Terracotta, Plum, Amber, Graphite). Drives START, room
+  selection and focus rings. Status colours are deliberately excluded: their
+  saturation carries meaning (cleaning / mopping / error), not preference. An
+  unparseable value is dropped rather than written through — an invalid custom
+  property would poison every rule referencing it, START included.
+- **`calm_state` option** (default on) — when nothing is running, nothing is
+  selected, no map tool is armed and no sheet is open, the leftover map trace
+  and the secondary metadata step back so the primary action reads clearly.
+  Purely de-emphasis: nothing is hidden, disabled or moved. This is the state
+  the card is in most of the time, and the only one that never had a look of
+  its own.
+- **`reduce_motion` option** — the config-level equivalent of the OS
+  `prefers-reduced-motion` setting, which is honoured on its own regardless.
+- **Micro-interactions** — press feedback on every button class, a breathing
+  glow on CANCEL while a clean runs, a slow highlight travelling along the
+  progress bar. Transform/opacity only, pure CSS, nothing per frame: the mobile
+  companion app has crash history around anything that takes imperative
+  ownership of layout (docs/21 §5b), so this cannot touch that. Room buttons
+  are excluded on purpose — they carry their own positioning transform that a
+  `scale()` would overwrite and throw them off their anchor.
+- **Appearance section** in the editor's Global tab for all four options.
+- **`tests/theme.spec.ts`** — seven Playwright tests covering theme selection,
+  the on-map channel reset, per-element channel resolution, accent validation,
+  calm state and the motion opt-out. 15/15 green together with
+  `tests/layout.spec.ts`.
+
+### Changed
+
+- **Design tokens.** Every colour resolves through a small set of channel
+  custom properties instead of ~130 hardcoded literals, so a theme is a handful
+  of numbers and cannot silently miss a spot. `:host` carries the legacy
+  values, which is why the old look is simply what you get when no theme class
+  applies. `.map-wrap` pins those channels back to white-on-black, so a light
+  theme can never reach the labels drawn on the vacuum's own map bitmap.
+- **Surfaces are lifted off pure black and carry soft elevation** instead of
+  hairline outlines, and corner radii step up one notch. This is what actually
+  changes the card's genre; the colour flip alone would not.
+- **START reads as the primary action it is** — gradient fill, stronger edge,
+  soft cast, now that the surface underneath is no longer near-black. The sage
+  green introduced in 0.73.0 was reported in the field as "looks unchanged":
+  at 24% alpha over near-black, the hue simply disappeared.
+- **Semantic palette softened** from the inherited Ant Design defaults — same
+  hues, same meanings, lower saturation.
+- **Type floor raised** to 11px (10px in portrait), and everything whose value
+  ticks now uses tabular figures, so a live ETA or battery reading stops
+  shoving its neighbours sideways on every poll.
+- **Map softened** — the dry trace gets a wide faint pass underneath, so a
+  fully covered flat reads as a lit trail rather than a scribble; the room age
+  dots lose their hard 1px stroke; rooms and the map wrapper are rounder. The
+  field-tuned room selection ring is untouched.
+- Four neutral `STATUS_MAP` entries (`charging`, `docked`, `idle`,
+  `shutting_down`) resolve through the ink channel instead of a hardcoded
+  white, so they stay legible on a light theme. Safe as a CSS variable
+  precisely because `_statusInfo(...)[1]` is only ever consumed as a whole
+  colour value — the `+ "80"` hex-alpha suffix trick elsewhere operates on the
+  vacuum's identity colour, never on this one.
+
+### Notes on `theme: legacy`
+
+Verified mechanically rather than asserted: resolving the new stylesheet's
+tokens and diffing against 1.1.0 gives **731 declarations against 731**, with
+every difference purely notational except three.
+
+| element | 1.1.0 | 1.2.0 `legacy` |
+| --- | --- | --- |
+| `.dock-mode-dot` (7px dock-attention dot) | `#e0994a` | `#faad14` |
+| `.dock-sheet` border | `rgba(255,255,255,0.1)` | `rgba(255,255,255,0.08)` |
+| `.layer-menu` background | `rgb(15,15,18)` | `rgb(18,18,18)` |
+
+So `legacy` is not bit-identical. It is practically indistinguishable, and the
+three places it differs are known exactly.
+
+### Size
+
+252.5 -> 284 KiB raw, 66.3 -> 74.7 KiB gzipped (+13%), entirely from the added
+stylesheet.
+
 ## [1.1.0] - 2026-08-08
 
 Completes the bug-fix and optimisation pass started in 1.0.10, closing out the

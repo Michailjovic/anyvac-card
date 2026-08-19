@@ -1,4 +1,5 @@
 import type { LayoutConfig } from "./layout";
+import type { CardTheme } from "./const";
 
 // ── Home Assistant core types ─────────────────────────────────────────────
 
@@ -351,4 +352,20 @@ export interface AnyVacCardConfig {
   /** Show debug details (raw geometry readouts etc.) in the production grid UI.
    *  Off by default (docs/18 §7c) — debug data moves behind this toggle. */
   debug?: boolean;
+  /** Visual theme (v1.2.0, docs/35). "dark" (default) / "light" / "auto"
+   *  (follows prefers-color-scheme) / "legacy" (the exact pre-1.2.0 look). */
+  theme?: CardTheme;
+  /** Accent colour driving START, room selection and focus rings. Any hex; the
+   *  editor offers curated presets (`ACCENT_PRESETS`). Deliberately does NOT
+   *  touch status colours — those stay semantic (docs/25 §6, docs/35 §3). */
+  accent?: string;
+  /** Resting ("calm") presentation when nothing is running and nothing is
+   *  selected: the map's leftover trace and the secondary metadata step back so
+   *  the primary action is the one thing that reads. Nothing is hidden or
+   *  disabled — purely de-emphasis (docs/35 §7). Default on; `false` opts out. */
+  calm_state?: boolean;
+  /** Opt out of the v1.2.0 press/breathe micro-interactions independently of
+   *  the theme. `prefers-reduced-motion` already disables them at the OS
+   *  level — this is for people who want them off regardless (docs/35 §5). */
+  reduce_motion?: boolean;
 }

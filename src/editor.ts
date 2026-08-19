@@ -24,7 +24,11 @@ import {
   CARD_VERSION,
   COLOR_HEX,
   DEFAULT_VACUUM_PALETTE,
+  ACCENT_PRESETS,
+  DEFAULT_ACCENT,
+  DEFAULT_THEME,
 } from "./const";
+import type { CardTheme } from "./const";
 import {
   placeRoomInCrop,
   resolveSeat,
@@ -1723,7 +1727,64 @@ export class AnyVacCardEditor extends LitElement {
     return html`
       <div class="tab-body">
 
-        <div class="section-title">Layout</div>
+        <div class="section-title">Appearance</div>
+        ${this._selectField<CardTheme>("Theme", this._config.theme ?? DEFAULT_THEME,
+          [{ value: "dark", label: "Dark — lifted surfaces, soft elevation" },
+           { value: "light", label: "Light — for a light HA theme" },
+           { value: "auto", label: "Auto — follow the system setting" },
+           { value: "legacy", label: "Legacy — the pre-1.2.0 look" }],
+          v => this._setConfig({ theme: v === DEFAULT_THEME ? undefined : v }))}
+        <p class="hint">Before 1.2.0 the card was dark-only and unreadable on a light dashboard.
+          "Legacy" is the exact previous appearance, kept as a way back if a dashboard was
+          tuned around it.</p>
+
+        ${this._hexColorField("Accent colour", this._config.accent,
+          v => this._setConfig({ accent: v || undefined }), DEFAULT_ACCENT)}
+        <div class="hex-color-row" style="flex-wrap:wrap;gap:6px;margin:-4px 0 0">
+          ${ACCENT_PRESETS.map((p) => {
+            const on = (this._config.accent ?? DEFAULT_ACCENT).toLowerCase() === p.hex.toLowerCase();
+            return html`<button type="button" title=${p.label}
+              style=${"width:24px;height:24px;padding:0;border-radius:50%;cursor:pointer;background:" + p.hex
+                + ";border:2px solid " + (on ? "#fff" : "transparent")
+                + ";box-shadow:0 0 0 1px rgba(0,0,0,0.35)"}
+              @click=${() => this._setConfig({ accent: p.hex })}></button>`;
+          })}
+        </div>
+        <p class="hint">Drives the primary action (START), room selection and focus rings.
+          Status colours are deliberately left alone — their saturation carries meaning
+          (cleaning / mopping / error), not taste.</p>
+
+        <div class="field field--row">
+          <label>Calm resting state</label>
+          <label class="toggle-wrap">
+            <input type="checkbox" class="toggle-input"
+              .checked=${this._config.calm_state !== false}
+              @change=${(e: Event) => this._setConfig({
+                calm_state: (e.target as HTMLInputElement).checked ? undefined : false,
+              })} />
+            <span class="toggle-track"></span>
+          </label>
+        </div>
+        <p class="hint">When nothing is running and nothing is selected, the leftover map trace
+          and the secondary numbers step back so the one thing worth touching stands out.
+          Nothing is hidden or disabled — it's purely de-emphasis.</p>
+
+        <div class="field field--row">
+          <label>Reduce motion</label>
+          <label class="toggle-wrap">
+            <input type="checkbox" class="toggle-input"
+              .checked=${!!this._config.reduce_motion}
+              @change=${(e: Event) => this._setConfig({
+                reduce_motion: (e.target as HTMLInputElement).checked ? true : undefined,
+              })} />
+            <span class="toggle-track"></span>
+          </label>
+        </div>
+        <p class="hint">Turns off the press feedback and the live pulses. Your operating
+          system's own "reduce motion" setting already does this on its own — this is for
+          switching them off without changing that.</p>
+
+        <div class="section-title" style="margin-top:4px">Layout</div>
         <div class="field field--row">
           <label>Fit card to available screen space</label>
           <label class="toggle-wrap">
