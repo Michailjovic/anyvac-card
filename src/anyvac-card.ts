@@ -6310,6 +6310,53 @@ export class AnyVacCard extends LitElement {
     .avc-theme .vac-icon-btn:active,
     .avc-theme .layer-btn:active { transform: scale(var(--avc-press)); }
 
+    /* Keyboard focus. The card had no focus styling at all before 1.2.0 — not
+     * suppressed, just never considered, so keyboard users got the browser's
+     * default ring over a design that had moved on. :focus-visible is the
+     * right primitive: it matches keyboard focus and stays out of the way on
+     * tap and click, where the press feedback above already answers.
+     *
+     * outline (not box-shadow) on purpose. Several of these elements carry a
+     * box-shadow of their own, some of it set inline — the selected room's
+     * glow, START's cast, the panels' elevation — and an inline value wins,
+     * so a box-shadow ring would be silently missing exactly on the elements
+     * that matter most. outline also never disturbs layout, which is why it
+     * is safe here on .room-btn/.room-overlay, unlike the scale() press
+     * feedback (those carry their own positioning transform).
+     *
+     * Scoped to .avc-theme like every other 1.2.0 rule, so legacy keeps the
+     * browser default — unstyled, but accessible on its own. */
+    .avc-theme .action-btn:focus-visible,
+    .avc-theme .start-bar:focus-visible,
+    .avc-theme .start-seg:focus-visible,
+    .avc-theme .dock-mode:focus-visible,
+    .avc-theme .dock-row:focus-visible,
+    .avc-theme .dock-chip:focus-visible,
+    .avc-theme .dock-sheet-action:focus-visible,
+    .avc-theme .dock-sheet-tab:focus-visible,
+    .avc-theme .dock-sheet-care-reset:focus-visible,
+    .avc-theme .mtbtn:focus-visible,
+    .avc-theme .badge:focus-visible,
+    .avc-theme .vac-icon-btn:focus-visible,
+    .avc-theme .layer-btn:focus-visible,
+    .avc-theme .layer-menu-row:focus-visible,
+    .avc-theme .room-btn:focus-visible,
+    .avc-theme .room-overlay:focus-visible {
+      outline: 2px solid rgb(var(--avc-accent-rgb));
+      outline-offset: 2px;
+    }
+    /* On the map the accent can land on anything the floorplan happens to be,
+     * so the ring switches to the on-map ink channel — which the .map-wrap
+     * reset already guarantees is white, in every theme — and steps further
+     * off the element so it reads against a busy path underneath. */
+    .avc-theme .map-wrap .room-btn:focus-visible,
+    .avc-theme .map-wrap .room-overlay:focus-visible,
+    .avc-theme .map-wrap .layer-btn:focus-visible,
+    .avc-theme .map-wrap .layer-menu-row:focus-visible {
+      outline: 3px solid rgb(var(--avc-ink-rgb));
+      outline-offset: 3px;
+    }
+
     @keyframes avc-live-breathe {
       0%, 100% { box-shadow: 0 6px 18px rgba(var(--avc-warn-rgb), 0.12); }
       50%      { box-shadow: 0 6px 26px rgba(var(--avc-warn-rgb), 0.3); }

@@ -122,6 +122,19 @@ black reads where 45% black on porcelain does not.
 
 ### Fixed
 
+- The card had **no focus styling at all** — zero `:focus-visible` rules. Not
+  suppressed, just never considered, so keyboard users got the browser's
+  default ring over a design that had moved on, which reads as an oversight
+  now that a press state exists. Added for every interactive element, using
+  `outline` rather than `box-shadow`: several of these carry a box-shadow of
+  their own, some of it inline (the selected room's glow, START's cast), and
+  an inline value wins — a box-shadow ring would have been silently missing
+  exactly where it matters. `outline` also never disturbs layout, so unlike
+  the press feedback it is safe on the room buttons, which carry their own
+  positioning transform. On the map the ring switches to white and steps
+  further off the element, so it reads against whatever the floorplan and the
+  cleaning trace happen to be underneath.
+
 - In landscape the primary action is the dock footer's Start button, not the
   START bar (that one is portrait's) — and it was the only control styled
   inline, so the promoted START treatment could not reach it. Lifted into a

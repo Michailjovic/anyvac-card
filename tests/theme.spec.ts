@@ -174,6 +174,64 @@ test.describe("theming (docs/35)", () => {
     await expect.poll(() => rootClass(page)).not.toContain("avc-calm");
   });
 
+  /** Deepest active element, piercing shadow roots. */
+  async function focusRing(page: Page): Promise<{ tag: string; cls: string; width: string; color: string }> {
+    return page.evaluate(() => {
+      let el: Element | null = document.activeElement;
+      while ((el as HTMLElement | null)?.shadowRoot?.activeElement) {
+        el = (el as HTMLElement).shadowRoot!.activeElement;
+      }
+      const s = el ? getComputedStyle(el) : null;
+      return {
+        tag: el ? el.tagName.toLowerCase() : "",
+        cls: el ? el.className.toString() : "",
+        width: s ? s.outlineWidth : "",
+        color: s ? s.outlineColor : "",
+      };
+    });
+  }
+
+  // Tab from a fresh page — never click first, or the browser's own heuristic
+  // decides the last interaction was a pointer and :focus-visible stops
+  // matching, which is exactly the behaviour these rules rely on.
+  async function tabToCardButton(page: Page) {
+    for (let i = 0; i < 25; i++) {
+      await page.keyboard.press("Tab");
+      const r = await focusRing(page);
+      if (r.tag === "button" && r.cls) return r;
+    }
+    throw new Error("no focusable card button reached via Tab");
+  }
+
+  test("keyboard focus draws an accent ring; a click does not", async ({ page }) => {
+    await mountCard(page);
+    const r = await tabToCardButton(page);
+    expect(r.width).toBe("2px");
+    expect(r.color).toBe("rgb(111, 191, 115)");
+
+    // Same element, reached by pointer: :focus-visible must stop matching, or
+    // every tap would leave a ring behind on touch devices. The press
+    // feedback is what answers a tap.
+    await page.evaluate(() => {
+      let el: Element | null = document.activeElement;
+      while ((el as HTMLElement | null)?.shadowRoot?.activeElement) {
+        el = (el as HTMLElement).shadowRoot!.activeElement;
+      }
+      (el as HTMLElement).blur();
+    });
+    await page.mouse.click(5, 5);
+    const after = await focusRing(page);
+    expect(after.color).not.toBe("rgb(111, 191, 115)");
+  });
+
+  test("theme: legacy keeps the browser default focus ring", async ({ page }) => {
+    // The focus styling is scoped to .avc-theme like every other 1.2.0 rule,
+    // so `legacy` stays exactly what it was — unstyled, but still accessible.
+    await mountCard(page, { config: { theme: "legacy" } });
+    const r = await tabToCardButton(page);
+    expect(r.color).not.toBe("rgb(111, 191, 115)");
+  });
+
   test("reduce_motion disables the press feedback", async ({ page }) => {
     await mountCard(page, { config: { reduce_motion: true } });
     await expect.poll(() => rootClass(page)).toContain("avc-still");
