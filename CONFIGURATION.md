@@ -46,7 +46,7 @@ Everything is optional unless stated otherwise — the whole card boots from
 | `room_icon_hidden` | boolean | `false` | Always | Hide every room overlay icon globally. |
 | `area_mappings` | `Record<room_key, area_id>` | — | Degraded only, `native-area` strategy | Maps a room key to an HA Area, for the `native-area` clean action. Irrelevant once the integration is active. |
 | `ui_mode` | `"auto" \| "manual"` | `"auto"` | Always | `auto` = one orchestrated controller (Dry/Wet/Both + map-tap room selection + Start). `manual` = one controller card per robot. |
-| `mobile_rotate` | `"auto" \| "always" \| "off"` | `"auto"` | Always, only when `layout` is **not** set | Legacy width-based map rotation heuristic. Ignored once `layout` is configured — see [Layout](#layout-responsive-grid). |
+| `mobile_rotate` | `"auto" \| "always" \| "off"` | `"auto"` | Always | Map rotation. `always` / `off` are hard overrides and win in every mode, including with `layout` set — useful for forcing a rotation while testing. `auto` (the default) is the legacy width-based heuristic **only without** a `layout` block; with one, it falls through to the per-profile computed choice, so `mobile_rotate: auto` next to `layout:` is a no-op. See [Layout](#layout-responsive-grid). |
 | `global_presets` | `GlobalPreset[]` | `[]` | Integration only, `ui_mode: auto` | Card-level targeted cleans ("After dinner", "Whole home", …). See [Presets](#presets). |
 | `orchestrator` | `OrchestratorPolicy` | see below | Integration only | Default orchestration policy, overridable per global preset. |
 | `debug_room_progress` | boolean | `false` | Integration only | Draws a live per-room coverage gauge on the map. Testing aid, not for everyday use. |
