@@ -1512,7 +1512,7 @@ export class AnyVacCard extends LitElement {
   }
 
   private _progColor(pct: number): string {
-    return pct >= 90 ? "#52c41a" : pct >= 50 ? "#faad14" : "#40a9ff";
+    return pct >= 90 ? "rgb(var(--avc-ok-rgb))" : pct >= 50 ? "rgb(var(--avc-warn-rgb))" : "rgb(var(--avc-info-rgb))";
   }
 
   /** Dry + wet mini gauges in the room's corner (debug_room_progress). Values are
@@ -1556,9 +1556,9 @@ export class AnyVacCard extends LitElement {
   }
 
   private _batColor(pct: number): string {
-    if (pct > 50) return "#52c41a";
-    if (pct > 20) return "#faad14";
-    return "#ff4d4f";
+    if (pct > 50) return "rgb(var(--avc-ok-rgb))";
+    if (pct > 20) return "rgb(var(--avc-warn-rgb))";
+    return "rgb(var(--avc-err-rgb))";
   }
 
   private _mapUrl(entity: string): string {
@@ -2090,7 +2090,7 @@ export class AnyVacCard extends LitElement {
           <div style="display:flex;flex-direction:column;gap:3px;align-items:center;flex-shrink:0;padding-right:2px">
             <span style="height:18px"></span>
             ${showDry ? html`<ha-icon icon="mdi:broom" style="--mdc-icon-size:14px;color:rgba(var(--avc-ink-rgb),.4)"></ha-icon>` : nothing}
-            ${showWet ? html`<ha-icon icon="mdi:water" style="--mdc-icon-size:14px;color:rgba(64,169,255,.7)"></ha-icon>` : nothing}
+            ${showWet ? html`<ha-icon icon="mdi:water" style="--mdc-icon-size:14px;color:rgba(var(--avc-info-rgb),.7)"></ha-icon>` : nothing}
           </div>
           ${selKeys.map((k) => {
             const r = roomDef(k);
@@ -2464,8 +2464,7 @@ export class AnyVacCard extends LitElement {
                 title="${unassigned.size} selected room${unassigned.size > 1 ? "s have" : " has"} no available robot for the ${mode} pass — it/they will be silently skipped. Check vacuum roles/config."></ha-icon>` : nothing}
               ${unsequenced.size ? html`<ha-icon class="dock-unseq" icon="mdi:sort-variant-off"
                 title="${unsequenced.size} selected room${unsequenced.size > 1 ? "s have" : " has"} no cleaning order set — the time above may be off. Set the order in the card editor's Maps tab."></ha-icon>` : nothing}</span>
-            <button class="action-btn ${this._holdId === runHid ? "action-btn--holding" : ""}"
-              style="flex:0 0 auto;padding:7px 14px;background:rgba(var(--avc-accent-rgb),0.24);border:1px solid rgba(var(--avc-accent-rgb),0.65);color:rgb(var(--avc-ink-rgb))"
+            <button class="action-btn dock-run ${this._holdId === runHid ? "action-btn--holding" : ""}"
               ?disabled=${!runKeys.length}
               @pointerdown=${runKeys.length ? this._holdStart(runHid, () => this._runOrchestrated(runKeys, this._planMode)) : nothing}
               @pointermove=${this._holdMove}
@@ -2918,7 +2917,7 @@ export class AnyVacCard extends LitElement {
     // distinction instead — works identically for hex or rgba input.
     const statusColor = this._statusInfo(vac)[1];
 
-    const bg = cleaning ? this._colorBgActive(vac) : active ? this._colorBg(vac) : "rgba(30,30,30,0.85)";
+    const bg = cleaning ? this._colorBgActive(vac) : active ? this._colorBg(vac) : "rgba(var(--avc-scrim-2-rgb),0.85)";
     const border = cleaning
       ? "3px solid " + statusColor
       : active
@@ -2985,7 +2984,7 @@ export class AnyVacCard extends LitElement {
     const holdId = "global-" + idx;
     const holding = this._holdId === holdId;
 
-    const bg = active ? this._resolveBg(ga.color, "orange", true) : "rgba(30,30,30,0.85)";
+    const bg = active ? this._resolveBg(ga.color, "orange", true) : "rgba(var(--avc-scrim-2-rgb),0.85)";
     const border = active ? "3px solid " + color : "2px solid rgba(var(--avc-ink-rgb),0.18)";
     const shadow = active ? "0 0 18px " + color + "B0" : "none";
 
@@ -4478,8 +4477,8 @@ export class AnyVacCard extends LitElement {
     return html`
       ${hasError ? html`
         <div class="error-row">
-          <ha-icon icon="mdi:alert-circle" style="color:#ff4d4f"></ha-icon>
-          <span style="color:#ff4d4f;font-size:11px;font-weight:600">${errState}</span>
+          <ha-icon icon="mdi:alert-circle" style="color:rgb(var(--avc-err-rgb))"></ha-icon>
+          <span style="color:rgb(var(--avc-err-rgb));font-size:11px;font-weight:600">${errState}</span>
         </div>
       ` : nothing}
       <div class="status-line1">
@@ -4588,7 +4587,7 @@ export class AnyVacCard extends LitElement {
             class="action-btn action-btn--secondary"
             @click=${() => this._dock(vac)}
           >
-            <ha-icon icon="mdi:home" style="color:rgba(64,169,255,0.6)"></ha-icon>
+            <ha-icon icon="mdi:home" style="color:rgba(var(--avc-info-rgb),0.6)"></ha-icon>
             <span>Dock</span>
           </button>
         </div>
@@ -4608,7 +4607,7 @@ export class AnyVacCard extends LitElement {
             @pointercancel=${this._holdEnd}
           >
             <div class="hold-ring"></div>
-            <ha-icon icon="mdi:pause" style="color:#faad14"></ha-icon>
+            <ha-icon icon="mdi:pause" style="color:rgb(var(--avc-warn-rgb))"></ha-icon>
             <span>Pause</span>
           </button>
         </div>
@@ -4616,7 +4615,7 @@ export class AnyVacCard extends LitElement {
     }
 
     const hId = "start-" + vacIdx;
-    const startBg = hasRooms ? this._colorBg(vac) : "rgba(60,60,60,0.4)";
+    const startBg = hasRooms ? this._colorBg(vac) : "var(--avc-disabled)";
     const startBorder = hasRooms ? "1px solid " + color + "80" : "1px solid rgba(var(--avc-ink-rgb),0.1)";
     const startIconColor = hasRooms ? color : "rgba(var(--avc-ink-rgb),0.2)";
     const startTextColor = hasRooms ? "rgb(var(--avc-ink-rgb))" : "rgba(var(--avc-ink-rgb),0.25)";
@@ -4759,7 +4758,7 @@ export class AnyVacCard extends LitElement {
               ${r.icon ? html`<ha-icon icon=${r.icon}></ha-icon>` : nothing}
               <span class="dbg-prog-name">${r.name ?? r.key}</span>
               ${p!.dry_pct != null ? this._renderMiniGauge(p!.dry_pct, color, "mdi:broom", !!p!.dry_calibrating) : nothing}
-              ${p!.wet_pct != null ? this._renderMiniGauge(p!.wet_pct, "#40a9ff", "mdi:water", !!p!.wet_calibrating) : nothing}
+              ${p!.wet_pct != null ? this._renderMiniGauge(p!.wet_pct, "rgb(var(--avc-info-rgb))", "mdi:water", !!p!.wet_calibrating) : nothing}
               ${p!.elapsed_s != null ? html`<small>${timeStr}</small>` : nothing}
             </span>
           `;
@@ -4948,7 +4947,7 @@ export class AnyVacCard extends LitElement {
     return html`
       <ha-card class=${this._rootClasses()} style=${styleMap(this._rootVars())}>
         ${this.editMode ? html`<div class="version-chip">v${CARD_VERSION} · ${Math.round(this._cardW)}w</div>` : nothing}
-        ${schemaWarn ? html`<div style="margin:0 4px;padding:8px 12px;border-radius:12px;border:1px solid rgba(250,173,20,0.55);background:rgba(250,173,20,0.12);color:#faad14;font-size:12px;display:flex;align-items:center;gap:8px">
+        ${schemaWarn ? html`<div style="margin:0 4px;padding:8px 12px;border-radius:12px;border:1px solid rgba(var(--avc-warn-rgb),0.55);background:rgba(var(--avc-warn-rgb),0.12);color:rgb(var(--avc-warn-rgb));font-size:12px;display:flex;align-items:center;gap:8px">
           <ha-icon icon="mdi:alert" style="--mdc-icon-size:18px"></ha-icon><span>${schemaWarn}</span>
         </div>` : nothing}
         <div class="badges-row">
@@ -5396,6 +5395,13 @@ export class AnyVacCard extends LitElement {
       padding-top: 6px;
     }
     .dock-est { font-size: 11px; color: rgba(var(--avc-ink-rgb), 0.45); }
+    .dock-run {
+      flex: 0 0 auto;
+      padding: 7px 14px;
+      background: rgba(var(--avc-accent-rgb), 0.24);
+      border: 1px solid rgba(var(--avc-accent-rgb), 0.65);
+      color: rgb(var(--avc-ink-rgb));
+    }
 
     /* START bar (portrait bottom, docs/18 §7d). docs/25 §6 (visual language
      * pass, 2026-07-24): the one thing this whole screen is FOR, so it
@@ -5985,7 +5991,7 @@ export class AnyVacCard extends LitElement {
     .action-btn:disabled { cursor: default; opacity: 0.7; }
 
     .action-btn ha-icon { --mdc-icon-size: 18px; flex-shrink: 0; position: relative; z-index: 1; }
-    .action-btn span { font-size: 13px; font-weight: 700; color: white; position: relative; z-index: 1; }
+    .action-btn span { font-size: 13px; font-weight: 700; color: rgb(var(--avc-ink-rgb)); position: relative; z-index: 1; }
 
     .action-btn--secondary {
       background: rgba(var(--avc-info-rgb), 0.08);
@@ -6113,12 +6119,12 @@ export class AnyVacCard extends LitElement {
       --avc-scrim-rgb: 252, 252, 253;
       --avc-scrim-2-rgb: 244, 245, 248;
 
-      --avc-ok-rgb: 56, 142, 76;
-      --avc-warn-rgb: 176, 122, 24;
+      --avc-ok-rgb: 52, 131, 70;
+      --avc-warn-rgb: 154, 106, 21;
       --avc-err-rgb: 197, 58, 66;
-      --avc-hint-rgb: 158, 118, 30;
+      --avc-hint-rgb: 147, 110, 28;
       --avc-tool-rgb: 42, 104, 210;
-      --avc-info-rgb: 34, 122, 186;
+      --avc-info-rgb: 34, 121, 184;
 
       --avc-surface: rgba(255, 255, 255, 0.93);
       --avc-panel: rgba(255, 255, 255, 0.68);
@@ -6147,12 +6153,12 @@ export class AnyVacCard extends LitElement {
         --avc-scrim-rgb: 252, 252, 253;
         --avc-scrim-2-rgb: 244, 245, 248;
 
-        --avc-ok-rgb: 56, 142, 76;
-        --avc-warn-rgb: 176, 122, 24;
+        --avc-ok-rgb: 52, 131, 70;
+        --avc-warn-rgb: 154, 106, 21;
         --avc-err-rgb: 197, 58, 66;
-        --avc-hint-rgb: 158, 118, 30;
+        --avc-hint-rgb: 147, 110, 28;
         --avc-tool-rgb: 42, 104, 210;
-        --avc-info-rgb: 34, 122, 186;
+        --avc-info-rgb: 34, 121, 184;
 
         --avc-surface: rgba(255, 255, 255, 0.93);
         --avc-panel: rgba(255, 255, 255, 0.68);
@@ -6215,6 +6221,18 @@ export class AnyVacCard extends LitElement {
       box-shadow: 0 6px 18px rgba(var(--avc-warn-rgb), 0.14);
       animation: var(--avc-live);
     }
+    /* Landscape's primary action lives in the dock footer, not in the START
+     * bar (that one is portrait's). Same promotion, same reason. */
+    .avc-theme .dock-run:not(:disabled) {
+      background: linear-gradient(180deg, rgba(var(--avc-accent-rgb), 0.34), rgba(var(--avc-accent-rgb), 0.2));
+      border-color: rgba(var(--avc-accent-rgb), 0.55);
+      box-shadow: 0 4px 14px rgba(var(--avc-accent-rgb), 0.16);
+    }
+    .avc-theme.avc-calm .dock-run:not(:disabled) {
+      box-shadow: 0 0 0 1px rgba(var(--avc-accent-rgb), 0.4),
+                  0 8px 20px rgba(var(--avc-accent-rgb), 0.16);
+    }
+
     .avc-theme .dock-row.on {
       background: rgba(var(--avc-accent-rgb), 0.14);
       border-color: rgba(var(--avc-accent-rgb), 0.5);
@@ -6333,6 +6351,67 @@ export class AnyVacCard extends LitElement {
     }
     .avc-theme .map-vector,
     .avc-theme .room-age-dots { transition: opacity 0.6s var(--avc-ease); }
+
+
+    /* ══ Light-theme legibility (docs/35 §9b) ══════════════════════════════
+     * The dim ink tiers were tuned as white-on-near-black, where 45% still
+     * reads. Flipped to black-on-porcelain the same 45% lands at 2.8:1 —
+     * below WCAG AA for the 11px text it is used on. Rather than change ~40
+     * shared use sites (and with them the dark theme they were tuned for),
+     * the light themes lift the tiers on the elements that actually carry
+     * text. Measured, not eyeballed: 0.61 alpha is where black-on-panel
+     * crosses 4.5:1, 0.68 leaves headroom for the lighter dashboards a user
+     * might sit the card on.
+     *
+     * The threshold colours are a separate problem: they come from
+     * room_thresholds, a documented user-editable default, and from inline
+     * styles, so they cannot be re-mapped here without overriding what the
+     * user configured. They are also correct where they are primarily used —
+     * on the map, which stays dark in every theme. Darkening them at the
+     * point of use keeps the configured hue and the map untouched, and only
+     * fixes the one place they are unreadable. brightness(0.45) is the value
+     * at which all four defaults clear 4.5:1 (amber is the binding one). */
+    .avc-theme--light .dock-est,
+    .avc-theme--light .last-clean,
+    .avc-theme--light .current-room,
+    .avc-theme--light .map-tools-label,
+    .avc-theme--light .mtbtn--ghost,
+    .avc-theme--light .dock-mode,
+    .avc-theme--light .dock-sheet-debug,
+    .avc-theme--light .dock-sheet-care-value,
+    .avc-theme--light .dbg-prog-item,
+    .avc-theme--light .dbg-prog-name,
+    .avc-theme--light .layer-menu-head { color: rgba(var(--avc-ink-rgb), 0.68); }
+    .avc-theme--light .last-clean ha-icon,
+    .avc-theme--light .dock-age ha-icon,
+    .avc-theme--light .dbg-prog-item small { color: rgba(var(--avc-ink-rgb), 0.55); }
+    .avc-theme--light .dock-cov { opacity: 0.72; }
+    .avc-theme--light.avc-calm .dock-cov { opacity: 0.6; }
+    .avc-theme--light .dock-age b,
+    .avc-theme--light .dock-cov,
+    .avc-theme--light .dbg-prog-item b { filter: brightness(0.45) saturate(1.4); }
+
+    @media (prefers-color-scheme: light) {
+      .avc-theme--auto .dock-est,
+      .avc-theme--auto .last-clean,
+      .avc-theme--auto .current-room,
+      .avc-theme--auto .map-tools-label,
+      .avc-theme--auto .mtbtn--ghost,
+      .avc-theme--auto .dock-mode,
+      .avc-theme--auto .dock-sheet-debug,
+      .avc-theme--auto .dock-sheet-care-value,
+      .avc-theme--auto .dbg-prog-item,
+      .avc-theme--auto .dbg-prog-name,
+      .avc-theme--auto .layer-menu-head { color: rgba(var(--avc-ink-rgb), 0.68); }
+      .avc-theme--auto .last-clean ha-icon,
+      .avc-theme--auto .dock-age ha-icon,
+      .avc-theme--auto .dbg-prog-item small { color: rgba(var(--avc-ink-rgb), 0.55); }
+      .avc-theme--auto .dock-cov { opacity: 0.72; }
+      .avc-theme--auto.avc-calm .dock-cov { opacity: 0.6; }
+      .avc-theme--auto .dock-age b,
+      .avc-theme--auto .dock-cov,
+      .avc-theme--auto .dbg-prog-item b { filter: brightness(0.45) saturate(1.4); }
+    }
 
     /* Motion opt-outs. The OS preference wins unconditionally; .avc-still
      * is the config-level equivalent (reduce_motion: true) for people who

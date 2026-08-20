@@ -91,6 +91,43 @@ changes the genre, not the quality.
   colour value — the `+ "80"` hex-alpha suffix trick elsewhere operates on the
   vacuum's identity colour, never on this one.
 
+### Accessibility
+
+Contrast was measured on the finished build rather than eyeballed — the real
+bundle rendered in a browser, ratios computed by compositing each token's alpha
+over the actual surface behind it.
+
+The dark theme passed as built: everything text-bearing at 4.5:1 or better,
+most of it above 7:1. The light theme did not, which is exactly where it was
+predictable — those alphas were tuned as white-on-near-black, and 45% white on
+black reads where 45% black on porcelain does not.
+
+- The dim ink tiers are lifted **only in the light themes, and only on the
+  elements that carry text** (0.45 → 0.68; measured, 0.61 is where black on the
+  panel crosses 4.5:1). The shared values stay as they are, because they are
+  correct for the dark theme they were tuned for.
+- `ok` / `warn` / `info` / `hint` darkened for light: 4.05/3.69/4.56/4.64 →
+  4.64/4.68/4.63/4.64.
+- Room age colours come from `room_thresholds`, a documented user-editable
+  default, and are correct where they are mainly used — on the map, which stays
+  dark in every theme. They are **not** overridden; they are darkened at the
+  point of use in the dock list, where they were sitting at 1.7–1.8:1 on
+  porcelain. `brightness(0.45)` is the value at which all four defaults clear
+  4.5:1.
+- Two things that would have shipped visibly broken on a light theme: the
+  primary action's label was `color: white` as a keyword (the conversion pass
+  only looked for `#fff`), and the idle START used a hardcoded
+  `rgba(60,60,60,0.4)` for its "nothing selected" background. Both go through
+  tokens now, and resolve to the same values under `legacy`.
+
+### Fixed
+
+- In landscape the primary action is the dock footer's Start button, not the
+  START bar (that one is portrait's) — and it was the only control styled
+  inline, so the promoted START treatment could not reach it. Lifted into a
+  `.dock-run` rule with identical values (`legacy` unchanged) and promoted the
+  same way.
+
 ### Notes on `theme: legacy`
 
 Verified mechanically rather than asserted: resolving the new stylesheet's
