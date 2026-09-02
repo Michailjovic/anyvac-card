@@ -1503,8 +1503,15 @@ export class AnyVacCard extends LitElement {
       const p = this._roomProgress(v, room);
       if (!p) continue;
       const val = type === "dry" ? p.dry_pct : p.wet_pct;
-      if (val !== null && val !== undefined && (best === null || val > best)) {
-        best = val; bestVac = v; bestCal = !!(type === "dry" ? p.dry_calibrating : p.wet_calibrating);
+      if (val === null || val === undefined) continue;
+      const cal = !!(type === "dry" ? p.dry_calibrating : p.wet_calibrating);
+      // A normalised value always beats a still-calibrating one (docs/36). The two are
+      // different scales — normalised is "% of a full clean", calibrating is the raw
+      // bounding-box %, which reads high because the box includes furniture the robot
+      // cannot reach — so a plain max() across the fleet let one vacuum's raw 78 %~
+      // hide another's real 45 %. Within the same scale the highest still wins.
+      if (best === null || (bestCal && !cal) || (bestCal === cal && val > best)) {
+        best = val; bestVac = v; bestCal = cal;
       }
     }
     if (best === null || !bestVac) return null;

@@ -8,6 +8,23 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Planned
 
+## [1.2.1] - 2026-09-02
+
+Paired with integration 1.2.1, which fixes the per-room coverage percentages at
+the source (`docs/36-beh-vs-vyjezd-coverage.md`). The card's own share of that
+bug is one line of selection logic.
+
+### Fixed
+
+**The room's live % chip no longer lets a still-calibrating vacuum outvote a
+calibrated one.** With several vacuums reporting progress for the same room, the
+chip took the highest number across the fleet — but the two kinds of number are
+not on the same scale. A vacuum that has already learned the room's full-clean
+baseline reports "% of a full clean"; one that has not yet reports the raw
+bounding-box percentage, which reads high because the box includes furniture and
+corners the robot cannot reach. A plain maximum let a raw 78 %~ hide a real 45 %.
+A normalised value now always wins; within the same scale the highest still does.
+
 ## [1.2.0] - 2026-08-19
 
 Visual language v2 — the largest purely visual change since the responsive
