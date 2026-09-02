@@ -8,6 +8,51 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Planned
 
+## [1.3.0] - 2026-09-02
+
+Paired with integration 1.3.0, which is where the Home Assistant 2026.9 analysis
+landed. The card's share: the Dock sheet stops guessing what a dock can do, and
+its three cycle buttons become toggles. New `tests/dock.spec.ts` covers both
+(9 tests, Playwright suite now 26).
+
+### Added
+
+**Empty, Wash and Dry are now start/stop toggles.** All three are cycles the dock
+ends on its own, and each has always had a stop command that nothing in AnyVac
+exposed — so a wash started by accident had to be waited out. While a cycle is
+running the button shows Stop and calls `anyvac.dock_*` with `action: "stop"`.
+Running state comes from the backend (`dock_status.running`), never re-derived
+here; an older paired integration that does not publish it leaves the button as a
+plain start rather than offering a Stop that might do nothing.
+
+### Changed
+
+**Dock actions and dock-mounted consumables are gated on the dock's reported
+capabilities** (`dock_status.features`) instead of the `dock_type` tier table in
+`_dockTier`. That table was a careful guess written when `docs/26` §3 concluded
+the information was not available; it is, and HA 2026.9's own dock switches use
+it. Practical difference: a dock that can empty and wash but not dry no longer
+gets a Dry button, which the three-tier model could not express. `_dockTier`
+remains as the fallback for an older paired integration — a coarser answer, not a
+wrong one.
+
+### Fixed
+
+**The Dock button no longer opens onto nothing on a room-less config.** The
+button is gated on dock capability, but the sheet renders from inside
+`_renderDock`, which bails before it when there are no rooms to list — so a
+config with a dock but no rooms yet (a fresh install in degraded mode) showed a
+button that did nothing. The sheet is about the dock, not the rooms, so it now
+comes along with the picker and icon strip on that early return. Found by the
+new `tests/dock.spec.ts` while writing it, not in the field.
+
+### Removed
+
+**`_batteryPct`**, dead since it was written (no callers), and its fallback to the
+vacuum entity's `battery_level` attribute — removed from the base vacuum entity in
+core 2026.9. The battery figure on the status card has always come from the
+`device_class: battery` sensor and is unaffected.
+
 ## [1.2.3] - 2026-09-02
 
 Paired with integration 1.2.3, which fixes the per-room coverage percentages at

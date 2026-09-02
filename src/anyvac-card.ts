@@ -1080,7 +1080,7 @@ export class AnyVacCard extends LitElement {
    *  entity (e.g. S6 has no dock device at all; S7's dock lacks reset buttons for its
    *  own consumables) simply omits that row — no guessing, no placeholders. */
   /** Cache key is `entity|tier`, not just the entity (2026-08-08 fix): the row
-   *  set BRANCHES on `_dockTier(vac)` below, which reads `dock_status.dock_type`
+   *  set BRANCHES on `_dockCaps(vac)` below, which reads live dock capability
    *  off the integration sensor — live state, not registry data. Before the
    *  first AnyVac poll lands, the tier reads "none", so the dock-mounted rows
    *  (dock brush, strainer, tank sensors) were skipped and that incomplete list
@@ -1092,8 +1092,8 @@ export class AnyVacCard extends LitElement {
     const reg = this._registry();
     const devs = (this.hass as any)?.devices as Record<string, any> | undefined;
     if (!reg || !devs || !vac.entity) return [];
-    const tier = this._dockTier(vac);
-    const cacheKey = vac.entity + "|" + tier;
+    const caps = this._dockCaps(vac);
+    const cacheKey = vac.entity + "|" + this._dockCapsKey(vac);
     if (this._careCache.has(cacheKey)) return this._careCache.get(cacheKey)!;
 
     const devId = reg[vac.entity]?.device_id as string | undefined;
@@ -1130,10 +1130,12 @@ export class AnyVacCard extends LitElement {
     // Dock-mounted consumables/tank status only apply to a wash-capable dock —
     // an empty-only dock's entities can still exist in HA's registry (created
     // per device model, not per physically-installed accessory) but always
-    // report "unavailable"; gate on the same dock_type tier as the actions
-    // above instead of just checking entity presence (docs/25 §10 3rd
-    // follow-up, live-confirmed on the field-reporting user's S7 MaxV).
-    if (tier === "full") {
+    // report "unavailable"; gate on capability instead of just checking entity
+    // presence (docs/25 §10 3rd follow-up, live-confirmed on the field-reporting
+    // user's S7 MaxV). Since 2026-09-02 that gate is the dock's own
+    // `is_washable` flag where the backend reports it, with the old dock_type
+    // tier as fallback — see `_dockCaps`.
+    if (caps.wash) {
       consumable("Dock brush", "cleaning_brush_time_left", "reset_dock_cleaning_brush_consumable", dockDevId);
       consumable("Strainer", "strainer_time_left", "reset_dock_strainer_consumable", dockDevId);
 
@@ -2240,14 +2242,6 @@ export class AnyVacCard extends LitElement {
       @click=${onTap ?? nothing}>${this._vacAbbrev(v)}</span>`;
   }
 
-  private _batteryPct(vac: VacuumConfig): number | null {
-    if (vac.battery_entity) {
-      const v = Number(this.hass.states[vac.battery_entity]?.state);
-      if (Number.isFinite(v)) return v;
-    }
-    const bl = Number((this.hass.states[vac.entity]?.attributes as Record<string, unknown> | undefined)?.battery_level);
-    return Number.isFinite(bl) ? bl : null;
-  }
   /** DEGRADED-MODE FALLBACK ONLY (no integration → no backend to ask): per room
    *  the worst (max) estimate across vacuums, summed with no notion of sequence,
    *  parallelism or dry→wet gating. With the integration present, `_etaFor` uses
@@ -2353,7 +2347,12 @@ export class AnyVacCard extends LitElement {
     // content, not on the picker/icon-strip above it, so it doesn't regress
     // that case. Mirrors the main return's `withPicker` + icon-strip pair
     // below (each self-gates to its own profile, so exactly one renders).
-    if (!rooms.length) return html`${withPicker ? this._renderVacuumPicker() : nothing}${this._renderVacuumIconStrip()}`;
+    // The dock sheet is about the dock, not the rooms, so it comes along too —
+    // caught by its own test (2026-09-02): the Dock button is gated on dock
+    // capability alone, so on a room-less config it rendered and then opened
+    // onto nothing, because this early return happened first.
+    if (!rooms.length)
+      return html`${withPicker ? this._renderVacuumPicker() : nothing}${this._renderVacuumIconStrip()}${this._renderDockSheet()}`;
     const hasInt = vacs.some((v) => this._intAttrs(v));
     const mode = this._planMode;
     const selKeys = this._allRoomKeys().filter((k) => this._isRoomSelectedAny(k, vacs));
@@ -2411,7 +2410,7 @@ export class AnyVacCard extends LitElement {
         ${withRun ? html`
           <div class="dock-head">
             ${modeBtn("dry", "mdi:broom", "Dry")}${modeBtn("wet", "mdi:water", "Wet")}${modeBtn("both", "mdi:water-plus", "Both")}
-            ${vacs.some((v) => this._dockTier(v) !== "none" || this._careItems(v).length > 0) ? html`
+            ${vacs.some((v) => this._dockCaps(v).hasDock || this._careItems(v).length > 0) ? html`
               <button class="dock-mode dock-mode--dock ${this._dockSheetOpen ? "on" : ""}"
                 @click=${(e: Event) => { e.stopPropagation(); this._dockSheetOpen = !this._dockSheetOpen; }}>
                 <ha-icon icon="mdi:home-outline"></ha-icon><span>Dock</span>
@@ -2524,6 +2523,60 @@ export class AnyVacCard extends LitElement {
     return "full";
   }
 
+  /** Which dock cycles this vacuum's dock can actually run (2026-09-02).
+   *
+   *  Preferred source is `dock_status.features` — the backend reads
+   *  `properties_api.device_features.dock_features`, the very same
+   *  `RoborockDockFeatures` flags HA 2026.9's own dock switches gate on. That
+   *  retires the guesswork docs/26 §3 recorded ("HA has no documented way to
+   *  report which dock accessories are installed") and the hand-maintained
+   *  `dock_type` tier table it forced (`_dockTier` above).
+   *
+   *  `_dockTier` stays as the fallback for an older integration paired with this
+   *  card — the tier is a coarser answer, not a wrong one, so degrading to it is
+   *  honest. `has_dock` is only trusted when the backend actually reported it;
+   *  an all-null `features` block (library renamed something) falls back too,
+   *  rather than silently hiding every dock button.
+   *
+   *  Pump and self-clean have no capability flag of their own; both act on the
+   *  cleaning sink, which only exists on a washable dock, so they follow `wash`. */
+  private _dockCaps(vac: VacuumConfig): { hasDock: boolean; collect: boolean; wash: boolean; dry: boolean } {
+    const f = this._intAttrs(vac)?.dock_status?.features as
+      | Record<string, boolean | null> | undefined;
+    if (f && (f.has_dock !== null && f.has_dock !== undefined)) {
+      return {
+        hasDock: !!f.has_dock,
+        collect: !!f.is_collectable,
+        wash: !!f.is_washable,
+        dry: !!f.is_dryable,
+      };
+    }
+    const tier = this._dockTier(vac);
+    return {
+      hasDock: tier !== "none",
+      collect: tier !== "none",
+      wash: tier === "full",
+      dry: tier === "full",
+    };
+  }
+
+  /** Cache key for anything that branches on dock capabilities — see `_careItems`. */
+  private _dockCapsKey(vac: VacuumConfig): string {
+    const c = this._dockCaps(vac);
+    return `${c.hasDock ? 1 : 0}${c.collect ? 1 : 0}${c.wash ? 1 : 0}${c.dry ? 1 : 0}`;
+  }
+
+  /** Is a dock cycle running right now? Backend-derived (`dock_status.running`,
+   *  mirroring HA 2026.9's dock switches); `null` when this integration version
+   *  does not publish it, which the caller renders as a plain start button. */
+  private _dockRunning(vac: VacuumConfig, kind: "empty" | "wash" | "dry"): boolean | null {
+    const r = this._intAttrs(vac)?.dock_status?.running as
+      | Record<string, boolean | null> | undefined;
+    if (!r) return null;
+    const v = r[kind];
+    return v === null || v === undefined ? null : !!v;
+  }
+
   /** docs/25 §7 field follow-up (2026-07-24): dock sheet — per-vacuum tabs +
    *  Empty/Wash/Dry actions (`anyvac.dock_*`, confirmed commands per docs/26
    *  §3, live-verified against the field-reporting user's real HW). Toggled
@@ -2546,14 +2599,40 @@ export class AnyVacCard extends LitElement {
     // device and have nothing to do with dock hardware). Dropped from the
     // list entirely only when it has neither dock actions nor care rows.
     const vacs = this._config.vacuums.filter(
-      (v) => this._dockTier(v) !== "none" || this._careItems(v).length > 0
+      (v) => this._dockCaps(v).hasDock || this._careItems(v).length > 0
     );
     if (!vacs.length) return nothing;
     const idx = Math.min(this._dockSheetIdx, vacs.length - 1);
     const vac = vacs[idx];
-    const tier = this._dockTier(vac);
+    const caps = this._dockCaps(vac);
     const dock = this._intAttrs(vac)?.dock_status as Record<string, unknown> | undefined;
-    const act = (service: string) => () => void this._call("anyvac", service, { entity_id: vac.entity });
+    const act = (service: string, action?: "start" | "stop") => () =>
+      void this._call("anyvac", service, {
+        entity_id: vac.entity,
+        ...(action ? { action } : {}),
+      });
+    /** Empty/wash/dry are cycles the dock ends on its own, so the button is a
+     *  toggle: it starts one, and turns into Stop while one is running
+     *  (`anyvac.dock_*` grew an `action` parameter for this, mirroring the
+     *  start/stop pairs HA 2026.9's own dock switches use). Running state comes
+     *  from the backend, never re-derived here (docs/14 rule 1); when the paired
+     *  integration is too old to publish it, `_dockRunning` returns null and the
+     *  button stays a plain start — no guessing, no dead Stop button. */
+    const cycle = (
+      service: string,
+      kind: "empty" | "wash" | "dry",
+      icon: string,
+      label: string
+    ) => {
+      const running = this._dockRunning(vac, kind);
+      return html`
+        <button class="dock-sheet-action ${running ? "running" : ""}"
+          title=${running ? `Stop ${label.toLowerCase()}` : label}
+          @click=${act(service, running ? "stop" : "start")}>
+          <ha-icon icon=${running ? "mdi:stop" : icon}></ha-icon>
+          <span>${running ? "Stop" : label}</span>
+        </button>`;
+    };
     const care = this._careItems(vac);
     // docs/25 §10 field-caught: `pendingKey` is the entity we actually WATCH
     // for the reset to land (the sensor, when we have one — falls back to
@@ -2592,18 +2671,12 @@ export class AnyVacCard extends LitElement {
             ${Object.entries(dock).filter(([, val]) => val !== null && val !== undefined)
               .map(([k, val]) => html`<span>${k}: ${String(val)}</span>`)}
           </div>` : nothing}
-        ${tier !== "none" ? html`
+        ${caps.hasDock ? html`
           <div class="dock-sheet-actions">
-            <button class="dock-sheet-action" @click=${act("dock_empty")}>
-              <ha-icon icon="mdi:delete-empty"></ha-icon><span>Empty</span>
-            </button>
-            ${tier === "full" ? html`
-              <button class="dock-sheet-action" @click=${act("dock_wash")}>
-                <ha-icon icon="mdi:water"></ha-icon><span>Wash</span>
-              </button>
-              <button class="dock-sheet-action" @click=${act("dock_dry")}>
-                <ha-icon icon="mdi:hair-dryer"></ha-icon><span>Dry</span>
-              </button>
+            ${caps.collect ? cycle("dock_empty", "empty", "mdi:delete-empty", "Empty") : nothing}
+            ${caps.wash ? cycle("dock_wash", "wash", "mdi:water", "Wash") : nothing}
+            ${caps.dry ? cycle("dock_dry", "dry", "mdi:hair-dryer", "Dry") : nothing}
+            ${caps.wash ? html`
               <button class="dock-sheet-action" @click=${act("dock_pump")}>
                 <ha-icon icon="mdi:water-pump"></ha-icon><span>Pump</span>
               </button>
@@ -2693,7 +2766,7 @@ export class AnyVacCard extends LitElement {
         <ha-icon icon=${modeIcon}></ha-icon>
         <span>${modeLabel}</span>
       </button>`;
-    const showDock = vacs.some((v) => this._dockTier(v) !== "none" || this._careItems(v).length > 0);
+    const showDock = vacs.some((v) => this._dockCaps(v).hasDock || this._careItems(v).length > 0);
     const dockSeg = showDock ? html`
       <button class="start-seg start-seg--dock ${this._dockSheetOpen ? "on" : ""}"
         title="Dock control"
@@ -5255,6 +5328,13 @@ export class AnyVacCard extends LitElement {
       border: 1px solid rgba(var(--avc-ink-rgb), 0.12);
     }
     .dock-sheet-action ha-icon { --mdc-icon-size: 18px; }
+    /* A dock cycle that is currently running: the button now stops it, so it
+       reads as active rather than as another thing to start. */
+    .dock-sheet-action.running {
+      color: rgba(var(--avc-ink-rgb), 0.95);
+      background: rgba(var(--avc-accent-rgb), 0.18);
+      border-color: rgba(var(--avc-accent-rgb), 0.5);
+    }
     .dock-sheet-care {
       display: flex;
       flex-direction: column;
