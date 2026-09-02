@@ -8,9 +8,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Planned
 
-## [1.2.1] - 2026-09-02
+## [1.2.3] - 2026-09-02
 
-Paired with integration 1.2.1, which fixes the per-room coverage percentages at
+Paired with integration 1.2.3, which fixes the per-room coverage percentages at
 the source (`docs/36-beh-vs-vyjezd-coverage.md`). The card's own share of that
 bug is one line of selection logic.
 
