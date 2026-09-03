@@ -3221,8 +3221,68 @@ export class AnyVacCard extends LitElement {
     }
     this._mapMode = "normal"; this._modeEntity = null;
   }
-  // Map a viewport click into THIS vacuum's map content space (undo its
-  // rotation/scale/offset) so pin&go / zones are seating-independent.
+  /** Total ambient rotation (CSS degrees, clockwise) that `_renderResponsive`
+   *  ACTUALLY applies to the map right now — 0, 90, 180 or 270. The single
+   *  source of truth for "which way is the map turned": the renderer, the
+   *  on-map assign-chip anchor and the click geometry below all read this one
+   *  answer, so they can never disagree.
+   *
+   *  Note the two cases where the answer is 0 even though `_narrow` is true:
+   *  the legacy path never flips, and the grid path bails out of rotating
+   *  entirely while the map region is still unmeasured (`_mapRegW/_mapRegH`).
+   *  Deriving rotation from `_narrow` alone — which several call sites used to
+   *  do — is wrong in exactly those windows. */
+  private _mapRotationDeg(): number {
+    if (!this._config.layout) return this._narrow ? 90 : 0;   // legacy: 90° or nothing
+    if (this._mapRegW <= 4 || this._mapRegH <= 4) return 0;   // region unmeasured -> renderer does not rotate
+    return (this._narrow ? 90 : 0) + (this._flipEff ? 180 : 0);
+  }
+
+  /** Undo the ambient map rotation on a VIEWPORT-SPACE DELTA.
+   *
+   *  `.avc-rot`'s wrapper applies a pure rotation (plus a translate, which a
+   *  delta is immune to, and never a scale), so a screen delta measured from
+   *  an element's own centre is the pre-rotation delta turned by
+   *  `_mapRotationDeg()`. Turning it back by the same angle recovers the
+   *  element's own local frame — that is the whole of what Pin & Go and zone
+   *  drawing were missing while the map was rotated (docs/13 A5). */
+  private _unrotateDelta(dx: number, dy: number): { dx: number; dy: number } {
+    const rot = ((this._mapRotationDeg() % 360) + 360) % 360;
+    if (!rot) return { dx, dy };
+    const t = (rot * Math.PI) / 180, c = Math.cos(t), s = Math.sin(t);
+    return { dx: c * dx + s * dy, dy: -s * dx + c * dy };
+  }
+
+  /** Viewport point -> percent of `el`'s OWN, pre-rotation layout box.
+   *  `getBoundingClientRect()` is the AXIS-ALIGNED box of the rotated element
+   *  (width/height swapped at 90°/270°), so its centre is still the element's
+   *  true centre — usable — but its width/height are not. Hence
+   *  `offsetWidth`/`offsetHeight`, which are always the untransformed layout
+   *  size, together with the un-rotated delta. */
+  private _wrapPct(el: HTMLElement, clientX: number, clientY: number): { x: number; y: number } {
+    const r = el.getBoundingClientRect();
+    const d = this._unrotateDelta(clientX - (r.left + r.right) / 2, clientY - (r.top + r.bottom) / 2);
+    const w = el.offsetWidth || 1, h = el.offsetHeight || 1;
+    return { x: (d.dx / w + 0.5) * 100, y: (d.dy / h + 0.5) * 100 };
+  }
+
+  /** Inverse of `_wrapPct`: percent of `el`'s own box -> viewport point.
+   *  Used to hand a drawn zone box back to `_clickToContent` as two screen
+   *  corners, the way it has always worked — just rotation-aware now. */
+  private _wrapPoint(el: HTMLElement, xPct: number, yPct: number): { x: number; y: number } {
+    const r = el.getBoundingClientRect();
+    const cx = (r.left + r.right) / 2, cy = (r.top + r.bottom) / 2;
+    const w = el.offsetWidth || 1, h = el.offsetHeight || 1;
+    const lx = (xPct / 100 - 0.5) * w, ly = (yPct / 100 - 0.5) * h;
+    const rot = ((this._mapRotationDeg() % 360) + 360) % 360;
+    if (!rot) return { x: cx + lx, y: cy + ly };
+    const t = (rot * Math.PI) / 180, c = Math.cos(t), s = Math.sin(t);
+    return { x: cx + (c * lx - s * ly), y: cy + (s * lx + c * ly) };
+  }
+
+  // Map a viewport click into THIS vacuum's map content space (undo the ambient
+  // map rotation first, then its own seat rotation/scale/offset) so pin&go /
+  // zones are both seating-independent AND rotation-independent.
   private _clickToContent(vac: VacuumConfig, clientX: number, clientY: number): { x: number; y: number } | null {
     // The map is the coordinate authority (mm live there). Select this vacuum's own
     // map element — with several vacuums shown there are several .map-img and the
@@ -3240,9 +3300,11 @@ export class AnyVacCard extends LitElement {
     const m = new DOMMatrix(tr === "none" ? undefined : tr);
     const det = m.a * m.d - m.b * m.c;
     if (Math.abs(det) < 1e-9) return null;
-    const dx = clientX - cx, dy = clientY - cy;
-    const lx = (m.d * dx - m.c * dy) / det;
-    const ly = (-m.b * dx + m.a * dy) / det;
+    // Ambient wrapper rotation first (map-wide), then this vacuum's own seat
+    // matrix — they compose in that order on screen, so they invert in reverse.
+    const d = this._unrotateDelta(clientX - cx, clientY - cy);
+    const lx = (m.d * d.dx - m.c * d.dy) / det;
+    const ly = (-m.b * d.dx + m.a * d.dy) / det;
     const w = el.offsetWidth || 1, h = el.offsetHeight || 1;
     return { x: (lx / w + 0.5) * 100, y: (ly / h + 0.5) * 100 };
   }
@@ -3251,9 +3313,7 @@ export class AnyVacCard extends LitElement {
     if (!editing && (this._mapMode !== "zone" || !this._isModeCandidate(vac))) return;
     const el = e.currentTarget as HTMLElement;
     (el as any).setPointerCapture?.(e.pointerId);
-    const r = el.getBoundingClientRect();
-    const x = ((e.clientX - r.left) / r.width) * 100;
-    const y = ((e.clientY - r.top) / r.height) * 100;
+    const { x, y } = this._wrapPct(el, e.clientX, e.clientY);
     if (this._zoneRectShown) {
       const hit = this._zoneHit(this._zoneRectShown, x, y);
       if (hit) {
@@ -3285,9 +3345,7 @@ export class AnyVacCard extends LitElement {
   private _onZoneMove(vac: VacuumConfig, e: PointerEvent): void {
     if (this._zoneEdit && this._zoneRectShown) {
       const el = e.currentTarget as HTMLElement;
-      const r = el.getBoundingClientRect();
-      const x = ((e.clientX - r.left) / r.width) * 100;
-      const y = ((e.clientY - r.top) / r.height) * 100;
+      const { x, y } = this._wrapPct(el, e.clientX, e.clientY);
       const MIN = 3; // smallest box side, in %, so a resize can't collapse to a point
       const edit = this._zoneEdit;
       if (edit.type === "move") {
@@ -3308,9 +3366,8 @@ export class AnyVacCard extends LitElement {
     }
     if (!this._zoneDrag || this._mapMode !== "zone" || !this._isModeCandidate(vac)) return;
     const el = e.currentTarget as HTMLElement;
-    const r = el.getBoundingClientRect();
-    this._zoneDrag = { x0: this._zoneDrag.x0, y0: this._zoneDrag.y0,
-      x1: ((e.clientX - r.left) / r.width) * 100, y1: ((e.clientY - r.top) / r.height) * 100 };
+    const p = this._wrapPct(el, e.clientX, e.clientY);
+    this._zoneDrag = { x0: this._zoneDrag.x0, y0: this._zoneDrag.y0, x1: p.x, y1: p.y };
   }
   private _onZoneUp(vac: VacuumConfig, e: PointerEvent): void {
     const el = e.currentTarget as HTMLElement;
@@ -3340,11 +3397,9 @@ export class AnyVacCard extends LitElement {
    *  be nudged into place after the fact without redrawing it from scratch. */
   private _commitZoneRect(vac: VacuumConfig, el: HTMLElement): void {
     const box = this._zoneRectShown; if (!box) return;
-    const r = el.getBoundingClientRect();
-    const ax = r.left + (Math.min(box.x0, box.x1) / 100) * r.width;
-    const ay = r.top + (Math.min(box.y0, box.y1) / 100) * r.height;
-    const bx = r.left + (Math.max(box.x0, box.x1) / 100) * r.width;
-    const by = r.top + (Math.max(box.y0, box.y1) / 100) * r.height;
+    const pa = this._wrapPoint(el, Math.min(box.x0, box.x1), Math.min(box.y0, box.y1));
+    const pb = this._wrapPoint(el, Math.max(box.x0, box.x1), Math.max(box.y0, box.y1));
+    const ax = pa.x, ay = pa.y, bx = pb.x, by = pb.y;
     if (this._zoneMulti) {
       // Merged multi-candidate: same two screen corners, translated through every
       // candidate vacuum's own map transform. Nothing sent yet — confirm per
@@ -3433,10 +3488,10 @@ export class AnyVacCard extends LitElement {
     // auto-picked target here anymore — that was the bug (immediate send with no
     // way to choose the robot).
     const candidates = this._modeCandidates();
-    const canCmd = candidates.length > 0 && !this._narrow;
-    const cmdTitle = this._narrow
-      ? "Not available while the map is rotated"
-      : !canCmd ? "Requires the AnyVac integration (≥ 0.18) + map entity" : "";
+    // No longer gated on `_narrow`: the click geometry undoes the ambient map
+    // rotation itself now (`_unrotateDelta`), so a rotated map is just a map.
+    const canCmd = candidates.length > 0;
+    const cmdTitle = canCmd ? "" : "Requires the AnyVac integration (≥ 0.18) + map entity";
     const mode = this._modeEntity === "*" ? this._mapMode : "normal";
     // docs/28 §2: room count + ETA dropped from this bar — the dock footer right
     // below already carries both (`_renderDock`'s `.dock-foot`), so this was a
@@ -3523,16 +3578,12 @@ export class AnyVacCard extends LitElement {
 
   private _renderMapTools(vac: VacuumConfig) {
     if (!vac.map && !vac.image_base && !this._mapEntityFor(vac)) return nothing;
-    // Map commands need the integration's calibration AND this vacuum's map element
-    // for the click geometry. Disabled whenever the map is rotated (any profile) —
-    // the click inversion does not account for the wrapper rotation yet (docs/13 A5).
+    // Map commands need the integration's calibration AND this vacuum's map
+    // element for the click geometry. A rotated map is no longer a blocker
+    // (docs/13 A5 lifted) — the click inversion undoes the wrapper rotation.
     const mapEnt = this._mapEntityFor(vac);
-    const canCmd = !!this._intAttrs(vac) && !!mapEnt && !this._narrow;
-    const cmdTitle = this._narrow
-      ? "Not available while the map is rotated"
-      : (!this._intAttrs(vac) || !mapEnt)
-        ? "Requires the AnyVac integration (≥ 0.18) + map entity"
-        : "";
+    const canCmd = !!this._intAttrs(vac) && !!mapEnt;
+    const cmdTitle = canCmd ? "" : "Requires the AnyVac integration (≥ 0.18) + map entity";
     const mode = this._modeEntity === vac.entity ? this._mapMode : "normal";
     return html`
       <div class="map-tools">
@@ -3862,11 +3913,13 @@ export class AnyVacCard extends LitElement {
    *  .crop.mapOrientation` / `layout.landscape.crop.mapOrientation` override
    *  the computed choice manually, per profile. Without a `layout:` block
    *  the legacy card-width heuristic applies, completely unchanged (that
-   *  path never rotated in landscape either, and still doesn't). NOTE: Pin
-   *  & Go / Zone are disabled whenever this is true (`_renderMetaBar`,
-   *  `_renderMapTools`, docs/13 A5 — the click-coordinate inversion doesn't
-   *  account for the rotation wrapper yet) — extending rotation to
-   *  landscape extends that same limitation to landscape. */
+   *  path never rotated in landscape either, and still doesn't). NOTE: this
+   *  getter answers "would rotating fit better", NOT "is the map rotated right
+   *  now" — for the latter (click geometry, on-map chip anchors) read
+   *  `_mapRotationDeg()`, which also folds in flip and the still-unmeasured
+   *  map region. Pin & Go / Zone used to be hard-disabled whenever this was
+   *  true (docs/13 A5); that limitation is lifted — the click inversion now
+   *  undoes the rotation wrapper itself. */
   private get _narrow(): boolean {
     const mr = this._config.mobile_rotate as string | undefined;
     if (mr === "off") return false;
@@ -3971,7 +4024,12 @@ export class AnyVacCard extends LitElement {
     // 2026-07-27) — `rotate` below already carries the right answer either way.
     if (this._mapRegW <= 4 || this._mapRegH <= 4) return mapHtml; // not measured yet
     const ar = this._mapAR > 0.1 ? this._mapAR : 3.636;
-    const rotate = this._narrow;
+    // Single source for "how far is the map actually turned" — the click
+    // geometry reads the same `_mapRotationDeg()`, so the renderer and the
+    // hit-testing can never disagree (they did, silently, at every angle
+    // other than 0 — which is why Pin & Go was simply disabled here instead).
+    const totalRotationDeg = this._mapRotationDeg();
+    const rotate = totalRotationDeg === 90 || totalRotationDeg === 270;
     // Content aspect AS IT SITS IN THE BOX: rotating a wide (ar > 1) floorplan
     // makes it tall, i.e. 1/ar. General contain/cover formula below is the same
     // shape either way with this one term swapped (verified against the
@@ -4005,8 +4063,6 @@ export class AnyVacCard extends LitElement {
     // is upside down for me") are independent and compose into one of the
     // four right angles. `.avc-rot`'s counter-rotation CSS reads the total
     // back off `--map-rot` (single computed source, not per-angle classes).
-    const flip = this._flipEff;
-    const totalRotationDeg = (rotate ? 90 : 0) + (flip ? 180 : 0);
     if (totalRotationDeg !== 0) {
       if (rotate) {
         // Stashed for `_refineGridColumns` (portrait's map/dock column
@@ -4460,7 +4516,7 @@ export class AnyVacCard extends LitElement {
                not a real content-width problem — simplifying back out rather
                than keep an untested fix for an invalidated hypothesis. */
             (dryEnt || wetEnt) ? (() => {
-              const totalRot = (this._narrow ? 90 : 0) + (this._flipEff ? 180 : 0);
+              const totalRot = this._mapRotationDeg();
               // Local room corner that maps to visual bottom-right — same
               // table as 1.0.5, now a point instead of an edge inset.
               const outerPos =

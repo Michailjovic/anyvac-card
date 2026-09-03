@@ -8,6 +8,45 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Planned
 
+## [1.3.1] - 2026-09-03
+
+### Fixed
+
+**Pin & Go and Zone work again on a rotated map.** They had been greyed out with
+"Not available while the map is rotated" — a deliberate guard from `docs/13` A5,
+because the click inversion undid the map image's own seat transform but not the
+`.avc-rot` wrapper the responsive layout puts around it. That guard was written
+when only portrait ever rotated; `0.81.1` extended auto-rotation to landscape for
+tall, narrow floorplans, and with it the guard, so a floorplan of roughly 1:4
+turned both tools permanently off on every screen. Nothing logged an error and
+the map looked normal — a tall floorplan rendered rotated is exactly the wide map
+you expect to see — so the only symptom was two buttons that had quietly stopped
+working.
+
+The guard is gone; the geometry is fixed instead. `_mapRotationDeg()` is now the
+single answer to "how far is the map actually turned" — 0, 90, 180 or 270,
+folding in the manual flip (`docs/32`) and the fact that the renderer does not
+rotate a map region it has not measured yet. The renderer, the on-map assign-chip
+anchor and the click inversion all read it, so they cannot drift apart. Clicks
+undo that ambient rotation (`_unrotateDelta`) before undoing the vacuum's own
+seat matrix: `.avc-rot` applies a pure rotation plus a translate, and a delta
+measured from the element's own centre is immune to the translate, so this is
+exact rather than an approximation.
+
+Zone drawing had a second, independent instance of the same class of bug: it took
+percentages of `getBoundingClientRect()`, whose width and height are swapped at
+90°/270° because it is the axis-aligned box of a rotated element. `_wrapPct` /
+`_wrapPoint` use `offsetWidth`/`offsetHeight` — always the untransformed layout
+box — together with the un-rotated delta.
+
+The maths was verified live against a running dashboard before any of it was
+written to source (monkey-patched into the loaded card, with the robot marker as
+ground truth: 0.005% agreement), then pinned down in `tests/rotated-map.spec.ts`
+— 16 tests across all four angles, checked to fail against the pre-1.3.1 code in
+7 places while 0° passes both before and after. Playwright suite 26 -> 42. This
+also gives 270° (auto-rotate plus flip) its first real verification; it had been
+derived by symmetry and shipped unproven since `docs/32`.
+
 ## [1.3.0] - 2026-09-02
 
 Paired with integration 1.3.0, which is where the Home Assistant 2026.9 analysis
