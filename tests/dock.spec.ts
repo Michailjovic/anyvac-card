@@ -36,23 +36,26 @@ const FULL_DOCK = {
 interface MountOpts {
   /** `dock_status` as the integration publishes it; omit for no integration. */
   dockStatus?: Record<string, unknown> | null;
+  /** Card-level `debug` flag — gates the raw `dock_status` strip in the sheet. */
+  debug?: boolean;
 }
 
 async function mountCard(page: Page, opts: MountOpts = {}): Promise<void> {
-  const { dockStatus = { features: FULL_DOCK } } = opts;
+  const { dockStatus = { features: FULL_DOCK }, debug = false } = opts;
   await page.goto("/tests/harness/mock-ha.html");
   await page.waitForFunction(() => (window as any).__mockHaReady === true);
   await page.evaluate(async () => {
     await customElements.whenDefined("anyvac-card");
   });
   await page.evaluate(
-    ({ dockStatus, PIXEL }) => {
+    ({ dockStatus, debug, PIXEL }) => {
       const w = window as any;
       w.__calls = [];
       const card = document.createElement("anyvac-card") as any;
       card.setConfig({
         type: "custom:anyvac-card",
         layout: {},
+        ...(debug ? { debug: true } : {}),
         vacuums: [
           {
             entity: "vacuum.my_roborock",
@@ -99,7 +102,7 @@ async function mountCard(page: Page, opts: MountOpts = {}): Promise<void> {
       w.__mockHa.cardWrap.appendChild(card);
       w.__card = card;
     },
-    { dockStatus, PIXEL }
+    { dockStatus, debug, PIXEL }
   );
   // The sheet is opened by a button whose placement differs per layout profile;
   // this test is about the sheet's contents, not about finding that button.
@@ -247,6 +250,54 @@ test.describe("dock sheet (card 1.3.0)", () => {
 
     await mountCard(page, { dockStatus: { dock_type: 1 } });
     expect(await actionLabels(page)).toEqual(["Empty"]);
+  });
+
+  test("the debug strip spells out the nested capability and running flags", async ({ page }) => {
+    // Regression (1.3.2): `dock_status` was all scalars until 1.3.0 added these
+    // two objects, and the strip's `String(val)` rendered both as
+    // "[object Object]" — hiding precisely the fields it exists to show.
+    await mountCard(page, {
+      debug: true,
+      dockStatus: {
+        dock_type: 10,
+        features: { has_dock: true, is_collectable: true, is_washable: false, is_dryable: null },
+        running: { empty: false, wash: true, dry: null },
+      },
+    });
+    const rows = await page.evaluate(() =>
+      Array.from(
+        (window as any).__card.shadowRoot.querySelectorAll(".dock-sheet-debug span")
+      ).map((s: any) => s.textContent.trim())
+    );
+    expect(rows).not.toContain("features: [object Object]");
+    expect(rows).toContain("dock_type: 10");
+    expect(rows).toContain("features.has_dock: true");
+    expect(rows).toContain("features.is_washable: false");
+    expect(rows).toContain("running.wash: true");
+  });
+
+  test("the debug strip keeps a capability's null apart from its false", async ({ page }) => {
+    // "not reported" and "reported absent" are different answers, and this view
+    // is where that distinction gets checked — so nested nulls are not filtered
+    // out the way top-level scalars are.
+    await mountCard(page, {
+      debug: true,
+      dockStatus: {
+        wash_phase: null,
+        features: { has_dock: true, is_collectable: true, is_washable: false, is_dryable: null },
+        running: { empty: false, wash: false, dry: null },
+      },
+    });
+    const rows = await page.evaluate(() =>
+      Array.from(
+        (window as any).__card.shadowRoot.querySelectorAll(".dock-sheet-debug span")
+      ).map((s: any) => s.textContent.trim())
+    );
+    expect(rows).toContain("features.is_dryable: null");
+    expect(rows).toContain("features.is_washable: false");
+    expect(rows).toContain("running.dry: null");
+    // Top-level scalars keep their existing "hide the nulls" behaviour.
+    expect(rows.some((r) => r.startsWith("wash_phase"))).toBe(false);
   });
 
   test("an all-null features block falls back rather than hiding everything", async ({ page }) => {

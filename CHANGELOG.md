@@ -8,6 +8,36 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Planned
 
+## [1.3.2] - 2026-09-07
+
+### Fixed
+
+**The Dock sheet's debug strip showed `features: [object Object]`.**
+`dock_status` was all scalars until 1.3.0 added the nested `features` and
+`running` objects, and the strip stringified every value with `String(val)` — so
+the two fields worth looking at were the two it could not show. Nested objects
+are now flattened one level into `features.is_washable`-style rows.
+
+Their `false` and `null` entries are deliberately kept, unlike the top-level
+scalars: for a capability flag "reported false" and "not reported" are different
+answers, and telling them apart is the entire reason to open this view.
+
+### Notes
+
+Verified live against the reporting user's four vacuums on HA 2026.9.1 while
+fixing this — capability reporting is correct on all of them: S6 `has_dock:
+false` (it has no dock, so offering no dock actions is the right answer, and that
+is what the screenshot behind this report was actually showing), both S7s
+`is_collectable` only, S8 MaxV Ultra all four true. `dock_status.running.wash`
+read `true` while that dock really was washing (raw state `washing_the_mop`
+behind a `docked` vacuum entity, docs/14 rule 4), so 1.3.0's start/stop toggle is
+confirmed on real hardware.
+
+The `features`-vs-`dock_type` reconciliation considered for a possible stale
+dock-type cache was NOT added: the two agree on every vacuum here, so there is
+nothing to reconcile and no evidence the case occurs. Documented rather than
+guarded against speculatively.
+
 ## [1.3.1] - 2026-09-03
 
 ### Fixed

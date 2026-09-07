@@ -2668,8 +2668,24 @@ export class AnyVacCard extends LitElement {
           </div>` : nothing}
         ${this._config.debug && dock ? html`
           <div class="dock-sheet-debug">
-            ${Object.entries(dock).filter(([, val]) => val !== null && val !== undefined)
-              .map(([k, val]) => html`<span>${k}: ${String(val)}</span>`)}
+            ${
+              // `dock_status` was all scalars until 1.3.0 added the nested
+              // `features` and `running` objects — `String(val)` turned those
+              // into "[object Object]", which is exactly the information the
+              // debug strip exists to show (field-caught 2026-09-06). Nested
+              // objects are flattened one level into `parent.key` rows and
+              // their false/null entries are KEPT: for a capability flag,
+              // "reported false" and "not reported" are different answers, and
+              // telling them apart is the whole point of looking here.
+              Object.entries(dock).flatMap(([k, val]) =>
+                val !== null && typeof val === "object" && !Array.isArray(val)
+                  ? Object.entries(val as Record<string, unknown>)
+                      .map(([sk, sv]) => [`${k}.${sk}`, sv] as const)
+                  : [[k, val] as const]
+              )
+                .filter(([k, val]) => val !== undefined && (val !== null || k.includes(".")))
+                .map(([k, val]) => html`<span>${k}: ${val === null ? "null" : String(val)}</span>`)
+            }
           </div>` : nothing}
         ${caps.hasDock ? html`
           <div class="dock-sheet-actions">
