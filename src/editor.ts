@@ -142,6 +142,17 @@ export class AnyVacCardEditor extends LitElement {
   @state() private _floorplanSnapshotBusy = false;
   @state() private _floorplanSnapshotError = "";
 
+  /** "Export guide layers" (docs/37, 2026-09-10) — draws room-boundary/dry/
+   *  wet-path guides as transparent PNGs in the SAME pixel canvas as the
+   *  floorplan snapshot above, for tracing furniture in an external image
+   *  editor (the gaps inside the drawn path are where furniture stands).
+   *  Pure drawing aid: unlike `_snapshotFloorplan`, this never touches
+   *  config (no `image_base`, no `hide_map`, no `rooms` — docs/37 §2.4). */
+  @state() private _guideExportBusy = false;
+  @state() private _guideExportError = "";
+  @state() private _guideExportResult:
+    { paths: Record<string, string>; size: { w: number; h: number } } | null = null;
+
   /** Active drag on a room's position dot / rectangle (2026-07-26 — was
    *  sliders-only, no way to see or drag the actual rectangle extent on the
    *  floorplan preview). `orig` is the room's state at drag START (not updated
@@ -247,6 +258,42 @@ export class AnyVacCardEditor extends LitElement {
       console.error("[anyvac-card] snapshot_map_as_floorplan failed:", err);
     } finally {
       this._floorplanSnapshotBusy = false;
+    }
+  }
+
+  /** Calls `anyvac.export_map_guide` (docs/37) for `vac`'s currently-resolved
+   *  map image entity — the same entity `_snapshotFloorplan` above uses, so
+   *  the guide layers line up with the floorplan photo it produced. No
+   *  config side effects: unlike `_snapshotFloorplan` this never sets
+   *  `image_base`, `hide_map`, or `rooms` (docs/37 §2.4). */
+  private async _exportMapGuide(vac: VacuumConfig): Promise<void> {
+    const entity = this._mapEntityFor(vac);
+    if (!entity) return;
+    this._guideExportBusy = true;
+    this._guideExportError = "";
+    this._guideExportResult = null;
+    try {
+      const res = (await (this.hass as any).callService(
+        "anyvac", "export_map_guide",
+        { image_entity: entity, name: vac.name || vac.entity },
+        undefined, false, true,
+      )) as {
+        response?: { paths?: Record<string, string>; size?: { w: number; h: number } };
+      } | undefined;
+      const paths = res?.response?.paths;
+      const size = res?.response?.size;
+      if (!paths || !size || !Object.keys(paths).length) {
+        throw new Error("no guide layers in service response");
+      }
+      this._guideExportResult = { paths, size };
+    } catch (err) {
+      this._guideExportError =
+        "Couldn't export guide layers — make sure the anyvac integration " +
+        "is updated to at least 1.4.0, then try again.";
+      // eslint-disable-next-line no-console
+      console.error("[anyvac-card] export_map_guide failed:", err);
+    } finally {
+      this._guideExportBusy = false;
     }
   }
 
@@ -1372,6 +1419,26 @@ export class AnyVacCardEditor extends LitElement {
               use "Import" only for rooms exclusive to that vacuum. Requires anyvac integration ≥ 0.88.0.</p>
             ${this._floorplanSnapshotError ? html`<p class="hint" style="color:#ff6b6b">${this._floorplanSnapshotError}</p>` : nothing}
           ` : nothing}
+
+          ${this._mapEntityFor(vac) ? html`
+            <div class="section-title">Custom floorplan helper</div>
+            <button class="btn btn--sm" style="align-self:flex-start"
+              ?disabled=${this._guideExportBusy}
+              @click=${() => this._exportMapGuide(vac)}>
+              <ha-icon icon="mdi:layers-outline"></ha-icon>
+              ${this._guideExportBusy ? "Exporting…" : "Export guide layers"}
+            </button>
+            <p class="hint">Opens as layers over the floorplan snapshot in any image editor —
+              the gaps inside the path are where your furniture stands. Requires anyvac
+              integration ≥ 1.4.0.</p>
+            ${this._guideExportError ? html`<p class="hint" style="color:#ff6b6b">${this._guideExportError}</p>` : nothing}
+            ${this._guideExportResult ? html`
+              <p class="hint">${this._guideExportResult.size.w}×${this._guideExportResult.size.h}px —
+                ${Object.entries(this._guideExportResult.paths).map(([layer, url], i) => html`${i > 0 ? " · " : ""}<a href=${url} target="_blank" rel="noopener">${layer}</a>`)}
+              </p>
+            ` : nothing}
+          ` : nothing}
+
           ${this._textField("Image src (URL)", ib?.src, v => this._setEditedImageBase({ src: v }), "/local/anyvac/flat.svg")}
           ${this._numberSlider("Image rotation", ib?.rotation ?? 0, 0, 360, 90, v => this._setEditedImageBase({ rotation: v }), "°")}
           ${this._numberSlider("Image scale", ib?.scale ?? 100, 50, 200, 5, v => this._setEditedImageBase({ scale: v }), "%")}

@@ -8,6 +8,24 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Planned
 
+## [1.4.0] - 2026-09-10
+
+Paired with integration 1.4.0.
+
+### Added
+
+**"Export guide layers" — a tracing aid for building a custom floorplan by
+hand.** New button in the Maps tab's Shared floorplan section ("Custom
+floorplan helper"), right below "Use this vacuum's current map as floorplan":
+calls the new `anyvac.export_map_guide` (integration ≥ 1.4.0) and, on success,
+lists links to the produced PNGs plus the canvas size. The service draws room
+boundaries and the vacuum's last dry/wet path as transparent layers, cropped
+to the exact same box the floorplan snapshot button already produces — open
+them over that photo in any image editor, and the gaps inside the drawn path
+are where furniture stands. Pure drawing aid: unlike the snapshot button, this
+never touches card config — no `image_base`, `hide_map`, or `rooms` change.
+Detail: docs/37.
+
 ## [1.3.2] - 2026-09-07
 
 ### Fixed
