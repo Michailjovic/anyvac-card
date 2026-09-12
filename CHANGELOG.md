@@ -8,6 +8,67 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Planned
 
+## [1.5.0] - 2026-09-12
+
+Paired with integration 1.4.0 (unchanged) — this release is card-only. Detail: docs/38.
+
+### Fixed
+
+**Room rectangles jumped the instant a drag started.** The Maps tab's
+pointer handlers wrote the cursor's absolute position straight into
+`map_x`/`map_y`, so grabbing a rectangle anywhere off-centre snapped its
+centre under the cursor immediately — by as much as the grab offset (up to
+~250px on a large rectangle in a tall preview). Drag/resize math moved into a
+new pure module, `rectdrag.ts` (`moveRect`/`resizeRect`, unit-tested in
+`tests/rect-drag.spec.ts` without a browser): every move/resize is now
+computed as a **delta from the pointer's position at drag start**, applied to
+the rectangle's state at that same moment — never the pointer's absolute
+position, and never an already-updated intermediate state (which would make
+a resize's anchor corner itself drift mid-drag).
+
+**Room geometry rounded to whole percent while the geometry it's compared
+against (`placeRoomInCrop`/`roomBboxToRect`) writes at 0.1%.** 1% of a typical
+floorplan is well over 10px — enough to show up as visible snapping while
+dragging/clicking, and to keep the auto-fit's "fit error" hint stuck at ~2%
+or more no matter how carefully a rectangle was placed by hand, since the
+anchor itself could never land closer than a whole point. Dragging, resizing,
+click-to-place, and the room X/Y/Width/Height sliders (step 1 → step 0.1) all
+now round to one decimal place (`rectdrag.ts`'s `round1`).
+
+**The native-map overlay in the Maps tab re-fit itself from the very
+rectangle being dragged, making it a moving target.** Dragging a room
+rectangle is meant to align it against this translucent reference — but every
+pointermove wrote into `_config`, and the overlay's seat fit read `_config`
+live, so the thing being aligned against moved on every frame right along
+with the rectangle chasing it. The seat fit used for the overlay `<img>` is
+now captured once at pointerdown and held there for the whole drag; the "✅
+Auto-fit from N rooms…" text hint keeps updating live throughout (it's
+informational, not something being visually aligned against), and the
+overlay re-fits for real the moment the drag ends.
+
+### Added
+
+**`image_base.crop_box`** — records the exact pixel crop (same coordinate
+space as the integration's `rooms[].bbox_px`) and vacuum a floorplan image
+came from. Written automatically by "Use this vacuum's current map as
+floorplan" (when the integration reports one, ≥ 1.5.0) and by a new **"Use
+this crop for the floorplan"** button after exporting guide layers. Read back
+by a new **"Place rooms from crop box"** button (Maps tab, Custom floorplan
+helper section) — re-derives the crop's own vacuum and places every one of
+its rooms directly onto that exact crop (`placeRoomsInCrop`, seatfit.ts: pure
+px→% re-normalisation, no fit/rotation ambiguity, same principle as the
+existing single-room `placeRoomInCrop`) — and by "Export guide layers", which
+now sends the current `crop_box` along (when it matches the vacuum being
+exported) so guide layers line up with the saved floorplan file even if the
+robot has remapped since. A **"Clear"** link removes the crop box, and a
+size-mismatch warning appears when the floorplan file's actual pixel
+dimensions no longer match the crop box's (e.g. a re-exported or hand-swapped
+image file).
+
+Existing rooms placed this way keep every other field (icon, thresholds,
+clean-time overrides) — only the geometry (`map_x/y/w/h`) is overwritten,
+since a new crop means new geometry but not a new icon.
+
 ## [1.4.0] - 2026-09-10
 
 Paired with integration 1.4.0.

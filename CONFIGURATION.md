@@ -128,6 +128,7 @@ Each entry in `vacuums[]`:
 | `rotation` | number (deg) | `0` | |
 | `scale` | number | `1` | |
 | `offset_x` / `offset_y` | number | `0` | |
+| `crop_box` | `{entity, x0, y0, x1, y1}` | — | Written automatically by **"Use this vacuum's current map as floorplan"** and by **"Use this crop for the floorplan"** (after "Export guide layers") — records exactly which vacuum and which pixel crop (same space as the integration's `rooms[].bbox_px`) this `src` was cut from. Read back by **"Place rooms from crop box"** to re-place that vacuum's own rooms onto it with no dragging or fit ambiguity, and by `anyvac.export_map_guide` so guide layers line up with the saved file. Not meant to be hand-edited; **Clear** it (Maps tab) whenever `src` is replaced by an image that didn't come from one of those two buttons — e.g. a hand-entered URL, or a floorplan re-cropped outside the card — so stale geometry isn't assumed to still match. |
 
 **Merged mode without a floorplan** overlays every vacuum's raw map at 1:1
 scale, unaligned — the editor warns about this on the Map mode selector. Set

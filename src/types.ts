@@ -55,6 +55,16 @@ export interface ImageBaseConfig {
   scale?: number;
   offset_x?: number;
   offset_y?: number;
+  /** Docs/38 §4.1 — the exact px-space crop box (integration's coordinate
+   *  space, same as `rooms[].bbox_px`) that `src` was cut from, and which
+   *  vacuum's map it came from. Written automatically by the "Use this
+   *  vacuum's current map as floorplan" button (docs/30 §8); read back by
+   *  "Place rooms from crop box" to re-normalise that vacuum's own rooms
+   *  against this exact crop (`placeRoomsInCrop`, seatfit.ts) and by
+   *  "Export guide layers" to ask the backend for guide PNGs pre-cropped to
+   *  match. Cleared (and left unset) whenever `src` no longer traces back to
+   *  a known crop — e.g. a hand-entered image URL. */
+  crop_box?: { entity: string; x0: number; y0: number; x1: number; y1: number };
 }
 
 export interface RoomThreshold {

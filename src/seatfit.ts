@@ -320,6 +320,68 @@ export function placeRoomInCrop(
   };
 }
 
+/** Minimal room-config shape `placeRoomsInCrop` needs: a `key` to match
+ *  against the integration's room names, plus an index signature so every
+ *  other card-authored field (icon, thresholds, clean-time overrides, …) on
+ *  an EXISTING room passes through untouched — this function only ever
+ *  touches `map_x/y/w/h` on a matched room, never anything else. Structural
+ *  like the rest of this file's types, so `RoomConfig` from `types.ts`
+ *  satisfies it without either file importing the other. */
+export interface RoomConfigLike {
+  key: string;
+  name?: string;
+  [extra: string]: unknown;
+}
+
+/**
+ * Place every room of `intRooms` (the integration's live room list) onto a
+ * known crop of the floorplan file (docs/30 §8 / docs/38 §4.2) — the same
+ * calculation as `placeRoomInCrop` above, run over a whole room list and
+ * merged into `existing` by name:
+ *
+ * - a room already in `existing` with a matching `key` gets NEW geometry
+ *   (`map_x/y/w/h`) but keeps every other field as-is — a new floorplan
+ *   crop means new geometry, but the user's icon/thresholds/clean-time
+ *   overrides for that room are unrelated to which file it's drawn on;
+ * - a room not yet in `existing` is appended, named after the integration's
+ *   room name, with an icon from `iconFor(currentLength)` (docs/30's
+ *   numbered-icon cycle);
+ * - a room with no `bbox_px` (not on this map, or not yet reported) is
+ *   skipped outright — it neither updates nor adds anything.
+ *
+ * Pure re-normalisation, no fit/rotation/ambiguity — see `placeRoomInCrop`.
+ */
+export function placeRoomsInCrop(
+  intRooms: Array<{ name?: string; bbox_px?: { x0: number; y0: number; x1: number; y1: number } | null }>,
+  crop: { x0: number; y0: number; x1: number; y1: number },
+  existing: RoomConfigLike[],
+  iconFor: (index: number) => string,
+): { rooms: RoomConfigLike[]; placed: number; added: number } {
+  const rooms = existing.map((r) => ({ ...r }));
+  const indexByKey = new Map<string, number>();
+  rooms.forEach((r, i) => indexByKey.set(r.key, i));
+  let placed = 0;
+  let added = 0;
+  for (const ir of intRooms) {
+    const nm = ir?.name;
+    const bp = ir?.bbox_px;
+    if (!nm || !bp) continue;
+    const rect = placeRoomInCrop(bp, crop);
+    if (!rect) continue;
+    const idx = indexByKey.get(nm);
+    if (idx !== undefined) {
+      rooms[idx] = { ...rooms[idx], ...rect };
+      placed++;
+    } else {
+      const room: RoomConfigLike = { key: nm, name: nm, icon: iconFor(rooms.length), ...rect };
+      rooms.push(room);
+      indexByKey.set(nm, rooms.length - 1);
+      added++;
+    }
+  }
+  return { rooms, placed, added };
+}
+
 export function roomBboxToRect(
   ir: Record<string, any>,
   at: Record<string, any>,

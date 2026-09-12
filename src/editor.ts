@@ -31,10 +31,21 @@ import {
 import type { CardTheme } from "./const";
 import {
   placeRoomInCrop,
+  placeRoomsInCrop,
   resolveSeat,
   roomBboxToRect,
   type SeatParams,
+  type ResolvedSeat,
+  type RoomConfigLike,
 } from "./seatfit";
+import {
+  moveRect,
+  resizeRect,
+  round1,
+  clampPct,
+  type Corner,
+  type RectPct,
+} from "./rectdrag";
 
 // ── Tab type ─────────────────────────────────────────────────────────────────
 
@@ -87,11 +98,6 @@ const DEFAULT_THRESHOLDS: RoomThreshold[] = [
   { days: 10, color: "#ff9800" },
 ];
 
-/** Clamps a room-rectangle percentage coordinate to the preview's 0–100 bounds. */
-function clampPct(v: number): number {
-  return Math.min(100, Math.max(0, v));
-}
-
 // ── Editor ───────────────────────────────────────────────────────────────────
 
 @customElement(EDITOR_NAME)
@@ -122,6 +128,12 @@ export class AnyVacCardEditor extends LitElement {
   /** Floorplan natural aspect ratio (W/H) learned from the preview image — used by
    *  the auto-seat fit and to give the preview the correct proportions. */
   @state() private _pvAR = 0;
+  /** Floorplan natural pixel size (docs/38 §4.4) — same `@load` handler as `_pvAR`
+   *  above, kept alongside it so the crop-box section can warn when the PNG the
+   *  user actually saved doesn't match the crop box it's supposedly cut from
+   *  (a trimmed/re-exported file, or a crop box left over from a different
+   *  floorplan) instead of silently placing rooms that don't line up. */
+  @state() private _pvNat: { w: number; h: number } | null = null;
   /** Snapshot of the selected vacuum's live map `entity_picture` (2026-07-26 field
    *  report — flashing risk). Home Assistant rotates this URL on essentially every
    *  entity update, and `hass` itself is a reactive property that re-renders this
@@ -151,22 +163,40 @@ export class AnyVacCardEditor extends LitElement {
   @state() private _guideExportBusy = false;
   @state() private _guideExportError = "";
   @state() private _guideExportResult:
-    { paths: Record<string, string>; size: { w: number; h: number } } | null = null;
+    {
+      paths: Record<string, string>; size: { w: number; h: number };
+      /** The crop this export actually used, and the entity it was for —
+       *  present whenever the integration reports one (≥ 1.5.0). Lets the
+       *  "Use this crop for the floorplan" button (docs/38 §4.3) write a
+       *  `crop_box` without re-deriving it, and lets the hint show it. */
+      crop?: { x0: number; y0: number; x1: number; y1: number };
+      entity: string;
+    } | null = null;
+
+  /** Result of the last "Place rooms from crop box" click (docs/38 §4.4) —
+   *  shown as a one-line confirmation, cleared implicitly on the next click
+   *  (a `null` result renders nothing, so there's nothing to reset). */
+  @state() private _placeRoomsResult: { placed: number; added: number } | null = null;
 
   /** Active drag on a room's position dot / rectangle (2026-07-26 — was
    *  sliders-only, no way to see or drag the actual rectangle extent on the
    *  floorplan preview). `orig` is the room's state at drag START (not updated
    *  mid-drag) so a resize always computes from the anchor corner, not from an
-   *  already-moved intermediate value. */
+   *  already-moved intermediate value. `seat` is the Maps-tab native-map overlay's
+   *  seat, ALSO frozen at drag start (docs/38 §3.3) — `_editorSeat` reads `_config`,
+   *  and every pointermove below writes into `_config`, so without a frozen
+   *  snapshot the reference the user is aligning against would recompute (and
+   *  visibly move) on every single pointermove. */
   private _rectDrag: {
     ri: number;
     mode: "move" | "resize-nw" | "resize-ne" | "resize-sw" | "resize-se";
     container: DOMRect;
-    orig: { x: number; y: number; w: number; h: number };
+    orig: RectPct;
     startClientX: number;
     startClientY: number;
     moved: boolean;
     wasSelected: boolean;
+    seat: ResolvedSeat;
   } | null = null;
 
   private _initialized = false;
@@ -228,7 +258,17 @@ export class AnyVacCardEditor extends LitElement {
       )) as { response?: { path?: string; crop?: { x0: number; y0: number; x1: number; y1: number } } } | undefined;
       const path = res?.response?.path;
       if (!path) throw new Error("no path in service response");
-      this._setEditedImageBase({ src: path });
+      const crop = res?.response?.crop;
+      // docs/38 §4.2: record exactly which crop this floorplan file was cut
+      // from (px space, same as rooms[].bbox_px) — read back by "Place rooms
+      // from crop box" and passed as `crop` to `anyvac.export_map_guide`, so
+      // a later regeneration lines up without asking the user to re-snapshot.
+      // Only written when the response actually carries one: an older
+      // integration without it leaves any EXISTING crop_box alone rather
+      // than clobbering it with nothing.
+      this._setEditedImageBase(
+        crop ? { src: path, crop_box: { entity: vac.entity, ...crop } } : { src: path },
+      );
       // A floorplan photo + everyone's raw map blended on top at once is a
       // wall of noise for a first-time result (field report 2026-07-30) —
       // once a floorplan exists there's nothing the raw map overlay adds
@@ -242,13 +282,14 @@ export class AnyVacCardEditor extends LitElement {
         const idx = this._config.vacuums.findIndex((v) => v.entity === vac.entity);
         if (idx >= 0) this._setVacuum(idx, { hide_map: true });
       }
-      // docs/30 §8: place this vacuum's OWN rooms exactly onto the crop we
-      // just got back — no dragging needed, and it hands every other vacuum
-      // sharing this floorplan real anchors to auto-fit against (by name).
-      const crop = res?.response?.crop;
+      // docs/30 §8 / docs/38 §4.2: place this vacuum's OWN rooms exactly onto
+      // the crop we just got back — no dragging needed, and it hands every
+      // other vacuum sharing this floorplan real anchors to auto-fit against
+      // (by name). Overwrites any existing room of the same name, since a
+      // new floorplan crop means new geometry — see `_placeOwnRooms`.
       if (crop) {
         const idx = this._config.vacuums.findIndex((v) => v.entity === vac.entity);
-        if (idx >= 0) this._autoPlaceOwnRooms(idx, crop);
+        if (idx >= 0) this._placeOwnRooms(idx, crop);
       }
     } catch (err) {
       this._floorplanSnapshotError =
@@ -265,27 +306,41 @@ export class AnyVacCardEditor extends LitElement {
    *  map image entity — the same entity `_snapshotFloorplan` above uses, so
    *  the guide layers line up with the floorplan photo it produced. No
    *  config side effects: unlike `_snapshotFloorplan` this never sets
-   *  `image_base`, `hide_map`, or `rooms` (docs/37 §2.4). */
+   *  `image_base`, `hide_map`, or `rooms` (docs/37 §2.4).
+   *
+   *  docs/38 §4.3: when the currently-viewed floorplan already has a
+   *  `crop_box` for THIS SAME entity, that exact crop is sent along so the
+   *  layers line up with the saved PNG even if the robot has remapped since
+   *  (a different crop box means a different pixel space — docs/37 §6's
+   *  "sedí na floorplan, i když robot mezitím přemapoval"). A crop_box for a
+   *  different entity, or none at all, is left for the backend to derive. */
   private async _exportMapGuide(vac: VacuumConfig): Promise<void> {
     const entity = this._mapEntityFor(vac);
     if (!entity) return;
     this._guideExportBusy = true;
     this._guideExportError = "";
     this._guideExportResult = null;
+    const cropBox = this._currentImageBase()?.crop_box;
+    const sendCrop = cropBox && cropBox.entity === vac.entity
+      ? { x0: cropBox.x0, y0: cropBox.y0, x1: cropBox.x1, y1: cropBox.y1 }
+      : undefined;
     try {
+      const data: Record<string, unknown> = { image_entity: entity, name: vac.name || vac.entity };
+      if (sendCrop) data.crop = sendCrop;
       const res = (await (this.hass as any).callService(
-        "anyvac", "export_map_guide",
-        { image_entity: entity, name: vac.name || vac.entity },
-        undefined, false, true,
+        "anyvac", "export_map_guide", data, undefined, false, true,
       )) as {
-        response?: { paths?: Record<string, string>; size?: { w: number; h: number } };
+        response?: {
+          paths?: Record<string, string>; size?: { w: number; h: number };
+          crop?: { x0: number; y0: number; x1: number; y1: number };
+        };
       } | undefined;
       const paths = res?.response?.paths;
       const size = res?.response?.size;
       if (!paths || !size || !Object.keys(paths).length) {
         throw new Error("no guide layers in service response");
       }
-      this._guideExportResult = { paths, size };
+      this._guideExportResult = { paths, size, crop: res?.response?.crop, entity: vac.entity };
     } catch (err) {
       this._guideExportError =
         "Couldn't export guide layers — make sure the anyvac integration " +
@@ -389,12 +444,15 @@ export class AnyVacCardEditor extends LitElement {
       else if (nearRight && nearBottom) effectiveMode = "resize-se";
     }
 
+    const mapVac = Math.min(this._mapVac, this._config.vacuums.length - 1);
     this._rectDrag = {
       ri, mode: effectiveMode,
       container: containerRect,
       orig: { x: room.map_x ?? 50, y: room.map_y ?? 50, w: room.map_w ?? 0, h: room.map_h ?? 0 },
       startClientX: e.clientX, startClientY: e.clientY,
       moved: false, wasSelected,
+      // docs/38 §3.3 — see the `_rectDrag` field docstring above.
+      seat: this._editorSeat(mapVac),
     };
     (e.currentTarget as Element).setPointerCapture(e.pointerId);
   }
@@ -409,32 +467,23 @@ export class AnyVacCardEditor extends LitElement {
       if (Math.hypot(e.clientX - d.startClientX, e.clientY - d.startClientY) < 3) return;
       d.moved = true;
     }
-    const rect = d.container;
-    const px = clampPct(((e.clientX - rect.left) / rect.width) * 100);
-    const py = clampPct(((e.clientY - rect.top) / rect.height) * 100);
+    // docs/38 §3.1/§3.2: delta from pointerdown, as % of the container —
+    // NEVER the pointer's absolute position. The old code wrote the
+    // absolute cursor position straight into map_x/map_y, which snapped the
+    // rect's CENTRE under the cursor the instant a drag started anywhere
+    // off-centre (the "bboxy poskakují" field report, docs/38 §1). The
+    // actual move/resize math (including rounding + clamping) now lives in
+    // rectdrag.ts, unit-tested independently of this pointer plumbing.
+    const dx = ((e.clientX - d.startClientX) / d.container.width) * 100;
+    const dy = ((e.clientY - d.startClientY) / d.container.height) * 100;
     if (d.mode === "move") {
-      this._setEditedRoom(d.ri, { map_x: Math.round(px), map_y: Math.round(py) });
+      const { map_x, map_y } = moveRect(d.orig, dx, dy);
+      this._setEditedRoom(d.ri, { map_x, map_y });
       return;
     }
-    // Resize: the OPPOSITE corner from the one being dragged stays anchored
-    // (standard resize-handle behaviour), computed from the room's state at
-    // drag START — never from an already-moved intermediate value, or the
-    // anchor corner would itself drift as the drag progresses.
-    const halfW = d.orig.w / 2, halfH = d.orig.h / 2;
-    const anchor = {
-      "resize-nw": { ox: d.orig.x + halfW, oy: d.orig.y + halfH },
-      "resize-ne": { ox: d.orig.x - halfW, oy: d.orig.y + halfH },
-      "resize-sw": { ox: d.orig.x + halfW, oy: d.orig.y - halfH },
-      "resize-se": { ox: d.orig.x - halfW, oy: d.orig.y - halfH },
-    }[d.mode];
-    const newW = Math.max(2, Math.min(100, Math.abs(px - anchor.ox)));
-    const newH = Math.max(2, Math.min(100, Math.abs(py - anchor.oy)));
-    this._setEditedRoom(d.ri, {
-      map_x: Math.round(clampPct((px + anchor.ox) / 2)),
-      map_y: Math.round(clampPct((py + anchor.oy) / 2)),
-      map_w: Math.round(newW),
-      map_h: Math.round(newH),
-    });
+    const corner = d.mode.slice("resize-".length) as Corner;
+    const { map_x, map_y, map_w, map_h } = resizeRect(d.orig, corner, dx, dy);
+    this._setEditedRoom(d.ri, { map_x, map_y, map_w, map_h });
   }
 
   private _onRoomPointerUp(): void {
@@ -444,6 +493,11 @@ export class AnyVacCardEditor extends LitElement {
       // matches the old dot's click-to-toggle behaviour.
       this._mapRoom = null;
     }
+    // docs/38 §3.3: the native-map overlay froze at pointerdown (`d.seat`).
+    // Force a re-render now so it re-fits against the room's final position
+    // instead of staying stuck at that frozen snapshot until some unrelated
+    // `hass` update happens to come through.
+    if (d?.moved) this.requestUpdate();
     this._rectDrag = null;
   }
 
@@ -484,6 +538,18 @@ export class AnyVacCardEditor extends LitElement {
     } else {
       this._setImageBase(Math.min(this._mapVac, this._config.vacuums.length - 1), updates);
     }
+  }
+  /** The `image_base` currently in view in the Maps tab — card-level in
+   *  merged mode, else the selected vacuum's own (docs/38 §4: one shared
+   *  accessor so the crop-box status line, "Place rooms from crop box"
+   *  gating, and the guide-export `crop` parameter all agree on which
+   *  floorplan is on screen, rather than three call sites redoing the same
+   *  merged/split branch). */
+  private _currentImageBase(): NonNullable<VacuumConfig["image_base"]> | undefined {
+    const vacuums = this._config.vacuums;
+    if (!vacuums.length) return undefined;
+    const mapVac = Math.min(this._mapVac, vacuums.length - 1);
+    return this._mergedEdit ? this._config.image_base : vacuums[mapVac].image_base;
   }
   // ── Auto-seating (docs/15) ────────────────────────────────────────────────
   // NOTE: the old 3-point align tool (v0.17) was removed — it was orphaned code
@@ -607,37 +673,57 @@ export class AnyVacCardEditor extends LitElement {
     else this._setVacuum(vacIdx, { rooms: target });
   }
 
-  /** docs/30 §8 "big seating rework": places THIS vacuum's own rooms exactly
-   *  onto a floorplan crop just produced by `anyvac.snapshot_map_as_floorplan`
-   *  — no seat, no dragging, no ambiguity, since the crop box is in the same
-   *  bbox_px pixel space this vacuum's own rooms already report and the
-   *  saved file IS that crop (`placeRoomInCrop`). Once these carry real
-   *  map_x/map_y they act as anchors for every OTHER vacuum sharing this
-   *  floorplan whose own room names match (existing `assembleAnchors`/
-   *  `computeSeatFit` auto-fit, unaffected by this) — so this one call is
-   *  usually the entire multi-vacuum seating step, not just this vacuum's. */
-  private _autoPlaceOwnRooms(vacIdx: number, crop: { x0: number; y0: number; x1: number; y1: number }): void {
+  /** docs/30 §8 "big seating rework" / docs/38 §4.2: places THIS vacuum's own
+   *  rooms exactly onto a KNOWN floorplan crop — no seat, no dragging, no
+   *  ambiguity, since the crop box is in the same bbox_px pixel space this
+   *  vacuum's own rooms already report and the saved file IS that crop
+   *  (`placeRoomsInCrop`, seatfit.ts). Once these carry real map_x/map_y
+   *  they act as anchors for every OTHER vacuum sharing this floorplan whose
+   *  own room names match (existing `assembleAnchors`/`computeSeatFit`
+   *  auto-fit, unaffected by this) — so this one call is usually the entire
+   *  multi-vacuum seating step, not just this vacuum's.
+   *
+   *  Unlike the pre-docs/38 version, an EXISTING room of the same name is
+   *  overwritten (new geometry, same icon/thresholds/clean-time overrides)
+   *  rather than skipped — the two callers this feeds are both cases where
+   *  the geometry is meant to change: a freshly (re)snapshotted floorplan
+   *  (`_snapshotFloorplan`) or an explicit "Place rooms from crop box"
+   *  click. Returns null when there was nothing to place (no integration
+   *  rooms at all) so callers can tell "did nothing" from "placed zero". */
+  private _placeOwnRooms(
+    vacIdx: number,
+    crop: { x0: number; y0: number; x1: number; y1: number },
+  ): { placed: number; added: number } | null {
     const vac = this._config.vacuums[vacIdx];
     const ie = this._intEntityFor(vac);
     const at = ie ? (this.hass.states[ie]?.attributes as Record<string, any> | undefined) : undefined;
     const intRooms: Array<Record<string, any>> = Array.isArray(at?.rooms) ? at!.rooms : [];
-    if (!intRooms.length) return;
-    const target = this._mergedEdit ? [...(this._config.rooms ?? [])] : [...(vac.rooms ?? [])];
-    const have = new Set(target.map((r) => r.key));
-    let added = 0;
-    for (const ir of intRooms) {
-      const nm = ir?.name as string | undefined;
-      const bp = ir?.bbox_px as { x0: number; y0: number; x1: number; y1: number } | undefined | null;
-      if (!nm || have.has(nm) || !bp) continue;
-      const rect = placeRoomInCrop(bp, crop);
-      if (!rect) continue;
-      target.push({ key: nm, name: nm, icon: _roomIconFor(target.length), ...rect });
-      have.add(nm);
-      added++;
+    if (!intRooms.length) return null;
+    const existing = this._mergedEdit ? (this._config.rooms ?? []) : (vac.rooms ?? []);
+    const { rooms, placed, added } = placeRoomsInCrop(
+      intRooms, crop, existing as unknown as RoomConfigLike[], _roomIconFor,
+    );
+    if (placed || added) {
+      const nextRooms = rooms as unknown as RoomConfig[];
+      if (this._mergedEdit) this._setConfig({ rooms: nextRooms });
+      else this._setVacuum(vacIdx, { rooms: nextRooms });
     }
-    if (!added) return;
-    if (this._mergedEdit) this._setConfig({ rooms: target });
-    else this._setVacuum(vacIdx, { rooms: target });
+    return { placed, added };
+  }
+
+  /** "Place rooms from crop box" button (docs/38 §4.4): re-derives the
+   *  vacuum from `crop_box.entity`, deliberately NOT from whichever pill is
+   *  currently selected in the Maps tab — the floorplan file came from a
+   *  specific vacuum's map, and that's the one whose rooms the crop box
+   *  describes, regardless of which vacuum the user happens to be looking
+   *  at right now. */
+  private _placeRoomsFromCropBox(): void {
+    const cb = this._currentImageBase()?.crop_box;
+    if (!cb) return;
+    const idx = this._config.vacuums.findIndex((v) => v.entity === cb.entity);
+    if (idx < 0) return;
+    const result = this._placeOwnRooms(idx, cb);
+    if (result) this._placeRoomsResult = result;
   }
 
   /** docs/30 §4b: room pairing across vacuums is by NAME, and a mismatch
@@ -1347,7 +1433,7 @@ export class AnyVacCardEditor extends LitElement {
     // here mid-render).
     const mapUrl = this._refMapVac === mapVac ? this._refMapUrl : "";
     const base = vac.base ?? "map";
-    const ib = this._config.map_mode === "merged" ? this._config.image_base : vac.image_base;
+    const ib = this._currentImageBase();
     const useImg = this._config.map_mode === "merged" ? !!ib?.src : ((base === "image" || base === "combined") && !!ib?.src);
     const previewUrl = useImg ? (ib!.src) : mapUrl;
     const pvRot   = useImg ? (ib!.rotation ?? 0)  : (map.rotation ?? 0);
@@ -1355,7 +1441,28 @@ export class AnyVacCardEditor extends LitElement {
     const pvOx    = useImg ? (ib!.offset_x ?? 0)  : (map.offset_x ?? 0);
     const pvOy    = useImg ? (ib!.offset_y ?? 0)  : (map.offset_y ?? 0);
     const rooms = this._editRooms();
-    const es = this._editorSeat(mapVac);
+    // docs/38 §3.3: `esLive` is the always-current fit (used for the text hint
+    // and the manual-sliders gate — those should track `_config` immediately,
+    // same as before). `esOverlay` is what the native-map overlay `<img>` below
+    // is actually positioned with — frozen at `_rectDrag.seat` while a room rect
+    // is being dragged, so the translucent reference doesn't itself become a
+    // moving target the user is trying to align against (the whole point of
+    // dragging a room is to match it to this overlay, which can't work if the
+    // overlay keeps re-fitting to the very rect being moved on every pointermove).
+    const esLive = this._editorSeat(mapVac);
+    const esOverlay = this._rectDrag?.seat ?? esLive;
+    const cropBox = ib?.crop_box;
+    const cropMismatch = cropBox && this._pvNat
+      ? (Math.abs(this._pvNat.w - (cropBox.x1 - cropBox.x0)) > 2 || Math.abs(this._pvNat.h - (cropBox.y1 - cropBox.y0)) > 2)
+      : false;
+    const canPlaceFromCrop = !!cropBox
+      && this._config.vacuums.some((v) => v.entity === cropBox.entity)
+      && (() => {
+        const cbVac = this._config.vacuums.find((v) => v.entity === cropBox.entity);
+        const ie = this._intEntityFor(cbVac);
+        const at = ie ? (this.hass.states[ie]?.attributes as Record<string, any> | undefined) : undefined;
+        return Array.isArray(at?.rooms) && at!.rooms.some((r: any) => !!r?.bbox_px);
+      })();
 
     return html`
       <div class="tab-body">
@@ -1433,10 +1540,46 @@ export class AnyVacCardEditor extends LitElement {
               integration ≥ 1.4.0.</p>
             ${this._guideExportError ? html`<p class="hint" style="color:#ff6b6b">${this._guideExportError}</p>` : nothing}
             ${this._guideExportResult ? html`
-              <p class="hint">${this._guideExportResult.size.w}×${this._guideExportResult.size.h}px —
+              <p class="hint">${this._guideExportResult.size.w}×${this._guideExportResult.size.h}px${
+                this._guideExportResult.crop ? html` · crop ${this._guideExportResult.crop.x0},${this._guideExportResult.crop.y0}–${this._guideExportResult.crop.x1},${this._guideExportResult.crop.y1}` : nothing} —
                 ${Object.entries(this._guideExportResult.paths).map(([layer, url], i) => html`${i > 0 ? " · " : ""}<a href=${url} target="_blank" rel="noopener">${layer}</a>`)}
               </p>
+              ${this._guideExportResult.crop && (!cropBox || cropBox.entity !== this._guideExportResult.entity) ? html`
+                <button class="btn btn--sm" style="align-self:flex-start"
+                  @click=${() => this._setEditedImageBase({
+                    crop_box: { entity: this._guideExportResult!.entity, ...this._guideExportResult!.crop! },
+                  })}>
+                  <ha-icon icon="mdi:crop"></ha-icon> Use this crop for the floorplan
+                </button>
+              ` : nothing}
             ` : nothing}
+
+            ${cropBox ? html`
+              <p class="hint">Crop box: <code>${cropBox.entity}</code> ·
+                ${cropBox.x0},${cropBox.y0}–${cropBox.x1},${cropBox.y1}
+                (${cropBox.x1 - cropBox.x0}×${cropBox.y1 - cropBox.y0}px)
+                <span class="footer-link" style="margin-left:6px" @click=${() => this._setEditedImageBase({ crop_box: undefined })}>Clear</span>
+              </p>
+              ${cropMismatch && this._pvNat ? html`
+                <p class="hint" style="color:#faad14">⚠️ The saved floorplan file is
+                  ${this._pvNat.w}×${this._pvNat.h}px, which doesn't match this crop box's
+                  ${cropBox.x1 - cropBox.x0}×${cropBox.y1 - cropBox.y0}px — rooms placed from it
+                  won't line up. Re-snapshot the floorplan, or Clear the crop box above.</p>
+              ` : nothing}
+              <button class="btn btn--sm" style="align-self:flex-start"
+                ?disabled=${!canPlaceFromCrop}
+                title=${canPlaceFromCrop ? "" : "Needs the crop's own vacuum configured here, with the integration reporting at least one room"}
+                @click=${() => this._placeRoomsFromCropBox()}>
+                <ha-icon icon="mdi:vector-square"></ha-icon> Place rooms from crop box
+              </button>
+              ${this._placeRoomsResult ? html`
+                <p class="hint">Placed ${this._placeRoomsResult.placed} room${this._placeRoomsResult.placed === 1 ? "" : "s"}
+                  (${this._placeRoomsResult.added} added).</p>
+              ` : nothing}
+            ` : html`
+              <p class="hint">No crop box yet — use "Use this vacuum's current map as floorplan" above
+                (integration ≥ 1.5.0), or "Use this crop for the floorplan" after exporting guide layers below.</p>
+            `}
           ` : nothing}
 
           ${this._textField("Image src (URL)", ib?.src, v => this._setEditedImageBase({ src: v }), "/local/anyvac/flat.svg")}
@@ -1469,8 +1612,12 @@ export class AnyVacCardEditor extends LitElement {
             @click=${(e: MouseEvent) => {
               if (this._mapRoom === null) return;
               const rect = (e.currentTarget as HTMLElement).getBoundingClientRect();
-              const x = Math.round(((e.clientX - rect.left) / rect.width) * 100);
-              const y = Math.round(((e.clientY - rect.top) / rect.height) * 100);
+              // docs/38 §2: 0.1% everywhere a room's geometry is written, to
+              // match the precision `placeRoomInCrop`/`roomBboxToRect` already
+              // write at — whole-percent click-to-place used to re-introduce a
+              // visible snap even after the drag math (rectdrag.ts) was fixed.
+              const x = round1(clampPct(((e.clientX - rect.left) / rect.width) * 100));
+              const y = round1(clampPct(((e.clientY - rect.top) / rect.height) * 100));
               this._setEditedRoom(this._mapRoom, { map_x: x, map_y: y });
             }}>
             <div class="map-preview-wrap"
@@ -1481,6 +1628,11 @@ export class AnyVacCardEditor extends LitElement {
                   if (useImg && im.naturalWidth && im.naturalHeight) {
                     const arv = im.naturalWidth / im.naturalHeight;
                     if (Math.abs(arv - this._pvAR) > 0.01) this._pvAR = arv;
+                    // docs/38 §4.4 — natural pixel size, for the crop-box size-
+                    // mismatch warning above.
+                    if (this._pvNat?.w !== im.naturalWidth || this._pvNat?.h !== im.naturalHeight) {
+                      this._pvNat = { w: im.naturalWidth, h: im.naturalHeight };
+                    }
                   }
                 }}
                 style=${styleMap({
@@ -1491,10 +1643,10 @@ export class AnyVacCardEditor extends LitElement {
                 })} />
               ${this._mergedEdit && useImg && mapUrl ? html`<img class="map-preview-img" src=${mapUrl} alt="Native map"
                 style=${styleMap({
-                  left:      (50 + es.offset_x) + "%",
-                  top:       (50 + es.offset_y) + "%",
-                  width:     es.scale + "%",
-                  transform: "translate(-50%,-50%) rotate(" + es.rotation + "deg)",
+                  left:      (50 + esOverlay.offset_x) + "%",
+                  top:       (50 + esOverlay.offset_y) + "%",
+                  width:     esOverlay.scale + "%",
+                  transform: "translate(-50%,-50%) rotate(" + esOverlay.rotation + "deg)",
                   opacity:   "0.5",
                 })} />` : nothing}
               ${rooms.map((r, ri) => {
@@ -1541,12 +1693,12 @@ export class AnyVacCardEditor extends LitElement {
             [{ value: "auto", label: "Auto — fit from rooms" },
              { value: "manual", label: "Manual — sliders" }],
             v => this._setMap(mapVac, { seat: v === "manual" ? "manual" : undefined }))}
-          ${map.seat !== "manual" ? (es.auto ? html`
-            <p class="hint">✅ Auto-fit from <strong>${es.anchorCount}</strong> room${(es.anchorCount ?? 0) > 1 ? "s" : ""}:
-              rot ${es.rotation}° · scale ${es.scale.toFixed(1)}% · offset ${es.offset_x.toFixed(1)}/${es.offset_y.toFixed(1)}%
-              · fit error ${(es.residual ?? 0).toFixed(1)}%${(es.residual ?? 0) > 3 ? " ⚠️ check room rectangles / keys" : ""}${
-              es.anchorCount === 1 ? " (single room — orientation estimated from its shape)" : ""}.
-              Recomputed live — self-heals after the robot remaps.</p>
+          ${map.seat !== "manual" ? (esLive.auto ? html`
+            <p class="hint">✅ Auto-fit from <strong>${esLive.anchorCount}</strong> room${(esLive.anchorCount ?? 0) > 1 ? "s" : ""}:
+              rot ${esLive.rotation}° · scale ${esLive.scale.toFixed(1)}% · offset ${esLive.offset_x.toFixed(1)}/${esLive.offset_y.toFixed(1)}%
+              · fit error ${(esLive.residual ?? 0).toFixed(1)}%${(esLive.residual ?? 0) > 3 ? " ⚠️ check room rectangles / keys" : ""}${
+              esLive.anchorCount === 1 ? " (single room — orientation estimated from its shape)" : ""}.
+              Recomputed live — self-heals after the robot remaps.${this._rectDrag ? " (overlay preview above is frozen until you release the drag)" : ""}</p>
           ` : html`
             <p class="hint">Auto-fit inactive — it needs the integration sensor, a floorplan and at least one
               room rectangle whose key matches a room name on this robot's map. Using the manual values below.</p>
@@ -1560,7 +1712,7 @@ export class AnyVacCardEditor extends LitElement {
                 Roborock app (room pairing is by exact name across vacuums) — otherwise use Import below to add it.</p>
             ` : nothing;
           })() : nothing}
-          ${(map.seat === "manual" || !es.auto) ? html`
+          ${(map.seat === "manual" || !esLive.auto) ? html`
             ${this._numberSlider("Rotation",  map.rotation  ?? 0,    0, 360, 90, v => this._setMap(mapVac, { rotation:  v }), "°")}
             ${this._numberSlider("Scale",     map.scale     ?? 100, 50, 200,  5, v => this._setMap(mapVac, { scale:     v }), "%")}
             ${this._numberSlider("Offset X",  map.offset_x  ?? 0,  -50,  50,  1, v => this._setMap(mapVac, { offset_x:  v }), "%")}
@@ -1635,17 +1787,17 @@ export class AnyVacCardEditor extends LitElement {
                 ${this._numberSlider("Wet clean time", rooms[this._mapRoom]?.clean_time_wet ?? 0, 0, 180, 1, v => this._setEditedRoom(this._mapRoom!, { clean_time_wet: v > 0 ? v : undefined }), " min")}
               ` : nothing}
               <div class="section-title" style="margin-top:4px">Position</div>
-              ${this._numberSlider("X", rooms[this._mapRoom]?.map_x ?? 50, 0, 100, 1,
-                v => this._setEditedRoom(this._mapRoom!, { map_x: v }), "%")}
-              ${this._numberSlider("Y", rooms[this._mapRoom]?.map_y ?? 50, 0, 100, 1,
-                v => this._setEditedRoom(this._mapRoom!, { map_y: v }), "%")}
+              ${this._numberSlider("X", rooms[this._mapRoom]?.map_x ?? 50, 0, 100, 0.1,
+                v => this._setEditedRoom(this._mapRoom!, { map_x: round1(v) }), "%")}
+              ${this._numberSlider("Y", rooms[this._mapRoom]?.map_y ?? 50, 0, 100, 0.1,
+                v => this._setEditedRoom(this._mapRoom!, { map_y: round1(v) }), "%")}
 
               <div class="section-title" style="margin-top:4px">Overlay mode</div>
               ${(() => {
                 const room = rooms[this._mapRoom!];
                 return room?.map_w !== undefined ? html`
-                  ${this._numberSlider("Width",  room.map_w,        1, 100, 1, v => this._setEditedRoom(this._mapRoom!, { map_w: v }), "%")}
-                  ${this._numberSlider("Height", room.map_h ?? 15,  1, 100, 1, v => this._setEditedRoom(this._mapRoom!, { map_h: v }), "%")}
+                  ${this._numberSlider("Width",  room.map_w,        1, 100, 0.1, v => this._setEditedRoom(this._mapRoom!, { map_w: round1(v) }), "%")}
+                  ${this._numberSlider("Height", room.map_h ?? 15,  1, 100, 0.1, v => this._setEditedRoom(this._mapRoom!, { map_h: round1(v) }), "%")}
                   <button class="btn btn--sm" style="align-self:flex-start"
                     @click=${() => this._setEditedRoom(this._mapRoom!, { map_w: undefined, map_h: undefined })}>
                     Switch to point mode
