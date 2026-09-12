@@ -382,6 +382,44 @@ export function placeRoomsInCrop(
   return { rooms, placed, added };
 }
 
+// ── 2-point manual calibration (docs/39) ─────────────────────────────────────
+
+/**
+ * Build fit anchors for the 2-point manual calibration flow (docs/39): the
+ * user clicks the SAME two physical points once on the vacuum's own raw map
+ * preview and once on the floorplan photo. Two point-pairs are exactly the
+ * `anchors.length >= 2` case `computeSeatFit` already handles — feeding them
+ * straight in gets the identical least-squares rotation/scale/offset solve
+ * the room-anchor auto-fit uses, just bootstrapped from clicks instead of
+ * name-matched room bboxes. No new maths, no duplicate implementation.
+ *
+ * Unit conventions mirror `assembleAnchors` exactly: `rawPts` are in the raw
+ * map's own NATURAL PIXEL space (same space `bbox_px` is measured in — i.e.
+ * the pixel size of the actual image file the reference `<img>` loaded, not
+ * a CSS/displayed size), `floorPts` are floorplan-container percentages
+ * (same convention as `RoomConfig.map_x`/`map_y`: x = left%, y = top%).
+ * `rawPts[i]` and `floorPts[i]` must be the SAME physical point.
+ */
+export function buildCalibrationAnchors(
+  rawPts: Array<{ x: number; y: number }>,
+  floorPts: Array<{ x: number; y: number }>,
+  rawDims: { NW: number; NH: number },
+  ar: number,
+): SeatAnchor[] {
+  const { NW, NH } = rawDims;
+  if (!(NW > 0) || !(NH > 0) || !(ar > 0)) return [];
+  const n = Math.min(rawPts.length, floorPts.length);
+  const out: SeatAnchor[] = [];
+  for (let i = 0; i < n; i++) {
+    const r = rawPts[i], f = floorPts[i];
+    out.push({
+      q: { x: (r.x - NW / 2) / NW, y: (r.y - NH / 2) / NW },
+      a: { x: f.x / 100, y: f.y / 100 / ar },
+    });
+  }
+  return out;
+}
+
 export function roomBboxToRect(
   ir: Record<string, any>,
   at: Record<string, any>,

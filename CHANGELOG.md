@@ -8,6 +8,40 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Planned
 
+## [1.6.0] - 2026-09-12
+
+Paired with integration 1.4.0 (unchanged) — this release is card-only. Detail: docs/39.
+
+### Added
+
+**"Calibrate from 2 points" — a one-time bootstrap for when auto-fit can't
+converge on its own.** Auto-seating (docs/15) fits a vacuum's map onto the
+floorplan from room anchors matched by name — but if the room rectangles
+already drawn on the floorplan don't have the same width:height proportions
+as a robot's real rooms, no amount of rotation/scale/offset tuning can fix
+the fit (a similarity transform can't reconcile mismatched rectangle
+*shapes*), and the resulting paths render far outside the visible floor —
+the classic field symptom "no matter what I try, the paths leak through the
+walls". The new button walks through 4 clicks: the same physical point
+twice on this vacuum's own raw map, then the same two points on the
+floorplan photo. Two point-pairs fully determine a similarity transform
+(rotation + one uniform scale + offset), solved by the *exact same*
+least-squares maths the room-anchor auto-fit already uses
+(`computeSeatFit`, `seatfit.ts`) — just fed two clicked points instead of
+name-matched room bboxes (`buildCalibrationAnchors`, new pure function,
+unit-tested). The solved (not guessed) values are written as
+`map.seat: "manual"`, so the existing "Import missing rooms" button can
+then place every room correctly in one click — and once the floorplan's
+anchors are accurate, every other vacuum's own auto-fit typically self-heals
+too, with nothing else to configure.
+
+Deliberately narrow in scope: this is a once-per-floorplan bootstrap that
+hands off to the existing auto-fit/room-import pipeline immediately after
+solving, not a persistent parallel calibration layer — distinct from the
+old 3-point align tool removed when auto-seating (docs/15) was introduced.
+Nothing about the calibration flow itself is saved to config; only its
+result (a manual seat) is.
+
 ## [1.5.0] - 2026-09-12
 
 Paired with integration 1.4.0 (unchanged) — this release is card-only. Detail: docs/38.

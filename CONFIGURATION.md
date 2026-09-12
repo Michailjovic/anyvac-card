@@ -118,6 +118,15 @@ Each entry in `vacuums[]`:
 | `offset_x` / `offset_y` | number | `0` | Manual seating only. |
 | `seat` | `"auto" \| "manual"` | `"auto"` | `auto` fits the vacuum's own map onto the shared floorplan from matching room anchors (needs the integration + a floorplan + at least one room whose name matches). `manual` uses `rotation`/`scale`/`offset_x`/`offset_y` above. |
 
+**Auto-fit stuck with a high fit error no matter how the room rectangles are tuned?**
+That usually means the rectangles' *shapes* don't match this robot's real rooms yet —
+no rotation/scale/offset can reconcile mismatched proportions. The Maps tab's
+**"Calibrate from 2 points"** button (docs/39) bootstraps a correct seat instead: click
+the same physical point once on this vacuum's own map and once on the floorplan, then
+a second matching pair — two point-pairs fully determine rotation, scale and offset.
+Writes `seat: "manual"` with the solved values; use **"Import missing rooms"**
+afterwards to place this vacuum's rooms from it.
+
 ## Image base / floorplan
 
 `image_base` (card-level in merged mode, `vacuums[].image_base` in split mode):

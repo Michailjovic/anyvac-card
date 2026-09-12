@@ -34,6 +34,8 @@ import {
   placeRoomsInCrop,
   resolveSeat,
   roomBboxToRect,
+  buildCalibrationAnchors,
+  computeSeatFit,
   type SeatParams,
   type ResolvedSeat,
   type RoomConfigLike,
@@ -50,6 +52,15 @@ import {
 // ── Tab type ─────────────────────────────────────────────────────────────────
 
 type ActiveTab = "vacuums" | "maps" | "global" | "debug";
+
+/** 2-point manual seat calibration flow state (docs/39) — see the `_calib`
+ *  field docstring on `AnyVacCardEditor` for the full rationale. */
+type CalibState = {
+  vacIdx: number;
+  step: "raw1" | "raw2" | "floor1" | "floor2";
+  rawPts: { x: number; y: number }[];
+  floorPts: { x: number; y: number }[];
+};
 
 // ── Defaults ─────────────────────────────────────────────────────────────────
 
@@ -178,6 +189,38 @@ export class AnyVacCardEditor extends LitElement {
    *  (a `null` result renders nothing, so there's nothing to reset). */
   @state() private _placeRoomsResult: { placed: number; added: number } | null = null;
 
+  /** Two-point manual seat calibration (docs/39) — a narrow one-time bootstrap
+   *  for when NO vacuum's auto-fit can converge because the room anchors on the
+   *  shared floorplan don't (yet) match any robot's real room proportions. The
+   *  user clicks the SAME two physical points once on this vacuum's own raw
+   *  map, then once on the floorplan photo; two point-pairs fully determine a
+   *  similarity transform (rotation + one uniform scale + offset), solved by
+   *  the exact same least-squares maths the room-anchor auto-fit already uses
+   *  (`computeSeatFit`/`buildCalibrationAnchors`, seatfit.ts) — just fed two
+   *  clicked points instead of name-matched room bboxes. The result is written
+   *  as `map.seat: "manual"` with the SOLVED values, not guessed ones, so the
+   *  existing "Import missing rooms" button can then place every room
+   *  correctly in one click, and (once the floorplan's anchors are accurate)
+   *  every other vacuum's own auto-fit self-heals too.
+   *
+   *  Deliberately distinct from the old removed 3-point align tool (docs/03
+   *  "Milník 2", superseded by docs/15 auto-seating): this isn't a persistent
+   *  parallel calibration layer, it's a once-per-floorplan bootstrap that
+   *  hands off to the existing auto-fit/import pipeline immediately after
+   *  solving — nothing about it is saved except the resulting seat. */
+  @state() private _calib: CalibState | null = null;
+
+  /** Natural pixel size of the raw reference map image while calibrating —
+   *  captured the same way as `_pvNat`, needed to convert a click's
+   *  container-relative position into the pixel coordinates
+   *  `buildCalibrationAnchors` expects (same space as `bbox_px`). */
+  @state() private _refNat: { w: number; h: number } | null = null;
+
+  /** Outcome of the last calibration attempt — a result banner (mirrors
+   *  `_placeRoomsResult`) or an error, cleared implicitly on the next attempt. */
+  @state() private _calibResult: { residual_pct: number } | null = null;
+  @state() private _calibError = "";
+
   /** Active drag on a room's position dot / rectangle (2026-07-26 — was
    *  sliders-only, no way to see or drag the actual rectangle extent on the
    *  floorplan preview). `orig` is the room's state at drag START (not updated
@@ -224,6 +267,13 @@ export class AnyVacCardEditor extends LitElement {
     // opened (nothing to snapshot yet).
     if (this._tab === "maps" && (changed.has("_tab") || changed.has("_mapVac"))) {
       this._snapshotRefMap();
+    }
+    // docs/39: an in-progress calibration is tied to one vacuum's raw map —
+    // switching tabs or vacuums mid-flow would silently mix two vacuums'
+    // points (or leave the banner showing over an unrelated preview), so
+    // cancel it outright rather than trying to carry it across.
+    if ((changed.has("_tab") || changed.has("_mapVac")) && this._calib) {
+      this._calib = null;
     }
   }
 
@@ -671,6 +721,154 @@ export class AnyVacCardEditor extends LitElement {
     if (!added) return;
     if (this._mergedEdit) this._setConfig({ rooms: target });
     else this._setVacuum(vacIdx, { rooms: target });
+  }
+
+  // ── 2-point manual calibration (docs/39) ──────────────────────────────────
+
+  /** Starts the 4-click flow for `vacIdx` — see `_calib` field docstring. */
+  private _startCalibration(vacIdx: number): void {
+    this._calib = { vacIdx, step: "raw1", rawPts: [], floorPts: [] };
+    this._calibResult = null;
+    this._calibError = "";
+    this._mapRoom = null;
+  }
+
+  private _cancelCalibration(): void {
+    this._calib = null;
+  }
+
+  /** Click on the raw-map calibration preview (steps "raw1"/"raw2") — records
+   *  the click in the raw map's own natural pixel space via `_refNat`, same
+   *  convention `buildCalibrationAnchors` expects. Silently ignored if the
+   *  reference image hasn't reported its natural size yet (its `@load` hasn't
+   *  fired) — practically instant, but avoids recording a garbage point. */
+  private _onCalibRawClick(e: MouseEvent): void {
+    const c = this._calib;
+    if (!c || (c.step !== "raw1" && c.step !== "raw2") || !this._refNat) return;
+    const rect = (e.currentTarget as HTMLElement).getBoundingClientRect();
+    const nx = (e.clientX - rect.left) / rect.width;
+    const ny = (e.clientY - rect.top) / rect.height;
+    const pt = { x: nx * this._refNat.w, y: ny * this._refNat.h };
+    this._calib = { ...c, rawPts: [...c.rawPts, pt], step: c.step === "raw1" ? "raw2" : "floor1" };
+  }
+
+  /** Click on the floorplan calibration preview (steps "floor1"/"floor2") —
+   *  same container-percentage convention as room placement (0.1% precision,
+   *  docs/38 §2). The second click solves and commits the calibration. */
+  private _onCalibFloorClick(e: MouseEvent): void {
+    const c = this._calib;
+    if (!c || (c.step !== "floor1" && c.step !== "floor2")) return;
+    const rect = (e.currentTarget as HTMLElement).getBoundingClientRect();
+    const x = round1(clampPct(((e.clientX - rect.left) / rect.width) * 100));
+    const y = round1(clampPct(((e.clientY - rect.top) / rect.height) * 100));
+    const floorPts = [...c.floorPts, { x, y }];
+    if (c.step === "floor1") {
+      this._calib = { ...c, floorPts, step: "floor2" };
+    } else {
+      this._finishCalibration(c.vacIdx, c.rawPts, floorPts);
+    }
+  }
+
+  /** Solves the similarity transform from the 4 collected clicks and writes it
+   *  as a manual seat (docs/39). Reuses `computeSeatFit` unchanged — 2 anchors
+   *  is a case it already handles — so a calibrated seat behaves exactly like
+   *  a well-fitted auto seat (same rotation-snap-to-90° convention), just
+   *  bootstrapped from clicks instead of room names. */
+  private _finishCalibration(
+    vacIdx: number,
+    rawPts: { x: number; y: number }[],
+    floorPts: { x: number; y: number }[],
+  ): void {
+    this._calib = null;
+    if (!this._refNat) {
+      this._calibError = "Reference map image wasn't ready — try again.";
+      return;
+    }
+    const ar = this._editorAR();
+    const anchors = buildCalibrationAnchors(
+      rawPts, floorPts, { NW: this._refNat.w, NH: this._refNat.h }, ar,
+    );
+    const fit = computeSeatFit(anchors, ar);
+    if (!fit) {
+      this._calibError = "Couldn't compute a calibration from those points — " +
+        "make sure the two points are clearly apart, then try again.";
+      return;
+    }
+    this._calibError = "";
+    this._setMap(vacIdx, {
+      seat: "manual",
+      rotation: fit.rotation,
+      scale: Math.round(fit.scale * 10) / 10,
+      offset_x: Math.round(fit.offset_x * 10) / 10,
+      offset_y: Math.round(fit.offset_y * 10) / 10,
+    });
+    this._calibResult = { residual_pct: Math.round(fit.residual_pct * 10) / 10 };
+  }
+
+  /** Renders the 4-step calibration preview in place of the normal Maps-tab
+   *  preview — the raw map (steps 1-2) or the floorplan (steps 3-4), each with
+   *  a click handler that records a point and a banner naming the current step.
+   *  `pvOx/pvOy/pvScale/pvRot` are the SAME floorplan placement values the
+   *  normal preview uses (`_renderMapsTab`), so the floorplan step shows it
+   *  exactly where the user already sees it, not a re-centred copy. */
+  private _renderCalibStep(
+    calib: CalibState, mapUrl: string, previewUrl: string,
+    pvOx: number, pvOy: number, pvScale: number, pvRot: number,
+  ) {
+    const step = calib.step;
+    const isRaw = step === "raw1" || step === "raw2";
+    const stepNum = step === "raw1" ? 1 : step === "raw2" ? 2 : step === "floor1" ? 3 : 4;
+    const rawAR = this._refNat && this._refNat.h > 0 ? this._refNat.w / this._refNat.h : 0;
+    return html`
+      <div class="calib-banner">
+        <span><strong>Step ${stepNum} of 4</strong> —
+          ${isRaw
+            ? html`click a distinctive point (e.g. a room corner) on this vacuum's OWN map${step === "raw2" ? ", well away from the first point" : ""}.`
+            : html`click the SAME physical point on the floorplan${step === "floor2" ? " (the second point)" : ""}.`}
+        </span>
+        <button class="btn btn--sm" @click=${() => this._cancelCalibration()}>Cancel</button>
+      </div>
+      ${isRaw ? html`
+        <div class="map-pos-container">
+          <div class="map-preview-wrap"
+            style=${styleMap(rawAR > 0.1 ? { paddingTop: (100 / rawAR).toFixed(2) + "%" } : {})}>
+            <img class="map-preview-img" src=${mapUrl} alt="Raw vacuum map"
+              @load=${(e: Event) => {
+                const im = e.target as HTMLImageElement;
+                if (im.naturalWidth && im.naturalHeight
+                  && (this._refNat?.w !== im.naturalWidth || this._refNat?.h !== im.naturalHeight)) {
+                  this._refNat = { w: im.naturalWidth, h: im.naturalHeight };
+                }
+              }}
+              style=${styleMap({ left: "0", top: "0", width: "100%", transform: "none" })}
+              @click=${(e: MouseEvent) => this._onCalibRawClick(e)} />
+            ${calib.rawPts.map((p, i) => this._refNat ? html`
+              <div class="calib-marker"
+                style=${styleMap({
+                  left: (p.x / this._refNat!.w * 100) + "%",
+                  top:  (p.y / this._refNat!.h * 100) + "%",
+                })}>${i + 1}</div>
+            ` : nothing)}
+          </div>
+        </div>
+      ` : html`
+        <div class="map-pos-container" @click=${(e: MouseEvent) => this._onCalibFloorClick(e)}>
+          <div class="map-preview-wrap"
+            style=${styleMap(this._pvAR > 0.1 ? { paddingTop: (100 / this._pvAR).toFixed(2) + "%" } : {})}>
+            <img class="map-preview-img" src=${previewUrl} alt="Floorplan"
+              style=${styleMap({
+                left:      (50 + pvOx) + "%",
+                top:       (50 + pvOy) + "%",
+                width:     pvScale + "%",
+                transform: "translate(-50%,-50%) rotate(" + pvRot + "deg)",
+              })} />
+            ${calib.floorPts.map((p, i) => html`
+              <div class="calib-marker" style=${styleMap({ left: p.x + "%", top: p.y + "%" })}>${i + 1}</div>
+            `)}
+          </div>
+        </div>
+      `}
+    `;
   }
 
   /** docs/30 §8 "big seating rework" / docs/38 §4.2: places THIS vacuum's own
@@ -1607,7 +1805,8 @@ export class AnyVacCardEditor extends LitElement {
             explores/remaps to update it.</p>
         ` : nothing}
 
-        ${previewUrl ? html`
+        ${this._calib && this._calib.vacIdx === mapVac ? this._renderCalibStep(this._calib, mapUrl, previewUrl, pvOx, pvOy, pvScale, pvRot)
+        : previewUrl ? html`
           <div class="map-pos-container ${this._mapRoom !== null ? "map-pos-container--active" : ""}"
             @click=${(e: MouseEvent) => {
               if (this._mapRoom === null) return;
@@ -1703,6 +1902,24 @@ export class AnyVacCardEditor extends LitElement {
             <p class="hint">Auto-fit inactive — it needs the integration sensor, a floorplan and at least one
               room rectangle whose key matches a room name on this robot's map. Using the manual values below.</p>
           `) : nothing}
+          ${mapUrl && previewUrl && useImg ? html`
+            <button class="btn btn--sm" style="align-self:flex-start"
+              @click=${() => this._startCalibration(mapVac)}>
+              <ha-icon icon="mdi:crosshairs-gps"></ha-icon> Calibrate from 2 points
+            </button>
+            <p class="hint">If auto-fit's fit error stays high no matter how the room rectangles are tuned,
+              the rectangles' shapes likely don't match this robot's real rooms yet — no amount of rotation/
+              scale can fix that. This bootstraps a correct seat instead: click the same physical point twice
+              (once on this vacuum's own map, once on the floorplan), then a second matching pair — two
+              points fully determine rotation, scale and offset. Do this once for one reference vacuum, then
+              use "Import missing rooms" below to place its rooms correctly; other vacuums often auto-fit
+              correctly too, once the floorplan's rectangles are accurate.</p>
+          ` : nothing}
+          ${this._calibResult ? html`
+            <p class="hint">✅ Calibrated — fit error ${this._calibResult.residual_pct}%. Now use
+              "Import missing rooms from this vacuum" below to place its rooms.</p>
+          ` : nothing}
+          ${this._calibError ? html`<p class="hint" style="color:#ff6b6b">${this._calibError}</p>` : nothing}
           ${vacuums.length > 1 && rooms.length > 0 ? (() => {
             const unmatched = this._unmatchedOwnRoomNames(mapVac);
             return unmatched.length ? html`
@@ -2469,6 +2686,22 @@ export class AnyVacCardEditor extends LitElement {
     .room-rect-handle--se { left:100%; top:100%; cursor:nwse-resize; }
     .room-rect-handle--ne { left:100%; top:0%;   cursor:nesw-resize; }
     .room-rect-handle--sw { left:0%;   top:100%; cursor:nesw-resize; }
+
+    /* ── 2-point calibration (docs/39) ── */
+    .calib-banner {
+      display:flex; align-items:center; justify-content:space-between; gap:8px;
+      padding:8px 10px; border-radius:8px;
+      background:rgba(250,173,20,.15); border:1px solid rgba(250,173,20,.4);
+      font-size:12px; color:var(--primary-text-color);
+    }
+    .calib-marker {
+      position:absolute; transform:translate(-50%,-50%);
+      width:22px; height:22px; border-radius:50%;
+      background:rgba(250,173,20,.85); border:2px solid white;
+      display:flex; align-items:center; justify-content:center;
+      color:#000; font-size:12px; font-weight:700;
+      pointer-events:none;
+    }
 
     .two-col { display:flex; gap:8px; }
     .two-col > * { flex:1; min-width:0; }
