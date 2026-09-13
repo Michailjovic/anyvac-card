@@ -121,11 +121,12 @@ Each entry in `vacuums[]`:
 **Auto-fit stuck with a high fit error no matter how the room rectangles are tuned?**
 That usually means the rectangles' *shapes* don't match this robot's real rooms yet —
 no rotation/scale/offset can reconcile mismatched proportions. The Maps tab's
-**"Calibrate from 2 points"** button (docs/39) bootstraps a correct seat instead: click
-the same physical point once on this vacuum's own map and once on the floorplan, then
-a second matching pair — two point-pairs fully determine rotation, scale and offset.
-Writes `seat: "manual"` with the solved values; use **"Import missing rooms"**
-afterwards to place this vacuum's rooms from it.
+**"Calibrate from clicked points"** button (docs/39) bootstraps a correct seat instead:
+click the same physical point once on this vacuum's own map and once on the floorplan,
+repeated for at least 2 point-pairs (2 minimum determines rotation/scale/offset; a few
+more, spread out, average down normal click imprecision — the banner shows the live fit
+error as each one is added). Writes `seat: "manual"` with the solved values once saved;
+use **"Import missing rooms"** afterwards to place this vacuum's rooms from it.
 
 ## Image base / floorplan
 

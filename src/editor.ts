@@ -53,14 +53,28 @@ import {
 
 type ActiveTab = "vacuums" | "maps" | "global" | "debug";
 
-/** 2-point manual seat calibration flow state (docs/39) — see the `_calib`
- *  field docstring on `AnyVacCardEditor` for the full rationale. */
+/** Manual seat calibration flow state (docs/39 §8 revision) — see the `_calib`
+ *  field docstring on `AnyVacCardEditor` for the full rationale.
+ *
+ *  N point-pairs, not fixed at 2: with EXACTLY 2 points the transform has no
+ *  slack to average out click imprecision — a click a few px off directly
+ *  becomes rotation/scale/offset error (field report: a careful 2-point click
+ *  still landed at ~4% fit error, visibly "close but not exact"). Extra pairs
+ *  feed the SAME least-squares fit (`computeSeatFit` already handles any
+ *  `anchors.length >= 2`) and average the noise down — this only changes how
+ *  many clicks feed it, not the maths. `phase` says which image accepts the
+ *  next click; a pair is complete once `floorPts.length` catches up with
+ *  `rawPts.length`. */
 type CalibState = {
   vacIdx: number;
-  step: "raw1" | "raw2" | "floor1" | "floor2";
+  phase: "raw" | "floor";
   rawPts: { x: number; y: number }[];
   floorPts: { x: number; y: number }[];
 };
+
+/** Soft cap on calibration point-pairs — plenty for averaging out click
+ *  noise; mainly guards the UI against an unbounded list of markers. */
+const MAX_CALIB_PAIRS = 6;
 
 // ── Defaults ─────────────────────────────────────────────────────────────────
 
@@ -189,15 +203,21 @@ export class AnyVacCardEditor extends LitElement {
    *  (a `null` result renders nothing, so there's nothing to reset). */
   @state() private _placeRoomsResult: { placed: number; added: number } | null = null;
 
-  /** Two-point manual seat calibration (docs/39) — a narrow one-time bootstrap
-   *  for when NO vacuum's auto-fit can converge because the room anchors on the
-   *  shared floorplan don't (yet) match any robot's real room proportions. The
-   *  user clicks the SAME two physical points once on this vacuum's own raw
-   *  map, then once on the floorplan photo; two point-pairs fully determine a
-   *  similarity transform (rotation + one uniform scale + offset), solved by
-   *  the exact same least-squares maths the room-anchor auto-fit already uses
-   *  (`computeSeatFit`/`buildCalibrationAnchors`, seatfit.ts) — just fed two
-   *  clicked points instead of name-matched room bboxes. The result is written
+  /** Manual seat calibration from clicked points (docs/39) — a narrow
+   *  one-time bootstrap for when NO vacuum's auto-fit can converge because the
+   *  room anchors on the shared floorplan don't (yet) match any robot's real
+   *  room proportions. The user clicks the SAME physical point once on this
+   *  vacuum's own raw map, then once on the floorplan photo — repeated for at
+   *  least 2 points (more allowed, up to `MAX_CALIB_PAIRS`). Any 2+ point-pairs
+   *  fully determine a similarity transform (rotation + one uniform scale +
+   *  offset), solved by the exact same least-squares maths the room-anchor
+   *  auto-fit already uses (`computeSeatFit`/`buildCalibrationAnchors`,
+   *  seatfit.ts) — just fed clicked points instead of name-matched room
+   *  bboxes. Originally fixed at exactly 2 points; a field report (a careful
+   *  2-point click still landing at ~4% fit error) showed a bare 2 points
+   *  leaves no slack to average out click imprecision, so the flow now lets
+   *  extra points feed the SAME fit and shows the live fit-error effect of
+   *  each one before committing (`_renderCalibStep`). The result is written
    *  as `map.seat: "manual"` with the SOLVED values, not guessed ones, so the
    *  existing "Import missing rooms" button can then place every room
    *  correctly in one click, and (once the floorplan's anchors are accurate)
@@ -723,11 +743,11 @@ export class AnyVacCardEditor extends LitElement {
     else this._setVacuum(vacIdx, { rooms: target });
   }
 
-  // ── 2-point manual calibration (docs/39) ──────────────────────────────────
+  // ── Manual calibration from clicked points (docs/39) ──────────────────────
 
-  /** Starts the 4-click flow for `vacIdx` — see `_calib` field docstring. */
+  /** Starts the click flow for `vacIdx` — see `_calib` field docstring. */
   private _startCalibration(vacIdx: number): void {
-    this._calib = { vacIdx, step: "raw1", rawPts: [], floorPts: [] };
+    this._calib = { vacIdx, phase: "raw", rawPts: [], floorPts: [] };
     this._calibResult = null;
     this._calibError = "";
     this._mapRoom = null;
@@ -737,65 +757,93 @@ export class AnyVacCardEditor extends LitElement {
     this._calib = null;
   }
 
-  /** Click on the raw-map calibration preview (steps "raw1"/"raw2") — records
+  /** Click on the raw-map calibration preview (`phase === "raw"`) — records
    *  the click in the raw map's own natural pixel space via `_refNat`, same
    *  convention `buildCalibrationAnchors` expects. Silently ignored if the
    *  reference image hasn't reported its natural size yet (its `@load` hasn't
    *  fired) — practically instant, but avoids recording a garbage point. */
   private _onCalibRawClick(e: MouseEvent): void {
     const c = this._calib;
-    if (!c || (c.step !== "raw1" && c.step !== "raw2") || !this._refNat) return;
+    if (!c || c.phase !== "raw" || !this._refNat || c.rawPts.length >= MAX_CALIB_PAIRS) return;
     const rect = (e.currentTarget as HTMLElement).getBoundingClientRect();
     const nx = (e.clientX - rect.left) / rect.width;
     const ny = (e.clientY - rect.top) / rect.height;
     const pt = { x: nx * this._refNat.w, y: ny * this._refNat.h };
-    this._calib = { ...c, rawPts: [...c.rawPts, pt], step: c.step === "raw1" ? "raw2" : "floor1" };
+    this._calib = { ...c, rawPts: [...c.rawPts, pt], phase: "floor" };
   }
 
-  /** Click on the floorplan calibration preview (steps "floor1"/"floor2") —
+  /** Click on the floorplan calibration preview (`phase === "floor"`) —
    *  same container-percentage convention as room placement (0.1% precision,
-   *  docs/38 §2). The second click solves and commits the calibration. */
+   *  docs/38 §2). Completes the pair and hands control back to the "raw"
+   *  phase — the decision to add another pair or save is the user's, made
+   *  from the live fit-error preview (`_renderCalibStep`), not automatic. */
   private _onCalibFloorClick(e: MouseEvent): void {
     const c = this._calib;
-    if (!c || (c.step !== "floor1" && c.step !== "floor2")) return;
+    if (!c || c.phase !== "floor") return;
     const rect = (e.currentTarget as HTMLElement).getBoundingClientRect();
     const x = round1(clampPct(((e.clientX - rect.left) / rect.width) * 100));
     const y = round1(clampPct(((e.clientY - rect.top) / rect.height) * 100));
-    const floorPts = [...c.floorPts, { x, y }];
-    if (c.step === "floor1") {
-      this._calib = { ...c, floorPts, step: "floor2" };
-    } else {
-      this._finishCalibration(c.vacIdx, c.rawPts, floorPts);
+    this._calib = { ...c, floorPts: [...c.floorPts, { x, y }], phase: "raw" };
+  }
+
+  /** Removes the last CLICKED point (whichever image it's on) — lets a
+   *  mis-click be corrected without restarting the whole flow. */
+  private _undoCalibPoint(): void {
+    const c = this._calib;
+    if (!c) return;
+    if (c.phase === "floor" && c.rawPts.length > c.floorPts.length) {
+      this._calib = { ...c, rawPts: c.rawPts.slice(0, -1), phase: "raw" };
+    } else if (c.floorPts.length > 0) {
+      this._calib = { ...c, floorPts: c.floorPts.slice(0, -1) };
     }
   }
 
-  /** Solves the similarity transform from the 4 collected clicks and writes it
-   *  as a manual seat (docs/39). Reuses `computeSeatFit` unchanged — 2 anchors
-   *  is a case it already handles — so a calibrated seat behaves exactly like
-   *  a well-fitted auto seat (same rotation-snap-to-90° convention), just
-   *  bootstrapped from clicks instead of room names. */
-  private _finishCalibration(
-    vacIdx: number,
-    rawPts: { x: number; y: number }[],
-    floorPts: { x: number; y: number }[],
-  ): void {
+  /** Live fit-error preview over whatever complete pairs exist so far — lets
+   *  the user see the effect of adding one more point BEFORE committing to
+   *  anything (docs/39 §8 revision). Returns `null` below 2 complete pairs
+   *  (nothing to fit yet). */
+  private _calibPreview(calib: CalibState): { residual_pct: number } | null {
+    const n = Math.min(calib.rawPts.length, calib.floorPts.length);
+    if (n < 2 || !this._refNat) return null;
+    const ar = this._editorAR();
+    const anchors = buildCalibrationAnchors(
+      calib.rawPts.slice(0, n), calib.floorPts.slice(0, n),
+      { NW: this._refNat.w, NH: this._refNat.h }, ar,
+    );
+    const fit = computeSeatFit(anchors, ar);
+    return fit ? { residual_pct: Math.round(fit.residual_pct * 10) / 10 } : null;
+  }
+
+  /** Solves the similarity transform from every complete pair collected so
+   *  far and writes it as a manual seat. Reuses `computeSeatFit` unchanged —
+   *  it already least-squares-fits any `anchors.length >= 2` — so 2 pairs
+   *  behave exactly as the original design, and each extra pair just adds
+   *  another row to that same fit, averaging down click imprecision (the
+   *  field report this revision responds to: a careful 2-point click still
+   *  landed at ~4% fit error). The result behaves exactly like a well-fitted
+   *  auto seat (same rotation-snap-to-90° convention), just bootstrapped from
+   *  clicks instead of room names. */
+  private _finishCalibration(): void {
+    const c = this._calib;
+    if (!c) return;
+    const n = Math.min(c.rawPts.length, c.floorPts.length);
     this._calib = null;
-    if (!this._refNat) {
-      this._calibError = "Reference map image wasn't ready — try again.";
+    if (!this._refNat || n < 2) {
+      this._calibError = "Need at least 2 complete point pairs — try again.";
       return;
     }
     const ar = this._editorAR();
     const anchors = buildCalibrationAnchors(
-      rawPts, floorPts, { NW: this._refNat.w, NH: this._refNat.h }, ar,
+      c.rawPts.slice(0, n), c.floorPts.slice(0, n), { NW: this._refNat.w, NH: this._refNat.h }, ar,
     );
     const fit = computeSeatFit(anchors, ar);
     if (!fit) {
       this._calibError = "Couldn't compute a calibration from those points — " +
-        "make sure the two points are clearly apart, then try again.";
+        "make sure they're clearly apart, then try again.";
       return;
     }
     this._calibError = "";
-    this._setMap(vacIdx, {
+    this._setMap(c.vacIdx, {
       seat: "manual",
       rotation: fit.rotation,
       scale: Math.round(fit.scale * 10) / 10,
@@ -805,69 +853,95 @@ export class AnyVacCardEditor extends LitElement {
     this._calibResult = { residual_pct: Math.round(fit.residual_pct * 10) / 10 };
   }
 
-  /** Renders the 4-step calibration preview in place of the normal Maps-tab
-   *  preview — the raw map (steps 1-2) or the floorplan (steps 3-4), each with
-   *  a click handler that records a point and a banner naming the current step.
-   *  `pvOx/pvOy/pvScale/pvRot` are the SAME floorplan placement values the
-   *  normal preview uses (`_renderMapsTab`), so the floorplan step shows it
-   *  exactly where the user already sees it, not a re-centred copy. */
+  /** Renders the calibration flow as a fixed full-viewport overlay (docs/39
+   *  §9) — the raw map (`phase === "raw"`) or the floorplan (`phase ===
+   *  "floor"`), each with a click handler that records a point and a banner
+   *  naming what to do next. Full-viewport, not inline in the Maps-tab column,
+   *  because that column can be a few hundred px wide (or less on mobile) —
+   *  the click-handling math is a plain ratio of the clicked element's own
+   *  rect, so rendering it at screen size instead of column size is a pure
+   *  display change, zero risk to the geometry. Once ≥ 2 complete pairs
+   *  exist, the raw-map step's banner also shows the live fit-error preview
+   *  and a "Save" button, so adding a point and its effect on the fit are
+   *  seen before committing to anything. `pvOx/pvOy/pvScale/pvRot` are the
+   *  SAME floorplan placement values the normal preview uses
+   *  (`_renderMapsTab`), so the floorplan step shows it exactly where the
+   *  user already sees it, not a re-centred copy. */
   private _renderCalibStep(
     calib: CalibState, mapUrl: string, previewUrl: string,
     pvOx: number, pvOy: number, pvScale: number, pvRot: number,
   ) {
-    const step = calib.step;
-    const isRaw = step === "raw1" || step === "raw2";
-    const stepNum = step === "raw1" ? 1 : step === "raw2" ? 2 : step === "floor1" ? 3 : 4;
+    const isRaw = calib.phase === "raw";
+    const pairs = Math.min(calib.rawPts.length, calib.floorPts.length);
+    const nextPoint = pairs + 1;
+    const preview = this._calibPreview(calib);
     const rawAR = this._refNat && this._refNat.h > 0 ? this._refNat.w / this._refNat.h : 0;
+    const stageAR = isRaw ? rawAR : this._pvAR;
+    const atCap = calib.rawPts.length >= MAX_CALIB_PAIRS;
     return html`
-      <div class="calib-banner">
-        <span><strong>Step ${stepNum} of 4</strong> —
-          ${isRaw
-            ? html`click a distinctive point (e.g. a room corner) on this vacuum's OWN map${step === "raw2" ? ", well away from the first point" : ""}.`
-            : html`click the SAME physical point on the floorplan${step === "floor2" ? " (the second point)" : ""}.`}
-        </span>
-        <button class="btn btn--sm" @click=${() => this._cancelCalibration()}>Cancel</button>
+      <div class="calib-overlay">
+        <div class="calib-banner">
+          <span>
+            ${isRaw
+              ? (atCap
+                  ? html`<strong>${MAX_CALIB_PAIRS} points</strong> — that's the max. Save below, or Cancel.`
+                  : html`<strong>Point ${nextPoint}</strong> — click a distinctive spot (e.g. a room corner)
+                    on this vacuum's OWN map${pairs > 0 ? ", away from the points already placed" : ""}.`)
+              : html`<strong>Point ${pairs + 1}</strong> — click the SAME physical point on the floorplan.`}
+            ${preview ? html` Current fit error with ${pairs} point${pairs > 1 ? "s" : ""}:
+              <strong>${preview.residual_pct}%</strong>.` : nothing}
+          </span>
+          <span style="display:flex;gap:6px;flex-shrink:0">
+            ${(calib.rawPts.length > 0 || calib.floorPts.length > 0) ? html`
+              <button class="btn btn--sm" @click=${() => this._undoCalibPoint()}>Undo point</button>
+            ` : nothing}
+            ${pairs >= 2 ? html`
+              <button class="btn btn--add btn--sm" @click=${() => this._finishCalibration()}>Save</button>
+            ` : nothing}
+            <button class="btn btn--sm" @click=${() => this._cancelCalibration()}>Cancel</button>
+          </span>
+        </div>
+        <div class="calib-stage" style=${styleMap({ "--calib-ar": String(stageAR > 0.1 ? stageAR : 1.5) })}>
+          ${isRaw ? html`
+            <div class="map-pos-container">
+              <div class="map-preview-wrap">
+                <img class="map-preview-img" src=${mapUrl} alt="Raw vacuum map"
+                  @load=${(e: Event) => {
+                    const im = e.target as HTMLImageElement;
+                    if (im.naturalWidth && im.naturalHeight
+                      && (this._refNat?.w !== im.naturalWidth || this._refNat?.h !== im.naturalHeight)) {
+                      this._refNat = { w: im.naturalWidth, h: im.naturalHeight };
+                    }
+                  }}
+                  style=${styleMap({ left: "0", top: "0", width: "100%", transform: "none" })}
+                  @click=${(e: MouseEvent) => this._onCalibRawClick(e)} />
+                ${calib.rawPts.map((p, i) => this._refNat ? html`
+                  <div class="calib-marker"
+                    style=${styleMap({
+                      left: (p.x / this._refNat!.w * 100) + "%",
+                      top:  (p.y / this._refNat!.h * 100) + "%",
+                    })}>${i + 1}</div>
+                ` : nothing)}
+              </div>
+            </div>
+          ` : html`
+            <div class="map-pos-container" @click=${(e: MouseEvent) => this._onCalibFloorClick(e)}>
+              <div class="map-preview-wrap">
+                <img class="map-preview-img" src=${previewUrl} alt="Floorplan"
+                  style=${styleMap({
+                    left:      (50 + pvOx) + "%",
+                    top:       (50 + pvOy) + "%",
+                    width:     pvScale + "%",
+                    transform: "translate(-50%,-50%) rotate(" + pvRot + "deg)",
+                  })} />
+                ${calib.floorPts.map((p, i) => html`
+                  <div class="calib-marker" style=${styleMap({ left: p.x + "%", top: p.y + "%" })}>${i + 1}</div>
+                `)}
+              </div>
+            </div>
+          `}
+        </div>
       </div>
-      ${isRaw ? html`
-        <div class="map-pos-container">
-          <div class="map-preview-wrap"
-            style=${styleMap(rawAR > 0.1 ? { paddingTop: (100 / rawAR).toFixed(2) + "%" } : {})}>
-            <img class="map-preview-img" src=${mapUrl} alt="Raw vacuum map"
-              @load=${(e: Event) => {
-                const im = e.target as HTMLImageElement;
-                if (im.naturalWidth && im.naturalHeight
-                  && (this._refNat?.w !== im.naturalWidth || this._refNat?.h !== im.naturalHeight)) {
-                  this._refNat = { w: im.naturalWidth, h: im.naturalHeight };
-                }
-              }}
-              style=${styleMap({ left: "0", top: "0", width: "100%", transform: "none" })}
-              @click=${(e: MouseEvent) => this._onCalibRawClick(e)} />
-            ${calib.rawPts.map((p, i) => this._refNat ? html`
-              <div class="calib-marker"
-                style=${styleMap({
-                  left: (p.x / this._refNat!.w * 100) + "%",
-                  top:  (p.y / this._refNat!.h * 100) + "%",
-                })}>${i + 1}</div>
-            ` : nothing)}
-          </div>
-        </div>
-      ` : html`
-        <div class="map-pos-container" @click=${(e: MouseEvent) => this._onCalibFloorClick(e)}>
-          <div class="map-preview-wrap"
-            style=${styleMap(this._pvAR > 0.1 ? { paddingTop: (100 / this._pvAR).toFixed(2) + "%" } : {})}>
-            <img class="map-preview-img" src=${previewUrl} alt="Floorplan"
-              style=${styleMap({
-                left:      (50 + pvOx) + "%",
-                top:       (50 + pvOy) + "%",
-                width:     pvScale + "%",
-                transform: "translate(-50%,-50%) rotate(" + pvRot + "deg)",
-              })} />
-            ${calib.floorPts.map((p, i) => html`
-              <div class="calib-marker" style=${styleMap({ left: p.x + "%", top: p.y + "%" })}>${i + 1}</div>
-            `)}
-          </div>
-        </div>
-      `}
     `;
   }
 
@@ -1905,15 +1979,16 @@ export class AnyVacCardEditor extends LitElement {
           ${mapUrl && previewUrl && useImg ? html`
             <button class="btn btn--sm" style="align-self:flex-start"
               @click=${() => this._startCalibration(mapVac)}>
-              <ha-icon icon="mdi:crosshairs-gps"></ha-icon> Calibrate from 2 points
+              <ha-icon icon="mdi:crosshairs-gps"></ha-icon> Calibrate from clicked points
             </button>
             <p class="hint">If auto-fit's fit error stays high no matter how the room rectangles are tuned,
               the rectangles' shapes likely don't match this robot's real rooms yet — no amount of rotation/
-              scale can fix that. This bootstraps a correct seat instead: click the same physical point twice
-              (once on this vacuum's own map, once on the floorplan), then a second matching pair — two
-              points fully determine rotation, scale and offset. Do this once for one reference vacuum, then
-              use "Import missing rooms" below to place its rooms correctly; other vacuums often auto-fit
-              correctly too, once the floorplan's rectangles are accurate.</p>
+              scale can fix that. This bootstraps a correct seat instead: click the same physical point once
+              on this vacuum's own map and once on the floorplan, repeated for at least 2 points — each pair
+              you add shows its effect on the fit error live, so click a couple more if it's not tight enough
+              yet (spread them out — corners of different rooms work well). Save once you're happy with the
+              number, then use "Import missing rooms" below to place this vacuum's rooms correctly; other
+              vacuums often auto-fit correctly too, once the floorplan's rectangles are accurate.</p>
           ` : nothing}
           ${this._calibResult ? html`
             <p class="hint">✅ Calibrated — fit error ${this._calibResult.residual_pct}%. Now use
@@ -1930,10 +2005,14 @@ export class AnyVacCardEditor extends LitElement {
             ` : nothing;
           })() : nothing}
           ${(map.seat === "manual" || !esLive.auto) ? html`
-            ${this._numberSlider("Rotation",  map.rotation  ?? 0,    0, 360, 90, v => this._setMap(mapVac, { rotation:  v }), "°")}
-            ${this._numberSlider("Scale",     map.scale     ?? 100, 50, 200,  5, v => this._setMap(mapVac, { scale:     v }), "%")}
-            ${this._numberSlider("Offset X",  map.offset_x  ?? 0,  -50,  50,  1, v => this._setMap(mapVac, { offset_x:  v }), "%")}
-            ${this._numberSlider("Offset Y",  map.offset_y  ?? 0,  -50,  50,  1, v => this._setMap(mapVac, { offset_y:  v }), "%")}
+            ${this._numberSlider("Rotation",  map.rotation  ?? 0,    0, 360,  90, v => this._setMap(mapVac, { rotation:  v }), "°")}
+            ${/* docs/39 §9: widened from 50-200 — a badly-fit auto-seat before calibration
+                (or a floorplan photographed at a very different scale from the robot's own
+                map) can genuinely need several hundred percent; the slider should be able to
+                show and adjust whatever calibration or auto-fit actually solved, not clamp it. */ nothing}
+            ${this._numberSlider("Scale",     map.scale     ?? 100, 20, 800,  5, v => this._setMap(mapVac, { scale:     v }), "%")}
+            ${this._numberSlider("Offset X",  map.offset_x  ?? 0, -150, 150,  1, v => this._setMap(mapVac, { offset_x:  v }), "%")}
+            ${this._numberSlider("Offset Y",  map.offset_y  ?? 0, -150, 150,  1, v => this._setMap(mapVac, { offset_y:  v }), "%")}
           ` : nothing}
           ${this._intEntityFor(vac) ? html`
             <button class="btn btn--add btn--sm" style="align-self:flex-start"
@@ -2687,19 +2766,52 @@ export class AnyVacCardEditor extends LitElement {
     .room-rect-handle--ne { left:100%; top:0%;   cursor:nesw-resize; }
     .room-rect-handle--sw { left:0%;   top:100%; cursor:nesw-resize; }
 
-    /* ── 2-point calibration (docs/39) ── */
+    /* ── Manual calibration from clicked points (docs/39) ──
+       docs/39 §9: the click target needs to be BIG on screen — the editor's
+       own column can be a few hundred px wide (or less on mobile), which
+       turns any click imprecision into a proportionally large geometric
+       error no amount of averaging fully cures. Rendered as a fixed
+       full-viewport overlay instead of inline, so the image is as large as
+       the whole screen allows regardless of how narrow the surrounding form
+       is — the click-handling math (_onCalibRawClick/_onCalibFloorClick)
+       is a plain ratio of the clicked element's own boundingClientRect, so
+       it's completely unaffected by how big that rect actually renders. */
+    .calib-overlay {
+      position:fixed; inset:0; z-index:1000;
+      background:rgba(0,0,0,.85);
+      display:flex; flex-direction:column; gap:10px;
+      padding:14px; box-sizing:border-box; overflow:auto;
+    }
     .calib-banner {
+      flex:0 0 auto;
       display:flex; align-items:center; justify-content:space-between; gap:8px;
       padding:8px 10px; border-radius:8px;
       background:rgba(250,173,20,.15); border:1px solid rgba(250,173,20,.4);
-      font-size:12px; color:var(--primary-text-color);
+      font-size:12px; color:#fff;
+    }
+    .calib-stage {
+      flex:1 1 auto; min-height:0;
+      display:flex; align-items:center; justify-content:center;
+    }
+    /* Sized from the image's own aspect ratio (--calib-ar, set inline per
+       render) via CSS alone — as wide/tall as the viewport allows (92vw by
+       92vh, whichever the aspect ratio hits first), no JS measurement needed. */
+    .calib-stage .map-preview-wrap {
+      position:relative; overflow:hidden; border-radius:8px;
+      background:rgba(255,255,255,.06);
+      width:min(92vw, calc(88vh * var(--calib-ar, 1.5)));
+      /* Overrides the base rule's padding-top aspect-ratio hack — this one
+         uses the aspect-ratio property instead, driven by --calib-ar, so
+         width can be computed from viewport units without any JS measuring. */
+      padding-top:0;
+      aspect-ratio:var(--calib-ar, 1.5);
     }
     .calib-marker {
       position:absolute; transform:translate(-50%,-50%);
-      width:22px; height:22px; border-radius:50%;
+      width:28px; height:28px; border-radius:50%;
       background:rgba(250,173,20,.85); border:2px solid white;
       display:flex; align-items:center; justify-content:center;
-      color:#000; font-size:12px; font-weight:700;
+      color:#000; font-size:14px; font-weight:700;
       pointer-events:none;
     }
 

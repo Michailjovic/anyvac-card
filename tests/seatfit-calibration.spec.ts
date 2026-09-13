@@ -84,6 +84,37 @@ test.describe("seatfit: buildCalibrationAnchors + computeSeatFit round-trip", ()
     });
   }
 
+  test("extra point-pairs average down click imprecision (docs/39 §8 field report)", () => {
+    // Field report: a careful 2-point click still landed at ~4% fit error.
+    // With exactly 2 points the fit has no redundancy — any click wobble gets
+    // read as if it were part of the true rotation/scale/offset, with nothing
+    // to reveal it as noise. More points can't all be satisfied by a single
+    // rigid transform that also matches the noise, so the SOLVED transform
+    // ends up closer to the true seat — this is the regression check for that:
+    // the same per-point wobble, spread over 4 points instead of 2, should
+    // solve a seat closer to ground truth, not just report a smaller number.
+    const dims = { NW: 1200, NH: 1200 };
+    const ar = 1;
+    const knownSeat: SeatParams = { rotation: 0, scale: 100, offset_x: 0, offset_y: 0 };
+    const rawPts = [
+      { x: 150, y: 200 }, { x: 1050, y: 300 }, { x: 250, y: 1000 }, { x: 900, y: 950 },
+    ];
+    const exactFloor = rawPts.map((p) => forwardPoint(p, dims, knownSeat, ar));
+    // A deterministic "click wobble" pattern (±0.4% of wrap width) applied to
+    // every point — not random, so the test is stable, but present on all of
+    // them the way real click imprecision would be.
+    const noise = [{ x: 0.4, y: -0.3 }, { x: -0.35, y: 0.4 }, { x: 0.3, y: 0.35 }, { x: -0.4, y: -0.4 }];
+    const noisyFloor = exactFloor.map((p, i) => ({ x: p.x + noise[i].x, y: p.y + noise[i].y }));
+
+    const fit2 = computeSeatFit(buildCalibrationAnchors(rawPts.slice(0, 2), noisyFloor.slice(0, 2), dims, ar), ar);
+    const fit4 = computeSeatFit(buildCalibrationAnchors(rawPts, noisyFloor, dims, ar), ar);
+    expect(fit2).not.toBeNull();
+    expect(fit4).not.toBeNull();
+    const deviationFromTruth = (fit: SeatParams) =>
+      Math.abs(fit.scale - knownSeat.scale) + Math.abs(fit.offset_x) + Math.abs(fit.offset_y);
+    expect(deviationFromTruth(fit4!)).toBeLessThan(deviationFromTruth(fit2!));
+  });
+
   test("two identical points (degenerate click) can't determine a transform", () => {
     const dims = { NW: 1000, NH: 1000 };
     const ar = 1;

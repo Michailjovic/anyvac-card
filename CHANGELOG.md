@@ -8,6 +8,61 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Planned
 
+## [1.6.2] - 2026-09-12
+
+Paired with integration 1.4.0 (unchanged) — this release is card-only. Detail: docs/39 §9.
+
+### Fixed
+
+**Manual calibration click precision was capped by how narrow the editor's own
+column renders, not by anything in the maths.** Field report: even careful,
+well-separated clicks landed with a visible fit error, because the raw-map/
+floorplan images were shown at whatever width the surrounding form column
+happened to have (a few hundred px, sometimes less on mobile) — every screen
+pixel of click imprecision there is several source-image pixels of real
+error. The calibration flow now renders as a **fixed full-viewport overlay**
+instead of inline in the Maps tab: same click-and-see-fit-error flow, just at
+screen size instead of column size. The click math itself
+(`_onCalibRawClick`/`_onCalibFloorClick`) is an unchanged ratio of the clicked
+element's own on-screen rect, so this is a pure display change with zero risk
+to the geometry — a bigger rect just means less real-world distance per
+screen pixel of imprecision.
+
+**The manual Scale/Offset X/Offset Y sliders under "Map seating" were capped
+at 50–200% / ±50%**, which can't reach a seat a badly-fit auto-fit (or an
+unusually cropped floorplan) genuinely needs — the calibration flow itself
+was never limited by this (it writes `map.scale`/`offset_x`/`offset_y`
+directly, bypassing the slider), but adjusting the result by hand afterwards
+could hit the ceiling. Widened to 20–800% / ±150%.
+
+### Note
+
+Downscaling the map or floorplan image does **not** help click precision —
+if anything it hurts, since it throws away exactly the pixel detail a
+precise click needs. The full-viewport overlay above is the actual fix for
+"the editor is too small to click accurately".
+
+## [1.6.1] - 2026-09-12
+
+Paired with integration 1.4.0 (unchanged) — this release is card-only. Detail: docs/39 §8.
+
+### Fixed
+
+**2-point calibration (1.6.0) left no slack to average out click imprecision.**
+Field report: a careful, well-separated 2-point click still landed at ~4% fit
+error — with exactly 2 points the least-squares fit has zero redundancy, so
+any click a few pixels off gets read as if it *were* the true rotation/scale/
+offset, with nothing to reveal it as noise. "Calibrate from 2 points" is now
+**"Calibrate from clicked points"**: still 2 minimum, but each further point
+(up to 6) feeds the *same* fit (`computeSeatFit` already least-squares-fits
+any `anchors.length >= 2` — no new maths) and shows the live fit-error effect
+of adding it, in the calibration banner itself, before anything is committed.
+An **Undo point** button fixes a mis-click without restarting the flow, and a
+**Save** button (shown once ≥ 2 pairs exist) commits whenever the user is
+happy with the number. Added a regression test demonstrating the fix
+directly: the same per-point click wobble, spread over 4 points instead of 2,
+solves a seat measurably closer to the true one (`tests/seatfit-calibration.spec.ts`).
+
 ## [1.6.0] - 2026-09-12
 
 Paired with integration 1.4.0 (unchanged) — this release is card-only. Detail: docs/39.
