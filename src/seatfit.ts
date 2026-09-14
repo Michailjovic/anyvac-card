@@ -197,12 +197,12 @@ export function computeSeatFit(anchors: SeatAnchor[], ar: number): SeatFitResult
  *  importing the full config types, so `seatfit.ts` stays dependency-free. */
 interface SeatVacuumLike {
   map?: { seat?: string; rotation?: number; scale?: number; offset_x?: number; offset_y?: number };
-  image_base?: { src?: string };
+  image_base?: { src?: string; crop_box?: CropBoxLike };
   rooms?: CardRoomLike[];
 }
 interface SeatConfigLike {
   map_mode?: string;
-  image_base?: { src?: string };
+  image_base?: { src?: string; crop_box?: CropBoxLike };
   rooms?: CardRoomLike[];
   vacuums?: SeatVacuumLike[];
 }
@@ -420,6 +420,152 @@ export function buildCalibrationAnchors(
   return out;
 }
 
+// ── Home frame (docs/40 §4.3-4.4, Fáze 3): identity crop, no fit/rotation ────
+//
+// Kontrakt v3 publishes every vacuum registered into a shared "home frame"
+// pre-transformed into ONE shared px space (`vacuum_position_home_px`,
+// `path_dry_home_px`/`path_wet_home_px`, `rooms[].bbox_home_px`/
+// `outline_home_px`) — unlike the legacy per-vacuum `*_px` fields, these
+// numbers already agree across every robot in that frame, by construction
+// (Fáze 1's registration). Placing them onto the shared floorplan is
+// therefore NOT a fit problem at all: it's the exact same "known crop, no
+// rotation" re-normalisation `placeRoomInCrop` already does for a bbox, just
+// for a single point (`pointInCrop`) or a whole polygon (`outlineInCrop`) —
+// one shared implementation, reused by rooms, markers, paths AND (inverted,
+// `pctToCropPoint`) by a Pin&Go/Zone click's home-frame coordinates.
+
+export interface CropBox { x0: number; y0: number; x1: number; y1: number }
+
+/** Minimal shape of `image_base.crop_box` this file needs — either flavour
+ *  from `types.ts` (`VacuumCropBox` legacy / `HomeFrameCropBox`), kept
+ *  structural like the rest of this file. */
+interface CropBoxLike extends CropBox { frame_id?: string; entity?: string }
+
+/** A point in a known px-space crop (a home frame's own px space, or any
+ *  other crop of that same space) → wrap-container percent (0..100). Same
+ *  maths as `placeRoomInCrop`'s centre-point step, standalone for a single
+ *  point (a vacuum marker) or reused per-point by `outlineInCrop` below. */
+export function pointInCrop(p: { x: number; y: number }, crop: CropBox): { x: number; y: number } | null {
+  const cropW = crop.x1 - crop.x0;
+  const cropH = crop.y1 - crop.y0;
+  if (!(cropW > 0) || !(cropH > 0)) return null;
+  return { x: ((p.x - crop.x0) / cropW) * 100, y: ((p.y - crop.y0) / cropH) * 100 };
+}
+
+/** Inverse of `pointInCrop` — wrap-container percent → a point back in the
+ *  crop's own px space. Used to turn a Pin&Go/Zone click's on-screen percent
+ *  into `x_home_px`/`y_home_px` for the `frame: "home"` service call. */
+export function pctToCropPoint(pct: { x: number; y: number }, crop: CropBox): { x: number; y: number } | null {
+  const cropW = crop.x1 - crop.x0;
+  const cropH = crop.y1 - crop.y0;
+  if (!(cropW > 0) || !(cropH > 0)) return null;
+  return { x: crop.x0 + (pct.x / 100) * cropW, y: crop.y0 + (pct.y / 100) * cropH };
+}
+
+/** Same re-normalisation as `pointInCrop`, for a whole polygon at once —
+ *  `rooms[].outline_home_px` (kontrakt v3), used to draw a room's real
+ *  traced shape instead of just its bounding rectangle (docs/40 §4.4).
+ *  Points are NOT clamped to 0..100 (unlike `placeRoomInCrop`'s rect) so a
+ *  shape that grazes the crop edge keeps its true form — the SVG it's drawn
+ *  into clips to the wrap regardless. */
+export function outlineInCrop(
+  points: Array<[number, number] | { x: number; y: number }> | undefined | null,
+  crop: CropBox,
+): Array<{ x: number; y: number }> | null {
+  if (!points?.length) return null;
+  const cropW = crop.x1 - crop.x0;
+  const cropH = crop.y1 - crop.y0;
+  if (!(cropW > 0) || !(cropH > 0)) return null;
+  return points.map((p) => {
+    const x = Array.isArray(p) ? p[0] : p.x;
+    const y = Array.isArray(p) ? p[1] : p.y;
+    return { x: ((x - crop.x0) / cropW) * 100, y: ((y - crop.y0) / cropH) * 100 };
+  });
+}
+
+/**
+ * Is `vac` rendered via the shared home frame right now? Requires BOTH: the
+ * config names a home frame to crop to (`image_base.crop_box.frame_id`, set
+ * once by "Snapshot home frame as floorplan" — `anyvac.snapshot_map_as_
+ * floorplan` with `frame: "home"`), AND this vacuum's OWN sensor currently
+ * reports a MATCHING `home_frame.id`. A vacuum on a different/no frame
+ * (different floor, just restarted, map failed the decoder self-test) has no
+ * matching id here and automatically falls back to its own legacy
+ * per-vacuum seat (`resolveSeat`) instead — no separate config for that
+ * case, docs/40 §4.4 "legacy fallback, když ne [nese home_frame]".
+ *
+ * `attrs` must already be schema-gated by the caller, same convention as
+ * `resolveSeat` (the card gates via `_intAttrs`).
+ */
+export function homeFrameCropFor(
+  config: SeatConfigLike,
+  vac: SeatVacuumLike | undefined,
+  attrs: Record<string, any> | undefined,
+): CropBox | null {
+  const merged = config.map_mode === "merged";
+  const ib = merged ? config.image_base : vac?.image_base;
+  const cb = ib?.crop_box;
+  if (!cb?.frame_id || cb.x1 == null || cb.y1 == null) return null;
+  const hf = attrs?.home_frame as { id?: string } | null | undefined;
+  if (!hf?.id || hf.id !== cb.frame_id) return null;
+  return { x0: cb.x0, y0: cb.y0, x1: cb.x1, y1: cb.y1 };
+}
+
+/** docs/40 §5.A.1: is a saved floorplan file's actual pixel size still a valid
+ * match for the crop box it's supposedly cut from — either exactly (the
+ * common case), or as a uniform re-export at a different resolution (e.g. the
+ * user opened the saved PNG in an image editor and exported it at 2×, or a
+ * screenshot tool captured it at a different DPI)? A re-export keeps the
+ * crop's own ASPECT RATIO exactly (it's a uniform scale, not a re-crop), so
+ * that's the signal this checks for — a real mismatch (a stale crop box left
+ * over from a different floorplan, or a file that was actually re-cropped)
+ * changes the aspect ratio too and is correctly rejected.
+ *
+ * Returns the detected scale factor (`nat` pixels per crop pixel — `1` for an
+ * exact/near-exact match) when the file is still a valid match, or `null`
+ * when it genuinely doesn't correspond to this crop box any more. There is
+ * nothing to DO with the returned scale at render time — every consumer of a
+ * crop box (`pointInCrop` and friends) only ever normalises to a 0..100
+ * percent of the wrap container, never against the loaded file's own pixel
+ * dimensions — so this exists purely to tell a real mismatch apart from a
+ * harmless re-export for the editor's own diagnostic hint. */
+export function canvasScaleForCrop(
+  nat: { w: number; h: number } | null | undefined,
+  crop: CropBox | null | undefined,
+): number | null {
+  if (!nat || !crop) return null;
+  const cropW = crop.x1 - crop.x0;
+  const cropH = crop.y1 - crop.y0;
+  if (!(cropW > 0) || !(cropH > 0) || !(nat.w > 0) || !(nat.h > 0)) return null;
+  // Near-exact match (today's ±2px absolute tolerance, kept as-is so a file
+  // that's pixel-identical bar rounding never reports a "2.003×" scale).
+  if (Math.abs(nat.w - cropW) <= 2 && Math.abs(nat.h - cropH) <= 2) return 1;
+  // Otherwise: same aspect ratio within ±0.3% -> uniform re-export. The two
+  // per-axis scale estimates (w/cropW, h/cropH) necessarily agree closely
+  // whenever the aspect-ratio check passes, so either one alone would do;
+  // averaging just keeps the reported number stable against which axis the
+  // ±0.3% tolerance happened to bite on.
+  const arNat = nat.w / nat.h;
+  const arCrop = cropW / cropH;
+  if (Math.abs(arNat / arCrop - 1) > 0.003) return null;
+  return (nat.w / cropW + nat.h / cropH) / 2;
+}
+
+/** Projects one point already expressed in a seat's own "q" space (NW-
+ *  normalised, origin at the source content's centre) onto the floorplan
+ *  wrap, as percent (0..100 on both axes) — "apply an already-solved seat
+ *  to a point", the shared last step behind `roomBboxToRect`'s bbox-centre
+ *  placement below and `projectHomePxThroughFit` (docs/40 §5.B): one
+ *  implementation of that projection, not two (docs/14 rule 1). */
+function seatProjectPct(q: { x: number; y: number }, seat: SeatParams, ar: number): { x: number; y: number } {
+  const s = seat.scale / 100;
+  const theta = seat.rotation * RAD;
+  const cos = Math.cos(theta), sin = Math.sin(theta);
+  const c = { x: (50 + seat.offset_x) / 100, y: (50 + seat.offset_y) / 100 / ar };
+  const u = { x: c.x + s * (cos * q.x - sin * q.y), y: c.y + s * (sin * q.x + cos * q.y) };
+  return { x: u.x * 100, y: u.y * ar * 100 };
+}
+
 export function roomBboxToRect(
   ir: Record<string, any>,
   at: Record<string, any>,
@@ -434,17 +580,114 @@ export function roomBboxToRect(
   let w = (bp.x1 - bp.x0) / NW;
   let h = (bp.y1 - bp.y0) / NW;
   const s = seat.scale / 100;
-  const theta = seat.rotation * RAD;
-  const cos = Math.cos(theta), sin = Math.sin(theta);
-  const c = { x: (50 + seat.offset_x) / 100, y: (50 + seat.offset_y) / 100 / ar };
-  const u = { x: c.x + s * (cos * q.x - sin * q.y), y: c.y + s * (sin * q.x + cos * q.y) };
+  const pct = seatProjectPct(q, seat, ar);
   const rot90 = Math.round(seat.rotation / 90) % 2 !== 0;
   if (rot90) { const tmp = w; w = h; h = tmp; }
   const clamp = (v: number, lo: number, hi: number) => Math.min(hi, Math.max(lo, v));
   return {
-    map_x: clamp(Math.round(u.x * 1000) / 10, 0, 100),
-    map_y: clamp(Math.round(u.y * ar * 1000) / 10, 0, 100),
+    map_x: clamp(Math.round(pct.x * 10) / 10, 0, 100),
+    map_y: clamp(Math.round(pct.y * 10) / 10, 0, 100),
     map_w: clamp(Math.round(s * w * 1000) / 10, 2, 100),
     map_h: clamp(Math.round(s * h * ar * 1000) / 10, 2, 100),
   };
+}
+
+// ── Cesta B: foreign floorplan calibrated against the home frame (docs/40 §5.B) ──
+//
+// Unlike docs/39's per-robot calibration (bootstraps ONE vacuum's own seat),
+// cesta B calibrates the FLOORPLAN ITSELF against the home frame's shared
+// mm-stable px space, once, card-level — `ImageBaseConfig.home_anchors`
+// (types.ts). Anchors store the raw clicked PAIRS, not a solved seat: the
+// fit is re-run live every render (`homeAnchorFit`) against the home
+// frame's CURRENT width/height, so it self-heals as the frame grows
+// (`grow_frame_canvas`, backend) without asking the user to re-click
+// anything. Reuses `buildCalibrationAnchors`/`computeSeatFit` UNCHANGED —
+// home-frame px plays exactly the role "raw map px" plays in docs/39, just
+// normalised against the frame's own `{width_px, height_px}` instead of one
+// vacuum's `image_dims` (docs/14 rule 1: one fit implementation).
+
+interface HomeFrameAnchorLike {
+  home_px: { x: number; y: number };
+  floor_pct: { x: number; y: number };
+}
+
+/** Solves `home_anchors` into a live seat-shaped fit. `frameDims` must be
+ *  the home frame's CURRENT `{width_px, height_px}` (from any registered
+ *  vacuum's `home_frame` sensor attribute) — the same live re-read that
+ *  makes this survive frame growth. `null` below 2 anchors or an unknown
+ *  frame size (nothing to fit yet). */
+export function homeAnchorFit(
+  anchors: HomeFrameAnchorLike[] | undefined | null,
+  frameDims: { NW: number; NH: number } | null | undefined,
+  ar: number,
+): SeatFitResult | null {
+  if (!anchors || anchors.length < 2 || !frameDims) return null;
+  const built = buildCalibrationAnchors(
+    anchors.map((a) => a.home_px), anchors.map((a) => a.floor_pct), frameDims, ar,
+  );
+  return computeSeatFit(built, ar);
+}
+
+/** Projects one point in home-frame px (a vacuum marker, a path point, a
+ *  room-outline vertex) through an already-solved `homeAnchorFit` result
+ *  onto the floorplan wrap, as percent — cesta B's counterpart of
+ *  `roomBboxToRect`'s bbox placement, sharing the same `seatProjectPct`
+ *  last step. `frameDims` MUST be the same `{NW, NH}` `homeAnchorFit` was
+ *  just solved against (both read live, same render pass) — a stale pair
+ *  would silently mis-scale every point. */
+export function projectHomePxThroughFit(
+  p: { x: number; y: number },
+  frameDims: { NW: number; NH: number },
+  fit: SeatFitResult,
+  ar: number,
+): { x: number; y: number } {
+  const q = { x: (p.x - frameDims.NW / 2) / frameDims.NW, y: (p.y - frameDims.NH / 2) / frameDims.NW };
+  return seatProjectPct(q, fit, ar);
+}
+
+/** Inverse of `projectHomePxThroughFit` — floorplan wrap percent -> home-
+ *  frame px. Used to turn a Pin&Go/Zone click's on-screen percent into
+ *  `x_home_px`/`y_home_px` for the `frame: "home"` service call when a
+ *  vacuum is rendered via cesta B's fit instead of cesta A's identity crop
+ *  (mirrors `pctToCropPoint` being `pointInCrop`'s inverse for that case).
+ *  `frameDims`/`fit`/`ar` must be the SAME triple the forward projection
+ *  used — inverting against a stale fit or a different frame size silently
+ *  lands on the wrong point. */
+export function unprojectPctThroughFit(
+  pct: { x: number; y: number },
+  frameDims: { NW: number; NH: number },
+  fit: SeatFitResult,
+  ar: number,
+): { x: number; y: number } {
+  const u = { x: pct.x / 100, y: pct.y / 100 / ar };
+  const s = fit.scale / 100;
+  const theta = fit.rotation * RAD;
+  const cos = Math.cos(theta), sin = Math.sin(theta);
+  const c = { x: (50 + fit.offset_x) / 100, y: (50 + fit.offset_y) / 100 / ar };
+  const dx = u.x - c.x, dy = u.y - c.y;
+  const qx = (cos * dx + sin * dy) / s;
+  const qy = (-sin * dx + cos * dy) / s;
+  return { x: qx * frameDims.NW + frameDims.NW / 2, y: qy * frameDims.NW + frameDims.NH / 2 };
+}
+
+/** Same re-normalisation as `projectHomePxThroughFit`, for a whole polygon
+ *  at once — `rooms[].outline_home_px` run through a cesta-B fit instead of
+ *  cesta A's identity crop, mirroring `outlineInCrop`'s per-point-map shape
+ *  exactly (docs/14 rule 1: `projectHomePxThroughFit` is the one point
+ *  primitive both this and `outlineInCrop`'s crop-based sibling build on —
+ *  the two differ only in what "known transform" a point goes through, an
+ *  identity crop vs. a solved similarity fit). Not clamped, same reasoning
+ *  as `outlineInCrop`. */
+export function outlineThroughFit(
+  points: Array<[number, number] | { x: number; y: number }> | undefined | null,
+  frameDims: { NW: number; NH: number },
+  fit: SeatFitResult,
+  ar: number,
+): Array<{ x: number; y: number }> | null {
+  if (!points?.length) return null;
+  return points.map((p) => {
+    const x = Array.isArray(p) ? p[0] : p.x;
+    const y = Array.isArray(p) ? p[1] : p.y;
+    return projectHomePxThroughFit({ x, y }, frameDims, fit, ar);
+  });
 }

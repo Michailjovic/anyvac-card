@@ -49,22 +49,77 @@ export interface MapConfig {
   seat?: "auto" | "manual";
 }
 
+/** Docs/38 §4.1 (legacy) — `src` was cut from ONE vacuum's own map px space
+ *  (same space as that vacuum's `rooms[].bbox_px`); re-normalising anything
+ *  against this crop is only valid for `entity`'s own data. */
+export interface VacuumCropBox {
+  entity: string;
+  x0: number; y0: number; x1: number; y1: number;
+}
+
+/** Docs/40 §4.5 (Fáze 3) — `src` was cut from the SHARED home frame `frame_id`
+ *  names (integration `home_frame.id`), in that frame's own px space (same
+ *  space as `rooms[].bbox_home_px`/`outline_home_px` and
+ *  `vacuum_position_home_px`/`path_*_home_px`) — valid for EVERY vacuum
+ *  currently registered into that frame, not just one. Written automatically
+ *  by "Snapshot home frame as floorplan" (`anyvac.snapshot_map_as_floorplan`,
+ *  `frame: "home"`); read back by the card's merged-mode renderer
+ *  (`homeFrameCropFor`, seatfit.ts) to place every such vacuum's marker/path/
+ *  rooms with NO per-vacuum seat at all — one shared identity crop, docs/40
+ *  §4.4. A vacuum whose own `home_frame.id` doesn't match `frame_id` (a
+ *  different floor, or not registered yet) automatically falls back to its
+ *  own legacy per-vacuum seat instead — no separate config for that case. */
+export interface HomeFrameCropBox {
+  frame_id: string;
+  x0: number; y0: number; x1: number; y1: number;
+}
+
+/** One clicked point-pair for docs/40 §5.B's foreign-floorplan calibration —
+ *  `home_px` is where that physical point sits in the shared home frame
+ *  (usually snapped to a detected wall corner, `anyvac.snap_wall_corner`),
+ *  `floor_pct` is the SAME physical point clicked on the foreign floorplan
+ *  image, as wrap-container percent (0.1% precision, same convention as
+ *  room placement). Deliberately NOT a solved seat (contrast docs/39's
+ *  `map.seat: "manual"`, which stores rotation/scale/offset once and
+ *  forgets the points): storing the raw pairs lets `computeSeatFit`
+ *  re-solve the transform on every render, so calibration survives the
+ *  home frame's canvas growing later (`grow_frame_canvas`, backend) without
+ *  needing to re-click anything — the whole point of anchoring cesta B to
+ *  mm-stable home-frame data instead of a robot's own drifting px canvas. */
+export interface HomeFrameAnchor {
+  home_px: { x: number; y: number };
+  floor_pct: { x: number; y: number };
+}
+
 export interface ImageBaseConfig {
   src: string;
   rotation?: number;
   scale?: number;
   offset_x?: number;
   offset_y?: number;
-  /** Docs/38 §4.1 — the exact px-space crop box (integration's coordinate
-   *  space, same as `rooms[].bbox_px`) that `src` was cut from, and which
-   *  vacuum's map it came from. Written automatically by the "Use this
-   *  vacuum's current map as floorplan" button (docs/30 §8); read back by
-   *  "Place rooms from crop box" to re-normalise that vacuum's own rooms
-   *  against this exact crop (`placeRoomsInCrop`, seatfit.ts) and by
-   *  "Export guide layers" to ask the backend for guide PNGs pre-cropped to
-   *  match. Cleared (and left unset) whenever `src` no longer traces back to
-   *  a known crop — e.g. a hand-entered image URL. */
-  crop_box?: { entity: string; x0: number; y0: number; x1: number; y1: number };
+  /** Which px space `src` was cut from — a single vacuum's own (legacy,
+   *  `entity`) or the shared home frame's (`frame_id`, docs/40 Fáze 3). Only
+   *  ever one shape at a time; cleared (and left unset) whenever `src` no
+   *  longer traces back to a known crop — e.g. a hand-entered image URL. */
+  crop_box?: VacuumCropBox | HomeFrameCropBox;
+  /** docs/40 §5.B — N-point calibration anchors for a FOREIGN-origin
+   *  floorplan (photo/drawing) calibrated against the shared home frame
+   *  once, card-level (not per-vacuum, contrast docs/39's `map.seat`).
+   *  2+ pairs fully determine a similarity transform (free rotation + one
+   *  scale, offset), recomputed live every render — see `HomeFrameAnchor`.
+   *  Mutually pointless together with a `crop_box` (a snapshotted
+   *  floorplan is already an identity crop and needs no fit at all), but
+   *  harmless if both are somehow set — `homeFrameCropFor` takes priority
+   *  wherever a vacuum is home-frame-eligible either way. */
+  home_anchors?: HomeFrameAnchor[];
+  /** Which home frame `home_anchors` were clicked against (its
+   *  `home_frame.id`) — set automatically when the calibration flow saves.
+   *  Omit to fit against whichever frame the most configured vacuums are
+   *  currently registered into (same default `_select_home_frame`/
+   *  `anyvac.snap_wall_corner` use with no explicit `frame_id`) — fine for
+   *  the common single-frame home, only needed to disambiguate a real
+   *  multi-floor one with more than one active frame at once. */
+  home_anchors_frame_id?: string;
 }
 
 export interface RoomThreshold {
@@ -98,6 +153,15 @@ export interface RoomConfig {
   map_y?: number;
   map_w?: number;                    // šířka % → aktivuje rectangle mód
   map_h?: number;                    // výška %
+  /** COMPUTED ONLY, never config — docs/40 §4.4 (Fáze 3): this room's real
+   *  traced shape (`rooms[].outline_home_px`, kontrakt v3) re-normalised into
+   *  wrap-container percent points, when this room is live-merged from a
+   *  vacuum currently rendered via the shared home frame. `map_x/y/w/h`
+   *  above stay the click/select hit-target and icon anchor either way — an
+   *  outline is drawn ON TOP of that rectangle as a purely visual refinement,
+   *  never a replacement for it, so a room with no outline (bbox-only, or
+   *  legacy per-vacuum seat) renders exactly as before. */
+  outline_pct?: Array<{ x: number; y: number }>;
 }
 
 // ── Clean action strategies ───────────────────────────────────────────────

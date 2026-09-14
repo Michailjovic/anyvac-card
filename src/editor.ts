@@ -18,6 +18,7 @@ import type {
   GlobalAction,
   GlobalActionCall,
   RoomThreshold,
+  HomeFrameAnchor,
 } from "./types";
 import {
   EDITOR_NAME,
@@ -36,6 +37,9 @@ import {
   roomBboxToRect,
   buildCalibrationAnchors,
   computeSeatFit,
+  canvasScaleForCrop,
+  pctToCropPoint,
+  homeAnchorFit,
   type SeatParams,
   type ResolvedSeat,
   type RoomConfigLike,
@@ -75,6 +79,29 @@ type CalibState = {
 /** Soft cap on calibration point-pairs — plenty for averaging out click
  *  noise; mainly guards the UI against an unbounded list of markers. */
 const MAX_CALIB_PAIRS = 6;
+
+/** Cesta B calibration flow state (docs/40 §5.B) — the `CalibState` above's
+ *  twin for a FOREIGN-origin floorplan calibrated against the shared home
+ *  frame instead of one vacuum's own raw map. Three differences from
+ *  `CalibState`, all from docs/40 §5.B: (1) the "raw" side is an on-demand
+ *  snapshot of the home frame itself (`_homeCalibSnapshotUrl`/`_homeCalibCrop`/
+ *  `_homeCalibFrameId`, fetched once per flow via `_startHomeCalibration`),
+ *  shared across every vacuum rather than tied to one — hence this whole
+ *  flow lives OUTSIDE `CalibState`'s per-`vacIdx` shape; (2) each frame-side
+ *  click is snapped to the nearest wall corner by the backend
+ *  (`anyvac.snap_wall_corner`) before it's recorded, so `homePts` already
+ *  holds SNAPPED home-frame px, not raw click coordinates; (3) `_finish
+ *  HomeCalibration` writes the raw anchor PAIRS to `image_base.home_anchors`
+ *  (+ `home_anchors_frame_id`), never a solved seat — the fit is re-run live
+ *  every render (`homeAnchorFit`, seatfit.ts) against the frame's CURRENT
+ *  size, so it self-heals as the frame grows without asking the user to
+ *  re-click. `phase`/pairing convention otherwise mirrors `CalibState`
+ *  exactly (a pair completes once `floorPts` catches up with `homePts`). */
+type HomeCalibState = {
+  phase: "frame" | "floor";
+  homePts: { x: number; y: number }[];
+  floorPts: { x: number; y: number }[];
+};
 
 // ── Defaults ─────────────────────────────────────────────────────────────────
 
@@ -179,6 +206,17 @@ export class AnyVacCardEditor extends LitElement {
   @state() private _floorplanSnapshotBusy = false;
   @state() private _floorplanSnapshotError = "";
 
+  /** "Snapshot home frame as floorplan" (docs/40 §4.4, Fáze 3) — the
+   *  home-frame equivalent of `_snapshotFloorplan` above: instead of one
+   *  vacuum's own map, renders a composite of every vacuum currently
+   *  registered into the shared home frame (`anyvac.snapshot_map_as_
+   *  floorplan`, `frame: "home"`, integration ≥ 1.8.0) and records the
+   *  frame-shaped `crop_box` (`{frame_id, ...}`) that unlocks the card's
+   *  identity rendering for every such vacuum — no per-vacuum seating at
+   *  all (`homeFrameCropFor`, seatfit.ts). */
+  @state() private _homeFrameSnapshotBusy = false;
+  @state() private _homeFrameSnapshotError = "";
+
   /** "Export guide layers" (docs/37, 2026-09-10) — draws room-boundary/dry/
    *  wet-path guides as transparent PNGs in the SAME pixel canvas as the
    *  floorplan snapshot above, for tracing furniture in an external image
@@ -241,6 +279,27 @@ export class AnyVacCardEditor extends LitElement {
   @state() private _calibResult: { residual_pct: number } | null = null;
   @state() private _calibError = "";
 
+  /** Cesta B calibration from clicked points against the home frame (docs/40
+   *  §5.B) — a card-level flow (not tied to one `vacIdx`, unlike `_calib`
+   *  above), since `image_base.home_anchors` lives on the shared floorplan,
+   *  not on any one vacuum. See `HomeCalibState`'s own docstring for the
+   *  three differences from the docs/39 flow. */
+  @state() private _homeCalib: HomeCalibState | null = null;
+  /** On-demand home-frame snapshot fetched by `_startHomeCalibration` —
+   *  a SCRATCH reference image to click on, never written to `image_base`
+   *  (unlike the "Snapshot home frame as floorplan" button, which saves
+   *  its snapshot as the floorplan itself for cesta A). `_homeCalibCrop` is
+   *  the px extent (home-frame space) that snapshot actually renders —
+   *  needed to convert a click on the displayed image back into home-frame
+   *  px via `pctToCropPoint`, same re-normalisation `_clickToHomePx` (card)
+   *  uses for the same response shape. */
+  @state() private _homeCalibSnapshotUrl = "";
+  @state() private _homeCalibCrop: { x0: number; y0: number; x1: number; y1: number } | null = null;
+  @state() private _homeCalibFrameId = "";
+  @state() private _homeCalibBusy = false;
+  @state() private _homeCalibError = "";
+  @state() private _homeCalibResult: { residual_pct: number } | null = null;
+
   /** Active drag on a room's position dot / rectangle (2026-07-26 — was
    *  sliders-only, no way to see or drag the actual rectangle extent on the
    *  floorplan preview). `orig` is the room's state at drag START (not updated
@@ -294,6 +353,12 @@ export class AnyVacCardEditor extends LitElement {
     // cancel it outright rather than trying to carry it across.
     if ((changed.has("_tab") || changed.has("_mapVac")) && this._calib) {
       this._calib = null;
+    }
+    // docs/40 §5.B: card-level, not tied to `_mapVac` — only cancel on
+    // leaving the Maps tab entirely, not on switching which vacuum pill is
+    // selected (unlike `_calib` above).
+    if (changed.has("_tab") && this._homeCalib) {
+      this._homeCalib = null;
     }
   }
 
@@ -372,6 +437,49 @@ export class AnyVacCardEditor extends LitElement {
     }
   }
 
+  /** Home-frame equivalent of `_snapshotFloorplan` above (docs/40 §4.4,
+   *  Fáze 3) — no `image_entity`: the backend renders a composite of every
+   *  vacuum currently registered into the shared home frame instead of one
+   *  vacuum's own map. No room placement afterwards, unlike the legacy
+   *  flow above — a home-frame vacuum's rooms are computed live from
+   *  `bbox_home_px`/`outline_home_px` every render (`homeFrameCropFor`,
+   *  seatfit.ts), never a one-shot static placement. */
+  private async _snapshotHomeFrame(): Promise<void> {
+    this._homeFrameSnapshotBusy = true;
+    this._homeFrameSnapshotError = "";
+    try {
+      const res = (await (this.hass as any).callService(
+        "anyvac", "snapshot_map_as_floorplan",
+        { frame: "home", name: "home_frame" },
+        undefined, false, true,
+      )) as {
+        response?: {
+          path?: string; frame_id?: string;
+          crop?: { x0: number; y0: number; x1: number; y1: number };
+        };
+      } | undefined;
+      const path = res?.response?.path;
+      const frameId = res?.response?.frame_id;
+      const crop = res?.response?.crop;
+      if (!path || !frameId || !crop) throw new Error("incomplete response — integration too old?");
+      this._setEditedImageBase({ src: path, crop_box: { frame_id: frameId, ...crop } });
+      // Same rationale as `_snapshotFloorplan`: once the shared floorplan
+      // shows every registered vacuum's floor/walls already, each vacuum's
+      // own raw map overlay adds nothing but noise on top of it.
+      const vacuums = this._config.vacuums.map((v) => ({ ...v, hide_map: true }));
+      this._setConfig({ vacuums });
+    } catch (err) {
+      this._homeFrameSnapshotError =
+        "Couldn't snapshot the home frame — make sure at least two vacuums have a " +
+        "home-frame registration (integration ≥ 1.8.0, check the 'registration' " +
+        "sensor attribute), then try again.";
+      // eslint-disable-next-line no-console
+      console.error("[anyvac-card] snapshot_map_as_floorplan (frame: home) failed:", err);
+    } finally {
+      this._homeFrameSnapshotBusy = false;
+    }
+  }
+
   /** Calls `anyvac.export_map_guide` (docs/37) for `vac`'s currently-resolved
    *  map image entity — the same entity `_snapshotFloorplan` above uses, so
    *  the guide layers line up with the floorplan photo it produced. No
@@ -391,7 +499,7 @@ export class AnyVacCardEditor extends LitElement {
     this._guideExportError = "";
     this._guideExportResult = null;
     const cropBox = this._currentImageBase()?.crop_box;
-    const sendCrop = cropBox && cropBox.entity === vac.entity
+    const sendCrop = cropBox && "entity" in cropBox && cropBox.entity === vac.entity
       ? { x0: cropBox.x0, y0: cropBox.y0, x1: cropBox.x1, y1: cropBox.y1 }
       : undefined;
     try {
@@ -662,6 +770,28 @@ export class AnyVacCardEditor extends LitElement {
       return !!st && st.state !== "unavailable" && st.state !== "unknown" && !!st.attributes["entity_picture"];
     });
     return live.length === 1 ? live[0] : (candidates.length === 1 ? candidates[0] : undefined);
+  }
+
+  /** The home frame to calibrate cesta B against (docs/40 §5.B) — mirrors
+   *  the card's own `_homeFrameDims()` (anyvac-card.ts) exactly: the frame
+   *  with the most currently-registered vacuums, read off each configured
+   *  vacuum's `home_frame` sensor attribute. No `home_anchors_frame_id`
+   *  override here (unlike the card) — that field only exists once cesta B
+   *  has already been calibrated once, and this is what establishes it. */
+  private _anyHomeFrame(): { id: string; w: number; h: number } | null {
+    const byId = new Map<string, { w: number; h: number; count: number }>();
+    for (const v of this._config.vacuums ?? []) {
+      const ie = this._intEntityFor(v);
+      const hf = (ie ? (this.hass.states[ie]?.attributes as Record<string, any> | undefined) : undefined)
+        ?.home_frame as { id?: string; width_px?: number; height_px?: number } | null | undefined;
+      if (!hf?.id || !(hf.width_px! > 0) || !(hf.height_px! > 0)) continue;
+      const cur = byId.get(hf.id);
+      if (cur) cur.count++;
+      else byId.set(hf.id, { w: hf.width_px!, h: hf.height_px!, count: 1 });
+    }
+    let best: { id: string; w: number; h: number; count: number } | null = null;
+    for (const [id, f] of byId) if (!best || f.count > best.count) best = { id, ...f };
+    return best ? { id: best.id, w: best.w, h: best.h } : null;
   }
 
   /** Backend-owned room cleaning sequence (docs/19): {room_key: 1-based position},
@@ -945,6 +1075,248 @@ export class AnyVacCardEditor extends LitElement {
     `;
   }
 
+  // ── Cesta B calibration against the home frame (docs/40 §5.B) ─────────────
+
+  /** Starts the flow: fetches an on-demand home-frame snapshot to click
+   *  against (SCRATCH reference, never saved to `image_base` — see
+   *  `_homeCalibSnapshotUrl`'s docstring) via the same `anyvac.snapshot_map_
+   *  as_floorplan` / `frame: "home"` call `_snapshotHomeFrame` uses to build
+   *  the cesta A floorplan itself. */
+  private async _startHomeCalibration(): Promise<void> {
+    const frame = this._anyHomeFrame();
+    if (!frame) return;
+    this._homeCalibError = "";
+    this._homeCalibResult = null;
+    this._homeCalibBusy = true;
+    try {
+      const res = (await (this.hass as any).callService(
+        "anyvac", "snapshot_map_as_floorplan",
+        { frame: "home", name: "home_frame_calib" },
+        undefined, false, true,
+      )) as {
+        response?: {
+          path?: string; frame_id?: string;
+          crop?: { x0: number; y0: number; x1: number; y1: number };
+        };
+      } | undefined;
+      const path = res?.response?.path;
+      const frameId = res?.response?.frame_id;
+      const crop = res?.response?.crop;
+      if (!path || !frameId || !crop) throw new Error("incomplete response — integration too old?");
+      this._homeCalibSnapshotUrl = path;
+      this._homeCalibCrop = crop;
+      this._homeCalibFrameId = frameId;
+      this._homeCalib = { phase: "frame", homePts: [], floorPts: [] };
+      this._mapRoom = null;
+    } catch (err) {
+      this._homeCalibError =
+        "Couldn't snapshot the home frame for calibration — make sure at least one vacuum has a " +
+        "home-frame registration (check its 'home_frame' sensor attribute) and the anyvac " +
+        "integration is at least 1.9.0, then try again.";
+      // eslint-disable-next-line no-console
+      console.error("[anyvac-card] snapshot_map_as_floorplan (frame: home, calib) failed:", err);
+    } finally {
+      this._homeCalibBusy = false;
+    }
+  }
+
+  private _cancelHomeCalibration(): void {
+    this._homeCalib = null;
+  }
+
+  /** Click on the home-frame snapshot (`phase === "frame"`) — converts the
+   *  click into home-frame px via `pctToCropPoint` against `_homeCalibCrop`
+   *  (the exact px extent that snapshot rendered, same re-normalisation the
+   *  card's `_clickToHomePx` uses for the same response shape), then snaps
+   *  it to the nearest wall corner via the backend `anyvac.snap_wall_corner`
+   *  service (docs/40 §5.B) before recording it — this is what removes most
+   *  of the click noise docs/39 §8-9 otherwise fights statistically. A
+   *  failed/unavailable snap falls back to the unsnapped point rather than
+   *  losing the click outright (an older integration without the service,
+   *  or a frame with no wall data yet — `_snap_wall_corner`'s own
+   *  `snapped: false` echo covers the latter and never reaches here as an
+   *  error at all). */
+  private async _onHomeCalibFrameClick(e: MouseEvent): Promise<void> {
+    const c = this._homeCalib;
+    const crop = this._homeCalibCrop;
+    if (!c || c.phase !== "frame" || !crop || c.homePts.length >= MAX_CALIB_PAIRS || this._homeCalibBusy) return;
+    const rect = (e.currentTarget as HTMLElement).getBoundingClientRect();
+    const pct = { x: ((e.clientX - rect.left) / rect.width) * 100, y: ((e.clientY - rect.top) / rect.height) * 100 };
+    const raw = pctToCropPoint(pct, crop);
+    if (!raw) return;
+    this._homeCalibBusy = true;
+    try {
+      const res = (await (this.hass as any).callService(
+        "anyvac", "snap_wall_corner",
+        { frame_id: this._homeCalibFrameId, x_home_px: raw.x, y_home_px: raw.y },
+        undefined, false, true,
+      )) as { response?: { x_home_px?: number; y_home_px?: number } } | undefined;
+      const px = res?.response?.x_home_px ?? raw.x;
+      const py = res?.response?.y_home_px ?? raw.y;
+      this._homeCalib = { ...c, homePts: [...c.homePts, { x: px, y: py }], phase: "floor" };
+    } catch (err) {
+      this._homeCalib = { ...c, homePts: [...c.homePts, raw], phase: "floor" };
+      // eslint-disable-next-line no-console
+      console.error("[anyvac-card] snap_wall_corner failed, using unsnapped click:", err);
+    } finally {
+      this._homeCalibBusy = false;
+    }
+  }
+
+  /** Click on the floorplan calibration preview (`phase === "floor"`) —
+   *  identical container-percentage convention to `_onCalibFloorClick`. */
+  private _onHomeCalibFloorClick(e: MouseEvent): void {
+    const c = this._homeCalib;
+    if (!c || c.phase !== "floor") return;
+    const rect = (e.currentTarget as HTMLElement).getBoundingClientRect();
+    const x = round1(clampPct(((e.clientX - rect.left) / rect.width) * 100));
+    const y = round1(clampPct(((e.clientY - rect.top) / rect.height) * 100));
+    this._homeCalib = { ...c, floorPts: [...c.floorPts, { x, y }], phase: "frame" };
+  }
+
+  /** Removes the last clicked point, whichever image it's on — mirrors
+   *  `_undoCalibPoint`. */
+  private _undoHomeCalibPoint(): void {
+    const c = this._homeCalib;
+    if (!c) return;
+    if (c.phase === "floor" && c.homePts.length > c.floorPts.length) {
+      this._homeCalib = { ...c, homePts: c.homePts.slice(0, -1), phase: "frame" };
+    } else if (c.floorPts.length > 0) {
+      this._homeCalib = { ...c, floorPts: c.floorPts.slice(0, -1) };
+    }
+  }
+
+  /** Live fit-error preview over whatever complete pairs exist so far —
+   *  mirrors `_calibPreview`, but calls `homeAnchorFit` directly (the exact
+   *  function the card re-solves live every render, seatfit.ts) instead of
+   *  `buildCalibrationAnchors`+`computeSeatFit` separately, since the
+   *  persisted shape here already IS `{home_px, floor_pct}` anchor pairs —
+   *  one hop closer to what actually gets saved (docs/14 rule 1). */
+  private _homeCalibPreview(calib: HomeCalibState): { residual_pct: number } | null {
+    const n = Math.min(calib.homePts.length, calib.floorPts.length);
+    const frame = this._anyHomeFrame();
+    if (n < 2 || !frame) return null;
+    const anchors: HomeFrameAnchor[] = calib.homePts.slice(0, n).map((p, i) => ({ home_px: p, floor_pct: calib.floorPts[i] }));
+    const fit = homeAnchorFit(anchors, { NW: frame.w, NH: frame.h }, this._editorAR());
+    return fit ? { residual_pct: Math.round(fit.residual_pct * 10) / 10 } : null;
+  }
+
+  /** Writes every complete pair collected so far as `image_base.home_anchors`
+   *  (+ `home_anchors_frame_id`) — the raw PAIRS, never a solved seat (docs/40
+   *  §5.B: the fit is re-run live every render against the frame's CURRENT
+   *  size, so it survives the frame growing without re-clicking). Also turns
+   *  "Hide vacuum map" on for every vacuum, same one-shot side effect
+   *  `_snapshotHomeFrame` already applies for cesta A — once the floorplan is
+   *  calibrated against the home frame, every registered vacuum's own raw
+   *  map overlay is redundant noise on top of it. */
+  private _finishHomeCalibration(): void {
+    const c = this._homeCalib;
+    if (!c) return;
+    const n = Math.min(c.homePts.length, c.floorPts.length);
+    this._homeCalib = null;
+    if (n < 2) {
+      this._homeCalibError = "Need at least 2 complete point pairs — try again.";
+      return;
+    }
+    const frame = this._anyHomeFrame();
+    if (!frame) {
+      this._homeCalibError = "No home frame available anymore — try again.";
+      return;
+    }
+    const anchors: HomeFrameAnchor[] = c.homePts.slice(0, n).map((p, i) => ({ home_px: p, floor_pct: c.floorPts[i] }));
+    const fit = homeAnchorFit(anchors, { NW: frame.w, NH: frame.h }, this._editorAR());
+    if (!fit) {
+      this._homeCalibError = "Couldn't compute a calibration from those points — " +
+        "make sure they're clearly apart, then try again.";
+      return;
+    }
+    this._setEditedImageBase({ home_anchors: anchors, home_anchors_frame_id: frame.id });
+    const vacuums = this._config.vacuums.map((v) => ({ ...v, hide_map: true }));
+    this._setConfig({ vacuums });
+    this._homeCalibError = "";
+    this._homeCalibResult = { residual_pct: Math.round(fit.residual_pct * 10) / 10 };
+  }
+
+  /** Renders the cesta B calibration flow as the same fixed full-viewport
+   *  overlay as `_renderCalibStep` (docs/39 §9) — the home-frame snapshot
+   *  (`phase === "frame"`) or the floorplan (`phase === "floor"`), each with
+   *  a click handler and a banner naming what to do next + the live
+   *  fit-error preview once ≥ 2 complete pairs exist. `pvOx/pvOy/pvScale/
+   *  pvRot` are the same floorplan placement values the normal preview uses,
+   *  same reasoning as `_renderCalibStep`. */
+  private _renderHomeCalibStep(
+    calib: HomeCalibState, previewUrl: string,
+    pvOx: number, pvOy: number, pvScale: number, pvRot: number,
+  ) {
+    const isFrame = calib.phase === "frame";
+    const pairs = Math.min(calib.homePts.length, calib.floorPts.length);
+    const nextPoint = pairs + 1;
+    const preview = this._homeCalibPreview(calib);
+    const crop = this._homeCalibCrop;
+    const frameAR = crop && (crop.y1 - crop.y0) > 0 ? (crop.x1 - crop.x0) / (crop.y1 - crop.y0) : 0;
+    const stageAR = isFrame ? frameAR : this._pvAR;
+    const atCap = calib.homePts.length >= MAX_CALIB_PAIRS;
+    return html`
+      <div class="calib-overlay">
+        <div class="calib-banner">
+          <span>
+            ${isFrame
+              ? (atCap
+                  ? html`<strong>${MAX_CALIB_PAIRS} points</strong> — that's the max. Save below, or Cancel.`
+                  : html`<strong>Point ${nextPoint}</strong> — click a distinctive spot (e.g. a wall corner) on
+                    the home frame${pairs > 0 ? ", away from the points already placed" : ""}.
+                    ${this._homeCalibBusy ? " Snapping…" : ""}`)
+              : html`<strong>Point ${pairs + 1}</strong> — click the SAME physical point on the floorplan.`}
+            ${preview ? html` Current fit error with ${pairs} point${pairs > 1 ? "s" : ""}:
+              <strong>${preview.residual_pct}%</strong>.` : nothing}
+          </span>
+          <span style="display:flex;gap:6px;flex-shrink:0">
+            ${(calib.homePts.length > 0 || calib.floorPts.length > 0) ? html`
+              <button class="btn btn--sm" @click=${() => this._undoHomeCalibPoint()}>Undo point</button>
+            ` : nothing}
+            ${pairs >= 2 ? html`
+              <button class="btn btn--add btn--sm" @click=${() => this._finishHomeCalibration()}>Save</button>
+            ` : nothing}
+            <button class="btn btn--sm" @click=${() => this._cancelHomeCalibration()}>Cancel</button>
+          </span>
+        </div>
+        <div class="calib-stage" style=${styleMap({ "--calib-ar": String(stageAR > 0.1 ? stageAR : 1.5) })}>
+          ${isFrame ? html`
+            <div class="map-pos-container">
+              <div class="map-preview-wrap">
+                <img class="map-preview-img" src=${this._homeCalibSnapshotUrl} alt="Home frame"
+                  style=${styleMap({ left: "0", top: "0", width: "100%", transform: "none" })}
+                  @click=${(e: MouseEvent) => this._onHomeCalibFrameClick(e)} />
+                ${calib.homePts.map((p, i) => crop ? html`
+                  <div class="calib-marker"
+                    style=${styleMap({
+                      left: (((p.x - crop.x0) / (crop.x1 - crop.x0)) * 100) + "%",
+                      top:  (((p.y - crop.y0) / (crop.y1 - crop.y0)) * 100) + "%",
+                    })}>${i + 1}</div>
+                ` : nothing)}
+              </div>
+            </div>
+          ` : html`
+            <div class="map-pos-container" @click=${(e: MouseEvent) => this._onHomeCalibFloorClick(e)}>
+              <div class="map-preview-wrap">
+                <img class="map-preview-img" src=${previewUrl} alt="Floorplan"
+                  style=${styleMap({
+                    left:      (50 + pvOx) + "%",
+                    top:       (50 + pvOy) + "%",
+                    width:     pvScale + "%",
+                    transform: "translate(-50%,-50%) rotate(" + pvRot + "deg)",
+                  })} />
+                ${calib.floorPts.map((p, i) => html`
+                  <div class="calib-marker" style=${styleMap({ left: p.x + "%", top: p.y + "%" })}>${i + 1}</div>
+                `)}
+              </div>
+            </div>
+          `}
+        </div>
+      </div>
+    `;
+  }
+
   /** docs/30 §8 "big seating rework" / docs/38 §4.2: places THIS vacuum's own
    *  rooms exactly onto a KNOWN floorplan crop — no seat, no dragging, no
    *  ambiguity, since the crop box is in the same bbox_px pixel space this
@@ -991,7 +1363,7 @@ export class AnyVacCardEditor extends LitElement {
    *  at right now. */
   private _placeRoomsFromCropBox(): void {
     const cb = this._currentImageBase()?.crop_box;
-    if (!cb) return;
+    if (!cb || !("entity" in cb)) return; // home-frame crop: rooms come live, no static placement
     const idx = this._config.vacuums.findIndex((v) => v.entity === cb.entity);
     if (idx < 0) return;
     const result = this._placeOwnRooms(idx, cb);
@@ -1724,13 +2096,37 @@ export class AnyVacCardEditor extends LitElement {
     const esLive = this._editorSeat(mapVac);
     const esOverlay = this._rectDrag?.seat ?? esLive;
     const cropBox = ib?.crop_box;
-    const cropMismatch = cropBox && this._pvNat
-      ? (Math.abs(this._pvNat.w - (cropBox.x1 - cropBox.x0)) > 2 || Math.abs(this._pvNat.h - (cropBox.y1 - cropBox.y0)) > 2)
-      : false;
-    const canPlaceFromCrop = !!cropBox
-      && this._config.vacuums.some((v) => v.entity === cropBox.entity)
+    // docs/40 §4.4-4.5 (Fáze 3): the two crop_box shapes drive very different
+    // UI below — a home-frame crop (`frame_id`) replaces per-vacuum seating
+    // entirely for whichever vacuums currently register into that frame,
+    // while a legacy vacuum crop (`entity`) keeps today's auto/manual seat +
+    // room-import flow untouched.
+    const homeFrameCrop = cropBox && "frame_id" in cropBox ? cropBox : undefined;
+    const vacCropBox = cropBox && "entity" in cropBox ? cropBox : undefined;
+    const vacHomeFrame = (this._intEntityFor(vac)
+      ? (this.hass.states[this._intEntityFor(vac)!]?.attributes as Record<string, any> | undefined)?.home_frame
+      : undefined) as { id?: string } | null | undefined;
+    // This specific vacuum is rendered via the shared home frame right now —
+    // same test the card's own `homeFrameCropFor` (seatfit.ts) makes at
+    // render time, so the editor's controls match what's actually drawn.
+    const isHomeFrame = !!homeFrameCrop && !!vacHomeFrame?.id && vacHomeFrame.id === homeFrameCrop.frame_id;
+    const registration = (this._intEntityFor(vac)
+      ? (this.hass.states[this._intEntityFor(vac)!]?.attributes as Record<string, any> | undefined)?.registration
+      : undefined) as { status?: string; rotation_deg?: number; score?: number } | null | undefined;
+    // docs/40 §5.A.1: a uniform re-export (same aspect ratio, different pixel
+    // size — the user re-saved the floorplan at 2×, or a different DPI) is
+    // NOT a mismatch; only a genuinely different crop (aspect ratio changed
+    // too) still warns. `canvasScaleForCrop` returns the detected scale
+    // (harmless — nothing downstream reads it, see its own doc comment) or
+    // `null` for a real mismatch.
+    const vacCanvasScale = vacCropBox ? canvasScaleForCrop(this._pvNat, vacCropBox) : null;
+    const cropMismatch = !!vacCropBox && !!this._pvNat && vacCanvasScale === null;
+    const homeFrameCanvasScale = homeFrameCrop ? canvasScaleForCrop(this._pvNat, homeFrameCrop) : null;
+    const homeFrameCropMismatch = !!homeFrameCrop && !!this._pvNat && homeFrameCanvasScale === null;
+    const canPlaceFromCrop = !!vacCropBox
+      && this._config.vacuums.some((v) => v.entity === vacCropBox.entity)
       && (() => {
-        const cbVac = this._config.vacuums.find((v) => v.entity === cropBox.entity);
+        const cbVac = this._config.vacuums.find((v) => v.entity === vacCropBox.entity);
         const ie = this._intEntityFor(cbVac);
         const at = ie ? (this.hass.states[ie]?.attributes as Record<string, any> | undefined) : undefined;
         return Array.isArray(at?.rooms) && at!.rooms.some((r: any) => !!r?.bbox_px);
@@ -1781,6 +2177,40 @@ export class AnyVacCardEditor extends LitElement {
 
         ${vac.base === "image" || vac.base === "combined" || this._config.map_mode === "merged" ? html`
           ${this._config.map_mode === "merged" ? html`<div class="section-title">Shared floorplan (all vacuums)</div>` : nothing}
+          ${this._config.map_mode === "merged" ? html`
+            <button class="btn btn--sm" style="align-self:flex-start"
+              ?disabled=${this._homeFrameSnapshotBusy}
+              @click=${() => this._snapshotHomeFrame()}>
+              <ha-icon icon="mdi:vector-combine"></ha-icon>
+              ${this._homeFrameSnapshotBusy ? "Snapshotting…" : "Snapshot home frame as floorplan"}
+            </button>
+            <p class="hint">Docs/40 Fáze 3 — the recommended way to set up merged mode with 2+ vacuums:
+              renders a composite of every vacuum currently registered into the shared "home frame"
+              (see each vacuum's <code>registration</code> sensor attribute) and turns it into the
+              floorplan below. No per-vacuum seating needed afterwards — a vacuum registered into this
+              frame draws its robot/path/rooms at their exact real position automatically, and a vacuum
+              that ISN'T (different floor, just restarted) falls back to the seating controls below on
+              its own. Requires anyvac integration ≥ 1.8.0.</p>
+            ${this._homeFrameSnapshotError ? html`<p class="hint" style="color:#ff6b6b">${this._homeFrameSnapshotError}</p>` : nothing}
+            ${homeFrameCrop ? html`
+              <p class="hint">Home frame: <code>${homeFrameCrop.frame_id}</code> ·
+                ${homeFrameCrop.x0},${homeFrameCrop.y0}–${homeFrameCrop.x1},${homeFrameCrop.y1}
+                (${homeFrameCrop.x1 - homeFrameCrop.x0}×${homeFrameCrop.y1 - homeFrameCrop.y0}px)
+                <span class="footer-link" style="margin-left:6px" @click=${() => this._setEditedImageBase({ crop_box: undefined })}>Clear</span>
+              </p>
+              ${homeFrameCropMismatch && this._pvNat ? html`
+                <p class="hint" style="color:#faad14">⚠️ The saved floorplan file is
+                  ${this._pvNat.w}×${this._pvNat.h}px, which doesn't match this home frame's
+                  ${homeFrameCrop.x1 - homeFrameCrop.x0}×${homeFrameCrop.y1 - homeFrameCrop.y0}px — rooms and
+                  markers placed on it won't line up. Re-snapshot the home frame, or Clear it above.</p>
+              ` : (homeFrameCanvasScale !== null && Math.abs(homeFrameCanvasScale - 1) > 0.01 ? html`
+                <p class="hint">ℹ️ File is a ${homeFrameCanvasScale.toFixed(2)}× export of this home frame
+                  (same shape, different resolution) — recognized automatically, no need to re-snapshot.</p>
+              ` : nothing)}
+            ` : nothing}
+            <div class="section-title">or, a floorplan photo of your own</div>
+          ` : nothing}
+
           ${this._mapEntityFor(vac) ? html`
             <button class="btn btn--sm" style="align-self:flex-start"
               ?disabled=${this._floorplanSnapshotBusy}
@@ -1788,10 +2218,11 @@ export class AnyVacCardEditor extends LitElement {
               <ha-icon icon="mdi:camera"></ha-icon>
               ${this._floorplanSnapshotBusy ? "Snapshotting…" : "Use this vacuum's current map as floorplan"}
             </button>
-            <p class="hint">No floor plan photo of your own? This saves ${vac.name || vac.entity}'s
-              current map as a static image and sets it as the floorplan below — the easiest way to
-              get auto-fit working across multiple vacuums. Also places ${vac.name || vac.entity}'s own
-              rooms on it automatically (no dragging needed) and turns "Hide vacuum map" on for
+            <p class="hint">No floor plan photo of your own, and no home frame yet either? This saves
+              ${vac.name || vac.entity}'s current map as a static image and sets it as the floorplan
+              below — the easiest way to get auto-fit working across multiple vacuums. Also places
+              ${vac.name || vac.entity}'s own rooms on it automatically (no dragging needed) and turns
+              "Hide vacuum map" on for
               ${this._config.map_mode === "merged" ? "every vacuum sharing this floorplan" : "this vacuum"}.
               Pick your fullest-coverage vacuum for this step, then switch to each other vacuum below —
               any of its rooms whose name matches one already placed auto-fits with nothing else to do;
@@ -1799,7 +2230,7 @@ export class AnyVacCardEditor extends LitElement {
             ${this._floorplanSnapshotError ? html`<p class="hint" style="color:#ff6b6b">${this._floorplanSnapshotError}</p>` : nothing}
           ` : nothing}
 
-          ${this._mapEntityFor(vac) ? html`
+          ${this._mapEntityFor(vac) && !homeFrameCrop ? html`
             <div class="section-title">Custom floorplan helper</div>
             <button class="btn btn--sm" style="align-self:flex-start"
               ?disabled=${this._guideExportBusy}
@@ -1816,7 +2247,7 @@ export class AnyVacCardEditor extends LitElement {
                 this._guideExportResult.crop ? html` · crop ${this._guideExportResult.crop.x0},${this._guideExportResult.crop.y0}–${this._guideExportResult.crop.x1},${this._guideExportResult.crop.y1}` : nothing} —
                 ${Object.entries(this._guideExportResult.paths).map(([layer, url], i) => html`${i > 0 ? " · " : ""}<a href=${url} target="_blank" rel="noopener">${layer}</a>`)}
               </p>
-              ${this._guideExportResult.crop && (!cropBox || cropBox.entity !== this._guideExportResult.entity) ? html`
+              ${this._guideExportResult.crop && (!vacCropBox || vacCropBox.entity !== this._guideExportResult.entity) ? html`
                 <button class="btn btn--sm" style="align-self:flex-start"
                   @click=${() => this._setEditedImageBase({
                     crop_box: { entity: this._guideExportResult!.entity, ...this._guideExportResult!.crop! },
@@ -1826,18 +2257,21 @@ export class AnyVacCardEditor extends LitElement {
               ` : nothing}
             ` : nothing}
 
-            ${cropBox ? html`
-              <p class="hint">Crop box: <code>${cropBox.entity}</code> ·
-                ${cropBox.x0},${cropBox.y0}–${cropBox.x1},${cropBox.y1}
-                (${cropBox.x1 - cropBox.x0}×${cropBox.y1 - cropBox.y0}px)
+            ${vacCropBox ? html`
+              <p class="hint">Crop box: <code>${vacCropBox.entity}</code> ·
+                ${vacCropBox.x0},${vacCropBox.y0}–${vacCropBox.x1},${vacCropBox.y1}
+                (${vacCropBox.x1 - vacCropBox.x0}×${vacCropBox.y1 - vacCropBox.y0}px)
                 <span class="footer-link" style="margin-left:6px" @click=${() => this._setEditedImageBase({ crop_box: undefined })}>Clear</span>
               </p>
               ${cropMismatch && this._pvNat ? html`
                 <p class="hint" style="color:#faad14">⚠️ The saved floorplan file is
                   ${this._pvNat.w}×${this._pvNat.h}px, which doesn't match this crop box's
-                  ${cropBox.x1 - cropBox.x0}×${cropBox.y1 - cropBox.y0}px — rooms placed from it
+                  ${vacCropBox.x1 - vacCropBox.x0}×${vacCropBox.y1 - vacCropBox.y0}px — rooms placed from it
                   won't line up. Re-snapshot the floorplan, or Clear the crop box above.</p>
-              ` : nothing}
+              ` : (vacCanvasScale !== null && Math.abs(vacCanvasScale - 1) > 0.01 ? html`
+                <p class="hint">ℹ️ File is a ${vacCanvasScale.toFixed(2)}× export of this crop
+                  (same shape, different resolution) — recognized automatically, no need to re-snapshot.</p>
+              ` : nothing)}
               <button class="btn btn--sm" style="align-self:flex-start"
                 ?disabled=${!canPlaceFromCrop}
                 title=${canPlaceFromCrop ? "" : "Needs the crop's own vacuum configured here, with the integration reporting at least one room"}
@@ -1859,6 +2293,36 @@ export class AnyVacCardEditor extends LitElement {
           ${this._numberSlider("Image scale", ib?.scale ?? 100, 50, 200, 5, v => this._setEditedImageBase({ scale: v }), "%")}
           ${this._numberSlider("Image offset X", ib?.offset_x ?? 0, -50, 50, 1, v => this._setEditedImageBase({ offset_x: v }), "%")}
           ${this._numberSlider("Image offset Y", ib?.offset_y ?? 0, -50, 50, 1, v => this._setEditedImageBase({ offset_y: v }), "%")}
+
+          ${this._config.map_mode === "merged" && !homeFrameCrop && ib?.src && this._anyHomeFrame() ? html`
+            <div class="section-title">Calibrate against home frame (docs/40 §5.B)</div>
+            <button class="btn btn--sm" style="align-self:flex-start"
+              ?disabled=${this._homeCalibBusy}
+              @click=${() => this._startHomeCalibration()}>
+              <ha-icon icon="mdi:crosshairs-gps"></ha-icon>
+              ${this._homeCalibBusy ? "Snapshotting…" : "Calibrate floorplan against home frame"}
+            </button>
+            <p class="hint">For a floorplan of your own (photo/drawing) rather than a home-frame
+              snapshot: click the same physical point once on a live snapshot of the shared home
+              frame (each click snaps to the nearest wall corner automatically) and once on the
+              floorplan above, repeated for at least 2 points — spread them out, corners of
+              different rooms work well. Unlike the floorplan photo itself, this calibration
+              re-fits itself automatically as the home frame's canvas grows over time (the robots
+              exploring further), so there's no need to re-click later. Also turns "Hide vacuum
+              map" on for every vacuum, same as the snapshot button above. Requires anyvac
+              integration ≥ 1.9.0 (the <code>anyvac.snap_wall_corner</code> service).</p>
+            ${this._homeCalibError ? html`<p class="hint" style="color:#ff6b6b">${this._homeCalibError}</p>` : nothing}
+            ${ib?.home_anchors?.length ? html`
+              <p class="hint">Calibrated: <strong>${ib.home_anchors.length}</strong> anchor point${ib.home_anchors.length > 1 ? "s" : ""}
+                against frame <code>${ib.home_anchors_frame_id}</code>
+                <span class="footer-link" style="margin-left:6px"
+                  @click=${() => this._setEditedImageBase({ home_anchors: undefined, home_anchors_frame_id: undefined })}>Clear</span>
+              </p>
+            ` : nothing}
+            ${this._homeCalibResult ? html`
+              <p class="hint">✅ Calibrated — fit error ${this._homeCalibResult.residual_pct}%.</p>
+            ` : nothing}
+          ` : nothing}
         ` : nothing}
 
         ${this._entityPicker("Map image entity", map.entity, ["image"],
@@ -1879,7 +2343,8 @@ export class AnyVacCardEditor extends LitElement {
             explores/remaps to update it.</p>
         ` : nothing}
 
-        ${this._calib && this._calib.vacIdx === mapVac ? this._renderCalibStep(this._calib, mapUrl, previewUrl, pvOx, pvOy, pvScale, pvRot)
+        ${this._homeCalib ? this._renderHomeCalibStep(this._homeCalib, previewUrl, pvOx, pvOy, pvScale, pvRot)
+        : this._calib && this._calib.vacIdx === mapVac ? this._renderCalibStep(this._calib, mapUrl, previewUrl, pvOx, pvOy, pvScale, pvRot)
         : previewUrl ? html`
           <div class="map-pos-container ${this._mapRoom !== null ? "map-pos-container--active" : ""}"
             @click=${(e: MouseEvent) => {
@@ -1962,68 +2427,82 @@ export class AnyVacCardEditor extends LitElement {
           </div>
 
           <div class="section-title">Map seating ${this._mergedEdit ? "(this vacuum)" : ""}</div>
-          ${this._selectField<"auto" | "manual">("Seating", (map.seat === "manual" ? "manual" : "auto"),
-            [{ value: "auto", label: "Auto — fit from rooms" },
-             { value: "manual", label: "Manual — sliders" }],
-            v => this._setMap(mapVac, { seat: v === "manual" ? "manual" : undefined }))}
-          ${map.seat !== "manual" ? (esLive.auto ? html`
-            <p class="hint">✅ Auto-fit from <strong>${esLive.anchorCount}</strong> room${(esLive.anchorCount ?? 0) > 1 ? "s" : ""}:
-              rot ${esLive.rotation}° · scale ${esLive.scale.toFixed(1)}% · offset ${esLive.offset_x.toFixed(1)}/${esLive.offset_y.toFixed(1)}%
-              · fit error ${(esLive.residual ?? 0).toFixed(1)}%${(esLive.residual ?? 0) > 3 ? " ⚠️ check room rectangles / keys" : ""}${
-              esLive.anchorCount === 1 ? " (single room — orientation estimated from its shape)" : ""}.
-              Recomputed live — self-heals after the robot remaps.${this._rectDrag ? " (overlay preview above is frozen until you release the drag)" : ""}</p>
+          ${isHomeFrame ? html`
+            <p class="hint">✅ Rendered via the shared home frame — no seating needed. Status:
+              <strong>${registration?.status ?? "aligned"}</strong>${registration?.rotation_deg != null ? html` · rot ${registration.rotation_deg}°` : nothing}${
+              registration?.score != null ? html` · score ${(registration.score * 100).toFixed(0)}%` : nothing}.
+              Its rooms, robot position and cleaning path are drawn at their exact real position
+              automatically (docs/40 kontrakt v3) — the auto/manual seating and room-import controls
+              below don't apply to it while this stays true.</p>
           ` : html`
-            <p class="hint">Auto-fit inactive — it needs the integration sensor, a floorplan and at least one
-              room rectangle whose key matches a room name on this robot's map. Using the manual values below.</p>
-          `) : nothing}
-          ${mapUrl && previewUrl && useImg ? html`
-            <button class="btn btn--sm" style="align-self:flex-start"
-              @click=${() => this._startCalibration(mapVac)}>
-              <ha-icon icon="mdi:crosshairs-gps"></ha-icon> Calibrate from clicked points
-            </button>
-            <p class="hint">If auto-fit's fit error stays high no matter how the room rectangles are tuned,
-              the rectangles' shapes likely don't match this robot's real rooms yet — no amount of rotation/
-              scale can fix that. This bootstraps a correct seat instead: click the same physical point once
-              on this vacuum's own map and once on the floorplan, repeated for at least 2 points — each pair
-              you add shows its effect on the fit error live, so click a couple more if it's not tight enough
-              yet (spread them out — corners of different rooms work well). Save once you're happy with the
-              number, then use "Import missing rooms" below to place this vacuum's rooms correctly; other
-              vacuums often auto-fit correctly too, once the floorplan's rectangles are accurate.</p>
-          ` : nothing}
-          ${this._calibResult ? html`
-            <p class="hint">✅ Calibrated — fit error ${this._calibResult.residual_pct}%. Now use
-              "Import missing rooms from this vacuum" below to place its rooms.</p>
-          ` : nothing}
-          ${this._calibError ? html`<p class="hint" style="color:#ff6b6b">${this._calibError}</p>` : nothing}
-          ${vacuums.length > 1 && rooms.length > 0 ? (() => {
-            const unmatched = this._unmatchedOwnRoomNames(mapVac);
-            return unmatched.length ? html`
-              <p class="hint" style="color:#faad14">⚠️ This vacuum reports room${unmatched.length > 1 ? "s" : ""}
-                not on the shared floorplan yet: <strong>${unmatched.join(", ")}</strong>. If any of these are the
-                same physical room as one already listed above under a different name, rename it to match in the
-                Roborock app (room pairing is by exact name across vacuums) — otherwise use Import below to add it.</p>
-            ` : nothing;
-          })() : nothing}
-          ${(map.seat === "manual" || !esLive.auto) ? html`
-            ${this._numberSlider("Rotation",  map.rotation  ?? 0,    0, 360,  90, v => this._setMap(mapVac, { rotation:  v }), "°")}
-            ${/* docs/39 §9: widened from 50-200 — a badly-fit auto-seat before calibration
-                (or a floorplan photographed at a very different scale from the robot's own
-                map) can genuinely need several hundred percent; the slider should be able to
-                show and adjust whatever calibration or auto-fit actually solved, not clamp it. */ nothing}
-            ${this._numberSlider("Scale",     map.scale     ?? 100, 20, 800,  5, v => this._setMap(mapVac, { scale:     v }), "%")}
-            ${this._numberSlider("Offset X",  map.offset_x  ?? 0, -150, 150,  1, v => this._setMap(mapVac, { offset_x:  v }), "%")}
-            ${this._numberSlider("Offset Y",  map.offset_y  ?? 0, -150, 150,  1, v => this._setMap(mapVac, { offset_y:  v }), "%")}
-          ` : nothing}
-          ${this._intEntityFor(vac) ? html`
-            <button class="btn btn--add btn--sm" style="align-self:flex-start"
-              @click=${() => this._importRooms(mapVac)}>
-              <ha-icon icon="mdi:import"></ha-icon> Import missing rooms from this vacuum
-            </button>
-            <p class="hint">Adds rooms this robot's map knows that aren't on the floorplan yet
-              (key = Roborock room name), placed through its current seat. Import from your
-              reference (whole-home) robot first; then switch to another robot to supplement
-              rooms only it has — it will be seated via the rooms you already share.</p>
-          ` : nothing}
+            ${homeFrameCrop ? html`
+              <p class="hint">This vacuum isn't currently registered into the <code>${homeFrameCrop.frame_id}</code>
+                home frame the floorplan above was snapshotted from${registration?.status ? html` (status:
+                <strong>${registration.status}</strong>)` : nothing} — falling back to its own seating below.</p>
+            ` : nothing}
+            ${this._selectField<"auto" | "manual">("Seating", (map.seat === "manual" ? "manual" : "auto"),
+              [{ value: "auto", label: "Auto — fit from rooms" },
+               { value: "manual", label: "Manual — sliders" }],
+              v => this._setMap(mapVac, { seat: v === "manual" ? "manual" : undefined }))}
+            ${map.seat !== "manual" ? (esLive.auto ? html`
+              <p class="hint">✅ Auto-fit from <strong>${esLive.anchorCount}</strong> room${(esLive.anchorCount ?? 0) > 1 ? "s" : ""}:
+                rot ${esLive.rotation}° · scale ${esLive.scale.toFixed(1)}% · offset ${esLive.offset_x.toFixed(1)}/${esLive.offset_y.toFixed(1)}%
+                · fit error ${(esLive.residual ?? 0).toFixed(1)}%${(esLive.residual ?? 0) > 3 ? " ⚠️ check room rectangles / keys" : ""}${
+                esLive.anchorCount === 1 ? " (single room — orientation estimated from its shape)" : ""}.
+                Recomputed live — self-heals after the robot remaps.${this._rectDrag ? " (overlay preview above is frozen until you release the drag)" : ""}</p>
+            ` : html`
+              <p class="hint">Auto-fit inactive — it needs the integration sensor, a floorplan and at least one
+                room rectangle whose key matches a room name on this robot's map. Using the manual values below.</p>
+            `) : nothing}
+            ${mapUrl && previewUrl && useImg ? html`
+              <button class="btn btn--sm" style="align-self:flex-start"
+                @click=${() => this._startCalibration(mapVac)}>
+                <ha-icon icon="mdi:crosshairs-gps"></ha-icon> Calibrate from clicked points
+              </button>
+              <p class="hint">If auto-fit's fit error stays high no matter how the room rectangles are tuned,
+                the rectangles' shapes likely don't match this robot's real rooms yet — no amount of rotation/
+                scale can fix that. This bootstraps a correct seat instead: click the same physical point once
+                on this vacuum's own map and once on the floorplan, repeated for at least 2 points — each pair
+                you add shows its effect on the fit error live, so click a couple more if it's not tight enough
+                yet (spread them out — corners of different rooms work well). Save once you're happy with the
+                number, then use "Import missing rooms" below to place this vacuum's rooms correctly; other
+                vacuums often auto-fit correctly too, once the floorplan's rectangles are accurate.</p>
+            ` : nothing}
+            ${this._calibResult ? html`
+              <p class="hint">✅ Calibrated — fit error ${this._calibResult.residual_pct}%. Now use
+                "Import missing rooms from this vacuum" below to place its rooms.</p>
+            ` : nothing}
+            ${this._calibError ? html`<p class="hint" style="color:#ff6b6b">${this._calibError}</p>` : nothing}
+            ${vacuums.length > 1 && rooms.length > 0 ? (() => {
+              const unmatched = this._unmatchedOwnRoomNames(mapVac);
+              return unmatched.length ? html`
+                <p class="hint" style="color:#faad14">⚠️ This vacuum reports room${unmatched.length > 1 ? "s" : ""}
+                  not on the shared floorplan yet: <strong>${unmatched.join(", ")}</strong>. If any of these are the
+                  same physical room as one already listed above under a different name, rename it to match in the
+                  Roborock app (room pairing is by exact name across vacuums) — otherwise use Import below to add it.</p>
+              ` : nothing;
+            })() : nothing}
+            ${(map.seat === "manual" || !esLive.auto) ? html`
+              ${this._numberSlider("Rotation",  map.rotation  ?? 0,    0, 360,  90, v => this._setMap(mapVac, { rotation:  v }), "°")}
+              ${/* docs/39 §9: widened from 50-200 — a badly-fit auto-seat before calibration
+                  (or a floorplan photographed at a very different scale from the robot's own
+                  map) can genuinely need several hundred percent; the slider should be able to
+                  show and adjust whatever calibration or auto-fit actually solved, not clamp it. */ nothing}
+              ${this._numberSlider("Scale",     map.scale     ?? 100, 20, 800,  5, v => this._setMap(mapVac, { scale:     v }), "%")}
+              ${this._numberSlider("Offset X",  map.offset_x  ?? 0, -150, 150,  1, v => this._setMap(mapVac, { offset_x:  v }), "%")}
+              ${this._numberSlider("Offset Y",  map.offset_y  ?? 0, -150, 150,  1, v => this._setMap(mapVac, { offset_y:  v }), "%")}
+            ` : nothing}
+            ${this._intEntityFor(vac) ? html`
+              <button class="btn btn--add btn--sm" style="align-self:flex-start"
+                @click=${() => this._importRooms(mapVac)}>
+                <ha-icon icon="mdi:import"></ha-icon> Import missing rooms from this vacuum
+              </button>
+              <p class="hint">Adds rooms this robot's map knows that aren't on the floorplan yet
+                (key = Roborock room name), placed through its current seat. Import from your
+                reference (whole-home) robot first; then switch to another robot to supplement
+                rooms only it has — it will be seated via the rooms you already share.</p>
+            ` : nothing}
+          `}
 
           ${(this._config.map_mode === "merged" && this._intEntityFor(vac) && rooms.length) ? (() => {
             const seqMap = this._roomSequence(vac);

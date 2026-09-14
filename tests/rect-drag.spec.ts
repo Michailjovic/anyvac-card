@@ -1,6 +1,6 @@
 import { test, expect } from "@playwright/test";
 import { moveRect, resizeRect, type RectPct } from "../src/rectdrag";
-import { placeRoomsInCrop, placeRoomInCrop } from "../src/seatfit";
+import { placeRoomsInCrop, placeRoomInCrop, canvasScaleForCrop } from "../src/seatfit";
 
 /**
  * docs/38 §3/§5 — pure-geometry regression tests for the editor's room-rect
@@ -129,5 +129,37 @@ test.describe("seatfit: placeRoomsInCrop", () => {
     expect(kitchen.map_y).toBe(direct.map_y);
     expect(kitchen.map_w).toBe(direct.map_w);
     expect(kitchen.map_h).toBe(direct.map_h);
+  });
+});
+
+test.describe("seatfit: canvasScaleForCrop (docs/40 §5.A.1)", () => {
+  test("a near-exact match (≤2px per axis) reports scale 1, not a fractional rounding artifact", () => {
+    const crop = { x0: 10, y0: 20, x1: 410, y1: 220 }; // 400x200
+    expect(canvasScaleForCrop({ w: 401, h: 199 }, crop)).toBe(1);
+    expect(canvasScaleForCrop({ w: 400, h: 200 }, crop)).toBe(1);
+  });
+
+  test("a uniform 2× re-export (same aspect ratio, doubled resolution) is recognized, not flagged", () => {
+    const crop = { x0: 0, y0: 0, x1: 600, y1: 400 }; // AR 1.5
+    expect(canvasScaleForCrop({ w: 1200, h: 800 }, crop)).toBe(2);
+  });
+
+  test("a uniform re-export at an odd factor still resolves to one consistent scale", () => {
+    const crop = { x0: 0, y0: 0, x1: 300, y1: 900 }; // AR 1/3
+    // 0.6x on both axes.
+    expect(canvasScaleForCrop({ w: 180, h: 540 }, crop)).toBeCloseTo(0.6, 5);
+  });
+
+  test("docs/40's own counter-example (351×1317 vs crop 352×1308, AR off by ~1%) is a real mismatch, not a re-export", () => {
+    const crop = { x0: 0, y0: 0, x1: 352, y1: 1308 };
+    expect(canvasScaleForCrop({ w: 351, h: 1317 }, crop)).toBeNull();
+  });
+
+  test("null/zero-sized inputs never crash and are treated as no scale relation", () => {
+    const crop = { x0: 0, y0: 0, x1: 400, y1: 200 };
+    expect(canvasScaleForCrop(null, crop)).toBeNull();
+    expect(canvasScaleForCrop({ w: 400, h: 200 }, null)).toBeNull();
+    expect(canvasScaleForCrop({ w: 0, h: 200 }, crop)).toBeNull();
+    expect(canvasScaleForCrop({ w: 400, h: 200 }, { x0: 0, y0: 0, x1: 0, y1: 200 })).toBeNull();
   });
 });

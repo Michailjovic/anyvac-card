@@ -118,6 +118,13 @@ Each entry in `vacuums[]`:
 | `offset_x` / `offset_y` | number | `0` | Manual seating only. |
 | `seat` | `"auto" \| "manual"` | `"auto"` | `auto` fits the vacuum's own map onto the shared floorplan from matching room anchors (needs the integration + a floorplan + at least one room whose name matches). `manual` uses `rotation`/`scale`/`offset_x`/`offset_y` above. |
 
+This whole table is **ignored, in merged mode, for a vacuum currently
+rendered via a shared [home frame](#home-frame-docs40-fáze-3--one-shared-identity-crop-instead-of-per-vacuum-seating)**
+— there's nothing left to seat once the integration has already
+co-registered it. It still applies normally in split mode, and as the
+automatic fallback for a home-frame-configured merged map whenever a given
+vacuum isn't (yet) registered into that frame.
+
 **Auto-fit stuck with a high fit error no matter how the room rectangles are tuned?**
 That usually means the rectangles' *shapes* don't match this robot's real rooms yet —
 no rotation/scale/offset can reconcile mismatched proportions. The Maps tab's
@@ -138,11 +145,69 @@ use **"Import missing rooms"** afterwards to place this vacuum's rooms from it.
 | `rotation` | number (deg) | `0` | |
 | `scale` | number | `1` | |
 | `offset_x` / `offset_y` | number | `0` | |
-| `crop_box` | `{entity, x0, y0, x1, y1}` | — | Written automatically by **"Use this vacuum's current map as floorplan"** and by **"Use this crop for the floorplan"** (after "Export guide layers") — records exactly which vacuum and which pixel crop (same space as the integration's `rooms[].bbox_px`) this `src` was cut from. Read back by **"Place rooms from crop box"** to re-place that vacuum's own rooms onto it with no dragging or fit ambiguity, and by `anyvac.export_map_guide` so guide layers line up with the saved file. Not meant to be hand-edited; **Clear** it (Maps tab) whenever `src` is replaced by an image that didn't come from one of those two buttons — e.g. a hand-entered URL, or a floorplan re-cropped outside the card — so stale geometry isn't assumed to still match. |
+| `crop_box` | `{entity, x0, y0, x1, y1}` (legacy, per-vacuum) or `{frame_id, x0, y0, x1, y1}` (home frame, docs/40 Fáze 3) | — | The legacy shape is written automatically by **"Use this vacuum's current map as floorplan"** and by **"Use this crop for the floorplan"** (after "Export guide layers") — records exactly which vacuum and which pixel crop (same space as that vacuum's own `rooms[].bbox_px`) this `src` was cut from, valid only for that one vacuum. The `frame_id` shape is written by the newer **"Snapshot home frame as floorplan"** button — records which shared **home frame** (integration `home_frame.id`) this `src` was cut from, in that frame's own px space (same space as `rooms[].bbox_home_px`/`outline_home_px` and `vacuum_position_home_px`/`path_*_home_px`) — valid for *every* vacuum currently registered into that frame, not just one. Either way: read back by **"Place rooms from crop box"** (or automatically after a home-frame snapshot) to place rooms with no dragging or fit ambiguity, and by `anyvac.export_map_guide` so guide layers line up with the saved file. Not meant to be hand-edited; **Clear** it (Maps tab) whenever `src` is replaced by an image that didn't come from one of those buttons — e.g. a hand-entered URL, or a floorplan re-cropped outside the card — so stale geometry isn't assumed to still match. |
+| `home_anchors` | `{home_px: {x, y}, floor_pct: {x, y}}[]` (docs/40 §5.B, "cesta B") | — | Written by the editor's **"Calibrate floorplan against home frame"** button (merged mode only) — a foreign-origin floorplan (a photo or drawing, `crop_box` absent) calibrated against the home frame by clicking a handful of matching points, rather than snapshotted directly from it. Unlike `crop_box`, this is not a single fixed rectangle: it's the raw clicked point PAIRS, re-fitted into a live similarity transform (rotation + scale + offset) every render against the frame's *current* `home_frame.width_px`/`height_px` — so it keeps working as the frame's canvas grows (the robots exploring further) without needing to re-click anything. Mutually exclusive with `crop_box` in practice (a floorplan is either a home-frame snapshot, cesta A, or hand-calibrated against one, cesta B — not both); not meant to be hand-edited, use the editor button. |
+| `home_anchors_frame_id` | string | — | Which home frame `home_anchors` were calibrated against (integration `home_frame.id`), written alongside `home_anchors`. Only needed to disambiguate a real multi-floor home with more than one active frame; when omitted, the card defaults to the frame with the most currently-registered vacuums (same policy the integration's own `_select_home_frame` uses). |
 
 **Merged mode without a floorplan** overlays every vacuum's raw map at 1:1
 scale, unaligned — the editor warns about this on the Map mode selector. Set
 a shared floorplan first.
+
+**Re-exported/re-saved floorplan file, same crop:** the editor's crop-box
+mismatch warning (either shape above) only fires for a genuine mismatch — a
+stale crop box from a different floorplan, or a file that was actually
+re-cropped. Opening the saved PNG in an image editor and re-exporting it at a
+different resolution (2×, a different DPI/screenshot scale, …) keeps the
+crop's own aspect ratio, and is recognized automatically (docs/40 §5.A.1):
+a quiet informational note replaces the warning, and nothing needs
+re-snapshotting or re-cropping.
+
+### Home frame (docs/40, Fáze 3) — one shared identity crop instead of per-vacuum seating
+
+When `image_base.crop_box` names a `frame_id` (via **"Snapshot home frame as
+floorplan"**, Maps tab), any vacuum whose own integration sensor currently
+reports a *matching* `home_frame.id` is rendered with **no per-vacuum seat at
+all** — its marker, dry/wet trace and room geometry are read straight from
+that vacuum's `vacuum_position_home_px`/`path_dry_home_px`/`path_wet_home_px`/
+`rooms[].bbox_home_px`/`outline_home_px` (kontrakt v3) and placed onto the
+floorplan through the shared crop alone — the exact same "known crop, no
+rotation" re-normalisation used elsewhere in this file, just shared across
+every robot instead of solved per vacuum. This is possible because the
+integration itself already co-registers every such vacuum into one frame
+(automatic self-calibration, docs/40) — the card has nothing left to fit.
+
+Per-vacuum `map.seat`/`rotation`/`scale`/`offset_*` (see [Map
+config](#map-config) below) are simply **ignored** for a vacuum in this
+state. A vacuum whose sensor doesn't currently report a matching
+`home_frame.id` — a different floor, an older integration, or one that
+hasn't finished registering yet — automatically falls back to its own
+legacy per-vacuum seat instead, in the very same merged map; there is no
+separate config for that case. Split mode is unaffected either way — each
+vacuum always renders in its own coordinate system there.
+
+A room's `outline_pct` (drawn as an additive real-shape outline on top of the
+usual rectangle hit-target) is likewise only ever populated for a room
+computed this way — it is never something you configure by hand.
+
+### Cesta B (docs/40 §5.B) — calibrating a floorplan of your own against the home frame
+
+The home-frame section above covers a floorplan snapshotted *from* the home
+frame (cesta A) — the recommended default. When you'd rather use a photo or
+drawing of your own instead, and at least one vacuum reports a `home_frame`
+sensor attribute, the Maps tab (merged mode) offers a second button:
+**"Calibrate floorplan against home frame"**. It walks through clicking the
+same handful of physical points once against a scratch snapshot of the home
+frame (each click snaps to the nearest wall corner automatically, removing
+most click noise) and once against your floorplan photo, then writes
+`home_anchors`/`home_anchors_frame_id` above — never a solved seat, so it
+self-heals as the frame's canvas grows without asking you to re-click.
+Every vacuum registered into that frame then renders through this live fit
+exactly the way a home-frame-registered vacuum renders through the identity
+crop above (marker, path, room rectangle + real outline, Pin & Go / Zone all
+resolve to `frame: "home"` + `x_home_px`/`y_home_px`) — an unregistered
+vacuum in the same map falls back to its own legacy per-vacuum seat, same as
+in cesta A. Requires anyvac integration ≥ 1.9.0 for the
+`anyvac.snap_wall_corner` service the click-snap step calls.
 
 ---
 
@@ -371,6 +436,7 @@ generated from
 | `anyvac.reset_learning` | Clear learned clean-time estimates and/or coverage baselines, e.g. after moving furniture or resetting a robot's map. |
 | `anyvac.dock_empty` / `dock_wash` / `dock_dry` / `dock_pump` / `dock_self_clean` | Manual dock control (empty dustbin, wash/dry mop, pump, Fill&Drain self-clean) — mirrors the manufacturer app's Dock Control sheet. Shown/hidden per vacuum based on detected dock capability. |
 | `anyvac.snapshot_map_as_floorplan` | Save a map image entity's current picture as a static file and return its URL — powers the Maps tab's "Use this vacuum's current map as floorplan" button. |
+| `anyvac.snap_wall_corner` | Snap a home-frame pixel point to the nearest wall corner (docs/40 §5.B) — powers the click-snap step of the Maps tab's "Calibrate floorplan against home frame" button. Requires integration ≥ 1.9.0. |
 
 `anyvac.run_job` also exists but is an internal executor (not documented
 here or in the editor) — use `anyvac.clean`/`anyvac.plan` instead.

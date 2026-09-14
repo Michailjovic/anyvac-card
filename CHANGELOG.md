@@ -8,6 +8,111 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Planned
 
+## [1.8.0] - 2026-09-14
+
+Paired with integration 1.9.0. Docs/40 §5.B ("cesta B" — calibrating a foreign-origin
+floorplan against the home frame), delivered alongside the backend's own snap-to-wall-corner
+support (integration 1.9.0). Detail: docs/40.
+
+### Added
+
+**N-point calibration of a foreign-origin floorplan (photo/drawing) against the home frame.**
+New editor flow ("Calibrate floorplan against home frame", Maps tab, merged mode) mirrors the
+existing docs/39 N-point calibration closely, with three differences: the state is card-level,
+not per-vacuum; clicks on the frame side go through an on-demand scratch snapshot
+(`anyvac.snapshot_map_as_floorplan` with `frame:"home"`, never saved to `image_base`) with each
+click snapped to the nearest wall corner via the new `anyvac.snap_wall_corner` service (falls
+back to the raw click on a service error, so a click is never lost); and what gets saved is the
+raw clicked pairs `image_base.home_anchors: {home_px, floor_pct}[]` (+ `home_anchors_frame_id`),
+not a solved seat.
+
+**`homeAnchorFit(anchors, frameDims, ar)` / `projectHomePxThroughFit` /
+`unprojectPctThroughFit` (exact inverse) / `outlineThroughFit`** (seatfit.ts) — the fit is
+recomputed live against the home frame's *current* canvas size on every render, so calibration
+self-heals as the frame's canvas grows (the robots exploring further) without asking the user
+to re-click anything. `_renderHomeAnchorOverlay` (anyvac-card.ts) draws through an SVG viewBox
+`0 0 100 (100/ar)` with `preserveAspectRatio="none"`, and reuses `roomBboxToRect`/
+`outlineThroughFit` with reshaped inputs for rooms — the same functions cesta A (home-frame
+identity crop) already uses, so there is no second room-projection implementation (docs/14
+rule 1). Pin & Go / zone clicks invert through `unprojectPctThroughFit`, same pattern as cesta
+A's `pctToCropPoint`.
+
+### Fixed
+
+**Card-level memoization (`_roomsMemo`/`_seatMemo`, since 1.1.0) was keyed only on `hass`
+object identity, never on `_mapAR`.** Both `_effectiveSeat` and `_computeRoomsFor`'s anchor-fit
+branch resolve `ar` via `_wrapAspect`, which falls back to `_mapAR` whenever `base_height` isn't
+configured — and `_mapAR` only learns the floorplan's real aspect ratio asynchronously, off the
+base image's own `load` event, completely independently of `hass` changing. A room computed
+before that `load` fires would cache its geometry at the fallback 3.636 ratio forever. Masked in
+real HA usage because `hass` is replaced almost every poll (an accidental self-correction, not a
+real fix); fully exposed by `tests/home-anchor-render.spec.ts`, whose single static `hass`
+object never changes again after mount. Fixed by adding a `_memoMapAR` field, invalidating the
+memo on either `hass` or `_mapAR` changing.
+
+New tests: `tests/home-anchor-fit.spec.ts` (6 — `homeAnchorFit`/projection/inverse, pure
+function), `tests/home-anchor-render.spec.ts` (6 — viewBox, marker, room rect/outline, Pin&Go,
+zone; all expected values hand-derived from the fixture geometry, not checked against the
+card's own code). `CONFIGURATION.md` updated (`home_anchors`/`home_anchors_frame_id` table
+rows, new "Cesta B" section, new service row). Full suite: 90/90 (77 + 13 new).
+
+## [1.7.1] - 2026-09-14
+
+Paired with integration 1.8.1 (unchanged — card-only release). Docs/40 §5.A.1: hardening the
+home-frame canvas-mismatch check, the piece the user picked from Fáze 3's deferred list. Detail:
+docs/40 §5.A.1.
+
+### Added
+
+**`canvasScaleForCrop(nat, crop)`** (seatfit.ts, shared by both `crop_box` shapes) tells a real
+crop-box mismatch apart from the saved floorplan PNG simply having been uniformly re-exported at
+a different resolution (same aspect ratio within ±0.3%, different pixel size — the user opened
+the file in an image editor and exported it at 2×, say). Returns `1` for a near-exact match
+(today's ±2px absolute tolerance, unchanged), a derived scale for a matching aspect ratio, and
+`null` for a genuine mismatch (a 351×1317 vs 352×1308 pair, whose aspect ratio differs by ~1%,
+correctly still returns `null` — that's a real crop, not a rescale). Nothing downstream reads
+the file's actual pixel dimensions (`pointInCrop` and friends always normalize against
+`crop_box`), so this is purely editor-side diagnostics: `cropMismatch` and the new
+`homeFrameCropMismatch` (editor.ts) now warn only on a genuine mismatch, showing a quiet
+informational note ("File is a 2.00× export…") instead when a clean rescale is recognized. Now
+covers BOTH `crop_box` shapes — previously only the legacy `{entity,…}` form had a mismatch
+check at all; the home-frame `{frame_id,…}` crop had none (a gap left over from Fáze 3's core
+scope, closed now).
+
+5 new tests in `tests/rect-drag.spec.ts` (`canvasScaleForCrop`, including the exact 351×1317 vs
+352×1308 example above). Full suite: 77/77 (72 + 5 new).
+
+## [1.7.0] - 2026-09-14
+
+Paired with integration 1.8.1 (registration heading fix landed the same day). Docs/40 Fáze 3 —
+merged-mode rendering against the home frame. Detail: docs/40.
+
+### Added
+
+**Merged mode renders a home-frame-registered vacuum through one identity crop instead of a
+per-vacuum fitted seat.** `_renderHomeFrameOverlay` (anyvac-card.ts) reads
+`vacuum_position_home_px`/`path_dry_home_px`/`path_wet_home_px` through `pointInCrop`/
+`outlineInCrop` (seatfit.ts) — no fit, no rotation; a vacuum in the same map that isn't
+registered against the home frame automatically falls back to the existing per-vacuum seat.
+Rooms draw from `bbox_home_px` (rectangle, via the existing `placeRoomInCrop` — unchanged
+function) and, additively, a real outline from `outline_home_px` (`RoomConfig.outline_pct`) —
+purely an extra layer over the rectangle, which stays the only click/select target. Pin & Go and
+zones for a home-frame vacuum invert the click through `pctToCropPoint` and call
+`goto`/`zone_clean` with `frame: "home"` plus `x_home_px`/`y_home_px` (or the zone corner
+equivalents) — ambient display rotation (docs/32, `_mapRotationDeg()`) still applies, but the
+per-vacuum seat inversion (`_unrotateDelta` via `.map-img`) drops out for this path. Config
+`image_base.crop_box` becomes a union of the legacy `{entity,…}` shape and a new
+`{frame_id,…}` shape, written automatically by the editor's "Snapshot home frame as floorplan"
+button (calls `anyvac.snapshot_map_as_floorplan` with `frame:"home"`, sets `hide_map:true` on
+every vacuum). Editor Maps tab simplified for a home-frame floorplan: the auto/manual seating
+switch, calibration buttons and manual sliders are hidden, leaving just the registration status
+line.
+
+New `tests/home-frame.spec.ts` (7 scenarios: viewBox, marker, room/outline, Pin&Go, zone,
+unregistered-vacuum fallback in the same map) — ground truth computed by hand from the crop
+numbers, not checked against the card's own code. `CONFIGURATION.md` updated (`crop_box` union,
+new "Home frame" section). Full suite: 72/72 (65 + 7 new).
+
 ## [1.6.2] - 2026-09-12
 
 Paired with integration 1.4.0 (unchanged) — this release is card-only. Detail: docs/39 §9.

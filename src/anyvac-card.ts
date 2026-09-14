@@ -37,7 +37,18 @@ import {
   resolveSeat,
   resolveStaticRooms,
   roomBboxToRect,
+  homeFrameCropFor,
+  pointInCrop,
+  pctToCropPoint,
+  outlineInCrop,
+  placeRoomInCrop,
+  homeAnchorFit,
+  projectHomePxThroughFit,
+  unprojectPctThroughFit,
+  outlineThroughFit,
   type SeatParams,
+  type SeatFitResult,
+  type CropBox,
 } from "./seatfit";
 import {
   pickProfile,
@@ -149,7 +160,12 @@ export class AnyVacCard extends LitElement {
    *  only ever populates one key; the merged multi-candidate flow (meta bar) may
    *  populate several at once — the user confirms on whichever vacuum's own
    *  status card they want to execute it. */
-  @state() private _zonePending: Record<string, { x1: number; y1: number; x2: number; y2: number }> | null = null;
+  /** `frame: "home"` marks a capture taken via `_clickToHomePx` (docs/40 §4.4,
+   *  Fáze 3) — x1/y1/x2/y2 are then home-frame PX, not `*_pct`, and
+   *  `_confirmZone` calls `zone_clean` with `frame: "home"` + `*_home_px`
+   *  instead of the legacy `*_pct` fields. Absent (legacy) for anything
+   *  captured through a per-vacuum seat (`_clickToContent`). */
+  @state() private _zonePending: Record<string, { x1: number; y1: number; x2: number; y2: number; frame?: "home" }> | null = null;
   /** Whether the current `_zoneRectShown`/`_zonePending` capture is the merged
    *  multi-candidate flow (meta bar, "*") vs. the legacy single-target flow
    *  (per-vacuum tools / split mode). Set once at draw time so post-drop editing
@@ -165,8 +181,10 @@ export class AnyVacCard extends LitElement {
     | { type: "nw" | "ne" | "sw" | "se" }
     | null = null;
   /** Pending pin(s) awaiting per-vacuum confirmation, keyed by entity_id — same
-   *  shape/reasoning as `_zonePending`, but for Pin & Go. */
-  @state() private _pinPending: Record<string, { x: number; y: number }> | null = null;
+   *  shape/reasoning as `_zonePending`, but for Pin & Go (`frame: "home"` same
+   *  meaning: x/y are home-frame PX, and `_confirmPin` calls `goto` with
+   *  `frame: "home"` + `x_home_px`/`y_home_px` instead of `x_pct`/`y_pct`). */
+  @state() private _pinPending: Record<string, { x: number; y: number; frame?: "home" }> | null = null;
   @state() private _layers: { dry: boolean; wet: boolean } = { dry: true, wet: false };
   @state() private _layerMenu: "dry" | "wet" | null = null;
   private _layerHoldTimer: number | null = null;
@@ -1279,15 +1297,36 @@ export class AnyVacCard extends LitElement {
    *  `willUpdate()`, it stays correct on the paths where no render happens at
    *  all: `shouldUpdate()` calls `_watchedEntities()` -> `_roomsFor()` BEFORE
    *  `willUpdate()` would run, and doesn't run it at all when it returns false.
-   *  `setConfig()` clears both maps too, for the config half of the inputs. */
+   *  `setConfig()` clears both maps too, for the config half of the inputs.
+   *
+   *  ALSO keyed on `_mapAR`: both `_effectiveSeat` and (docs/40 §5.B)
+   *  `_computeRoomsFor`'s anchor-fit branch resolve `ar` via `_wrapAspect`,
+   *  which falls back to `_mapAR` whenever no `base_height` is configured —
+   *  and `_mapAR` only learns the floorplan's real aspect asynchronously,
+   *  off the base image's own `load` event (`_onFloorplanLoad`), completely
+   *  independently of `hass` changing. Without this, a room placed before
+   *  that `load` fires would cache its geometry at the fallback 3.636 ratio
+   *  and never recompute — masked in real HA usage only because `hass` is
+   *  typically replaced again within a poll or two, self-correcting the
+   *  memo as an accidental side effect rather than a real fix (caught via
+   *  `tests/home-anchor-render.spec.ts`, whose single static `hass` never
+   *  changes again after mount). */
   private _memoHass: unknown;
+  private _memoMapAR = 0;
   private _roomsMemo = new Map<string, RoomConfig[]>();
   private _seatMemo = new Map<string, ReturnType<typeof resolveSeat>>();
+  /** docs/40 §4.4 (Fáze 3) — per-vacuum home-frame identity crop, memoized the
+   *  same way as `_seatMemo` (`null` is a valid cached "not home-frame right
+   *  now" result, so the map's own `.has()` — not a falsy check — gates the
+   *  cache hit; see `_homeFrameCropFor`). */
+  private _homeFrameMemo = new Map<string, CropBox | null>();
   private _memoSync(): void {
-    if (this.hass !== this._memoHass) {
+    if (this.hass !== this._memoHass || this._mapAR !== this._memoMapAR) {
       this._memoHass = this.hass;
+      this._memoMapAR = this._mapAR;
       this._roomsMemo.clear();
       this._seatMemo.clear();
+      this._homeFrameMemo.clear();
     }
   }
 
@@ -1315,8 +1354,15 @@ export class AnyVacCard extends LitElement {
     const at = this._intAttrs(vac);
     const intRooms: Array<Record<string, any>> = Array.isArray(at?.rooms) ? at!.rooms : [];
     if (!at || !intRooms.length) return this._staticRoomsFor(vac);
-    const seat = this._effectiveSeat(vac);
+    // docs/40 §4.4 (Fáze 3): a home-frame-registered vacuum places rooms from
+    // the shared bbox_home_px/outline_home_px through its own identity crop
+    // (placeRoomInCrop/outlineInCrop — the exact same crop-normalise maths the
+    // one-shot "place rooms from crop box" import already uses, docs/14 rule 1
+    // — no fit/rotation) instead of roomBboxToRect's per-vacuum bbox_px + seat.
+    const crop = this._homeFrameCropFor(vac);
     const ar = this._wrapAspect(this._baseHeightFor(vac));
+    const anchorFit = crop ? null : this._homeAnchorFitFor(vac, ar);
+    const seat = crop || anchorFit ? null : this._effectiveSeat(vac);
     const staticRooms = this._staticRoomsFor(vac);
     const byKey = new Map(staticRooms.filter((r) => r.key).map((r) => [r.key, r]));
     const seen = new Set<string>();
@@ -1327,9 +1373,32 @@ export class AnyVacCard extends LitElement {
       seen.add(nm);
       const cfg = byKey.get(nm);
       if (cfg && cfg.map_x != null && cfg.map_y != null) { out.push(cfg); continue; } // explicit override/anchor wins
-      const rect = roomBboxToRect(ir, at, seat, ar);
-      if (!rect) { if (cfg) out.push(cfg); continue; } // no seat yet -> whatever static has, if anything
-      out.push({ ...(cfg ?? { key: nm, name: nm, icon: "mdi:floor-plan" }), ...rect });
+      // docs/40 §5.B: reuses `roomBboxToRect` UNCHANGED for a cesta-B room too
+      // (docs/14 rule 1) — its bbox-centre-projection maths is exactly what
+      // "place a home-px bbox through a solved fit" needs; only the inputs it
+      // normally reads off `ir`/`at` are reshaped to source home_px/frame dims
+      // instead of a vacuum's own bbox_px/image_dims.
+      const rect = crop
+        ? (ir?.bbox_home_px ? placeRoomInCrop(ir.bbox_home_px, crop) : null)
+        : anchorFit
+          ? (ir?.bbox_home_px
+              ? roomBboxToRect(
+                  { bbox_px: ir.bbox_home_px },
+                  { image_dims: { width: anchorFit.dims.NW, height: anchorFit.dims.NH, scale: 1, rotation: 0 } },
+                  anchorFit.fit, ar,
+                )
+              : null)
+          : roomBboxToRect(ir, at, seat!, ar);
+      if (!rect) { if (cfg) out.push(cfg); continue; } // no seat/frame yet -> whatever static has, if anything
+      // Additive only (types.ts `RoomConfig.outline_pct` doc) — the rectangle
+      // above stays the click/select hit-target and icon anchor either way;
+      // an outline just draws the room's real traced shape on top of it.
+      const outline = crop
+        ? outlineInCrop(ir?.outline_home_px, crop)
+        : anchorFit
+          ? outlineThroughFit(ir?.outline_home_px, anchorFit.dims, anchorFit.fit, ar)
+          : null;
+      out.push({ ...(cfg ?? { key: nm, name: nm, icon: "mdi:floor-plan" }), ...rect, outline_pct: outline ?? undefined });
     }
     for (const cfg of staticRooms) if (cfg.key && !seen.has(cfg.key)) out.push(cfg);
     return out;
@@ -3210,10 +3279,28 @@ export class AnyVacCard extends LitElement {
     if (!this._isModeCandidate(vac)) return;
     if (this._modeEntity === "*" && this._config.map_mode === "merged") {
       // Merged multi-candidate: capture the SAME screen point through every
-      // candidate vacuum's own map transform. Nothing is sent yet — the user picks
-      // who actually goes there next, on that vacuum's own status card.
-      const pts: Record<string, { x: number; y: number }> = {};
+      // candidate vacuum's own map transform (docs/40 §4.4: home px through the
+      // shared identity crop for a home-frame candidate, legacy per-vacuum seat
+      // otherwise — a mixed fleet may have both at once). Nothing is sent yet —
+      // the user picks who actually goes there next, on that vacuum's own
+      // status card.
+      const pts: Record<string, { x: number; y: number; frame?: "home" }> = {};
       for (const cand of this._modeCandidates()) {
+        const crop = this._homeFrameCropFor(cand);
+        if (crop) {
+          const hp = this._clickToHomePx(crop, e.clientX, e.clientY);
+          if (hp) pts[cand.entity] = { x: hp.x, y: hp.y, frame: "home" };
+          continue;
+        }
+        // docs/40 §5.B: no identity crop, but a live cesta-B fit exists —
+        // invert through IT instead of falling to a legacy per-vacuum seat
+        // that has no bearing on a foreign floorplan calibrated this way.
+        const af = this._homeAnchorFitFor(cand, this._wrapAspect(this._baseHeightFor(cand)));
+        if (af) {
+          const hp = this._clickToHomeAnchorPx(af.fit, af.dims, this._wrapAspect(this._baseHeightFor(cand)), e.clientX, e.clientY);
+          if (hp) pts[cand.entity] = { x: hp.x, y: hp.y, frame: "home" };
+          continue;
+        }
         const c = this._clickToContent(cand, e.clientX, e.clientY);
         if (c) pts[cand.entity] = { x: this._clampPct(c.x), y: this._clampPct(c.y) };
       }
@@ -3223,17 +3310,23 @@ export class AnyVacCard extends LitElement {
     }
     // Legacy single-target immediate send (per-vacuum tools, and "*" in split mode
     // where each map is its own on-screen region — clicking it IS the unambiguous
-    // choice of vacuum, so there's nothing to defer).
-    const content = this._clickToContent(vac, e.clientX, e.clientY);
+    // choice of vacuum, so there's nothing to defer). docs/40 §4.4: a home-frame
+    // candidate sends home px + frame: "home" instead of x_pct/y_pct.
+    const crop = this._homeFrameCropFor(vac);
+    const af = crop ? null : this._homeAnchorFitFor(vac, this._wrapAspect(this._baseHeightFor(vac)));
+    const homeFrame = !!crop || !!af;
+    const content = crop
+      ? this._clickToHomePx(crop, e.clientX, e.clientY)
+      : af
+        ? this._clickToHomeAnchorPx(af.fit, af.dims, this._wrapAspect(this._baseHeightFor(vac)), e.clientX, e.clientY)
+        : this._clickToContent(vac, e.clientX, e.clientY);
     this._dbg = content
-      ? "goto " + content.x.toFixed(1) + "%, " + content.y.toFixed(1) + "%"
+      ? (homeFrame ? "goto (home) " + content.x.toFixed(1) + "px, " + content.y.toFixed(1) + "px" : "goto " + content.x.toFixed(1) + "%, " + content.y.toFixed(1) + "%")
       : "(map element not found)";
     if (content) {
-      void this._call("anyvac", "goto", {
-        entity_id: vac.entity,
-        x_pct: this._clampPct(content.x),
-        y_pct: this._clampPct(content.y),
-      });
+      void this._call("anyvac", "goto", homeFrame
+        ? { entity_id: vac.entity, frame: "home", x_home_px: content.x, y_home_px: content.y }
+        : { entity_id: vac.entity, x_pct: this._clampPct(content.x), y_pct: this._clampPct(content.y) });
     }
     this._mapMode = "normal"; this._modeEntity = null;
   }
@@ -3323,6 +3416,53 @@ export class AnyVacCard extends LitElement {
     const ly = (-m.b * d.dx + m.a * d.dy) / det;
     const w = el.offsetWidth || 1, h = el.offsetHeight || 1;
     return { x: (lx / w + 0.5) * 100, y: (ly / h + 0.5) * 100 };
+  }
+  /** docs/40 §4.4 (Fáze 3) home-frame twin of `_clickToContent`: viewport point
+   *  -> floorplan-% (the shared base image's OWN content space — that image
+   *  itself may carry a user offset/rotation/scale, `image_base.*`, same
+   *  DOMMatrix-inversion technique as `_clickToContent`, just against
+   *  `.image-base-img` instead of a per-vacuum `.map-img`) -> home px via
+   *  `pctToCropPoint`. No per-vacuum seat enters this at all — every vacuum
+   *  sharing `crop` gets the exact same point, which is the whole premise of
+   *  the home frame (Fáze 1 registration already agrees them). `crop` is
+   *  `_homeFrameCropFor(vac)`'s result for whichever vacuum(s) this capture is
+   *  for; the caller re-derives it per candidate since a mixed fleet may have
+   *  some vacuums home-frame-eligible and others still on the legacy path. */
+  private _clickToHomePx(crop: CropBox, clientX: number, clientY: number): { x: number; y: number } | null {
+    const pct = this._clickToImageBasePct(clientX, clientY);
+    return pct ? pctToCropPoint(pct, crop) : null;
+  }
+  /** Shared floorplan-% extraction behind `_clickToHomePx` (cesta A) and
+   *  `_clickToHomeAnchorPx` below (cesta B) — same DOMMatrix-inversion
+   *  technique as `_clickToContent`, just against the shared `.image-base-
+   *  img` instead of a per-vacuum `.map-img`. Factored out so both "known
+   *  crop" and "solved fit" paths invert the SAME click geometry, not two
+   *  slightly different copies of it (docs/14 rule 1). */
+  private _clickToImageBasePct(clientX: number, clientY: number): { x: number; y: number } | null {
+    const el = this.renderRoot?.querySelector(".image-base-img") as HTMLElement | null;
+    if (!el) return null;
+    const r = el.getBoundingClientRect();
+    const cx = (r.left + r.right) / 2, cy = (r.top + r.bottom) / 2;
+    const tr = getComputedStyle(el).transform;
+    const m = new DOMMatrix(tr === "none" ? undefined : tr);
+    const det = m.a * m.d - m.b * m.c;
+    if (Math.abs(det) < 1e-9) return null;
+    const d = this._unrotateDelta(clientX - cx, clientY - cy);
+    const lx = (m.d * d.dx - m.c * d.dy) / det;
+    const ly = (-m.b * d.dx + m.a * d.dy) / det;
+    const w = el.offsetWidth || 1, h = el.offsetHeight || 1;
+    return { x: (lx / w + 0.5) * 100, y: (ly / h + 0.5) * 100 };
+  }
+  /** docs/40 §5.B twin of `_clickToHomePx`: viewport point -> floorplan-%
+   *  (same shared extraction) -> home px via the INVERSE of the live-solved
+   *  cesta-B fit (`unprojectPctThroughFit`, seatfit.ts) instead of a known
+   *  crop's inverse. `fit`/`dims`/`ar` must be the SAME triple
+   *  `_homeAnchorFitFor` just produced for this vacuum (one render pass). */
+  private _clickToHomeAnchorPx(
+    fit: SeatFitResult, dims: { NW: number; NH: number }, ar: number, clientX: number, clientY: number,
+  ): { x: number; y: number } | null {
+    const pct = this._clickToImageBasePct(clientX, clientY);
+    return pct ? unprojectPctThroughFit(pct, dims, fit, ar) : null;
   }
   private _onZoneDown(vac: VacuumConfig, e: PointerEvent): void {
     const editing = !!this._zoneRectShown && this._hasZoneEditTarget(vac);
@@ -3418,10 +3558,39 @@ export class AnyVacCard extends LitElement {
     const ax = pa.x, ay = pa.y, bx = pb.x, by = pb.y;
     if (this._zoneMulti) {
       // Merged multi-candidate: same two screen corners, translated through every
-      // candidate vacuum's own map transform. Nothing sent yet — confirm per
-      // vacuum on its own status card.
-      const rects: Record<string, { x1: number; y1: number; x2: number; y2: number }> = {};
+      // candidate vacuum's own map transform (docs/40 §4.4: home px through the
+      // shared identity crop for a home-frame candidate, legacy per-vacuum seat
+      // otherwise). Nothing sent yet — confirm per vacuum on its own status card.
+      const rects: Record<string, { x1: number; y1: number; x2: number; y2: number; frame?: "home" }> = {};
       for (const cand of this._modeCandidates()) {
+        const crop = this._homeFrameCropFor(cand);
+        if (crop) {
+          const ha = this._clickToHomePx(crop, ax, ay);
+          const hb = this._clickToHomePx(crop, bx, by);
+          if (ha && hb) {
+            rects[cand.entity] = {
+              x1: Math.min(ha.x, hb.x), y1: Math.min(ha.y, hb.y),
+              x2: Math.max(ha.x, hb.x), y2: Math.max(ha.y, hb.y),
+              frame: "home",
+            };
+          }
+          continue;
+        }
+        // docs/40 §5.B: same fallback as `_onMapClick` above.
+        const candAr = this._wrapAspect(this._baseHeightFor(cand));
+        const af = this._homeAnchorFitFor(cand, candAr);
+        if (af) {
+          const ha = this._clickToHomeAnchorPx(af.fit, af.dims, candAr, ax, ay);
+          const hb = this._clickToHomeAnchorPx(af.fit, af.dims, candAr, bx, by);
+          if (ha && hb) {
+            rects[cand.entity] = {
+              x1: Math.min(ha.x, hb.x), y1: Math.min(ha.y, hb.y),
+              x2: Math.max(ha.x, hb.x), y2: Math.max(ha.y, hb.y),
+              frame: "home",
+            };
+          }
+          continue;
+        }
         const ca = this._clickToContent(cand, ax, ay);
         const cb = this._clickToContent(cand, bx, by);
         if (ca && cb) {
@@ -3436,7 +3605,39 @@ export class AnyVacCard extends LitElement {
     }
     // Legacy single-target (per-vacuum tools, and "*" in split mode — each map is
     // its own on-screen region, so the vacuum that received the drag IS the
-    // unambiguous choice).
+    // unambiguous choice). docs/40 §4.4: a home-frame vacuum gets home px instead.
+    const crop = this._homeFrameCropFor(vac);
+    if (crop) {
+      const ha = this._clickToHomePx(crop, ax, ay);
+      const hb = this._clickToHomePx(crop, bx, by);
+      if (ha && hb) {
+        this._zonePending = {
+          [vac.entity]: {
+            x1: Math.min(ha.x, hb.x), y1: Math.min(ha.y, hb.y),
+            x2: Math.max(ha.x, hb.x), y2: Math.max(ha.y, hb.y),
+            frame: "home",
+          },
+        };
+      }
+      return;
+    }
+    // docs/40 §5.B: same fallback as `_onMapClick` above.
+    const vacAr = this._wrapAspect(this._baseHeightFor(vac));
+    const af = this._homeAnchorFitFor(vac, vacAr);
+    if (af) {
+      const ha = this._clickToHomeAnchorPx(af.fit, af.dims, vacAr, ax, ay);
+      const hb = this._clickToHomeAnchorPx(af.fit, af.dims, vacAr, bx, by);
+      if (ha && hb) {
+        this._zonePending = {
+          [vac.entity]: {
+            x1: Math.min(ha.x, hb.x), y1: Math.min(ha.y, hb.y),
+            x2: Math.max(ha.x, hb.x), y2: Math.max(ha.y, hb.y),
+            frame: "home",
+          },
+        };
+      }
+      return;
+    }
     const ca = this._clickToContent(vac, ax, ay);
     const cb = this._clickToContent(vac, bx, by);
     if (ca && cb) {
@@ -3457,11 +3658,17 @@ export class AnyVacCard extends LitElement {
     // still run with the vacuum's normal HOW settings, same as room cleaning
     // does via `_settingPresets`/`clean_action`.
     const ca = vac.clean_action as Partial<NativeAutoCleanAction> | undefined;
-    void this._call("anyvac", "zone_clean", {
-      entity_id: vac.entity,
-      x1_pct: z.x1, y1_pct: z.y1, x2_pct: z.x2, y2_pct: z.y2,
-      repeat: ca?.repeat ?? 1,
-    });
+    void this._call("anyvac", "zone_clean", z.frame === "home"
+      ? {
+          entity_id: vac.entity, frame: "home",
+          x1_home_px: z.x1, y1_home_px: z.y1, x2_home_px: z.x2, y2_home_px: z.y2,
+          repeat: ca?.repeat ?? 1,
+        }
+      : {
+          entity_id: vac.entity,
+          x1_pct: z.x1, y1_pct: z.y1, x2_pct: z.x2, y2_pct: z.y2,
+          repeat: ca?.repeat ?? 1,
+        });
     if (this._zonePending) {
       const next = { ...this._zonePending };
       delete next[vac.entity];
@@ -3474,7 +3681,9 @@ export class AnyVacCard extends LitElement {
   }
   private _confirmPin(vac: VacuumConfig): void {
     const p = this._pinPending?.[vac.entity]; if (!p) return;
-    void this._call("anyvac", "goto", { entity_id: vac.entity, x_pct: p.x, y_pct: p.y });
+    void this._call("anyvac", "goto", p.frame === "home"
+      ? { entity_id: vac.entity, frame: "home", x_home_px: p.x, y_home_px: p.y }
+      : { entity_id: vac.entity, x_pct: p.x, y_pct: p.y });
     if (this._pinPending) {
       const next = { ...this._pinPending };
       delete next[vac.entity];
@@ -3670,6 +3879,78 @@ export class AnyVacCard extends LitElement {
     return out;
   }
 
+  /** docs/40 §4.4 (Fáze 3): is `vac` currently rendered via the shared home
+   *  frame (one identity crop, no per-vacuum fit) instead of `_effectiveSeat`?
+   *  `null` whenever not — different/no frame, not registered yet, or the
+   *  config simply doesn't name one (`homeFrameCropFor`, seatfit.ts, is the
+   *  single source of truth for the eligibility check; this just memoizes
+   *  it the same way `_effectiveSeat` memoizes `resolveSeat`). */
+  private _homeFrameCropFor(vac: VacuumConfig): CropBox | null {
+    this._memoSync();
+    if (this._homeFrameMemo.has(vac.entity)) return this._homeFrameMemo.get(vac.entity)!;
+    const out = homeFrameCropFor(this._config, vac, this._intAttrs(vac));
+    this._homeFrameMemo.set(vac.entity, out);
+    return out;
+  }
+
+  /** docs/40 §5.B: the home frame's own CURRENT `{width_px, height_px}` —
+   *  read live off whatever configured vacuum's `home_frame` sensor
+   *  attribute reports it, so `homeAnchorFit` always fits against the
+   *  frame's present size, not a stale one (the whole self-healing point of
+   *  storing raw anchor pairs instead of a solved seat). `image_base.
+   *  home_anchors_frame_id` picks a specific frame by id when more than one
+   *  is active (a real multi-floor home); omitted, this picks whichever
+   *  frame the most configured vacuums are currently registered into — the
+   *  same default policy the backend's `_select_home_frame` uses for
+   *  `frame: "home"` calls with no explicit `frame_id` (docs/14 rule 1: one
+   *  selection policy, mirrored here since the card has no service call to
+   *  delegate this particular choice to). */
+  private _homeFrameDims(): { NW: number; NH: number } | null {
+    const wantId = this._config.image_base?.home_anchors_frame_id;
+    const byId = new Map<string, { w: number; h: number; count: number }>();
+    for (const v of this._config.vacuums ?? []) {
+      const hf = this._intAttrs(v)?.home_frame as
+        | { id?: string; width_px?: number; height_px?: number }
+        | null
+        | undefined;
+      if (!hf?.id || !(hf.width_px! > 0) || !(hf.height_px! > 0)) continue;
+      const cur = byId.get(hf.id);
+      if (cur) cur.count++;
+      else byId.set(hf.id, { w: hf.width_px!, h: hf.height_px!, count: 1 });
+    }
+    if (wantId) { const f = byId.get(wantId); if (f) return { NW: f.w, NH: f.h }; }
+    let best: { w: number; h: number; count: number } | null = null;
+    for (const f of byId.values()) if (!best || f.count > best.count) best = f;
+    return best ? { NW: best.w, NH: best.h } : null;
+  }
+
+  /** docs/40 §5.B: `vac`'s live cesta-B fit — a FOREIGN-origin floorplan
+   *  (`image_base.home_anchors`) calibrated against the home frame, used
+   *  only when cesta A's identity crop does NOT already apply (that always
+   *  takes priority — no fit needed there at all) and `vac` is currently
+   *  registered into a home frame (so its `*_home_px` fields are valid).
+   *  `null` whenever ineligible or under 2 anchors — caller falls back to
+   *  `_effectiveSeat`, same automatic "no extra config" fallback chain
+   *  cesta A already established. Re-solved on every call (a 2-6 point
+   *  least-squares fit is negligible cost — no memo needed, unlike
+   *  `_effectiveSeat`/`_homeFrameCropFor`, which cache to skip a live
+   *  integration-attribute walk on every access instead). */
+  private _homeAnchorFitFor(
+    vac: VacuumConfig, ar: number,
+  ): { fit: SeatFitResult; dims: { NW: number; NH: number } } | null {
+    // docs/40 §4.4/§5.B: cesta B, like cesta A, is a MERGED-mode-only concept
+    // (a home frame is inherently shared across vacuums) — split mode stays
+    // untouched ("Split mód beze změny"), so this never reads a per-vacuum
+    // `image_base` as if it were the card-level one.
+    if (this._config.map_mode !== "merged") return null;
+    if (this._homeFrameCropFor(vac)) return null;
+    if (!this._intAttrs(vac)?.home_frame) return null;
+    const anchors = this._config.image_base?.home_anchors;
+    const dims = this._homeFrameDims();
+    const fit = homeAnchorFit(anchors, dims, ar);
+    return fit && dims ? { fit, dims } : null;
+  }
+
   /** Integration mode: draw the robot + cleaning path as a vector overlay from the
    *  px-space attributes (kontrakt v2: vacuum_position_px, path_dry_px, path_wet_px
    *  — already in rendered-map pixels, no client-side mm math). */
@@ -3786,6 +4067,205 @@ export class AnyVacCard extends LitElement {
     const markerInner = svg`${errHalo}${robotT}`;
     const inner = part === "paths" ? pathsInner : part === "marker" ? markerInner : svg`${pathsInner}${markerInner}`;
     return html`<svg class="map-vector" viewBox="0 0 ${NW} ${NH}" preserveAspectRatio="none" style=${styleMap(seat)}>${inner}</svg>`;
+  }
+
+  /** docs/40 §4.4 (Fáje 3) home-frame twin of `_renderIntegrationOverlay` —
+   *  same visual language (dry/wet trace, marker, error halo) but sourcing
+   *  the ALREADY-CO-REGISTERED `*_home_px` fields through `crop` (this
+   *  vacuum's own `homeFrameCropFor` result) instead of this vacuum's own
+   *  `*_px`/seat. No fit, no rotation, no per-vacuum CSS seat at all — the
+   *  crop already agrees across every vacuum sharing this frame (Fáze 1
+   *  registration), so it's the exact same "known crop, no rotation"
+   *  re-normalisation `placeRoomInCrop`/`outlineInCrop` do for rooms
+   *  (seatfit.ts), just for a point/polyline. The `<svg>`'s own viewBox is
+   *  the crop's OWN px extent (not a 0..100 square) so it inherits the
+   *  wrap's aspect ratio exactly (that wrap was itself sized off the same
+   *  crop's `image_base`, docs/40 §4.5) — keeping the robot-marker circle
+   *  actually circular instead of stretched.
+   *
+   *  Heading: `vacuum_position_home_px.a` is `_home_px_heading`'s OWN
+   *  self-consistent convention (coordinator.py, integration 1.8.1 bugfix)
+   *  — standard atan2 in this exact px space (0°=+x/right, 90°=+y/down) —
+   *  unlike the legacy `vacuum_position_px` contract, where the card negates
+   *  `sin` to undo a flip baked into THAT contract's solved affine. Since
+   *  home-px space needs no such correction, this uses `+sin`. */
+  private _renderHomeFrameOverlay(vac: VacuumConfig, crop: CropBox, part: "both" | "paths" | "marker" = "both") {
+    const at = this._intAttrs(vac);
+    if (!at) return nothing;
+    const cropW = crop.x1 - crop.x0;
+    const cropH = crop.y1 - crop.y0;
+    if (!(cropW > 0) || !(cropH > 0)) return nothing;
+    const color = this._color(vac);
+    const rr = Math.max(cropW, cropH) / 55;
+    const local = (p: { x: number; y: number }) => ({ x: p.x - crop.x0, y: p.y - crop.y0 });
+    const toPts = (seg: any) =>
+      (Array.isArray(seg) ? seg : [])
+        .map((p: any) => { const q = local(p); return q.x.toFixed(1) + "," + q.y.toFixed(1); })
+        .join(" ");
+    const ct = this._vacCleanType(vac);
+    const layersOn = this._layersEff();
+    const showDry = layersOn.dry && ct.dry;
+    const showWet = layersOn.wet && ct.wet;
+    const drySegs: string[] = showDry && Array.isArray(at.path_dry_home_px)
+      ? at.path_dry_home_px.map((seg: any) => toPts(seg)).filter((s: string) => s.length > 0)
+      : [];
+    const wetSegs: string[] = showWet && Array.isArray(at.path_wet_home_px)
+      ? at.path_wet_home_px.map((seg: any) => toPts(seg)).filter((s: string) => s.length > 0)
+      : [];
+    const vp = at.vacuum_position_home_px;
+    const rob = vp ? local(vp) : null;
+    let head: { x: number; y: number } | null = null;
+    if (rob && vp.a != null) {
+      const arad = (vp.a * Math.PI) / 180;
+      head = { x: rob.x + rr * 1.3 * Math.cos(arad), y: rob.y + rr * 1.3 * Math.sin(arad) };
+    }
+    const style = { left: "0", top: "0", width: "100%", height: "100%" };
+    const pw = rr * 0.35 * ((vac.path_width ?? 100) / 100);
+    const sw = pw.toFixed(2);
+    const bw = (pw * 2.6 * ((vac.mop_band_width ?? 100) / 100)).toFixed(2);
+    const bandOp = ((vac.mop_band_opacity ?? 28) / 100).toFixed(2);
+    const wetColor = vac.mop_path_color || "#40a9ff";
+    const mopBand = wetSegs.length
+      ? svg`${wetSegs.map((s) => svg`<polyline points=${s} fill="none" stroke=${wetColor} stroke-width=${bw} stroke-linejoin="round" stroke-linecap="round" opacity=${bandOp}></polyline>`)}`
+      : nothing;
+    const mopLine = wetSegs.length
+      ? svg`${wetSegs.map((s) => svg`<polyline points=${s} fill="none" stroke=${wetColor} stroke-width=${sw} stroke-linejoin="round" stroke-linecap="round" opacity="0.9"></polyline>`)}`
+      : nothing;
+    const dryColor = vac.path_color || color;
+    const softMap = (this._config.theme ?? DEFAULT_THEME) !== "legacy";
+    const glowW = (pw * 3).toFixed(2);
+    const traceT = drySegs.length
+      ? svg`${softMap ? drySegs.map((s) => svg`<polyline points=${s} fill="none" stroke=${dryColor} stroke-width=${glowW} stroke-linejoin="round" stroke-linecap="round" opacity="0.12"></polyline>`) : nothing}${drySegs.map((s) => svg`<polyline points=${s} fill="none" stroke=${dryColor} stroke-width=${sw} stroke-linejoin="round" stroke-linecap="round" opacity="0.85"></polyline>`)}`
+      : nothing;
+    const useImg = !!(vac.robot_image_on_map && vac.image);
+    const robSize = rr * 2.6 * ((vac.robot_size ?? 100) / 100);
+    const robA = (vp && vp.a != null ? vp.a : 0) + (vac.robot_image_rotation ?? 0);
+    const robotT = rob
+      ? (useImg
+          ? svg`<image href=${vac.image!} x=${(rob.x - robSize / 2).toFixed(1)} y=${(rob.y - robSize / 2).toFixed(1)} width=${robSize.toFixed(1)} height=${robSize.toFixed(1)} preserveAspectRatio="xMidYMid meet" transform=${"rotate(" + robA + " " + rob.x.toFixed(1) + " " + rob.y.toFixed(1) + ")"}></image>`
+          : svg`${head ? svg`<line x1=${rob.x.toFixed(1)} y1=${rob.y.toFixed(1)} x2=${head.x.toFixed(1)} y2=${head.y.toFixed(1)} stroke="#ffffff" stroke-width=${(rr * 0.3).toFixed(2)} stroke-linecap="round"></line>` : nothing}<circle cx=${rob.x.toFixed(1)} cy=${rob.y.toFixed(1)} r=${rr.toFixed(1)} fill=${color} stroke="#ffffff" stroke-width=${(rr * 0.18).toFixed(2)}></circle>`)
+      : nothing;
+    const hasErr = rob && this._hasError(vac);
+    const errFilterId = "avc-hf-err-blur-" + vac.entity.replace(/[^a-zA-Z0-9]/g, "-");
+    const errHalo = hasErr
+      ? svg`<defs><filter id=${errFilterId} x="-150%" y="-150%" width="400%" height="400%">
+              <feGaussianBlur stdDeviation=${(rr * 0.5).toFixed(2)}></feGaussianBlur>
+            </filter></defs>
+            <circle class="avc-err-halo" cx=${rob!.x.toFixed(1)} cy=${rob!.y.toFixed(1)} r=${(rr * 2.2).toFixed(1)}
+              fill="#ff3b30" filter=${"url(#" + errFilterId + ")"}></circle>`
+      : nothing;
+    const pathsInner = svg`${mopBand}${mopLine}${traceT}`;
+    const markerInner = svg`${errHalo}${robotT}`;
+    const inner = part === "paths" ? pathsInner : part === "marker" ? markerInner : svg`${pathsInner}${markerInner}`;
+    return html`<svg class="map-vector" viewBox="0 0 ${cropW} ${cropH}" preserveAspectRatio="none" style=${styleMap(style)}>${inner}</svg>`;
+  }
+
+  /** docs/40 §5.B ("cesta B") twin of `_renderHomeFrameOverlay` above — for a
+   *  FOREIGN-origin floorplan (photo/drawing) calibrated against the home
+   *  frame instead of snapshotted from it, so there is no identity crop:
+   *  every `*_home_px` point is projected through the live-solved
+   *  `homeAnchorFit` (seatfit.ts) onto the floorplan wrap directly, one
+   *  point at a time, via `projectHomePxThroughFit` — no CSS-transformed
+   *  "raw content rectangle" the way a per-vacuum seat or an identity crop
+   *  both place, since there is no single rectangle of raw content here to
+   *  place, only individual points.
+   *
+   *  The `<svg>` covers the WHOLE wrap (`viewBox="0 0 100 ${100/ar}"`,
+   *  `preserveAspectRatio="none"`, full-cover style) rather than being
+   *  itself positioned/sized/rotated by CSS — that viewBox's own aspect
+   *  ratio is chosen to equal `ar` (the wrap's own), so the anisotropic CSS
+   *  stretch to 100%/100% is actually a UNIFORM scale on both axes and
+   *  circles (the robot marker, its error halo) stay circular, same
+   *  motivation as `_renderHomeFrameOverlay`'s crop-shaped viewBox, just
+   *  achieved by picking the viewBox's shape directly instead of inheriting
+   *  it from a crop. `projectHomePxThroughFit`'s output is plain 0..100
+   *  wrap-percent, so a projected point's own SVG coordinate is `(pct.x,
+   *  pct.y / ar)` — dividing y by `ar` is the same "wrap units" convention
+   *  `seatfit.ts` already uses internally (`SeatAnchor.a`), just carried
+   *  one step further out into this file.
+   *
+   *  Heading: home-px space's own heading convention already composes
+   *  cleanly with the fit's rotation — `fit.rotation` (snapped to 0/90/
+   *  180/270 by `computeSeatFit`) rotates every point/vector the SAME way,
+   *  so a heading direction `(cos a, sin a)` in home-px axes becomes
+   *  `(cos(a+rot), sin(a+rot))` in the projected (also x-right/y-down)
+   *  output axes — no separate point projection needed for the heading
+   *  tick, just this one angle addition. */
+  private _renderHomeAnchorOverlay(
+    vac: VacuumConfig,
+    fit: SeatFitResult,
+    dims: { NW: number; NH: number },
+    ar: number,
+    part: "both" | "paths" | "marker" = "both",
+  ) {
+    const at = this._intAttrs(vac);
+    if (!at || !(ar > 0)) return nothing;
+    const color = this._color(vac);
+    const proj = (p: { x: number; y: number }) => {
+      const pct = projectHomePxThroughFit(p, dims, fit, ar);
+      return { x: pct.x, y: pct.y / ar };
+    };
+    const rr = Math.max(100, 100 / ar) / 55;
+    const toPts = (seg: any) =>
+      (Array.isArray(seg) ? seg : [])
+        .map((p: any) => { const q = proj(p); return q.x.toFixed(2) + "," + q.y.toFixed(2); })
+        .join(" ");
+    const ct = this._vacCleanType(vac);
+    const layersOn = this._layersEff();
+    const showDry = layersOn.dry && ct.dry;
+    const showWet = layersOn.wet && ct.wet;
+    const drySegs: string[] = showDry && Array.isArray(at.path_dry_home_px)
+      ? at.path_dry_home_px.map((seg: any) => toPts(seg)).filter((s: string) => s.length > 0)
+      : [];
+    const wetSegs: string[] = showWet && Array.isArray(at.path_wet_home_px)
+      ? at.path_wet_home_px.map((seg: any) => toPts(seg)).filter((s: string) => s.length > 0)
+      : [];
+    const vp = at.vacuum_position_home_px;
+    const rob = vp ? proj(vp) : null;
+    let head: { x: number; y: number } | null = null;
+    if (rob && vp.a != null) {
+      const arad = ((vp.a + fit.rotation) * Math.PI) / 180;
+      head = { x: rob.x + rr * 1.3 * Math.cos(arad), y: rob.y + rr * 1.3 * Math.sin(arad) };
+    }
+    const style = { left: "0", top: "0", width: "100%", height: "100%" };
+    const pw = rr * 0.35 * ((vac.path_width ?? 100) / 100);
+    const sw = pw.toFixed(2);
+    const bw = (pw * 2.6 * ((vac.mop_band_width ?? 100) / 100)).toFixed(2);
+    const bandOp = ((vac.mop_band_opacity ?? 28) / 100).toFixed(2);
+    const wetColor = vac.mop_path_color || "#40a9ff";
+    const mopBand = wetSegs.length
+      ? svg`${wetSegs.map((s) => svg`<polyline points=${s} fill="none" stroke=${wetColor} stroke-width=${bw} stroke-linejoin="round" stroke-linecap="round" opacity=${bandOp}></polyline>`)}`
+      : nothing;
+    const mopLine = wetSegs.length
+      ? svg`${wetSegs.map((s) => svg`<polyline points=${s} fill="none" stroke=${wetColor} stroke-width=${sw} stroke-linejoin="round" stroke-linecap="round" opacity="0.9"></polyline>`)}`
+      : nothing;
+    const dryColor = vac.path_color || color;
+    const softMap = (this._config.theme ?? DEFAULT_THEME) !== "legacy";
+    const glowW = (pw * 3).toFixed(2);
+    const traceT = drySegs.length
+      ? svg`${softMap ? drySegs.map((s) => svg`<polyline points=${s} fill="none" stroke=${dryColor} stroke-width=${glowW} stroke-linejoin="round" stroke-linecap="round" opacity="0.12"></polyline>`) : nothing}${drySegs.map((s) => svg`<polyline points=${s} fill="none" stroke=${dryColor} stroke-width=${sw} stroke-linejoin="round" stroke-linecap="round" opacity="0.85"></polyline>`)}`
+      : nothing;
+    const useImg = !!(vac.robot_image_on_map && vac.image);
+    const robSize = rr * 2.6 * ((vac.robot_size ?? 100) / 100);
+    const robA = (vp && vp.a != null ? vp.a + fit.rotation : 0) + (vac.robot_image_rotation ?? 0);
+    const robotT = rob
+      ? (useImg
+          ? svg`<image href=${vac.image!} x=${(rob.x - robSize / 2).toFixed(2)} y=${(rob.y - robSize / 2).toFixed(2)} width=${robSize.toFixed(2)} height=${robSize.toFixed(2)} preserveAspectRatio="xMidYMid meet" transform=${"rotate(" + robA + " " + rob.x.toFixed(2) + " " + rob.y.toFixed(2) + ")"}></image>`
+          : svg`${head ? svg`<line x1=${rob.x.toFixed(2)} y1=${rob.y.toFixed(2)} x2=${head.x.toFixed(2)} y2=${head.y.toFixed(2)} stroke="#ffffff" stroke-width=${(rr * 0.3).toFixed(2)} stroke-linecap="round"></line>` : nothing}<circle cx=${rob.x.toFixed(2)} cy=${rob.y.toFixed(2)} r=${rr.toFixed(2)} fill=${color} stroke="#ffffff" stroke-width=${(rr * 0.18).toFixed(2)}></circle>`)
+      : nothing;
+    const hasErr = rob && this._hasError(vac);
+    const errFilterId = "avc-ha-err-blur-" + vac.entity.replace(/[^a-zA-Z0-9]/g, "-");
+    const errHalo = hasErr
+      ? svg`<defs><filter id=${errFilterId} x="-150%" y="-150%" width="400%" height="400%">
+              <feGaussianBlur stdDeviation=${(rr * 0.5).toFixed(2)}></feGaussianBlur>
+            </filter></defs>
+            <circle class="avc-err-halo" cx=${rob!.x.toFixed(2)} cy=${rob!.y.toFixed(2)} r=${(rr * 2.2).toFixed(2)}
+              fill="#ff3b30" filter=${"url(#" + errFilterId + ")"}></circle>`
+      : nothing;
+    const pathsInner = svg`${mopBand}${mopLine}${traceT}`;
+    const markerInner = svg`${errHalo}${robotT}`;
+    const inner = part === "paths" ? pathsInner : part === "marker" ? markerInner : svg`${pathsInner}${markerInner}`;
+    return html`<svg class="map-vector" viewBox=${"0 0 100 " + (100 / ar).toFixed(3)} preserveAspectRatio="none" style=${styleMap(style)}>${inner}</svg>`;
   }
 
   private _onLayerDown(type: "dry" | "wet"): void {
@@ -3916,6 +4396,29 @@ export class AnyVacCard extends LitElement {
     const defs = this._mergedRoomDefs(shown);
     const wholeHome = !defs.some(({ r }) => this._isRoomSelectedAny(r.key, shown));
     return defs.map(({ r, v }) => this._renderRoomOverlay(r, v, { vacs: shown, wholeHome }));
+  }
+
+  /** docs/40 §4.4 (Fáze 3) — additive layer drawing each room's REAL traced
+   *  shape (`outline_pct`, only ever set for a home-frame-rendered room, see
+   *  `_computeRoomsFor`) on top of the existing rectangle buttons. Its own
+   *  full-wrap `<svg>` (0..100 viewBox, matching `outline_pct`'s own units)
+   *  rather than nested inside each room's `<button>` — `outline_pct` is
+   *  already wrap-relative percent, so no per-room re-basing is needed, and
+   *  `pointer-events: none` keeps it purely visual: the rectangle stays the
+   *  one and only click/select hit-target either way. */
+  private _renderRoomOutlines(defs: Array<{ r: RoomConfig; v: VacuumConfig }>, vacs: VacuumConfig[]) {
+    const withOutline = defs.filter(({ r }) => r.outline_pct && r.outline_pct.length >= 3);
+    if (!withOutline.length) return nothing;
+    const polys = svg`${withOutline.map(({ r }) => {
+      const selected = this._isRoomSelectedAny(r.key, vacs);
+      const pts = r.outline_pct!.map((p) => p.x.toFixed(2) + "," + p.y.toFixed(2)).join(" ");
+      return svg`<polygon points=${pts}
+        fill=${selected ? "rgba(255,255,255,0.12)" : "rgba(255,255,255,0.05)"}
+        stroke=${selected ? "#ffffff" : "rgba(255,255,255,0.35)"}
+        stroke-width="0.35" stroke-linejoin="round"></polygon>`;
+    })}`;
+    return html`<svg class="room-outline-layer" viewBox="0 0 100 100" preserveAspectRatio="none"
+      style="position:absolute;inset:0;width:100%;height:100%;pointer-events:none;">${polys}</svg>`;
   }
 
   /** Narrow → rotate the map 90° (auto, unless disabled). With a `layout:`
@@ -4166,13 +4669,33 @@ export class AnyVacCard extends LitElement {
               mixBlendMode: v.overlay_blend ?? "normal",
             })} />`;
         })}
-        ${shown.map((v) => (this._intAttrs(v) ? this._renderIntegrationOverlay(v, this._effectiveSeat(v), "paths") : nothing))}
+        ${/* docs/40 §4.4 (Fáze 3): a home-frame-registered vacuum draws from
+           `*_home_px` through its own identity crop (no fit/rotation) instead
+           of `_effectiveSeat` — automatic per vacuum (`_homeFrameCropFor`),
+           so a mixed fleet (some registered, some not yet) renders each with
+           whichever path is actually valid for it right now. */
+          shown.map((v) => {
+            if (!this._intAttrs(v)) return nothing;
+            const crop = this._homeFrameCropFor(v);
+            if (crop) return this._renderHomeFrameOverlay(v, crop, "paths");
+            const af = this._homeAnchorFitFor(v, this._wrapAspect(this._baseHeightFor(v)));
+            if (af) return this._renderHomeAnchorOverlay(v, af.fit, af.dims, this._wrapAspect(this._baseHeightFor(v)), "paths");
+            return this._renderIntegrationOverlay(v, this._effectiveSeat(v), "paths");
+          })}
         ${/* Markers in their OWN pass, after every vacuum's paths (not one
            interleaved pass per vacuum) — a vacuum's wide translucent wet-mop
            band can no longer sit on top of ANOTHER vacuum's robot marker
            regardless of shown/DOM order (field report 2026-07-26). */
-          shown.map((v) => (this._intAttrs(v) ? this._renderIntegrationOverlay(v, this._effectiveSeat(v), "marker") : nothing))}
+          shown.map((v) => {
+            if (!this._intAttrs(v)) return nothing;
+            const crop = this._homeFrameCropFor(v);
+            if (crop) return this._renderHomeFrameOverlay(v, crop, "marker");
+            const af = this._homeAnchorFitFor(v, this._wrapAspect(this._baseHeightFor(v)));
+            if (af) return this._renderHomeAnchorOverlay(v, af.fit, af.dims, this._wrapAspect(this._baseHeightFor(v)), "marker");
+            return this._renderIntegrationOverlay(v, this._effectiveSeat(v), "marker");
+          })}
         ${this._config.layout ? nothing : this._renderLayerToggles(shown)}
+        ${this._renderRoomOutlines(this._mergedRoomDefs(shown), shown)}
         ${this._renderMergedRooms(shown)}
         ${/* Pin & Go / Zone interaction layer — merged mode used to render NONE of
            this (only split-mode _renderMap had it), so clicks fell straight through
