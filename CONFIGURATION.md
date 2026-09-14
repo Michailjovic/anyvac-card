@@ -209,6 +209,26 @@ vacuum in the same map falls back to its own legacy per-vacuum seat, same as
 in cesta A. Requires anyvac integration ≥ 1.9.0 for the
 `anyvac.snap_wall_corner` service the click-snap step calls.
 
+### Fiducial markers (docs/40 §5.A.2) — zero-click calibration, advanced/last resort
+
+A third way to produce `home_anchors`, shown below the calibration button
+above and meant to be reached for only when that clicking flow (or the
+canvas-scale tolerance check the home-frame section covers) genuinely isn't
+enough — e.g. the floorplan file also needs rotating, not just cropping.
+Step 1, **"Snapshot home frame with markers"**, saves a home-frame snapshot
+with 4 invisible markers baked into its own border and sets it as the
+floorplan `src`; crop/resize/rotate that file in an external image editor
+as needed (GIMP etc.), keeping it as PNG and without flattening it. Step 2,
+**"Detect markers in edited file"**, scans the CURRENT floorplan `src` for
+those markers and, once at least 2 of the 4 are found, writes
+`home_anchors`/`home_anchors_frame_id` exactly as the manual flow above
+would — nothing downstream needs to know which of the two produced it. This
+only works if the file's alpha channel survives the edit intact: a
+flattened image, or one re-exported as JPEG, loses the markers and step 2
+reports which corners it couldn't find (or fails outright if it found
+fewer than 2). Requires anyvac integration ≥ 1.10.0 for the
+`anyvac.detect_floorplan_fiducials` service step 2 calls.
+
 ---
 
 ## Room config
@@ -437,6 +457,7 @@ generated from
 | `anyvac.dock_empty` / `dock_wash` / `dock_dry` / `dock_pump` / `dock_self_clean` | Manual dock control (empty dustbin, wash/dry mop, pump, Fill&Drain self-clean) — mirrors the manufacturer app's Dock Control sheet. Shown/hidden per vacuum based on detected dock capability. |
 | `anyvac.snapshot_map_as_floorplan` | Save a map image entity's current picture as a static file and return its URL — powers the Maps tab's "Use this vacuum's current map as floorplan" button. |
 | `anyvac.snap_wall_corner` | Snap a home-frame pixel point to the nearest wall corner (docs/40 §5.B) — powers the click-snap step of the Maps tab's "Calibrate floorplan against home frame" button. Requires integration ≥ 1.9.0. |
+| `anyvac.detect_floorplan_fiducials` | Scan a floorplan file for invisible fiducial markers and return `home_anchors` with zero clicking (docs/40 §5.A.2) — powers the Maps tab's "Detect markers in edited file" button. Requires integration ≥ 1.10.0. |
 
 `anyvac.run_job` also exists but is an internal executor (not documented
 here or in the editor) — use `anyvac.clean`/`anyvac.plan` instead.

@@ -8,6 +8,46 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Planned
 
+## [1.9.0] - 2026-09-14
+
+Paired with integration 1.10.0. Docs/40 §5.A.2 — a third, zero-click way to
+populate `image_base.home_anchors`, alongside cesta A's identity crop and
+1.8.0's manual N-point calibration. Detail: docs/40 §5.A.2.
+
+### Added
+
+**"Fiducial markers" editor flow** (Maps tab, merged mode, positioned as a
+last resort below manual calibration): step 1, "Snapshot home frame with
+markers" (`_snapshotHomeFrameWithFiducials`), calls
+`anyvac.snapshot_map_as_floorplan` with `fiducials: true`, sets the result
+as the floorplan `src` and remembers where each marker was placed
+(`_fiducialKnown`) — unlike the plain snapshot button, it does NOT record a
+`crop_box`, since the whole point is that the file gets edited externally
+afterwards. Step 2, "Detect markers in edited file"
+(`_detectFiducials`), calls the new `anyvac.detect_floorplan_fiducials`
+with that same marker list against the CURRENT `image_base.src` (however
+it's since been cropped/resized/rotated), and writes whatever comes back
+straight into `image_base.home_anchors`/`home_anchors_frame_id` — the
+EXACT same config shape 1.8.0's manual calibration produces, so
+`_renderHomeAnchorOverlay`, Pin&Go/zone inversion and room rendering need
+zero changes to support this (docs/14 rule 1). Also turns `hide_map: true`
+on for every vacuum, same as the other snapshot buttons.
+
+Deliberately the last option offered in the UI, gated behind the same
+`!homeFrameCrop && this._anyHomeFrame()` condition as manual calibration —
+this only works if the file's alpha channel survives whatever editing
+happens to it externally (a flattened image, or one re-exported as JPEG,
+loses the markers), which is exactly the "cheap hack" framing the original
+docs/40 ratification gave this feature.
+
+No new Playwright coverage for the editor flow itself, consistent with
+existing project precedent (the sibling docs/39/§5.B calibration flows have
+never had UI-level tests either — both new methods are thin wiring around
+already-tested primitives: the backend services themselves, and
+`_setEditedImageBase`/`_setConfig`, both exercised elsewhere). Full suite:
+90/90 (no regressions — the new code is additively gated and never runs in
+any existing test's config).
+
 ## [1.8.0] - 2026-09-14
 
 Paired with integration 1.9.0. Docs/40 §5.B ("cesta B" — calibrating a foreign-origin

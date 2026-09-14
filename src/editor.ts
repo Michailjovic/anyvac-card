@@ -300,6 +300,31 @@ export class AnyVacCardEditor extends LitElement {
   @state() private _homeCalibError = "";
   @state() private _homeCalibResult: { residual_pct: number } | null = null;
 
+  /** Fiducial-marker workflow (docs/40 §5.A.2) — a third, zero-click way to
+   *  populate `image_base.home_anchors`, alongside cesta A's identity crop
+   *  and cesta B's manual N-point calibration above. Deliberately deferred
+   *  behind both of those ("cheap hack" in the original ratification): a
+   *  home-frame snapshot embeds 4 invisible markers in its own padding
+   *  border (`anyvac.snapshot_map_as_floorplan`, `fiducials: true`), the
+   *  user crops/resizes/ROTATES that file in an external editor same as
+   *  any other floorplan photo, and `anyvac.detect_floorplan_fiducials`
+   *  resolves the exact resulting scale+offset+rotation with zero clicks —
+   *  PROVIDED the file's alpha channel survives the edit intact (a
+   *  flattened image, or one re-exported as JPEG, loses the markers).
+   *  Writes the SAME `home_anchors`/`home_anchors_frame_id` shape cesta B's
+   *  own calibration produces (docs/14 rule 1 — `_renderHomeAnchorOverlay`
+   *  and every other cesta B code path need no changes at all here).
+   *  `_fiducialKnown` remembers the `{id, home_px}` list the snapshot
+   *  step returned, so the later detect step can pass it straight through
+   *  unmodified rather than re-deriving it. */
+  @state() private _fiducialKnown:
+    { frameId: string; markers: { id: string; home_px: { x: number; y: number } }[] } | null = null;
+  @state() private _fiducialSnapshotBusy = false;
+  @state() private _fiducialSnapshotError = "";
+  @state() private _fiducialDetectBusy = false;
+  @state() private _fiducialDetectError = "";
+  @state() private _fiducialDetectResult: { found: number; missing: string[] } | null = null;
+
   /** Active drag on a room's position dot / rectangle (2026-07-26 — was
    *  sliders-only, no way to see or drag the actual rectangle extent on the
    *  floorplan preview). `orig` is the room's state at drag START (not updated
@@ -359,6 +384,14 @@ export class AnyVacCardEditor extends LitElement {
     // selected (unlike `_calib` above).
     if (changed.has("_tab") && this._homeCalib) {
       this._homeCalib = null;
+    }
+    // docs/40 §5.A.2: `_fiducialKnown` only makes sense against the snapshot
+    // it was just returned for — leaving the Maps tab and coming back later
+    // to a possibly-different `image_base.src` shouldn't silently try to
+    // match markers from an unrelated snapshot (a clean "not found" error is
+    // still safe, but there's no reason to invite it).
+    if (changed.has("_tab") && this._fiducialKnown) {
+      this._fiducialKnown = null;
     }
   }
 
@@ -477,6 +510,100 @@ export class AnyVacCardEditor extends LitElement {
       console.error("[anyvac-card] snapshot_map_as_floorplan (frame: home) failed:", err);
     } finally {
       this._homeFrameSnapshotBusy = false;
+    }
+  }
+
+  /** Step 1 of the fiducial-marker workflow (docs/40 §5.A.2): snapshots the
+   *  home frame the SAME way `_snapshotHomeFrame` does, but with
+   *  `fiducials: true` — the response's `fiducials` list (where the 4
+   *  markers were actually placed, in home px) is remembered in
+   *  `_fiducialKnown` for `_detectFiducials` below. Sets it as the
+   *  floorplan `src` (same as `_snapshotHomeFrame`) so the user has
+   *  something to open and edit externally — unlike cesta A, it does NOT
+   *  set a `crop_box`: the whole point is that the file gets
+   *  cropped/resized/rotated afterwards, so any crop_box recorded now
+   *  would immediately go stale. */
+  private async _snapshotHomeFrameWithFiducials(): Promise<void> {
+    this._fiducialSnapshotBusy = true;
+    this._fiducialSnapshotError = "";
+    this._fiducialDetectResult = null;
+    try {
+      const res = (await (this.hass as any).callService(
+        "anyvac", "snapshot_map_as_floorplan",
+        { frame: "home", name: "home_frame_fiducial", fiducials: true },
+        undefined, false, true,
+      )) as {
+        response?: {
+          path?: string; frame_id?: string;
+          fiducials?: { id: string; home_px: { x: number; y: number } }[];
+        };
+      } | undefined;
+      const path = res?.response?.path;
+      const frameId = res?.response?.frame_id;
+      const markers = res?.response?.fiducials;
+      if (!path || !frameId || !markers?.length) throw new Error("incomplete response — integration too old?");
+      this._fiducialKnown = { frameId, markers };
+      this._setEditedImageBase({ src: path });
+    } catch (err) {
+      this._fiducialSnapshotError =
+        "Couldn't snapshot the home frame with markers — requires anyvac integration ≥ 1.9.0 " +
+        "with at least one registered vacuum.";
+      // eslint-disable-next-line no-console
+      console.error("[anyvac-card] snapshot_map_as_floorplan (fiducials) failed:", err);
+    } finally {
+      this._fiducialSnapshotBusy = false;
+    }
+  }
+
+  /** Step 2: scans the CURRENT `image_base.src` (the file the user has since
+   *  cropped/resized/rotated externally) for the markers `_fiducialKnown`
+   *  says were embedded, and writes whatever it finds as `home_anchors` —
+   *  the exact config shape cesta B's own manual calibration produces, so
+   *  nothing downstream (`_renderHomeAnchorOverlay`, Pin&Go/zone inversion,
+   *  room rendering) needs to know which of the two ever produced it.
+   *  Requires `_fiducialKnown` from step 1 in THIS editing session — the
+   *  card never stores it in config (it's derivable again any time by
+   *  re-running step 1, and storing it would mean one more thing to keep in
+   *  sync with the frame as it grows). */
+  private async _detectFiducials(): Promise<void> {
+    const known = this._fiducialKnown;
+    const src = this._config.image_base?.src;
+    if (!known || !src) return;
+    this._fiducialDetectBusy = true;
+    this._fiducialDetectError = "";
+    this._fiducialDetectResult = null;
+    try {
+      const res = (await (this.hass as any).callService(
+        "anyvac", "detect_floorplan_fiducials",
+        { path: src, fiducials: known.markers },
+        undefined, false, true,
+      )) as {
+        response?: {
+          home_anchors?: { home_px: { x: number; y: number }; floor_pct: { x: number; y: number } }[];
+          found?: number; missing?: string[];
+        };
+      } | undefined;
+      const anchors = res?.response?.home_anchors;
+      if (!anchors?.length) throw new Error("no markers detected");
+      this._setEditedImageBase({ home_anchors: anchors, home_anchors_frame_id: known.frameId });
+      // Same rationale as `_snapshotHomeFrame`/`_finishHomeCalibration`: once
+      // home_anchors resolve every vacuum's position on the shared
+      // floorplan, each vacuum's own raw map overlay is redundant.
+      const vacuums = this._config.vacuums.map((v) => ({ ...v, hide_map: true }));
+      this._setConfig({ vacuums });
+      this._fiducialDetectResult = {
+        found: res?.response?.found ?? anchors.length,
+        missing: res?.response?.missing ?? [],
+      };
+    } catch (err) {
+      this._fiducialDetectError =
+        "Couldn't detect markers — make sure the file above still has its alpha channel " +
+        "(stayed PNG, wasn't flattened/re-exported as JPEG) and at least 2 of the 4 " +
+        "corners survived the crop.";
+      // eslint-disable-next-line no-console
+      console.error("[anyvac-card] detect_floorplan_fiducials failed:", err);
+    } finally {
+      this._fiducialDetectBusy = false;
     }
   }
 
@@ -2321,6 +2448,48 @@ export class AnyVacCardEditor extends LitElement {
             ` : nothing}
             ${this._homeCalibResult ? html`
               <p class="hint">✅ Calibrated — fit error ${this._homeCalibResult.residual_pct}%.</p>
+            ` : nothing}
+          ` : nothing}
+
+          ${this._config.map_mode === "merged" && !homeFrameCrop && this._anyHomeFrame() ? html`
+            <div class="section-title">or, fiducial markers (docs/40 §5.A.2, advanced)</div>
+            <button class="btn btn--sm" style="align-self:flex-start"
+              ?disabled=${this._fiducialSnapshotBusy}
+              @click=${() => this._snapshotHomeFrameWithFiducials()}>
+              <ha-icon icon="mdi:crosshairs"></ha-icon>
+              ${this._fiducialSnapshotBusy ? "Snapshotting…" : "1. Snapshot home frame with markers"}
+            </button>
+            <p class="hint">A third way to calibrate a floorplan of your own — skip this unless the
+              tolerance check above and clicking through calibration both aren't enough (e.g. you
+              need to rotate the file, not just crop/resize it). Saves a home-frame snapshot with 4
+              invisible markers baked into its border, sets it as the floorplan below — now crop,
+              resize and/or rotate that file in an external image editor as needed (GIMP etc.), keep
+              it as PNG, and don't flatten it. Then set the floorplan src to your edited file (or
+              overwrite the same file) and run step 2. Requires anyvac integration ≥ 1.9.0.</p>
+            ${this._fiducialSnapshotError ? html`<p class="hint" style="color:#ff6b6b">${this._fiducialSnapshotError}</p>` : nothing}
+            ${this._fiducialKnown ? html`
+              <button class="btn btn--sm" style="align-self:flex-start"
+                ?disabled=${this._fiducialDetectBusy || !ib?.src}
+                @click=${() => this._detectFiducials()}>
+                <ha-icon icon="mdi:crosshairs-gps"></ha-icon>
+                ${this._fiducialDetectBusy ? "Detecting…" : "2. Detect markers in edited file"}
+              </button>
+              <p class="hint">Scans the floorplan src above (as it is now) for the markers step 1
+                embedded and, once at least 2 of the 4 are found, calibrates from them — no
+                clicking. Same self-healing <code>home_anchors</code> as manual calibration above,
+                so it also survives the home frame's canvas growing later.</p>
+              ${this._fiducialDetectError ? html`<p class="hint" style="color:#ff6b6b">${this._fiducialDetectError}</p>` : nothing}
+              ${this._fiducialDetectResult ? html`
+                <p class="hint">✅ Found ${this._fiducialDetectResult.found}/4 marker${this._fiducialDetectResult.found === 1 ? "" : "s"}${
+                  this._fiducialDetectResult.missing.length ? html` (missing: ${this._fiducialDetectResult.missing.join(", ")})` : nothing}.</p>
+              ` : nothing}
+            ` : nothing}
+            ${ib?.home_anchors?.length ? html`
+              <p class="hint">Calibrated: <strong>${ib.home_anchors.length}</strong> anchor point${ib.home_anchors.length > 1 ? "s" : ""}
+                against frame <code>${ib.home_anchors_frame_id}</code>
+                <span class="footer-link" style="margin-left:6px"
+                  @click=${() => this._setEditedImageBase({ home_anchors: undefined, home_anchors_frame_id: undefined })}>Clear</span>
+              </p>
             ` : nothing}
           ` : nothing}
         ` : nothing}
