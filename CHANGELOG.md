@@ -8,6 +8,19 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Planned
 
+## [1.9.1] - 2026-09-15
+
+### Fixed
+
+- **Seating sliders are now typeable, not just draggable** — Rotation / Scale / Offset X / Offset Y
+  under "Map seating" (and every other slider field in the editor: image base transform, room
+  position/size, overlay opacity, path width, clean-time estimates) now show an editable number
+  input next to the track instead of a plain readout. Field report: with Scale spanning 20-800%
+  or Offset spanning -150 to 150% on a track only a few hundred pixels wide, one drag step moves
+  the value by several percent — too coarse to land a precise manual seat. Typed values are
+  clamped to the field's min/max but not snapped to its slider `step`, since typing an exact
+  number is the point. Commits on blur or Enter, same as the other text fields in the editor.
+
 ## [1.9.0] - 2026-09-14
 
 Paired with integration 1.10.0. Docs/40 §5.A.2 — a third, zero-click way to

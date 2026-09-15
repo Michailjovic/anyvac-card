@@ -1746,13 +1746,28 @@ export class AnyVacCardEditor extends LitElement {
   private _numberSlider(label: string, value: number | undefined, min: number, max: number, step: number,
     onChange: (v: number) => void, suffix = "") {
     const cur = value ?? 0;
+    // Typed entry alongside the slider (2026-09-15 field report): dragging a slider whose
+    // range spans hundreds of % over a ~150px track can't reach a precise value, so the
+    // shown number is now an editable field, not just a label — clamped to [min,max] but
+    // NOT snapped to `step` (typing an exact value is the whole point).
+    const commit = (raw: string) => {
+      const n = Number(raw);
+      if (Number.isNaN(n)) return;
+      onChange(Math.min(max, Math.max(min, n)));
+    };
     return html`
       <div class="field field--row">
         <label>${label}</label>
         <div class="slider-wrap">
           <input type="range" class="slider" min=${min} max=${max} step=${step} .value=${String(cur)}
             @input=${(e: Event) => onChange(Number((e.target as HTMLInputElement).value))} />
-          <span class="slider-val">${cur}${suffix}</span>
+          <span class="slider-val-wrap">
+            <input type="number" class="slider-val-input" min=${min} max=${max} step=${step}
+              .value=${String(cur)}
+              @change=${(e: Event) => commit((e.target as HTMLInputElement).value)}
+              @keydown=${(e: KeyboardEvent) => { if (e.key === "Enter") (e.target as HTMLInputElement).blur(); }} />
+            ${suffix ? html`<span class="slider-val-suffix">${suffix}</span>` : nothing}
+          </span>
         </div>
       </div>`;
   }
@@ -3504,7 +3519,18 @@ export class AnyVacCardEditor extends LitElement {
 
     .slider-wrap { display:flex; align-items:center; gap:8px; flex:1; }
     .slider { flex:1; accent-color:var(--primary-color); }
-    .slider-val { width:52px; text-align:right; font-size:13px; font-weight:600; color:var(--primary-color); flex-shrink:0; }
+    .slider-val-wrap { display:flex; align-items:center; gap:2px; flex-shrink:0; }
+    .slider-val-input {
+      width:48px; text-align:right; font-size:13px; font-weight:600; color:var(--primary-color);
+      font-family:inherit; border:none; border-radius:4px; background:transparent; padding:2px 3px;
+      -moz-appearance:textfield;
+    }
+    .slider-val-input:hover, .slider-val-input:focus {
+      background:var(--secondary-background-color,rgba(127,127,127,.15)); outline:none;
+    }
+    .slider-val-input::-webkit-outer-spin-button,
+    .slider-val-input::-webkit-inner-spin-button { -webkit-appearance:none; margin:0; }
+    .slider-val-suffix { font-size:13px; font-weight:600; color:var(--primary-color); }
 
     /* ── Buttons ── */
     .btn {
