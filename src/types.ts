@@ -41,6 +41,15 @@ export interface MapConfig {
   entity: string;
   rotation: number;
   scale: number;
+  /** Independent Y-axis scale override (manual seating only; % of wrap width,
+   *  same unit as `scale`). Undefined means "same as `scale`" — every config
+   *  written before this existed renders identically. Lets a manual seat
+   *  correct an aspect distortion baked into the robot's own map (its raw
+   *  pixel grid isn't perfectly square relative to a floorplan measured in
+   *  real units) that a single uniform `scale` can't reach. Applied to the
+   *  robot's own LOCAL axes before `rotation` spins it into place — same
+   *  order as the CSS transform composes in. */
+  scale_y?: number;
   offset_x: number;
   offset_y: number;
   /** Seating mode (docs/15): "auto" (default — fitted from room anchors when the

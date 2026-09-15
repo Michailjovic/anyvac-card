@@ -40,6 +40,7 @@ import {
   canvasScaleForCrop,
   pctToCropPoint,
   homeAnchorFit,
+  seatRotateScaleCss,
   type SeatParams,
   type ResolvedSeat,
   type RoomConfigLike,
@@ -2222,10 +2223,11 @@ export class AnyVacCardEditor extends LitElement {
     const ib = this._currentImageBase();
     const useImg = this._config.map_mode === "merged" ? !!ib?.src : ((base === "image" || base === "combined") && !!ib?.src);
     const previewUrl = useImg ? (ib!.src) : mapUrl;
-    const pvRot   = useImg ? (ib!.rotation ?? 0)  : (map.rotation ?? 0);
-    const pvScale = useImg ? (ib!.scale ?? 100)   : (map.scale ?? 100);
-    const pvOx    = useImg ? (ib!.offset_x ?? 0)  : (map.offset_x ?? 0);
-    const pvOy    = useImg ? (ib!.offset_y ?? 0)  : (map.offset_y ?? 0);
+    const pvRot    = useImg ? (ib!.rotation ?? 0) : (map.rotation ?? 0);
+    const pvScale  = useImg ? (ib!.scale ?? 100)  : (map.scale ?? 100);
+    const pvScaleY = useImg ? undefined           : map.scale_y;
+    const pvOx     = useImg ? (ib!.offset_x ?? 0) : (map.offset_x ?? 0);
+    const pvOy     = useImg ? (ib!.offset_y ?? 0) : (map.offset_y ?? 0);
     const rooms = this._editRooms();
     // docs/38 §3.3: `esLive` is the always-current fit (used for the text hint
     // and the manual-sliders gate — those should track `_config` immediately,
@@ -2561,14 +2563,14 @@ export class AnyVacCardEditor extends LitElement {
                   left:      (50 + pvOx) + "%",
                   top:       (50 + pvOy) + "%",
                   width:     pvScale + "%",
-                  transform: "translate(-50%,-50%) rotate(" + pvRot + "deg)",
+                  transform: "translate(-50%,-50%) " + seatRotateScaleCss(pvRot, pvScale, pvScaleY),
                 })} />
               ${this._mergedEdit && useImg && mapUrl ? html`<img class="map-preview-img" src=${mapUrl} alt="Native map"
                 style=${styleMap({
                   left:      (50 + esOverlay.offset_x) + "%",
                   top:       (50 + esOverlay.offset_y) + "%",
                   width:     esOverlay.scale + "%",
-                  transform: "translate(-50%,-50%) rotate(" + esOverlay.rotation + "deg)",
+                  transform: "translate(-50%,-50%) " + seatRotateScaleCss(esOverlay.rotation, esOverlay.scale, esOverlay.scaleY),
                   opacity:   "0.5",
                 })} />` : nothing}
               ${rooms.map((r, ri) => {
@@ -2672,7 +2674,15 @@ export class AnyVacCardEditor extends LitElement {
                   (or a floorplan photographed at a very different scale from the robot's own
                   map) can genuinely need several hundred percent; the slider should be able to
                   show and adjust whatever calibration or auto-fit actually solved, not clamp it. */ nothing}
-              ${this._numberSlider("Scale",     map.scale     ?? 100, 20, 800,  5, v => this._setMap(mapVac, { scale:     v }), "%")}
+              ${this._numberSlider("Scale X",   map.scale     ?? 100, 20, 800,  5, v => this._setMap(mapVac, { scale:     v }), "%")}
+              ${this._numberSlider("Scale Y",   map.scale_y   ?? map.scale ?? 100, 20, 800, 5, v => this._setMap(mapVac, { scale_y: v }), "%")}
+              ${/* Field report 2026-09-15: the robot's own raw map isn't always
+                  perfectly square-pixeled relative to a floorplan measured in real
+                  units, even when the floorplan was built precisely (floorplanner
+                  app). Scale X/Y stretch the robot's map along its OWN axes, before
+                  Rotation turns it — so at 90°/270° "Scale X" ends up affecting the
+                  floorplan's vertical extent, not horizontal (matches how Rotation
+                  is already a separate, earlier step). */ nothing}
               ${this._numberSlider("Offset X",  map.offset_x  ?? 0, -150, 150,  1, v => this._setMap(mapVac, { offset_x:  v }), "%")}
               ${this._numberSlider("Offset Y",  map.offset_y  ?? 0, -150, 150,  1, v => this._setMap(mapVac, { offset_y:  v }), "%")}
             ` : nothing}

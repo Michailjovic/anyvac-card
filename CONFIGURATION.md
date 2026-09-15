@@ -115,8 +115,9 @@ Each entry in `vacuums[]`:
 | `entity` | string | auto-resolved | The `image.*` map entity. Auto-resolves to the currently-live map candidate on the vacuum's HA device (picks the one actually reporting a picture, since multi-floor vacuums can have one `image.*` per saved floor) — override only if auto-resolve picks the wrong one. |
 | `rotation` | number (deg) | `0` | Manual seating only. |
 | `scale` | number | `1` | Manual seating only. |
+| `scale_y` | number | same as `scale` | Manual seating only. Independent Y-axis scale, applied to the robot's own map on its own axes BEFORE `rotation` turns it into place. Undefined means isotropic (identical to `scale`, i.e. today's behavior) — set it only to correct a real aspect distortion in the robot's own map that a single `scale` can't reach (e.g. a precisely-measured external floorplan still doesn't quite match the robot's raw map proportions). At 90°/270° rotation, `scale`/`scale_y` end up affecting the floorplan's vertical/horizontal extent respectively, not the other way round — they're the robot's own local axes, rotation is a separate later step. |
 | `offset_x` / `offset_y` | number | `0` | Manual seating only. |
-| `seat` | `"auto" \| "manual"` | `"auto"` | `auto` fits the vacuum's own map onto the shared floorplan from matching room anchors (needs the integration + a floorplan + at least one room whose name matches). `manual` uses `rotation`/`scale`/`offset_x`/`offset_y` above. |
+| `seat` | `"auto" \| "manual"` | `"auto"` | `auto` fits the vacuum's own map onto the shared floorplan from matching room anchors (needs the integration + a floorplan + at least one room whose name matches). `manual` uses `rotation`/`scale`/`scale_y`/`offset_x`/`offset_y` above. |
 
 This whole table is **ignored, in merged mode, for a vacuum currently
 rendered via a shared [home frame](#home-frame-docs40-fáze-3--one-shared-identity-crop-instead-of-per-vacuum-seating)**

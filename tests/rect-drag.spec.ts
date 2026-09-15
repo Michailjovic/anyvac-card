@@ -1,6 +1,6 @@
 import { test, expect } from "@playwright/test";
 import { moveRect, resizeRect, type RectPct } from "../src/rectdrag";
-import { placeRoomsInCrop, placeRoomInCrop, canvasScaleForCrop } from "../src/seatfit";
+import { placeRoomsInCrop, placeRoomInCrop, canvasScaleForCrop, roomBboxToRect, seatRotateScaleCss } from "../src/seatfit";
 
 /**
  * docs/38 §3/§5 — pure-geometry regression tests for the editor's room-rect
@@ -161,5 +161,61 @@ test.describe("seatfit: canvasScaleForCrop (docs/40 §5.A.1)", () => {
     expect(canvasScaleForCrop({ w: 400, h: 200 }, null)).toBeNull();
     expect(canvasScaleForCrop({ w: 0, h: 200 }, crop)).toBeNull();
     expect(canvasScaleForCrop({ w: 400, h: 200 }, { x0: 0, y0: 0, x1: 0, y1: 200 })).toBeNull();
+  });
+});
+
+test.describe("seatfit: roomBboxToRect with an anisotropic manual seat (2026-09-15 field report)", () => {
+  // A precisely-measured external floorplan can still disagree with the
+  // robot's own raw map proportions — a single uniform `scale` can't reach
+  // that, hence `scaleY`: an independent Y-axis stretch applied in the
+  // robot's own LOCAL space, before `rotation` turns it into place (same
+  // order the CSS transform composes in — `rotate(...) scale(sx,sy)`).
+  const at = { image_dims: { width: 1000, height: 1000, scale: 1, rotation: 0 } };
+
+  test("scaleY unset behaves exactly like the old uniform `scale` (regression pin)", () => {
+    const ir = { bbox_px: { x0: 400, y0: 400, x1: 600, y1: 600 } }; // centred, 0.2x0.2
+    const seat = { rotation: 0, scale: 100, offset_x: 0, offset_y: 0 };
+    expect(roomBboxToRect(ir, at, seat, 1)).toEqual({ map_x: 50, map_y: 50, map_w: 20, map_h: 20 });
+  });
+
+  test("scaleY stretches only the room's height at rotation 0, not its width or position (centred bbox)", () => {
+    const ir = { bbox_px: { x0: 400, y0: 400, x1: 600, y1: 600 } };
+    const seat = { rotation: 0, scale: 100, scaleY: 200, offset_x: 0, offset_y: 0 };
+    expect(roomBboxToRect(ir, at, seat, 1)).toEqual({ map_x: 50, map_y: 50, map_w: 20, map_h: 40 });
+  });
+
+  test("an off-centre bbox is repositioned by scaleY too, not just resized (it's a real axis stretch of the whole map)", () => {
+    const ir = { bbox_px: { x0: 600, y0: 700, x1: 800, y1: 900 } }; // centre (700,800), 0.2x0.2
+    const seat = { rotation: 0, scale: 100, scaleY: 150, offset_x: 0, offset_y: 0 };
+    expect(roomBboxToRect(ir, at, seat, 1)).toEqual({ map_x: 70, map_y: 95, map_w: 20, map_h: 30 });
+  });
+
+  test("at 90° rotation, scale/scaleY swap which SCREEN axis they affect (they're the robot's own local axes, rotation is a separate later step)", () => {
+    const ir = { bbox_px: { x0: 400, y0: 400, x1: 600, y1: 600 } }; // centred, local 0.2x0.2
+    const seat = { rotation: 90, scale: 100, scaleY: 200, offset_x: 0, offset_y: 0 };
+    // Local X (scale=100%) -> screen height; local Y (scaleY=200%) -> screen width.
+    expect(roomBboxToRect(ir, at, seat, 1)).toEqual({ map_x: 50, map_y: 50, map_w: 40, map_h: 20 });
+  });
+});
+
+test.describe("seatfit: seatRotateScaleCss (2026-09-15 field report)", () => {
+  test("no scaleY -> plain rotate, no scale() term added", () => {
+    expect(seatRotateScaleCss(0, 100)).toBe("rotate(0deg)");
+  });
+
+  test("scaleY equal to scale -> still plain rotate (isotropic, no visible/DOM change)", () => {
+    expect(seatRotateScaleCss(90, 100, 100)).toBe("rotate(90deg)");
+  });
+
+  test("scaleY greater than scale -> appends a Y-only scale() after rotate", () => {
+    expect(seatRotateScaleCss(0, 100, 150)).toBe("rotate(0deg) scale(1,1.5)");
+  });
+
+  test("the ratio is scaleY/scale, not scaleY alone", () => {
+    expect(seatRotateScaleCss(45, 200, 100)).toBe("rotate(45deg) scale(1,0.5)");
+  });
+
+  test("scale of 0 never divides by zero -- falls back to plain rotate", () => {
+    expect(seatRotateScaleCss(0, 0, 150)).toBe("rotate(0deg)");
   });
 });

@@ -8,6 +8,37 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Planned
 
+## [1.10.0] - 2026-09-15
+
+### Added
+
+- **Independent Scale X / Scale Y for manual map seating** (`vacuums[].map.scale_y`) —
+  a "Scale Y" slider now sits next to Scale (renamed "Scale X") under Map seating's
+  manual sliders. Field report: even a floorplan built precisely in a floorplanner app
+  can still disagree with the robot's own raw map proportions (the robot's pixel grid
+  isn't necessarily square relative to real-world units) in a way one uniform `scale`
+  can't correct. `scale_y` stretches the robot's map along its own local Y axis,
+  independently of `scale`'s X axis, *before* `rotation` turns the whole thing into
+  place — so at 90°/270° rotation, Scale X/Y end up affecting the floorplan's
+  vertical/horizontal extent respectively, not the other way round (they're the
+  robot's own axes; rotation is a separate, later step). Undefined `scale_y` (every
+  config written before this existed) renders byte-identically to before — this is a
+  pure opt-in addition, not a behavior change. Applies everywhere a per-vacuum seat is
+  drawn: the map image itself, the robot marker + cleaning path overlay, and room-bbox
+  placement (`roomBboxToRect`, used by the "Import missing rooms" button and the
+  editor's own live preview) — one shared implementation, not several (docs/14 rule 1).
+  Pin & Go / Zone clicks needed no change at all: they already invert the map layer's
+  live CSS transform generically (`_clickToContent`'s `DOMMatrix` inversion), which
+  handles an anisotropic scale just as correctly as a uniform one.
+
+New tests: `tests/rect-drag.spec.ts` gains 9 cases — `roomBboxToRect` with an
+anisotropic seat (isotropic regression pin, Y-only resize, off-centre bbox
+repositioning, and the 90°-rotation axis swap, hand-derived and verified against the
+implementation) plus `seatRotateScaleCss`, the new small helper that builds the
+`rotate()[ scale(1,r)]` CSS fragment shared by every seat-styled element. Full suite:
+99/99 (90 + 9 new, no regressions from the `seatProjectPct`/`roomBboxToRect`
+refactor).
+
 ## [1.9.1] - 2026-09-15
 
 ### Fixed

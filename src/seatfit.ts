@@ -16,6 +16,12 @@
 export interface SeatParams {
   rotation: number;   // deg (snapped to 0/90/180/270)
   scale: number;      // % of wrap width
+  /** Independent Y-axis scale (manual-only override; same "% of wrap width"
+   *  unit as `scale`). Undefined = isotropic (use `scale` for both axes) —
+   *  auto-fit (`computeSeatFit`) never sets this, it only ever solves a
+   *  uniform similarity transform. Applied in LOCAL space, before `rotation`
+   *  (see `seatProjectPct`). */
+  scaleY?: number;
   offset_x: number;   // % (same semantics as MapConfig.offset_x)
   offset_y: number;   // %
 }
@@ -196,7 +202,7 @@ export function computeSeatFit(anchors: SeatAnchor[], ar: number): SeatFitResult
 /** Minimal shapes needed to resolve a seat — deliberately structural rather than
  *  importing the full config types, so `seatfit.ts` stays dependency-free. */
 interface SeatVacuumLike {
-  map?: { seat?: string; rotation?: number; scale?: number; offset_x?: number; offset_y?: number };
+  map?: { seat?: string; rotation?: number; scale?: number; scale_y?: number; offset_x?: number; offset_y?: number };
   image_base?: { src?: string; crop_box?: CropBoxLike };
   rooms?: CardRoomLike[];
 }
@@ -265,7 +271,7 @@ export function resolveSeat(
 ): ResolvedSeat {
   const m = vac?.map;
   const manual: ResolvedSeat = {
-    rotation: m?.rotation ?? 0, scale: m?.scale ?? 100,
+    rotation: m?.rotation ?? 0, scale: m?.scale ?? 100, scaleY: m?.scale_y,
     offset_x: m?.offset_x ?? 0, offset_y: m?.offset_y ?? 0, auto: false,
   };
   if (!vac || m?.seat === "manual") return manual;
@@ -558,12 +564,33 @@ export function canvasScaleForCrop(
  *  placement below and `projectHomePxThroughFit` (docs/40 §5.B): one
  *  implementation of that projection, not two (docs/14 rule 1). */
 function seatProjectPct(q: { x: number; y: number }, seat: SeatParams, ar: number): { x: number; y: number } {
-  const s = seat.scale / 100;
+  // Anisotropic scale (manual-only `scaleY`): each local axis is scaled
+  // independently BEFORE rotating — the same order the CSS transform
+  // composes in (`rotate(...) scale(sx,sy)` applies scale to local content
+  // first, then spins the whole thing). Reduces to the old uniform formula
+  // bit-for-bit whenever `scaleY` is unset (sy === sx).
+  const sx = seat.scale / 100;
+  const sy = (seat.scaleY ?? seat.scale) / 100;
   const theta = seat.rotation * RAD;
   const cos = Math.cos(theta), sin = Math.sin(theta);
   const c = { x: (50 + seat.offset_x) / 100, y: (50 + seat.offset_y) / 100 / ar };
-  const u = { x: c.x + s * (cos * q.x - sin * q.y), y: c.y + s * (sin * q.x + cos * q.y) };
+  const qx = sx * q.x, qy = sy * q.y;
+  const u = { x: c.x + (cos * qx - sin * qy), y: c.y + (sin * qx + cos * qy) };
   return { x: u.x * 100, y: u.y * ar * 100 };
+}
+
+/** Builds the `rotate()[ scale(1,r)]` half of a seat's CSS transform string
+ *  (the caller supplies its own `translate(...)` centring prefix, since not
+ *  every seat-styled element uses `-50%,-50%`). Only emits the extra
+ *  `scale(1,r)` term when `scaleY` actually diverges from `scale` — every
+ *  element that renders a seat (`.map-img` in both render modes, the
+ *  integration overlay SVG, the editor's two preview images) shares this one
+ *  implementation (docs/14 rule 1), and every config written before
+ *  `scale_y` existed produces a byte-identical style string through it. */
+export function seatRotateScaleCss(rotationDeg: number, scale: number, scaleY?: number | null): string {
+  const rot = "rotate(" + rotationDeg + "deg)";
+  if (scaleY == null || scaleY === scale || !scale) return rot;
+  return rot + " scale(1," + (scaleY / scale) + ")";
 }
 
 export function roomBboxToRect(
@@ -577,9 +604,13 @@ export function roomBboxToRect(
   if (!dims || !bp || [bp.x0, bp.y0, bp.x1, bp.y1].some((v) => v == null)) return null;
   const { NW, NH } = dims;
   const q = { x: ((bp.x0 + bp.x1) / 2 - NW / 2) / NW, y: ((bp.y0 + bp.y1) / 2 - NH / 2) / NW };
-  let w = (bp.x1 - bp.x0) / NW;
-  let h = (bp.y1 - bp.y0) / NW;
-  const s = seat.scale / 100;
+  const sx = seat.scale / 100;
+  const sy = (seat.scaleY ?? seat.scale) / 100;
+  // Scaled in LOCAL space (x by sx, y by sy) BEFORE the rot90 swap below —
+  // same axis convention as `seatProjectPct`. Reduces to the old `s*w`/`s*h`
+  // bit-for-bit when scaleY is unset (sx === sy).
+  let w = ((bp.x1 - bp.x0) / NW) * sx;
+  let h = ((bp.y1 - bp.y0) / NW) * sy;
   const pct = seatProjectPct(q, seat, ar);
   const rot90 = Math.round(seat.rotation / 90) % 2 !== 0;
   if (rot90) { const tmp = w; w = h; h = tmp; }
@@ -587,8 +618,8 @@ export function roomBboxToRect(
   return {
     map_x: clamp(Math.round(pct.x * 10) / 10, 0, 100),
     map_y: clamp(Math.round(pct.y * 10) / 10, 0, 100),
-    map_w: clamp(Math.round(s * w * 1000) / 10, 2, 100),
-    map_h: clamp(Math.round(s * h * ar * 1000) / 10, 2, 100),
+    map_w: clamp(Math.round(w * 1000) / 10, 2, 100),
+    map_h: clamp(Math.round(h * ar * 1000) / 10, 2, 100),
   };
 }
 

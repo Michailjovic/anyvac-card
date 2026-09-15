@@ -46,6 +46,7 @@ import {
   projectHomePxThroughFit,
   unprojectPctThroughFit,
   outlineThroughFit,
+  seatRotateScaleCss,
   type SeatParams,
   type SeatFitResult,
   type CropBox,
@@ -4015,7 +4016,7 @@ export class AnyVacCard extends LitElement {
       top: (50 + (m?.offset_y ?? 0)) + "%",
       width: (m?.scale ?? 100) + "%",
       aspectRatio: NW + " / " + NH,
-      transform: "translate(-50%,-50%) rotate(" + (m?.rotation ?? 0) + "deg)",
+      transform: "translate(-50%,-50%) " + seatRotateScaleCss(m?.rotation ?? 0, m?.scale ?? 100, m?.scaleY),
     };
     const pw = rr * 0.35 * ((vac.path_width ?? 100) / 100);
     const sw = pw.toFixed(2);
@@ -4664,7 +4665,7 @@ export class AnyVacCard extends LitElement {
               left: (50 + seat.offset_x) + "%",
               top: (50 + seat.offset_y) + "%",
               width: seat.scale + "%",
-              transform: "translate(-50%,-50%) rotate(" + seat.rotation + "deg)",
+              transform: "translate(-50%,-50%) " + seatRotateScaleCss(seat.rotation, seat.scale, seat.scaleY),
               opacity: v.hide_map ? "0" : String((v.overlay_opacity ?? (overlay ? 55 : 100)) / 100),
               mixBlendMode: v.overlay_blend ?? "normal",
             })} />`;
@@ -4758,7 +4759,7 @@ export class AnyVacCard extends LitElement {
               left: (50 + seat.offset_x) + "%",
               top:  (50 + seat.offset_y) + "%",
               width: seat.scale + "%",
-              transform: "translate(-50%,-50%) rotate(" + seat.rotation + "deg)",
+              transform: "translate(-50%,-50%) " + seatRotateScaleCss(seat.rotation, seat.scale, seat.scaleY),
               ...(vac.hide_map ? { opacity: "0" } : (showImage ? { opacity: String((vac.overlay_opacity ?? 55) / 100), mixBlendMode: vac.overlay_blend ?? "normal" } : {})),
             })} />
         ` : nothing}
