@@ -8,6 +8,35 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Planned
 
+## [1.10.2] - 2026-09-17
+
+### Changed
+
+- **Horizontal/vertical slider labelling, extended and made correctable.** Field report:
+  1.10.1's "horizontal"/"vertical" relabelling for the two Scale sliders only accounted for
+  a vacuum's own `rotation` — but the card also auto-rotates its *whole* map area 90° to fit
+  a narrow card box (`_mapRotationDeg()`, independent of any vacuum's `rotation`), and Home
+  Assistant's own card-config dialog renders its live preview in a box of whatever width
+  *that dialog* happens to use — which is not always the width the same card renders at on
+  the real dashboard. So the dialog's preview and the real dashboard can legitimately pick
+  different auto-rotations and disagree on which way is "horizontal", which is exactly what
+  was reported ("horizontal controls vertical and vice versa") even with `rotation` at a
+  value that shouldn't have triggered any swap. There is no way for the editor — a separate
+  component from the live card, with no visibility into the real dashboard's width — to
+  detect this reliably, so instead: a new **"Swap ↔/↕" toggle** at the top of the Maps tab
+  lets the user correct every ↔/↕ label in the tab at once, by eye, against their real
+  dashboard (never saved to config — editor-only UI state).
+- **The same ↔/↕ relabelling now covers every X/Y pair in the Maps tab**, not just Scale:
+  Offset X/Y, Image offset X/Y (`image_base`), and Room position (X/Y) and size (Width/
+  Height). Offset-like fields (screen frame, set before any local rotation) swap only with
+  the new toggle; Scale (the robot's own local, pre-rotation axes) swaps with the toggle
+  *and* independently with `rotation`, same as before, so the two can cancel out correctly
+  when both apply. Stored config keys and their meaning are unchanged in every case — only
+  the editor's presentation adapts.
+
+Full suite: 102/102, no regressions (no new geometry — this is editor label/wiring only,
+built on the already-tested `isRot90` helper).
+
 ## [1.10.1] - 2026-09-17
 
 ### Fixed

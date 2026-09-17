@@ -179,6 +179,24 @@ export class AnyVacCardEditor extends LitElement {
   // Maps tab state
   @state() private _mapVac  = 0;
   @state() private _mapRoom: number | null = null;
+  /** Maps tab: manual override for every horizontal/vertical (↔/↕) slider
+   *  label in this tab (Scale, Offset, Image offset, Room position/size).
+   *  Editor-local UI state only — never written to config, resets on reload.
+   *
+   *  Why this exists (2026-09-17 field report): the card auto-rotates its
+   *  whole map area 90° when its own rendered box is narrow
+   *  (`_mapRotationDeg()`, anyvac-card.ts), independently of any per-vacuum
+   *  Rotation value. HA's card-config dialog renders this tab's live preview
+   *  in a box of whatever width THAT dialog happens to use, which can easily
+   *  differ from the card's real width on the user's own dashboard — so the
+   *  preview and the real dashboard can pick different ambient rotations and
+   *  disagree on which way is "horizontal". This editor is a separate
+   *  component from the live card and has no reliable way to know the real
+   *  dashboard's width, so rather than guess, the ↔/↕ labels below default
+   *  to tracking Rotation alone (correct whenever both places agree, the
+   *  common case) and this toggle lets the user correct all of them at once
+   *  when they don't. */
+  @state() private _hvSwap = false;
   /** Floorplan natural aspect ratio (W/H) learned from the preview image — used by
    *  the auto-seat fit and to give the preview the correct proportions. */
   @state() private _pvAR = 0;
@@ -2290,6 +2308,22 @@ export class AnyVacCardEditor extends LitElement {
           </div>
         ` : nothing}
 
+        <div class="field field--row">
+          <label>Swap ↔/↕ everywhere below</label>
+          <label class="toggle-wrap">
+            <input type="checkbox" class="toggle-input"
+              .checked=${this._hvSwap}
+              @change=${(e: Event) => { this._hvSwap = (e.target as HTMLInputElement).checked; }} />
+            <span class="toggle-track"></span>
+          </label>
+        </div>
+        <p class="hint">HA's own edit-card dialog can render the preview above (and below) at a
+          different width than your real dashboard — which can flip whether the map auto-rotates
+          90°, independently of any Rotation field. If dragging a slider marked ↔ (horizontal)
+          visibly moves something vertically — judge by your <strong>real dashboard</strong>, not
+          this dialog — turn this on to fix every ↔/↕ label in this tab at once (Scale, Offset,
+          Image offset, Room position/size).</p>
+
         ${this._selectField<"split" | "merged">("Map mode (all vacuums)", this._config.map_mode ?? "split",
           [{ value: "split", label: "Split — one map per vacuum" }, { value: "merged", label: "Merged — all in one map" }],
           v => this._setConfig({ map_mode: v === "merged" ? "merged" : undefined }))}
@@ -2436,8 +2470,20 @@ export class AnyVacCardEditor extends LitElement {
           ${this._textField("Image src (URL)", ib?.src, v => this._setEditedImageBase({ src: v }), "/local/anyvac/flat.svg")}
           ${this._numberSlider("Image rotation", ib?.rotation ?? 0, 0, 360, 90, v => this._setEditedImageBase({ rotation: v }), "°")}
           ${this._numberSlider("Image scale", ib?.scale ?? 100, 50, 200, 5, v => this._setEditedImageBase({ scale: v }), "%")}
-          ${this._numberSlider("Image offset X", ib?.offset_x ?? 0, -50, 50, 1, v => this._setEditedImageBase({ offset_x: v }), "%")}
-          ${this._numberSlider("Image offset Y", ib?.offset_y ?? 0, -50, 50, 1, v => this._setEditedImageBase({ offset_y: v }), "%")}
+          ${(() => {
+            // Image offset moves the floorplan image in the PARENT (screen)
+            // frame, before its own rotation is applied — unlike seat Scale,
+            // it never swaps with Image rotation, only with the ambient
+            // map-area rotation the "Swap ↔/↕" toggle above stands in for.
+            const ibHField: "offset_x" | "offset_y" = this._hvSwap ? "offset_y" : "offset_x";
+            const ibVField: "offset_x" | "offset_y" = this._hvSwap ? "offset_x" : "offset_y";
+            const ibHVal = this._hvSwap ? (ib?.offset_y ?? 0) : (ib?.offset_x ?? 0);
+            const ibVVal = this._hvSwap ? (ib?.offset_x ?? 0) : (ib?.offset_y ?? 0);
+            return html`
+              ${this._numberSlider("Image offset ↔ (horizontal)", ibHVal, -50, 50, 1, v => this._setEditedImageBase({ [ibHField]: v }), "%")}
+              ${this._numberSlider("Image offset ↕ (vertical)",   ibVVal, -50, 50, 1, v => this._setEditedImageBase({ [ibVField]: v }), "%")}
+            `;
+          })()}
 
           ${this._config.map_mode === "merged" && !homeFrameCrop && ib?.src && this._anyHomeFrame() ? html`
             <div class="section-title">Calibrate against home frame (docs/40 §5.B)</div>
@@ -2684,11 +2730,24 @@ export class AnyVacCardEditor extends LitElement {
               // "horizontal" always does what it says, whatever Rotation is set
               // to. The stored config keys (`scale`/`scale_y`) are unchanged and
               // still mean "local X"/"local Y" if read directly from YAML.
-              const swapped = isRot90(map.rotation ?? 0);
+              // Scale is stored in the robot's own LOCAL axes (pre-rotation,
+              // see seatfit.ts), so it swaps with Rotation itself. Offset moves
+              // the seat in the PARENT (floorplan) frame, before that local
+              // rotation — it never swaps with Rotation, only with the ambient
+              // map-area rotation the "Swap ↔/↕" toggle above stands in for.
+              // XOR-ing the two swaps for Scale (and using the ambient one
+              // alone for Offset) is what lets a single toggle correct every
+              // ↔/↕ label in this tab at once, whatever each field's own
+              // swap condition is.
+              const swapped = isRot90(map.rotation ?? 0) !== this._hvSwap;
               const hField: "scale" | "scale_y" = swapped ? "scale_y" : "scale";
               const vField: "scale" | "scale_y" = swapped ? "scale" : "scale_y";
               const hVal = swapped ? (map.scale_y ?? map.scale ?? 100) : (map.scale ?? 100);
               const vVal = swapped ? (map.scale ?? 100) : (map.scale_y ?? map.scale ?? 100);
+              const oHField: "offset_x" | "offset_y" = this._hvSwap ? "offset_y" : "offset_x";
+              const oVField: "offset_x" | "offset_y" = this._hvSwap ? "offset_x" : "offset_y";
+              const oHVal = this._hvSwap ? (map.offset_y ?? 0) : (map.offset_x ?? 0);
+              const oVVal = this._hvSwap ? (map.offset_x ?? 0) : (map.offset_y ?? 0);
               return html`
                 ${this._numberSlider("Rotation",  map.rotation  ?? 0,    0, 360,  90, v => this._setMap(mapVac, { rotation:  v }), "°")}
                 ${/* docs/39 §9: widened from 50-200 — a badly-fit auto-seat before calibration
@@ -2697,8 +2756,8 @@ export class AnyVacCardEditor extends LitElement {
                     show and adjust whatever calibration or auto-fit actually solved, not clamp it. */ nothing}
                 ${this._numberSlider("Scale ↔ (horizontal)", hVal, 20, 800, 5, v => this._setMap(mapVac, { [hField]: v }), "%")}
                 ${this._numberSlider("Scale ↕ (vertical)",   vVal, 20, 800, 5, v => this._setMap(mapVac, { [vField]: v }), "%")}
-                ${this._numberSlider("Offset X",  map.offset_x  ?? 0, -150, 150,  1, v => this._setMap(mapVac, { offset_x:  v }), "%")}
-                ${this._numberSlider("Offset Y",  map.offset_y  ?? 0, -150, 150,  1, v => this._setMap(mapVac, { offset_y:  v }), "%")}
+                ${this._numberSlider("Offset ↔ (horizontal)", oHVal, -150, 150,  1, v => this._setMap(mapVac, { [oHField]: v }), "%")}
+                ${this._numberSlider("Offset ↕ (vertical)",   oVVal, -150, 150,  1, v => this._setMap(mapVac, { [oVField]: v }), "%")}
               `;
             })() : nothing}
             ${this._intEntityFor(vac) ? html`
@@ -2771,25 +2830,45 @@ export class AnyVacCardEditor extends LitElement {
                 ${this._numberSlider("Wet clean time", rooms[this._mapRoom]?.clean_time_wet ?? 0, 0, 180, 1, v => this._setEditedRoom(this._mapRoom!, { clean_time_wet: v > 0 ? v : undefined }), " min")}
               ` : nothing}
               <div class="section-title" style="margin-top:4px">Position</div>
-              ${this._numberSlider("X", rooms[this._mapRoom]?.map_x ?? 50, 0, 100, 0.1,
-                v => this._setEditedRoom(this._mapRoom!, { map_x: round1(v) }), "%")}
-              ${this._numberSlider("Y", rooms[this._mapRoom]?.map_y ?? 50, 0, 100, 0.1,
-                v => this._setEditedRoom(this._mapRoom!, { map_y: round1(v) }), "%")}
+              ${(() => {
+                // Room map_x/map_y are already stored in the shared floorplan's
+                // own (screen) frame — like seat Offset, they never swap with
+                // any vacuum's own Rotation, only with the ambient map-area
+                // rotation the "Swap ↔/↕" toggle above stands in for.
+                const r = rooms[this._mapRoom!];
+                const rHField: "map_x" | "map_y" = this._hvSwap ? "map_y" : "map_x";
+                const rVField: "map_x" | "map_y" = this._hvSwap ? "map_x" : "map_y";
+                const rHVal = this._hvSwap ? (r?.map_y ?? 50) : (r?.map_x ?? 50);
+                const rVVal = this._hvSwap ? (r?.map_x ?? 50) : (r?.map_y ?? 50);
+                return html`
+                  ${this._numberSlider("X ↔ (horizontal)", rHVal, 0, 100, 0.1,
+                    v => this._setEditedRoom(this._mapRoom!, { [rHField]: round1(v) }), "%")}
+                  ${this._numberSlider("Y ↕ (vertical)",   rVVal, 0, 100, 0.1,
+                    v => this._setEditedRoom(this._mapRoom!, { [rVField]: round1(v) }), "%")}
+                `;
+              })()}
 
               <div class="section-title" style="margin-top:4px">Overlay mode</div>
               ${(() => {
                 const room = rooms[this._mapRoom!];
-                return room?.map_w !== undefined ? html`
-                  ${this._numberSlider("Width",  room.map_w,        1, 100, 0.1, v => this._setEditedRoom(this._mapRoom!, { map_w: round1(v) }), "%")}
-                  ${this._numberSlider("Height", room.map_h ?? 15,  1, 100, 0.1, v => this._setEditedRoom(this._mapRoom!, { map_h: round1(v) }), "%")}
-                  <button class="btn btn--sm" style="align-self:flex-start"
-                    @click=${() => this._setEditedRoom(this._mapRoom!, { map_w: undefined, map_h: undefined })}>
-                    Switch to point mode
-                  </button>
-                ` : html`
+                if (room?.map_w === undefined) return html`
                   <button class="btn btn--add btn--sm" style="align-self:flex-start"
                     @click=${() => this._setEditedRoom(this._mapRoom!, { map_w: 20, map_h: 15 })}>
                     <ha-icon icon="mdi:rectangle-outline"></ha-icon> Enable rectangle overlay
+                  </button>
+                `;
+                // Same ambient-only swap as Position X/Y above — map_w/map_h are
+                // the room rectangle's extents in that same floorplan frame.
+                const wField: "map_w" | "map_h" = this._hvSwap ? "map_h" : "map_w";
+                const hField: "map_w" | "map_h" = this._hvSwap ? "map_w" : "map_h";
+                const wVal = this._hvSwap ? (room.map_h ?? 15) : room.map_w;
+                const hVal = this._hvSwap ? room.map_w : (room.map_h ?? 15);
+                return html`
+                  ${this._numberSlider("Width ↔ (horizontal)",  wVal, 1, 100, 0.1, v => this._setEditedRoom(this._mapRoom!, { [wField]: round1(v) }), "%")}
+                  ${this._numberSlider("Height ↕ (vertical)",   hVal, 1, 100, 0.1, v => this._setEditedRoom(this._mapRoom!, { [hField]: round1(v) }), "%")}
+                  <button class="btn btn--sm" style="align-self:flex-start"
+                    @click=${() => this._setEditedRoom(this._mapRoom!, { map_w: undefined, map_h: undefined })}>
+                    Switch to point mode
                   </button>
                 `;
               })()}
