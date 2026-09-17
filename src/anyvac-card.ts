@@ -47,6 +47,7 @@ import {
   unprojectPctThroughFit,
   outlineThroughFit,
   seatRotateScaleCss,
+  seatScaleYRatio,
   type SeatParams,
   type SeatFitResult,
   type CropBox,
@@ -4064,8 +4065,23 @@ export class AnyVacCard extends LitElement {
             <circle class="avc-err-halo" cx=${rob!.x.toFixed(1)} cy=${rob!.y.toFixed(1)} r=${(rr * 2.2).toFixed(1)}
               fill="#ff3b30" filter=${"url(#" + errFilterId + ")"}></circle>`
       : nothing;
+    // 2026-09-17 field report: the extra Y-only `scale(1,r)` `scaleY` adds to
+    // the SVG's OWN CSS transform (`seatRotateScaleCss`, in `seat` below)
+    // stretches EVERYTHING drawn in its `viewBox` space uniformly — paths
+    // and rooms are meant to stretch (that's the whole point of `scaleY`),
+    // but the robot marker/icon is not: a plain circle would render as an
+    // ellipse, and `robot_image_on_map` would visibly squash. Counter-scale
+    // just the marker group by the reciprocal ratio, anchored at the robot's
+    // own position so it neither shifts nor distorts, while the path stretch
+    // (`pathsInner`, left alone) still does its job. `seatScaleYRatio` is 1
+    // (a no-op) for every non-`_renderIntegrationOverlay` caller and every
+    // config written before `scale_y` existed, so this is additive only.
+    const scaleYRatio = seatScaleYRatio(m?.scale ?? 100, m?.scaleY);
+    const markerContent = svg`${errHalo}${robotT}`;
+    const markerInner = (scaleYRatio !== 1 && rob)
+      ? svg`<g transform=${"translate(" + rob.x.toFixed(1) + "," + rob.y.toFixed(1) + ") scale(1," + (1 / scaleYRatio).toFixed(4) + ") translate(" + (-rob.x).toFixed(1) + "," + (-rob.y).toFixed(1) + ")"}>${markerContent}</g>`
+      : markerContent;
     const pathsInner = svg`${mopBand}${mopLine}${traceT}`;
-    const markerInner = svg`${errHalo}${robotT}`;
     const inner = part === "paths" ? pathsInner : part === "marker" ? markerInner : svg`${pathsInner}${markerInner}`;
     return html`<svg class="map-vector" viewBox="0 0 ${NW} ${NH}" preserveAspectRatio="none" style=${styleMap(seat)}>${inner}</svg>`;
   }

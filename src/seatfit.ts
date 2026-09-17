@@ -579,6 +579,26 @@ function seatProjectPct(q: { x: number; y: number }, seat: SeatParams, ar: numbe
   return { x: u.x * 100, y: u.y * ar * 100 };
 }
 
+/** Whether a rotation angle is nearer a 90°/270° snap than a 0°/180° one —
+ *  the point at which a seat's LOCAL x/y axes (pre-rotation) end up mapped
+ *  onto the SCREEN's y/x axes instead of straight through. Shared by
+ *  `roomBboxToRect`'s own w/h swap below and the editor's horizontal/
+ *  vertical Scale slider relabelling (docs/14 rule 1 — one axis-swap test,
+ *  not two that could quietly disagree at an odd typed angle). */
+export function isRot90(rotationDeg: number): boolean {
+  return Math.round(rotationDeg / 90) % 2 !== 0;
+}
+
+/** `scaleY`'s ratio to `scale` (1 when unset, equal, or `scale` is 0/falsy —
+ *  every one of those means "no anisotropic stretch"). Shared by
+ *  `seatRotateScaleCss` below and the integration-overlay robot marker's
+ *  counter-scale (anyvac-card.ts) so both agree on exactly when a stretch is
+ *  actually in effect (docs/14 rule 1). */
+export function seatScaleYRatio(scale: number, scaleY?: number | null): number {
+  if (scaleY == null || scaleY === scale || !scale) return 1;
+  return scaleY / scale;
+}
+
 /** Builds the `rotate()[ scale(1,r)]` half of a seat's CSS transform string
  *  (the caller supplies its own `translate(...)` centring prefix, since not
  *  every seat-styled element uses `-50%,-50%`). Only emits the extra
@@ -589,8 +609,8 @@ function seatProjectPct(q: { x: number; y: number }, seat: SeatParams, ar: numbe
  *  `scale_y` existed produces a byte-identical style string through it. */
 export function seatRotateScaleCss(rotationDeg: number, scale: number, scaleY?: number | null): string {
   const rot = "rotate(" + rotationDeg + "deg)";
-  if (scaleY == null || scaleY === scale || !scale) return rot;
-  return rot + " scale(1," + (scaleY / scale) + ")";
+  const r = seatScaleYRatio(scale, scaleY);
+  return r === 1 ? rot : rot + " scale(1," + r + ")";
 }
 
 export function roomBboxToRect(
@@ -612,7 +632,7 @@ export function roomBboxToRect(
   let w = ((bp.x1 - bp.x0) / NW) * sx;
   let h = ((bp.y1 - bp.y0) / NW) * sy;
   const pct = seatProjectPct(q, seat, ar);
-  const rot90 = Math.round(seat.rotation / 90) % 2 !== 0;
+  const rot90 = isRot90(seat.rotation);
   if (rot90) { const tmp = w; w = h; h = tmp; }
   const clamp = (v: number, lo: number, hi: number) => Math.min(hi, Math.max(lo, v));
   return {

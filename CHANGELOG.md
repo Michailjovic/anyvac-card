@@ -8,6 +8,35 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Planned
 
+## [1.10.1] - 2026-09-17
+
+### Fixed
+
+- **`scale_y` no longer distorts the robot marker/icon into an ellipse.** The integration
+  overlay (robot marker + cleaning path) draws in one `<svg viewBox>` that gets the seat's
+  full CSS transform, `scale_y`'s extra Y-only `scale(1,r)` included — correct for the path
+  and rooms (the whole point), but it also squashed the robot dot/image, which should stay
+  visually undistorted. The marker sub-tree now gets a counter-scale by the reciprocal ratio,
+  anchored at the robot's own position, so it renders correctly proportioned regardless of
+  `scale_y` while the path/room geometry still stretches as configured.
+
+### Changed
+
+- **The Map seating editor's two Scale sliders are now "horizontal"/"vertical", not "X"/"Y".**
+  Field report: `scale`/`scale_y` are stored as the robot's own LOCAL axes (the only frame
+  simple at any angle), but a person aligning a map by eye thinks in what's on screen — and at
+  90°/270° rotation those disagree (local X ends up as the floorplan's *vertical* extent).
+  The two sliders now relabel themselves "Scale ↔ (horizontal)" / "Scale ↕ (vertical)" and swap
+  which of `scale`/`scale_y` each one reads and writes, based on the current Rotation — so the
+  slider labelled "horizontal" always does what it says. The stored config keys and their
+  meaning are unchanged (`scale` is still local-X, `scale_y` still local-Y) — only the editor's
+  presentation adapts.
+
+New tests: `tests/rect-drag.spec.ts` gains 3 cases for the new `isRot90`/`seatScaleYRatio`
+helpers (extracted from `roomBboxToRect`/`seatRotateScaleCss` so the axis-swap test and the
+ratio-guard are each defined once, shared by the editor's slider relabelling and the marker
+counter-scale). Full suite: 102/102 (99 + 3 new, no regressions).
+
 ## [1.10.0] - 2026-09-15
 
 ### Added

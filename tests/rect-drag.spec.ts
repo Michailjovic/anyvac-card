@@ -1,6 +1,6 @@
 import { test, expect } from "@playwright/test";
 import { moveRect, resizeRect, type RectPct } from "../src/rectdrag";
-import { placeRoomsInCrop, placeRoomInCrop, canvasScaleForCrop, roomBboxToRect, seatRotateScaleCss } from "../src/seatfit";
+import { placeRoomsInCrop, placeRoomInCrop, canvasScaleForCrop, roomBboxToRect, seatRotateScaleCss, isRot90, seatScaleYRatio } from "../src/seatfit";
 
 /**
  * docs/38 §3/§5 — pure-geometry regression tests for the editor's room-rect
@@ -217,5 +217,26 @@ test.describe("seatfit: seatRotateScaleCss (2026-09-15 field report)", () => {
 
   test("scale of 0 never divides by zero -- falls back to plain rotate", () => {
     expect(seatRotateScaleCss(0, 0, 150)).toBe("rotate(0deg)");
+  });
+});
+
+test.describe("seatfit: isRot90 / seatScaleYRatio (2026-09-17 field report)", () => {
+  test("isRot90 is true only near 90°/270° -- the single swap test roomBboxToRect and the editor's horizontal/vertical slider relabelling both share", () => {
+    expect(isRot90(0)).toBe(false);
+    expect(isRot90(90)).toBe(true);
+    expect(isRot90(180)).toBe(false);
+    expect(isRot90(270)).toBe(true);
+    expect(isRot90(360)).toBe(false);
+  });
+
+  test("seatScaleYRatio is 1 (no-op) for unset, equal, or a zero/falsy scale", () => {
+    expect(seatScaleYRatio(100)).toBe(1);
+    expect(seatScaleYRatio(100, 100)).toBe(1);
+    expect(seatScaleYRatio(0, 150)).toBe(1);
+  });
+
+  test("seatScaleYRatio is otherwise scaleY/scale -- the exact reciprocal the robot-marker counter-scale needs", () => {
+    expect(seatScaleYRatio(100, 150)).toBe(1.5);
+    expect(seatScaleYRatio(200, 100)).toBe(0.5);
   });
 });

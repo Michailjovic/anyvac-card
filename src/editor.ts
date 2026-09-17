@@ -41,6 +41,7 @@ import {
   pctToCropPoint,
   homeAnchorFit,
   seatRotateScaleCss,
+  isRot90,
   type SeatParams,
   type ResolvedSeat,
   type RoomConfigLike,
@@ -2668,24 +2669,38 @@ export class AnyVacCardEditor extends LitElement {
                   Roborock app (room pairing is by exact name across vacuums) — otherwise use Import below to add it.</p>
               ` : nothing;
             })() : nothing}
-            ${(map.seat === "manual" || !esLive.auto) ? html`
-              ${this._numberSlider("Rotation",  map.rotation  ?? 0,    0, 360,  90, v => this._setMap(mapVac, { rotation:  v }), "°")}
-              ${/* docs/39 §9: widened from 50-200 — a badly-fit auto-seat before calibration
-                  (or a floorplan photographed at a very different scale from the robot's own
-                  map) can genuinely need several hundred percent; the slider should be able to
-                  show and adjust whatever calibration or auto-fit actually solved, not clamp it. */ nothing}
-              ${this._numberSlider("Scale X",   map.scale     ?? 100, 20, 800,  5, v => this._setMap(mapVac, { scale:     v }), "%")}
-              ${this._numberSlider("Scale Y",   map.scale_y   ?? map.scale ?? 100, 20, 800, 5, v => this._setMap(mapVac, { scale_y: v }), "%")}
-              ${/* Field report 2026-09-15: the robot's own raw map isn't always
-                  perfectly square-pixeled relative to a floorplan measured in real
-                  units, even when the floorplan was built precisely (floorplanner
-                  app). Scale X/Y stretch the robot's map along its OWN axes, before
-                  Rotation turns it — so at 90°/270° "Scale X" ends up affecting the
-                  floorplan's vertical extent, not horizontal (matches how Rotation
-                  is already a separate, earlier step). */ nothing}
-              ${this._numberSlider("Offset X",  map.offset_x  ?? 0, -150, 150,  1, v => this._setMap(mapVac, { offset_x:  v }), "%")}
-              ${this._numberSlider("Offset Y",  map.offset_y  ?? 0, -150, 150,  1, v => this._setMap(mapVac, { offset_y:  v }), "%")}
-            ` : nothing}
+            ${(map.seat === "manual" || !esLive.auto) ? (() => {
+              // Field report 2026-09-15/17: `scale`/`scale_y` are stored as the
+              // robot's own LOCAL axes (pre-rotation — see seatfit.ts), which is
+              // the only frame in which the geometry math stays simple at ANY
+              // angle. But a person aligning a map by eye thinks in what they see
+              // on screen, not the robot's un-rotated axes — and at 90°/270° those
+              // disagree (local X ends up as the floorplan's vertical extent, not
+              // horizontal). Rather than ask the user to hold that swap in their
+              // head, these two sliders relabel themselves as "horizontal"/
+              // "vertical" and swap which underlying field they read/write,
+              // using the SAME rot90 test `roomBboxToRect` already uses for its
+              // own axis swap (`isRot90`, seatfit.ts) — so the slider labelled
+              // "horizontal" always does what it says, whatever Rotation is set
+              // to. The stored config keys (`scale`/`scale_y`) are unchanged and
+              // still mean "local X"/"local Y" if read directly from YAML.
+              const swapped = isRot90(map.rotation ?? 0);
+              const hField: "scale" | "scale_y" = swapped ? "scale_y" : "scale";
+              const vField: "scale" | "scale_y" = swapped ? "scale" : "scale_y";
+              const hVal = swapped ? (map.scale_y ?? map.scale ?? 100) : (map.scale ?? 100);
+              const vVal = swapped ? (map.scale ?? 100) : (map.scale_y ?? map.scale ?? 100);
+              return html`
+                ${this._numberSlider("Rotation",  map.rotation  ?? 0,    0, 360,  90, v => this._setMap(mapVac, { rotation:  v }), "°")}
+                ${/* docs/39 §9: widened from 50-200 — a badly-fit auto-seat before calibration
+                    (or a floorplan photographed at a very different scale from the robot's own
+                    map) can genuinely need several hundred percent; the slider should be able to
+                    show and adjust whatever calibration or auto-fit actually solved, not clamp it. */ nothing}
+                ${this._numberSlider("Scale ↔ (horizontal)", hVal, 20, 800, 5, v => this._setMap(mapVac, { [hField]: v }), "%")}
+                ${this._numberSlider("Scale ↕ (vertical)",   vVal, 20, 800, 5, v => this._setMap(mapVac, { [vField]: v }), "%")}
+                ${this._numberSlider("Offset X",  map.offset_x  ?? 0, -150, 150,  1, v => this._setMap(mapVac, { offset_x:  v }), "%")}
+                ${this._numberSlider("Offset Y",  map.offset_y  ?? 0, -150, 150,  1, v => this._setMap(mapVac, { offset_y:  v }), "%")}
+              `;
+            })() : nothing}
             ${this._intEntityFor(vac) ? html`
               <button class="btn btn--add btn--sm" style="align-self:flex-start"
                 @click=${() => this._importRooms(mapVac)}>
