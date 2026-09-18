@@ -3,8 +3,11 @@ import {
   seatToMatrix,
   translateSeat,
   scaleSeatAbout,
+  scaleSeatCornerAniso,
   rotateSeatAbout,
   stretchSeatY,
+  stretchSeatX,
+  localAxisScaleRatio,
   pinchSeat,
   nudgeOffset,
   nudgeRotation,
@@ -126,6 +129,90 @@ test.describe("seatedit: translateSeat / scaleSeatAbout / rotateSeatAbout / stre
     expect(next.scale).toBe(100);
     const seat2: SeatParams = { ...seat, scaleY: 80 };
     expect(stretchSeatY(seat2, 1.5).scaleY).toBeCloseTo(120, 9);
+  });
+});
+
+// docs/41 field report 2026-09-18 — corner handles stayed aspect-locked even
+// with Independent Y scale on, and there was no X-axis stretch primitive at
+// all (only the uniform `scale` + `stretchSeatY`). `scaleSeatCornerAniso` /
+// `stretchSeatX` / `localAxisScaleRatio` close both gaps.
+test.describe("seatedit: scaleSeatCornerAniso / stretchSeatX / localAxisScaleRatio", () => {
+  const ar = 1.6;
+
+  test("scaleSeatCornerAniso with kx === ky matches scaleSeatAbout exactly (rotation 0, cross-check against the trusted uniform path)", () => {
+    const seat: SeatParams = { rotation: 0, scale: 90, offset_x: 5, offset_y: -3, scaleY: 70 };
+    const pivot = { x: 20, y: 15 };
+    const s0 = { x: 60, y: 55 };
+    const k = 1.35;
+    // rotation 0 -> local axes === world (pct) axes, so scaling the RAW
+    // pointer offset from pivot by k on both axes is exactly kx = ky = k.
+    const s1 = { x: pivot.x + (s0.x - pivot.x) * k, y: pivot.y + (s0.y - pivot.y) * k };
+    const aniso = scaleSeatCornerAniso(seat, s0, s1, pivot, ar);
+    const uniform = scaleSeatAbout(seat, k, pivot, ar);
+    expect(aniso.scale).toBeCloseTo(uniform.scale, 6);
+    expect(aniso.scaleY!).toBeCloseTo(uniform.scaleY!, 6);
+    expect(aniso.offset_x).toBeCloseTo(uniform.offset_x, 6);
+    expect(aniso.offset_y).toBeCloseTo(uniform.offset_y, 6);
+  });
+
+  test("scaleSeatCornerAniso with kx !== ky stretches each axis independently and keeps the pivot's content point fixed (rotation 0)", () => {
+    const seat: SeatParams = { rotation: 0, scale: 100, offset_x: 0, offset_y: 0 };
+    const qPivot = { x: -0.5, y: -0.5 }; // NW corner, opposite an SE drag
+    const pivot = forwardPct(qPivot, seat, ar);
+    const s0 = forwardPct({ x: 0.5, y: 0.5 }, seat, ar); // SE corner, the dragged one
+    const kx = 1.5, ky = 0.6;
+    const s1 = { x: pivot.x + (s0.x - pivot.x) * kx, y: pivot.y + (s0.y - pivot.y) * ky };
+    const next = scaleSeatCornerAniso(seat, s0, s1, pivot, ar);
+    expect(next.scale).toBeCloseTo(100 * kx, 6);
+    expect(next.scaleY!).toBeCloseTo(100 * ky, 6);
+    const pivotAfter = forwardPct(qPivot, next, ar);
+    expect(pivotAfter.x).toBeCloseTo(pivot.x, 6);
+    expect(pivotAfter.y).toBeCloseTo(pivot.y, 6);
+  });
+
+  test("scaleSeatCornerAniso keeps the pivot's content point fixed for an arbitrary drag on a ROTATED seat", () => {
+    const seat: SeatParams = { rotation: 33, scale: 85, offset_x: 6, offset_y: -4, scaleY: 60 };
+    const qPivot = { x: 0.5, y: -0.5 }; // NE corner, opposite a SW drag
+    const pivot = forwardPct(qPivot, seat, ar);
+    const s0 = forwardPct({ x: -0.5, y: 0.5 }, seat, ar); // SW corner, the dragged one
+    // An arbitrary drag destination — not constructed from any particular
+    // kx/ky — the pivot-invariance guarantee has to hold regardless.
+    const s1 = { x: s0.x - 11, y: s0.y + 23 };
+    const next = scaleSeatCornerAniso(seat, s0, s1, pivot, ar);
+    const pivotAfter = forwardPct(qPivot, next, ar);
+    expect(pivotAfter.x).toBeCloseTo(pivot.x, 6);
+    expect(pivotAfter.y).toBeCloseTo(pivot.y, 6);
+    expect(next.rotation).toBe(33);
+  });
+
+  test("stretchSeatX sets scale from scale when scaleY unset, compounds when set — mirrors stretchSeatY, never touches scaleY/offset/rotation", () => {
+    const seat: SeatParams = { rotation: 12, scale: 100, offset_x: 3, offset_y: -2 };
+    const next = stretchSeatX(seat, 1.3);
+    expect(next.scale).toBeCloseTo(130, 9);
+    expect(next.scaleY).toBeCloseTo(100, 9); // frozen from `scale` so Y stays put
+    expect(next.offset_x).toBe(3);
+    expect(next.offset_y).toBe(-2);
+    expect(next.rotation).toBe(12);
+    const seat2: SeatParams = { ...seat, scaleY: 80 };
+    const next2 = stretchSeatX(seat2, 1.5);
+    expect(next2.scale).toBeCloseTo(150, 9);
+    expect(next2.scaleY).toBeCloseTo(80, 9); // untouched, already independent
+  });
+
+  test("localAxisScaleRatio recovers the exact local-axis factor regardless of rotation or the seat's own scale/scaleY", () => {
+    for (const seat of [
+      { rotation: 0, scale: 100, offset_x: 0, offset_y: 0 } as SeatParams,
+      { rotation: 47, scale: 130, offset_x: 8, offset_y: -5, scaleY: 65 } as SeatParams,
+    ]) {
+      const k = 1.75;
+      const s0 = forwardPct({ x: 0, y: 0.3 }, seat, ar); // pure local-Y offset from centre
+      const s1 = forwardPct({ x: 0, y: 0.3 * k }, seat, ar); // same local axis, scaled
+      expect(localAxisScaleRatio(seat, "y", s0, s1, ar)).toBeCloseTo(k, 6);
+
+      const s0x = forwardPct({ x: 0.4, y: 0 }, seat, ar); // pure local-X offset from centre
+      const s1x = forwardPct({ x: 0.4 * k, y: 0 }, seat, ar);
+      expect(localAxisScaleRatio(seat, "x", s0x, s1x, ar)).toBeCloseTo(k, 6);
+    }
   });
 });
 

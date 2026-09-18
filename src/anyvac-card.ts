@@ -58,6 +58,10 @@ import {
   seatToMatrix,
   translateSeat,
   scaleSeatAbout,
+  scaleSeatCornerAniso,
+  stretchSeatX,
+  stretchSeatY,
+  localAxisScaleRatio,
   rotateSeatAbout,
   pinchSeat,
   defaultAlignView,
@@ -248,7 +252,7 @@ export class AnyVacCard extends LitElement {
    *  are tracked so a two-finger pinch can tell its two live pointers apart
    *  from a stray third touch (docs/41 §4.4/§6 risk 2). */
   private _alignGesture: {
-    kind: "drag" | "scale" | "rotate" | "pinch";
+    kind: "drag" | "scale" | "rotate" | "pinch" | "stretchX" | "stretchY";
     /** Seat the gesture (or, for a pinch, the pinch itself) started from —
      *  deltas are computed against this, not accumulated step-by-step, so a
      *  gesture can't drift from floating-point error across many
@@ -4326,7 +4330,8 @@ export class AnyVacCard extends LitElement {
    *  below calls; `pivotPct` is fixed for the whole gesture (the opposite
    *  corner for scale, the layer's own centre for rotate). */
   private _alignStartGesture(
-    e: PointerEvent, kind: "drag" | "scale" | "rotate", pivotPct?: { x: number; y: number },
+    e: PointerEvent, kind: "drag" | "scale" | "rotate" | "stretchX" | "stretchY",
+    pivotPct?: { x: number; y: number },
   ): void {
     const session = this._alignSession;
     if (!session || this._alignReadOnly()) return;
@@ -4373,9 +4378,24 @@ export class AnyVacCard extends LitElement {
     } else if (g.kind === "scale" && g.pivotPct) {
       const id = e.pointerId;
       const s0 = g.startPos.get(id)!, s1 = g.livePos.get(id)!;
-      const d0 = this._alignIsoDist(s0, g.pivotPct, ar);
-      const d1 = this._alignIsoDist(s1, g.pivotPct, ar);
-      if (d0 > 1e-6) next = scaleSeatAbout(g.startSeat, d1 / d0, g.pivotPct, ar);
+      if (g.startSeat.scaleY != null) {
+        // Independent Y scale is on -> corner handles unlock into an
+        // anisotropic (X/Y independent) drag instead of staying
+        // aspect-locked (field report 2026-09-18).
+        next = scaleSeatCornerAniso(g.startSeat, s0, s1, g.pivotPct, ar);
+      } else {
+        const d0 = this._alignIsoDist(s0, g.pivotPct, ar);
+        const d1 = this._alignIsoDist(s1, g.pivotPct, ar);
+        if (d0 > 1e-6) next = scaleSeatAbout(g.startSeat, d1 / d0, g.pivotPct, ar);
+      }
+    } else if (g.kind === "stretchY") {
+      const id = e.pointerId;
+      const s0 = g.startPos.get(id)!, s1 = g.livePos.get(id)!;
+      next = stretchSeatY(g.startSeat, localAxisScaleRatio(g.startSeat, "y", s0, s1, ar));
+    } else if (g.kind === "stretchX") {
+      const id = e.pointerId;
+      const s0 = g.startPos.get(id)!, s1 = g.livePos.get(id)!;
+      next = stretchSeatX(g.startSeat, localAxisScaleRatio(g.startSeat, "x", s0, s1, ar));
     } else if (g.kind === "rotate" && g.pivotPct) {
       const id = e.pointerId;
       const s0 = g.startPos.get(id)!, s1 = g.livePos.get(id)!;
@@ -4565,6 +4585,7 @@ export class AnyVacCard extends LitElement {
     const draft = session.draft;
     const corner = (cx: number, cy: number) => this._alignCornerPct(draft, cx, cy, wrapW, wrapH);
     const nw = corner(0, 0), ne = corner(1, 0), sw = corner(0, 1), se = corner(1, 1);
+    const nMid = corner(0.5, 0), sMid = corner(0.5, 1), wMid = corner(0, 0.5), eMid = corner(1, 0.5);
     const centre = { x: 50 + draft.offset_x, y: 50 + draft.offset_y };
     const rotateHandle = this._alignCornerPct(draft, 0.5, -0.18, wrapW, wrapH);
     const candidates = this._alignCandidates(this._config.vacuums);
@@ -4689,6 +4710,15 @@ export class AnyVacCard extends LitElement {
                     @pointercancel=${(e: PointerEvent) => this._alignGestureEnd(e)}>
                   </div>
                 `)}
+                ${([["n", nMid, "stretchY"], ["s", sMid, "stretchY"], ["w", wMid, "stretchX"], ["e", eMid, "stretchX"]] as const).map(([key, pos, kind]) => html`
+                  <div class="align-handle align-handle--side align-handle--${key}" data-side=${key}
+                    style=${styleMap({ left: pos.x + "%", top: pos.y + "%" })}
+                    @pointerdown=${(e: PointerEvent) => this._alignStartGesture(e, kind)}
+                    @pointermove=${(e: PointerEvent) => this._alignGestureMove(e)}
+                    @pointerup=${(e: PointerEvent) => this._alignGestureEnd(e)}
+                    @pointercancel=${(e: PointerEvent) => this._alignGestureEnd(e)}>
+                  </div>
+                `)}
                 <div class="align-handle align-handle--rotate"
                   style=${styleMap({ left: rotateHandle.x + "%", top: rotateHandle.y + "%" })}
                   @pointerdown=${(e: PointerEvent) => this._alignStartGesture(e, "rotate", centre)}
@@ -4719,7 +4749,7 @@ export class AnyVacCard extends LitElement {
                 ?disabled=${readOnly} @change=${(e: Event) => this._alignSetField("rotation", (e.target as HTMLInputElement).value)} />
             </div>
             <div class="align-field-row">
-              <label>Scale<span>%</span></label>
+              <label>${draft.scaleY != null ? "Scale X" : "Scale"}<span>%</span></label>
               <input type="number" step="0.1" min="1" .value=${String(Math.round(draft.scale * 100) / 100)}
                 ?disabled=${readOnly} @change=${(e: Event) => this._alignSetField("scale", (e.target as HTMLInputElement).value)} />
             </div>
@@ -8128,6 +8158,9 @@ export class AnyVacCard extends LitElement {
       --mdc-icon-size: 16px;
     }
     .align-handle--rotate { background: rgba(var(--avc-tool-rgb), 0.85); }
+    .align-handle--side { width: 20px; height: 20px; margin: -10px 0 0 -10px; opacity: 0.85; }
+    .align-handle--n, .align-handle--s { cursor: ns-resize; }
+    .align-handle--w, .align-handle--e { cursor: ew-resize; }
     .align-btn[disabled] { opacity: 0.35; cursor: default; pointer-events: none; }
     .align-btn--flash { background: rgba(var(--avc-ok-rgb), 0.22); border-color: rgba(var(--avc-ok-rgb), 0.6); }
     .align-save-btn {

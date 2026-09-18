@@ -200,6 +200,49 @@ export function scaleSeatAbout(
   return next;
 }
 
+/** Anisotropic (independent X/Y) corner-handle scale — used instead of the
+ *  uniform `scaleSeatAbout` once the seat already has an independent Y
+ *  scale (`scaleY != null`), so a corner drag can change the layer's aspect
+ *  ratio instead of only resizing it uniformly (field report 2026-09-18:
+ *  corner handles stayed aspect-locked even with "Independent Y scale" on —
+ *  gating which of the two this function/`scaleSeatAbout` gets called is
+ *  `_alignGestureMove`'s job, keyed off `g.startSeat.scaleY`).
+ *
+ *  `s0Pct`/`s1Pct` are the dragged pointer's start/live wrap-percent
+ *  positions, `pivotPct` the OPPOSITE corner (fixed for the whole gesture,
+ *  same convention as `scaleSeatAbout`). The pivot->pointer vector is
+ *  decomposed onto the seat's own (rotated) local axes — scaling each axis
+ *  independently there, then rotating back, is what keeps the pivot corner
+ *  fixed while X and Y stretch by different amounts. Reduces to exactly
+ *  `scaleSeatAbout`'s own math when kx == ky (uniform scale commutes with
+ *  rotation), so this is a strict superset, not a parallel path.
+ *
+ *  Always resolves `scaleY` from `scale` first when it was still `null` —
+ *  only reachable once Independent Y is already on in practice, but stays
+ *  well-defined either way. A ~0 start offset on an axis (degenerate —
+ *  shouldn't happen for a real corner handle, whose local offset from the
+ *  opposite corner is always the layer's own full width/height on both
+ *  axes) leaves that axis' factor at 1 instead of dividing by ~0. */
+export function scaleSeatCornerAniso(
+  seat: SeatParams,
+  s0Pct: { x: number; y: number }, s1Pct: { x: number; y: number },
+  pivotPct: { x: number; y: number }, ar: number,
+): SeatParams {
+  const pivot = pctToFrac(pivotPct, ar);
+  const f0 = pctToFrac(s0Pct, ar), f1 = pctToFrac(s1Pct, ar);
+  const rel0 = rotatePoint({ x: f0.x - pivot.x, y: f0.y - pivot.y }, -seat.rotation);
+  const rel1 = rotatePoint({ x: f1.x - pivot.x, y: f1.y - pivot.y }, -seat.rotation);
+  const kx = Math.abs(rel0.x) > 1e-6 ? rel1.x / rel0.x : 1;
+  const ky = Math.abs(rel0.y) > 1e-6 ? rel1.y / rel0.y : 1;
+  const c = seatCentreFrac(seat, ar);
+  const relC = rotatePoint({ x: c.x - pivot.x, y: c.y - pivot.y }, -seat.rotation);
+  const scaledRelC = rotatePoint({ x: relC.x * kx, y: relC.y * ky }, seat.rotation);
+  const newC = { x: pivot.x + scaledRelC.x, y: pivot.y + scaledRelC.y };
+  const off = frameToOffset(newC, ar);
+  const scaleY = seat.scaleY ?? seat.scale;
+  return { ...seat, scale: seat.scale * kx, scaleY: scaleY * ky, offset_x: off.offset_x, offset_y: off.offset_y };
+}
+
 /** Rotate by `dDeg` about an arbitrary pivot point (percent-space) — the
  *  rotation handle pivots about the layer's own centre (`pivotPct` = centre
  *  in that case), but this stays general since a future "rotate about the
@@ -221,6 +264,42 @@ export function rotateSeatAbout(
 export function stretchSeatY(seat: SeatParams, k: number): SeatParams {
   const base = seat.scaleY ?? seat.scale;
   return { ...seat, scaleY: base * k };
+}
+
+/** Independent X-axis stretch by factor `k`, local axis, centred (offset
+ *  untouched — mirrors `stretchSeatY` exactly). The local X axis IS `scale`
+ *  already (docs/14 rule 1 — one seat model, not a separate `scale_x`
+ *  field), so this freezes `scaleY` from its current effective value first
+ *  (same as `stretchSeatY` freezing from `scale`) — that's what keeps Y
+ *  visually fixed while X changes independently, and it's also what the
+ *  left/right side handles use to make X-only stretch possible at all
+ *  (field report 2026-09-18: there was no X-axis stretch primitive, only
+ *  the uniform `scale` + `stretchSeatY`). */
+export function stretchSeatX(seat: SeatParams, k: number): SeatParams {
+  const scaleY = seat.scaleY ?? seat.scale;
+  return { ...seat, scale: seat.scale * k, scaleY };
+}
+
+/** Local-axis (pre-rotation) scale ratio for a centre-anchored side-handle
+ *  drag — `axis` picks which local axis the handle moves along ("x" for
+ *  the left/right handles -> `stretchSeatX`, "y" for top/bottom ->
+ *  `stretchSeatY`). `s0Pct`/`s1Pct` are the dragged pointer's start/live
+ *  wrap-percent positions; signed (not abs), so dragging a handle back
+ *  through the layer's own centre flips that axis, same as a corner drag
+ *  crossing `scaleSeatCornerAniso`'s pivot — not specially guarded against,
+ *  same as every other gizmo ratio here. Same ~0-start-offset guard as
+ *  `scaleSeatCornerAniso`. */
+export function localAxisScaleRatio(
+  seat: SeatParams, axis: "x" | "y",
+  s0Pct: { x: number; y: number }, s1Pct: { x: number; y: number }, ar: number,
+): number {
+  const c = seatCentreFrac(seat, ar);
+  const f0 = pctToFrac(s0Pct, ar), f1 = pctToFrac(s1Pct, ar);
+  const rel0 = rotatePoint({ x: f0.x - c.x, y: f0.y - c.y }, -seat.rotation);
+  const rel1 = rotatePoint({ x: f1.x - c.x, y: f1.y - c.y }, -seat.rotation);
+  const v0 = axis === "x" ? rel0.x : rel0.y;
+  const v1 = axis === "x" ? rel1.x : rel1.y;
+  return Math.abs(v0) > 1e-6 ? v1 / v0 : 1;
 }
 
 /** Solves the similarity transform (rotation + uniform scale + translation)

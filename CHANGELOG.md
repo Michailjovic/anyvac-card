@@ -6,6 +6,30 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [1.11.2] - 2026-09-18
+
+### Added
+
+- **Align mode: independent (anisotropic) corner-handle scale, an X-axis
+  stretch primitive, and side (edge) handles (docs/41 §4.4, field report).**
+  Corner handles previously stayed aspect-locked even with "Independent Y
+  scale" checked (always uniform `scaleSeatAbout`) — they now unlock into a
+  true independent X/Y drag once that box is on, via a new
+  `scaleSeatCornerAniso` primitive that reduces to the exact uniform path
+  when X/Y factors match, and otherwise decomposes the drag onto the seat's
+  own rotated local axes while keeping the opposite (pivot) corner fixed on
+  screen (proven algebraically and cross-checked in
+  `tests/seat-edit.spec.ts`). Closed a second gap alongside it: the seat
+  model only ever had a Y-axis stretch primitive (`stretchSeatY`) — added
+  the missing `stretchSeatX` counterpart, and four new side handles (top/
+  bottom/left/right edge midpoints) so a single-axis stretch no longer
+  requires the corner gizmo at all. The "Scale" side-panel field now reads
+  "Scale X" once Independent Y is on, since `scale` already *is* the X
+  value — there's no separate `scale_x` in the data model, just a clearer
+  label for what was already there. New unit tests (pure geometry,
+  independently cross-checked) and E2E coverage in
+  `tests/align-overlay.spec.ts`.
+
 ## [1.11.1] - 2026-09-18
 
 ### Added

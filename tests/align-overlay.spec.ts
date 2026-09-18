@@ -328,4 +328,101 @@ test.describe("Align mode overlay (docs/41, C2b)", () => {
     });
     expect(rmOpacityAfter).toBe("0.4");
   });
+
+  test("the four side handles (top/bottom/left/right) render with the correct data-side attributes", async ({ page }) => {
+    await mountCard(page);
+    await openAlign(page);
+    const sides = await page.evaluate(() => {
+      const host = document.querySelector("anyvac-align-overlay") as any;
+      return [...host.shadowRoot.querySelectorAll(".align-handle--side")]
+        .map((el: any) => el.dataset.side).sort();
+    });
+    expect(sides).toEqual(["e", "n", "s", "w"]);
+  });
+
+  test("corner-handle scale stays uniform (scaleY undefined) with Independent Y off, but goes independent once it's on (field report 2026-09-18)", async ({ page }) => {
+    await mountCard(page);
+    await openAlign(page);
+
+    // Independent Y off (default) — a corner "scale" gesture must not set scaleY.
+    await page.evaluate(() => {
+      const card = (window as any).__card;
+      const host = document.querySelector("anyvac-align-overlay") as any;
+      const layer = host.shadowRoot.querySelector(".align-seat-layer") as any;
+      layer.setPointerCapture = () => {};
+      const scene = host.shadowRoot.querySelector(".align-scene") as HTMLElement;
+      const r = scene.getBoundingClientRect();
+      const x0 = r.left + r.width * 0.9, y0 = r.top + r.height * 0.9;
+      const ev = (x: number, y: number) => ({
+        currentTarget: layer, clientX: x, clientY: y, pointerId: 1,
+        stopPropagation: () => {}, preventDefault: () => {},
+      } as any);
+      card._alignStartGesture(ev(x0, y0), "scale", { x: 10, y: 10 });
+      card._alignGestureMove(ev(x0 + 15, y0 + 30));
+      card._alignGestureEnd(ev(x0 + 15, y0 + 30));
+    });
+    let s = await session(page);
+    expect(s.draft.scaleY).toBeUndefined();
+    expect(s.draft.scale).not.toBeCloseTo(s.start.scale, 6);
+
+    // Turn Independent Y on (freezes scaleY from the current scale) and repeat
+    // an asymmetric corner drag — scale and scaleY must now move by different
+    // ratios instead of staying locked together.
+    await page.evaluate(() => (window as any).__card._alignToggleScaleY(true));
+    s = await session(page);
+    expect(s.draft.scaleY).not.toBeUndefined();
+
+    await page.evaluate(() => {
+      const card = (window as any).__card;
+      const host = document.querySelector("anyvac-align-overlay") as any;
+      const layer = host.shadowRoot.querySelector(".align-seat-layer") as any;
+      layer.setPointerCapture = () => {};
+      const scene = host.shadowRoot.querySelector(".align-scene") as HTMLElement;
+      const r = scene.getBoundingClientRect();
+      const x0 = r.left + r.width * 0.9, y0 = r.top + r.height * 0.9;
+      const ev = (x: number, y: number) => ({
+        currentTarget: layer, clientX: x, clientY: y, pointerId: 2,
+        stopPropagation: () => {}, preventDefault: () => {},
+      } as any);
+      card._alignStartGesture(ev(x0, y0), "scale", { x: 10, y: 10 });
+      card._alignGestureMove(ev(x0 + 60, y0 + 5));
+      card._alignGestureEnd(ev(x0 + 60, y0 + 5));
+    });
+    const after = await session(page);
+    const scaleRatio = after.draft.scale / s.draft.scale;
+    const scaleYRatio = after.draft.scaleY / s.draft.scaleY;
+    expect(Math.abs(scaleRatio - scaleYRatio)).toBeGreaterThan(0.05);
+  });
+
+  test("a drag on the top side handle stretches scaleY only (offset and scale untouched) and enables Independent Y", async ({ page }) => {
+    await mountCard(page);
+    await openAlign(page);
+    const before = await session(page);
+    expect(before.draft.scaleY).toBeUndefined();
+
+    await page.evaluate(() => {
+      const card = (window as any).__card;
+      const host = document.querySelector("anyvac-align-overlay") as any;
+      const nHandle = host.shadowRoot.querySelector('.align-handle--side[data-side="n"]') as any;
+      nHandle.setPointerCapture = () => {};
+      const scene = host.shadowRoot.querySelector(".align-scene") as HTMLElement;
+      const r = scene.getBoundingClientRect();
+      const cx = r.left + r.width * 0.5, cy = r.top + r.height * 0.5;
+      const ev = (x: number, y: number) => ({
+        currentTarget: nHandle, clientX: x, clientY: y, pointerId: 3,
+        stopPropagation: () => {}, preventDefault: () => {},
+      } as any);
+      // Start on the local Y axis above centre, drag further away (bigger
+      // |y - centre|) -> scaleY grows, scale/offset stay put.
+      card._alignStartGesture(ev(cx, cy - 20), "stretchY");
+      card._alignGestureMove(ev(cx, cy - 40));
+      card._alignGestureEnd(ev(cx, cy - 40));
+    });
+    const after = await session(page);
+    expect(after.draft.scaleY).not.toBeUndefined();
+    expect(after.draft.scaleY!).toBeGreaterThan(after.draft.scale);
+    expect(after.draft.scale).toBeCloseTo(before.draft.scale, 6);
+    expect(after.draft.offset_x).toBeCloseTo(before.draft.offset_x, 6);
+    expect(after.draft.offset_y).toBeCloseTo(before.draft.offset_y, 6);
+  });
 });
