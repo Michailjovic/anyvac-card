@@ -4226,6 +4226,23 @@ export class AnyVacCard extends LitElement {
     this._alignSession = { ...session, draft: next, history: [...session.history, d], future: [] };
   }
 
+  /** Live view-only layer opacity (docs/41 SS4.2/SS4.3 `layers.floor` /
+   *  `layers.rawMap`) — 0..1 multipliers applied straight to the floorplan's
+   *  and the edited vacuum's raw-map <img> opacity, so both layers can be
+   *  seen through each other while eyeballing the alignment. Purely a
+   *  display preference: NOT pushed onto history/future (no undo, same as
+   *  `_alignView`) and NOT gated by `_alignReadOnly()` — seeing through the
+   *  raw map is just as useful in a read-only (home-frame) session. */
+  private _alignSetLayerOpacity(field: "floor" | "rawMap", raw: string): void {
+    const session = this._alignSession;
+    if (!session) return;
+    const n = parseFloat(raw);
+    if (!Number.isFinite(n)) return;
+    const v = Math.min(1, Math.max(0, n / 100));
+    if (session.layers[field] === v) return;
+    this._alignSession = { ...session, layers: { ...session.layers, [field]: v } };
+  }
+
   /** Contain-fits the floorplan's own aspect ratio (`_mapAR`) into the
    *  viewport at view zoom = 1 (docs/41 §4.3). The overlay is always
    *  full-screen (docs/41 §4.1), so the viewport itself is the available
@@ -4620,6 +4637,7 @@ export class AnyVacCard extends LitElement {
               ${ib?.src ? html`<img class="align-floorplan-img" src=${ib.src} alt="Floorplan"
                   @load=${this._onFloorplanLoad}
                   style=${styleMap({
+                    opacity: String(session.layers.floor),
                     transform: "translate(" + (ib.offset_x ?? 0) + "%," + (ib.offset_y ?? 0) + "%) rotate(" + (ib.rotation ?? 0) + "deg) scale(" + ((ib.scale ?? 100) / 100) + ")",
                   })} />` : nothing}
               ${others.map((v) => {
@@ -4643,6 +4661,7 @@ export class AnyVacCard extends LitElement {
                 @pointercancel=${(e: PointerEvent) => this._alignGestureEnd(e)}>
                 ${mapUrl ? html`<img class="align-seat-img" src=${mapUrl} alt="Vacuum map"
                     style=${styleMap({
+                      opacity: String(session.layers.rawMap),
                       left: (50 + draft.offset_x) + "%", top: (50 + draft.offset_y) + "%", width: draft.scale + "%",
                       transform: "translate(-50%,-50%) " + seatRotateScaleCss(draft.rotation, draft.scale, draft.scaleY),
                     })} />` : nothing}
@@ -4682,6 +4701,18 @@ export class AnyVacCard extends LitElement {
             </div>
           </div>
           <div class="align-side-panel">
+            <div class="align-field-row align-field-row--opacity">
+              <label>Floorplan<span>%</span></label>
+              <input type="range" min="0" max="100" step="5"
+                .value=${String(Math.round(session.layers.floor * 100))}
+                @input=${(e: Event) => this._alignSetLayerOpacity("floor", (e.target as HTMLInputElement).value)} />
+            </div>
+            <div class="align-field-row align-field-row--opacity">
+              <label>Vacuum map<span>%</span></label>
+              <input type="range" min="0" max="100" step="5"
+                .value=${String(Math.round(session.layers.rawMap * 100))}
+                @input=${(e: Event) => this._alignSetLayerOpacity("rawMap", (e.target as HTMLInputElement).value)} />
+            </div>
             <div class="align-field-row">
               <label>Rotation<span>°</span></label>
               <input type="number" step="0.1" .value=${String(Math.round(draft.rotation * 100) / 100)}
@@ -8136,6 +8167,10 @@ export class AnyVacCard extends LitElement {
       border: 1px solid var(--avc-panel-line); border-radius: 8px; padding: 5px 7px;
     }
     .align-field-row input[disabled] { opacity: 0.4; }
+    .align-field-row--opacity { flex-direction: column; align-items: stretch; gap: 2px; }
+    .align-field-row--opacity input[type="range"] {
+      width: 100%; accent-color: rgb(var(--avc-tool-rgb)); cursor: pointer;
+    }
     .align-field-row--check label { flex: 1 1 auto; display: flex; align-items: center; gap: 6px; }
     .align-field-row--check input[type="checkbox"] { width: 15px; height: 15px; }
     @media (max-width: 700px) {

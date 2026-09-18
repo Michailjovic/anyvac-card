@@ -6,6 +6,24 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [1.11.1] - 2026-09-18
+
+### Added
+
+- **Align mode: adjustable floorplan/raw-map layer opacity (docs/41 §4.2/§4.3
+  `layers.floor`/`layers.rawMap`, field-report fix).** Two range sliders in
+  the side panel ("Floorplan" / "Vacuum map", 0-100%) live-drive the two
+  `<img>` layers' opacity so both can be seen through each other while
+  aligning — the edited vacuum's raw map previously rendered fully opaque
+  with no way to see the floorplan underneath it, which on a real calibrated
+  setup (existing large `scale` covering most of the canvas, combined with a
+  vacuum map that is itself mostly a flat, low-detail colour) could make the
+  floorplan appear completely hidden behind what looked like a solid colour
+  block. View-only preference — not written to history/future (no undo) and
+  not gated by the read-only home-frame state. `AlignSession.layers` already
+  carried the `floor`/`rawMap` numbers from Phase A; this wires them into the
+  render for the first time. New test in `tests/align-overlay.spec.ts`.
+
 ## [1.11.0] - 2026-09-18
 
 ### Added

@@ -291,4 +291,41 @@ test.describe("Align mode overlay (docs/41, C2b)", () => {
     // Copy YAML keeps working regardless (docs/41 §4.8 — P3 always present).
     expect(await page.evaluate(() => typeof (window as any).__card._alignCopyYaml)).toBe("function");
   });
+
+  test("layer opacity sliders default to 100% and drive the floorplan/raw-map <img> opacity live, without touching undo history", async ({ page }) => {
+    await mountCard(page);
+    await openAlign(page);
+
+    const before = await session(page);
+    expect(before.layers.floor).toBe(1);
+    expect(before.layers.rawMap).toBe(1);
+
+    const opacities = await page.evaluate(() => {
+      const h = document.querySelector("anyvac-align-overlay") as any;
+      const fp = h.shadowRoot.querySelector(".align-floorplan-img") as HTMLElement;
+      const rm = h.shadowRoot.querySelector(".align-seat-img") as HTMLElement;
+      return { floor: fp.style.opacity, rawMap: rm.style.opacity };
+    });
+    expect(opacities.floor).toBe("1");
+    expect(opacities.rawMap).toBe("1");
+
+    // Dragging the "Vacuum map" slider to 40% updates layers.rawMap and the
+    // <img>'s live opacity — but must NOT push a history entry (docs/41
+    // §4.2: layers are a view-only preference, not an undoable seat edit).
+    await page.evaluate(() => {
+      const card = (window as any).__card;
+      card._alignSetLayerOpacity("rawMap", "40");
+    });
+    const after = await session(page);
+    expect(after.layers.rawMap).toBeCloseTo(0.4, 5);
+    expect(after.layers.floor).toBe(1);
+    expect(after.history.length).toBe(before.history.length);
+    expect(after.draft).toEqual(before.draft);
+
+    const rmOpacityAfter = await page.evaluate(() => {
+      const h = document.querySelector("anyvac-align-overlay") as any;
+      return (h.shadowRoot.querySelector(".align-seat-img") as HTMLElement).style.opacity;
+    });
+    expect(rmOpacityAfter).toBe("0.4");
+  });
 });
