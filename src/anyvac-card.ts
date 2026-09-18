@@ -4334,8 +4334,23 @@ export class AnyVacCard extends LitElement {
    *  actually drag vertically — a fixed `ew-resize`/`ns-resize` CSS class
    *  would then point the wrong way (field report 2026-09-18, the same
    *  "which arrow is really X once you've rotated" confusion the new
-   *  handle icons below fix visually). Snapped to the 4 cursor shapes CSS
-   *  actually has (`ew`/`nwse`/`ns`/`nesw`), 45° each. */
+   *  handle icons below fix visually).
+   *
+   *  Callers must pass `draft.rotation + this._alignView.rot` combined, not
+   *  `draft.rotation` alone: `_alignView.rot` is the separate, screen-only
+   *  "Rotate view 90°" toolbar rotation applied to the whole `.align-scene`
+   *  via CSS `transform`. A `transform: rotate()` on a handle's own `<ha-icon>`
+   *  composes with that ancestor transform automatically (CSS transforms
+   *  nest), so the icon's own `rotate(draft.rotation)` already looks right
+   *  on screen without listing `_alignView.rot` explicitly — but `cursor`
+   *  is a plain CSS property, not a transform, and does not compose with
+   *  ancestor transforms at all. Omitting `_alignView.rot` here left the
+   *  cursor (and, before this fix, nothing else) pointing the pre-view-
+   *  rotation direction once the user rotated the view — a real gap in the
+   *  1.11.4 fix (field report 2026-09-18 follow-up), distinct from
+   *  `nudgeOffset` in seatedit.ts, which already un-rotates keyboard nudges
+   *  by `_alignView.rot` for exactly the same reason. Snapped to the 4
+   *  cursor shapes CSS actually has (`ew`/`nwse`/`ns`/`nesw`), 45° each. */
   private _alignResizeCursor(baseAxisDeg: number, rotationDeg: number): string {
     const eff = (((baseAxisDeg + rotationDeg) % 180) + 180) % 180;
     if (eff < 22.5 || eff >= 157.5) return "ew-resize";
@@ -4758,7 +4773,7 @@ export class AnyVacCard extends LitElement {
                     title=${kind === "stretchX" ? "Scale X" : "Scale Y"}
                     style=${styleMap({
                       left: pos.x + "%", top: pos.y + "%",
-                      cursor: this._alignResizeCursor(baseAxisDeg, draft.rotation),
+                      cursor: this._alignResizeCursor(baseAxisDeg, draft.rotation + this._alignView.rot),
                     })}
                     @pointerdown=${(e: PointerEvent) => this._alignStartGesture(e, kind)}
                     @pointermove=${(e: PointerEvent) => this._alignGestureMove(e)}

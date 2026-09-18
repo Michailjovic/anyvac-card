@@ -6,6 +6,34 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [1.11.5] - 2026-09-18
+
+### Fixed
+
+- **Align mode: side-handle resize cursor now also follows the "Rotate
+  view 90°" toolbar rotation, not just the seat's own rotation** (field
+  report 2026-09-18 follow-up). `_alignResizeCursor` only took the seat's
+  `draft.rotation` — the separate, screen-only `_alignView.rot` set by the
+  "Rotate view" button was never added in, so once a user rotated the
+  VIEW, the Scale X/Y handle cursors kept pointing the pre-view-rotation
+  direction (`ew-resize` where the drag was actually vertical, and vice
+  versa) even though the handle's own arrow icon already looked right —
+  a `<ha-icon>`'s `rotate()` transform composes with the ancestor
+  `.align-scene` transform automatically, but the CSS `cursor` property
+  does not compose with ancestor transforms at all. Now passes
+  `draft.rotation + this._alignView.rot` combined, matching the same
+  correction `nudgeOffset()` in `seatedit.ts` already applies to keyboard
+  arrow-key nudges. The drag gesture math itself was never affected by
+  this bug (`_alignPointToWrapPct` already un-rotates pointer input by
+  the view's full CSS transform before any gesture math sees it) — this
+  fix is cursor-direction-only. New test coverage in
+  `tests/align-overlay.spec.ts`.
+- Verified the 1.11.4 build shipped correctly (byte-identical dist on
+  the device, all new CSS/markup present and well-formed) — if the new
+  arrow icons still don't appear after updating to this version, it's a
+  stale cached copy of the card resource; hard-refresh (or bump the
+  Lovelace resource cache) to pick it up.
+
 ## [1.11.4] - 2026-09-18
 
 ### Added

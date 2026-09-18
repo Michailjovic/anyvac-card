@@ -523,4 +523,48 @@ test.describe("Align mode overlay (docs/41, C2b)", () => {
     expect(info.wIconRotate).toBe("rotate(90deg)");
     expect(info.xHintRotate).toBe(""); // offset hint stays wrap-aligned, no rotate transform
   });
+
+  test("side-handle cursor also accounts for the separate view rotation, not just the seat's own rotation (field report 2026-09-18 follow-up)", async ({ page }) => {
+    await mountCard(page);
+    await openAlign(page);
+
+    // Seat unrotated, view unrotated: baseline, as in the previous test.
+    let wCursor = await page.evaluate(() => {
+      const host = document.querySelector("anyvac-align-overlay") as any;
+      const w = host.shadowRoot.querySelector('.align-handle--side[data-side="w"]') as HTMLElement;
+      return w.style.cursor;
+    });
+    expect(wCursor).toBe("ew-resize");
+
+    // Seat still unrotated, but the "Rotate view 90°" toolbar button was
+    // used (_alignView.rot, a purely screen-side rotation of the whole
+    // .align-scene, entirely separate from the seat's own draft.rotation).
+    // On screen the W handle now reads as a vertical drag, so its cursor
+    // must follow the VIEW rotation too, exactly as nudgeOffset() already
+    // does for keyboard arrow nudges.
+    await page.evaluate(() => {
+      const card = (window as any).__card;
+      card._alignView = { ...card._alignView, rot: 90 };
+    });
+    wCursor = await page.evaluate(() => {
+      const host = document.querySelector("anyvac-align-overlay") as any;
+      const w = host.shadowRoot.querySelector('.align-handle--side[data-side="w"]') as HTMLElement;
+      return w.style.cursor;
+    });
+    expect(wCursor).toBe("ns-resize");
+
+    // Seat rotation and view rotation combine: 90° seat + 90° view = 180°,
+    // which is back to the horizontal bucket (180 mod 180 === 0).
+    await page.evaluate(() => {
+      const card = (window as any).__card;
+      const s = card._alignSession;
+      card._alignSession = { ...s, draft: { ...s.draft, rotation: 90 } };
+    });
+    wCursor = await page.evaluate(() => {
+      const host = document.querySelector("anyvac-align-overlay") as any;
+      const w = host.shadowRoot.querySelector('.align-handle--side[data-side="w"]') as HTMLElement;
+      return w.style.cursor;
+    });
+    expect(wCursor).toBe("ew-resize");
+  });
 });
