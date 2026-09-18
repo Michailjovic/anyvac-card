@@ -425,4 +425,53 @@ test.describe("Align mode overlay (docs/41, C2b)", () => {
     expect(after.draft.offset_x).toBeCloseTo(before.draft.offset_x, 6);
     expect(after.draft.offset_y).toBeCloseTo(before.draft.offset_y, 6);
   });
+
+  test("a focused side-panel field defers only the arrow keys to its own native behavior — ,/.[ ] still nudge the seat (field report 2026-09-18)", async ({ page }) => {
+    await mountCard(page);
+    await openAlign(page);
+    const before = await session(page);
+
+    const after = await page.evaluate(() => {
+      const host = document.querySelector("anyvac-align-overlay") as any;
+      const rangeInput = host.shadowRoot.querySelector('input[type="range"]') as HTMLInputElement;
+      rangeInput.focus();
+      // Arrow key: deferred to the field (its own native slider-step
+      // behavior) — must NOT nudge the seat.
+      rangeInput.dispatchEvent(new KeyboardEvent("keydown", { key: "ArrowLeft", bubbles: true, cancelable: true }));
+      // "," has no native meaning in a range input — still reaches the
+      // gizmo's scale-nudge even though the field is focused.
+      rangeInput.dispatchEvent(new KeyboardEvent("keydown", { key: ",", bubbles: true, cancelable: true }));
+      return (window as any).__card._alignSession;
+    });
+    expect(after.draft.offset_x).toBeCloseTo(before.draft.offset_x, 6);
+    expect(after.draft.scale).toBeLessThan(before.draft.scale);
+  });
+
+  test("starting a canvas/gizmo gesture returns keyboard focus to the overlay even when a side-panel field was focused (field report 2026-09-18)", async ({ page }) => {
+    await mountCard(page);
+    await openAlign(page);
+
+    const stillOnInput = await page.evaluate(() => {
+      const host = document.querySelector("anyvac-align-overlay") as any;
+      const rangeInput = host.shadowRoot.querySelector('input[type="range"]') as HTMLInputElement;
+      rangeInput.focus();
+      return host.shadowRoot.activeElement === rangeInput;
+    });
+    expect(stillOnInput).toBe(true);
+
+    const refocused = await page.evaluate(() => {
+      const card = (window as any).__card;
+      const host = document.querySelector("anyvac-align-overlay") as any;
+      const layer = host.shadowRoot.querySelector(".align-seat-layer") as any;
+      layer.setPointerCapture = () => {};
+      const ev = {
+        currentTarget: layer, clientX: 10, clientY: 10, pointerId: 9,
+        stopPropagation: () => {}, preventDefault: () => {},
+      } as any;
+      card._alignStartGesture(ev, "drag");
+      const overlayRoot = host.shadowRoot.querySelector(".align-overlay");
+      return host.shadowRoot.activeElement === overlayRoot;
+    });
+    expect(refocused).toBe(true);
+  });
 });

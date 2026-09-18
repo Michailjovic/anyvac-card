@@ -6,6 +6,31 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [1.11.3] - 2026-09-18
+
+### Fixed
+
+- **Align mode: keyboard nudges could get permanently stuck once any
+  side-panel field (e.g. a layer-opacity slider) took keyboard focus**
+  (field report 2026-09-18, following the opacity sliders added earlier
+  today — adjusting one to see the floorplan at all was enough to trigger
+  this). Two causes, both fixed:
+  - `_alignStartGesture`/`_alignBgPointerDown` call `preventDefault()` on
+    their pointerdown, which also suppresses the browser's own default
+    "clicking elsewhere blurs the focused input" behavior — so clicking or
+    dragging on the canvas/gizmo again did NOT return focus either. Both
+    now explicitly return focus to the overlay root first
+    (`_alignRefocusOverlay`, also reused by the opacity sliders' `change`
+    so releasing one hands keyboard control straight back without an extra
+    click, and by the open-time autofocus which had the same logic
+    inlined).
+  - The keydown handler's `inField` guard blocked ALL nudge keys while any
+    `<input>` had focus, including `,`/`.`/`[`/`]` (scale/rotation), which
+    have no native meaning in a number/range field and never needed
+    blocking — only the arrow keys, which a focused field's own
+    caret-move/step/slider-drag genuinely wants for itself, are still
+    deferred to native behavior now.
+
 ## [1.11.2] - 2026-09-18
 
 ### Added

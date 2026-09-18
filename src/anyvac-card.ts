@@ -4087,10 +4087,23 @@ export class AnyVacCard extends LitElement {
     this._alignGesture = null;
     // Autofocus so keyboard nudges (docs/41 SS4.4, this session's C2b) work
     // immediately without the user first clicking into the overlay.
-    requestAnimationFrame(() => {
-      const el = this._alignHost?.shadowRoot?.querySelector(".align-overlay") as HTMLElement | null;
-      el?.focus();
-    });
+    requestAnimationFrame(() => this._alignRefocusOverlay());
+  }
+
+  /** Returns keyboard focus to the overlay root so `_alignKeyDown`'s nudges
+   *  keep working — called once on open (above) and again at the START of
+   *  every canvas/gizmo pointer gesture (`_alignStartGesture`,
+   *  `_alignBgPointerDown`). Needed because those both call
+   *  `e.preventDefault()` on the pointerdown, which ALSO suppresses the
+   *  browser's own default "clicking elsewhere blurs the focused input"
+   *  behavior — so a side-panel field (e.g. the opacity slider, field
+   *  report 2026-09-18: had to be dragged down just to see the floorplan
+   *  at all) kept keyboard focus even once the user started interacting
+   *  with the canvas/gizmo again, silently eating arrow-key nudges with no
+   *  visible feedback that anything was wrong. */
+  private _alignRefocusOverlay(): void {
+    const el = this._alignHost?.shadowRoot?.querySelector(".align-overlay") as HTMLElement | null;
+    el?.focus();
   }
 
   /** Unconditional close — no confirmation. Used after a successful Save,
@@ -4335,6 +4348,7 @@ export class AnyVacCard extends LitElement {
   ): void {
     const session = this._alignSession;
     if (!session || this._alignReadOnly()) return;
+    this._alignRefocusOverlay();
     (e.currentTarget as HTMLElement).setPointerCapture(e.pointerId);
     e.stopPropagation();
     e.preventDefault();
@@ -4510,7 +4524,12 @@ export class AnyVacCard extends LitElement {
       this._alignRedo();
       return;
     }
-    if (inField) return;
+    // Arrow keys have real native meaning in a focused number/range
+    // input (caret move / value step) — defer to that. `,`/`.`/`[`/`]`
+    // don't, so they still reach the gizmo below even while a side-panel
+    // field has focus (field report 2026-09-18 — see `_alignRefocusOverlay`
+    // for the other half of this fix).
+    if (inField && e.key.startsWith("Arrow")) return;
     if (this._alignReadOnly()) return;
 
     const mult = nudgeTierMultiplier(this._alignEffectiveNudgeTier(e));
@@ -4540,6 +4559,7 @@ export class AnyVacCard extends LitElement {
   private _alignViewDrag: { pointerId: number; x0: number; y0: number; panX0: number; panY0: number } | null = null;
   private _alignBgPointerDown(e: PointerEvent): void {
     if (this._alignGesture) return;
+    this._alignRefocusOverlay();
     (e.currentTarget as HTMLElement).setPointerCapture(e.pointerId);
     this._alignViewDrag = {
       pointerId: e.pointerId, x0: e.clientX, y0: e.clientY,
@@ -4735,13 +4755,15 @@ export class AnyVacCard extends LitElement {
               <label>Floorplan<span>%</span></label>
               <input type="range" min="0" max="100" step="5"
                 .value=${String(Math.round(session.layers.floor * 100))}
-                @input=${(e: Event) => this._alignSetLayerOpacity("floor", (e.target as HTMLInputElement).value)} />
+                @input=${(e: Event) => this._alignSetLayerOpacity("floor", (e.target as HTMLInputElement).value)}
+                @change=${() => this._alignRefocusOverlay()} />
             </div>
             <div class="align-field-row align-field-row--opacity">
               <label>Vacuum map<span>%</span></label>
               <input type="range" min="0" max="100" step="5"
                 .value=${String(Math.round(session.layers.rawMap * 100))}
-                @input=${(e: Event) => this._alignSetLayerOpacity("rawMap", (e.target as HTMLInputElement).value)} />
+                @input=${(e: Event) => this._alignSetLayerOpacity("rawMap", (e.target as HTMLInputElement).value)}
+                @change=${() => this._alignRefocusOverlay()} />
             </div>
             <div class="align-field-row">
               <label>Rotation<span>°</span></label>
