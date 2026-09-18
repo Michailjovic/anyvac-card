@@ -127,11 +127,24 @@ function seatFromFrame(
 }
 
 /**
- * Least-squares similarity fit (rotation snapped to 90° steps) mapping map anchors
- * onto floorplan anchors. Returns null when the anchors cannot determine a seat.
+ * Least-squares similarity fit (rotation snapped to 90° steps by default —
+ * see `opts.snapRotation`) mapping map anchors onto floorplan anchors.
+ * Returns null when the anchors cannot determine a seat.
  */
-export function computeSeatFit(anchors: SeatAnchor[], ar: number): SeatFitResult | null {
+export function computeSeatFit(
+  anchors: SeatAnchor[], ar: number, opts?: { snapRotation?: boolean },
+): SeatFitResult | null {
   if (!anchors.length || !(ar > 0)) return null;
+  // Snap to the nearest 90° by default (Roborock maps and floorplans are
+  // axis-aligned) — auto-fit from named room anchors (docs/15) always wants
+  // this. Align mode's click-based point pairing (docs/41 §4.2, Fáze E) opts
+  // out with `{ snapRotation: false }`: two robots, or a hand-photographed
+  // floorplan, can legitimately be rotated by a few degrees relative to each
+  // other. Only affects the >=2-anchor branch below — the 1-anchor fallback
+  // has no continuous rotation signal at all (it can only test the four
+  // axis-aligned orientations against bbox size ratios), so it stays
+  // axis-aligned regardless of this option.
+  const snapRotation = opts?.snapRotation ?? true;
 
   if (anchors.length >= 2) {
     const n = anchors.length;
@@ -148,9 +161,10 @@ export function computeSeatFit(anchors: SeatAnchor[], ar: number): SeatFitResult
     }
     if (denom > 1e-8) {
       const rawTheta = Math.atan2(numSin, numCos);
-      // Snap to the nearest 90° (Roborock maps and floorplans are axis-aligned),
-      // then refit scale + translation with the snapped rotation.
-      const theta = Math.round(rawTheta / (Math.PI / 2)) * (Math.PI / 2);
+      // Refit scale + translation with whichever rotation was chosen above.
+      const theta = snapRotation
+        ? Math.round(rawTheta / (Math.PI / 2)) * (Math.PI / 2)
+        : rawTheta;
       const cos = Math.cos(theta), sin = Math.sin(theta);
       let num = 0;
       for (const p of anchors) {

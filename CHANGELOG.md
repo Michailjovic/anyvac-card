@@ -6,6 +6,217 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [1.11.0] - 2026-09-18
+
+### Added
+
+- **Align mode, Phase A (docs/41 §7): pure gesture math for manual floorplan
+  seating, card-side only — no UI wiring yet.** New `src/seatedit.ts` module
+  (no Lit/HA dependencies, per docs/14 rule 1 — one geometry implementation,
+  reused rather than duplicated):
+  - `seatToMatrix(seat, wrapW, wrapH, NW, NH)` — the seat transform as a
+    `DOMMatrix`, algebraically derived from the same formula `seatfit.ts`'s
+    private `seatProjectPct` already uses to place `.map-img`/overlay SVGs,
+    so a future overlay can predict on-screen positions without a second
+    geometry path.
+  - `translateSeat`, `scaleSeatAbout`, `rotateSeatAbout`, `stretchSeatY` —
+    pivot-preserving edits for drag/pinch/stretch gestures.
+  - `pinchSeat` — two-pointer (touch pinch or two-point click) similarity
+    solve via complex-number division, recovering rotation+scale+offset from
+    a before/after point pair.
+  - `nudgeOffset` (screen-direction aware), `nudgeRotation`, `nudgeScale`,
+    `snapRotation` — keyboard nudge helpers for the future overlay's numeric
+    controls, per docs/41 §4.4.
+  - `seatToYaml` — formats a `SeatParams` as a config-shaped YAML snippet,
+    rounded to 0.01 (docs/41 §5 bod 4, the document's own recommendation,
+    adopted here since it's Phase A code).
+  - `applyFloorplanSeats` — applies a `FloorplanSeats` override layer
+    (docs/41 §4.6 shape) onto a card config, correctly following
+    `resolveImageBaseSrc`'s existing merged-vs-split resolution rules
+    instead of re-deriving them.
+- **`computeSeatFit` gains an optional third parameter**,
+  `opts?: { snapRotation?: boolean }` (default `true`, unchanged existing
+  behaviour). Auto-fit from named room anchors keeps snapping to 90° as
+  before; Align mode's future click-based point-pairing tool (Phase E) will
+  opt out with `{ snapRotation: false }`, since two robots — or a
+  hand-photographed floorplan — can legitimately sit a few degrees off from
+  each other. Per docs/41 §5 bod 2 (the document's own recommendation).
+  Only the ≥2-anchor branch is affected; the 1-anchor fallback has no
+  continuous rotation signal to snap or not (it only tests the four
+  axis-aligned orientations against bbox ratios). `seatFromFrame`'s
+  whole-degree rounding is untouched — out of scope for this phase.
+- New `tests/seat-edit.spec.ts` (26 tests): unit tests for every
+  `seatedit.ts` export, plus a DOM ground-truth check — mounts the real card
+  (split mode, `mobile_rotate: "off"` to isolate per-vacuum seat from the
+  unrelated ambient `.avc-rot` display-rotation wrapper) and compares
+  `seatToMatrix`'s predicted position against the actually-rendered
+  `.map-img` box, at 4 seats (including negative rotation and an
+  anisotropic `scale_y`) × 3 content points each.
+
+Full suite: 128/128 (102 pre-existing, no regressions; 26 new — 22 unit +
+4 DOM ground-truth — for this phase).
+`tsc --noEmit` reports 25 pre-existing errors, all in `anyvac-card.ts`/
+`editor.ts` (zero in `seatedit.ts`/`seatfit.ts`), reproducible identically
+against this repo's own committed `node_modules` with zero changes from
+this session — `tsconfig.json`'s `moduleResolution: "node"` doesn't consult
+`lit@3.3.3`'s package.json `exports["."].types` (only `node16`/`nodenext`/
+`bundler` resolution do), so `lit`'s types resolve to `any`, cascading into
+the `LitElement` member-access errors. Pre-existing, environment-independent,
+and out of Phase A's scope — noted here rather than touched.
+
+- **Align mode, Phase C / Krok 2 batch "C2a" (docs/41 §7): portal shell,
+  entry point, and a basic transform gizmo — the first visible UI for Align
+  mode.** Krok 1 (this session's live stacking test against the user's real
+  HA instance, confirming the `document.body`-portal approach) is recorded
+  in docs/41 §5 bod 1, not here (no source change).
+  - New `src/align-overlay.ts`: a bare custom element
+    (`<anyvac-align-overlay>`) that mounts itself onto `document.body` with
+    its own shadow root, adopting the card's own `static styles`
+    (`adoptedStyleSheets` — one stylesheet, not a forked copy, docs/14 rule
+    1) plus a small allowlist of HA custom properties copied from the
+    card's host element. It owns no UI of its own — "portal je jen
+    hostitel + styly" (docs/41 §4.1) — the card's own new `updated()` logic
+    Lit-`render()`s `_renderAlignOverlay()`'s template straight into the
+    portal's shadow root.
+  - `seatedit.ts` gains the Align-session data types from docs/41 §4.2
+    (`AlignViewState`, `AlignTool`, `AlignSession`, plus
+    `defaultAlignView`/`defaultAlignLayers`) — still Lit/HA-free.
+  - `types.ts`: new `AnyVacCardConfig.align_mode?: boolean` (default on;
+    `false` hides the entry button — kiosk tablets, docs/41 §4.7).
+  - New "Align" entry button (`mdi:vector-square-edit`) in both the
+    landscape meta bar and the portrait `.dock-layers` row, next to "Flip
+    map". Gated exactly per docs/41 §4.7: `resolveImageBaseSrc()` resolves a
+    floorplan for at least one shown vacuum, that vacuum's integration
+    sensor exists (`_intAttrs`), and `align_mode !== false`.
+  - Opening the overlay captures the vacuum's current effective seat
+    (`_effectiveSeat`, auto-fit or manual, whichever is showing) exactly
+    once into `AlignSession.start`/`draft` — the overlay never reads
+    `_effectiveSeat`/`_seatMemo` again for the rest of the session (docs/41
+    risk #5); the draft is edited independently and is NOT saved anywhere
+    yet (see "Not in this batch" below).
+  - Scene: the floorplan image, the edited vacuum's raw map + integration
+    overlay (`_renderIntegrationOverlay`, paths + robot marker) seated from
+    the draft, and ghost (25% opacity, non-interactive) copies of any other
+    vacuum sharing the same floorplan.
+  - View transform — pan/zoom/rotate-of-VIEW — is a completely separate
+    piece of state (`AlignViewState`/`_alignView`) from the seat being
+    edited (docs/41 risk #4): mouse-wheel zoom (viewport-centred, not yet
+    cursor-anchored), background drag to pan, and a "Rotate view 90°"
+    toolbar button. Never persisted; resets every time the overlay opens.
+  - Gizmo: drag the layer to translate; 4 corner handles to uniform-scale
+    about the opposite corner; 1 rotation handle to rotate about the
+    layer's own centre; a second touch pointer on the layer upgrades a drag
+    to a two-finger pinch (translate+rotate+scale at once). All four wired
+    directly onto the already-shipped `seatedit.ts` primitives
+    (`translateSeat`/`scaleSeatAbout`/`rotateSeatAbout`/`pinchSeat`) — no
+    new geometry math, per docs/14 rule 1. Pointer-to-content conversion
+    (`_alignPointToWrapPct`) follows the same `DOMMatrix`-inverse approach
+    `_clickToContent` already uses for Pin & Go/Zone clicks; corner/rotate
+    handle positions reuse the shared `seatToMatrix` primitive rather than
+    a second projection formula.
+  - Backend override merge, card-side: `setConfig()` now keeps the
+    as-authored config in a new `_rawConfig` field; a new
+    `_syncEffectiveConfig()`, called at the very top of `shouldUpdate()`
+    (before `_watchedEntities()`/`_roomsFor()`, which already run inside
+    `shouldUpdate` — see the existing `_memoSync` doc comment), recomputes
+    `_config = applyFloorplanSeats(_rawConfig, floorplan_seats)` — JSON-
+    diffed against the previous effective config so an unrelated `hass`
+    update never forces a spurious `_config` identity change — and clears
+    `_roomsMemo`/`_seatMemo` only when the merge actually changed something
+    (docs/41 §4.6). The card doesn't yet expose any UI that WRITES an
+    override back to the backend (no Save) — this batch only makes the
+    card correctly *display* whatever a future Save (or another dashboard,
+    or a future editor Adopt) has already written.
+  - **Not in this batch (Krok 2's "C2b", per the user's explicit
+    two-batch split):** numeric side-panel fields (rotation/scale/offset),
+    keyboard nudges, undo/redo, the Save/Reset/Cancel/Copy-YAML action row
+    (only a bare, unstyled "×" close button exists for now, so the overlay
+    can be opened and closed at all — closing discards the draft
+    unconditionally, no confirmation), integration-version degradation
+    handling (`hass.services` availability check), and
+    `tests/align-overlay.spec.ts`. Also simplified relative to docs/41
+    §4.3's full scene: no live per-room bounding-box rectangles
+    (`roomBboxToRect` against the draft) and no static config-room
+    reference rectangles in the overlay yet — only the integration's own
+    paths/marker overlay. Shift-to-snap-90° during a rotate gesture is not
+    wired up (`AlignSession.snap90` exists in the data model but nothing
+    sets it yet). Cursor-anchored wheel zoom is simplified to
+    viewport-centred. A `base_height`-configured card (fixed pixel map
+    height rather than floorplan-aspect-driven) will show the integration
+    overlay (paths/marker) at a slightly different aspect ratio than the
+    rest of the Align scene, since `_renderIntegrationOverlay` internally
+    resolves its own aspect via `_wrapAspect()`/`_cardW`, not a parameter
+    the overlay can override — the common case (no `base_height`) is
+    unaffected since both resolve to the same `_mapAR`.
+
+- **Align mode, Phase C / Krok 2 batch "C2b" (docs/41 §7): numeric side
+  panel, keyboard nudges + a touch-friendly step-tier toggle, undo/redo,
+  the full Save/Reset/Cancel/Copy-YAML toolbar with a Cancel confirmation
+  panel, and home-frame read-only degradation — the overlay is now
+  actually usable end-to-end, not just openable.** Also fixes a C2a bug
+  that silently broke every gizmo gesture (see "Fixed" below).
+  - Numeric side panel (docs/41 §4.3): rotation/scale/offset_x/offset_y
+    fields plus an "Independent Y scale" checkbox that reveals a fifth
+    `scale_y` field, bound to the draft via `_alignSetField`/
+    `_alignToggleScaleY`. Committed on `change` (blur/Enter), not `input`
+    — one history entry per typed value, matching the existing
+    one-entry-per-gesture/per-keyboard-burst convention, not one per
+    keystroke.
+  - Keyboard nudges (docs/41 §4.4): arrows = offset (0.1%), `[`/`]` =
+    rotation (0.5°), `,`/`.` = scale (0.5%) — `,`/`.` deliberately replace
+    the doc's original `+`/`-` proposal, which collides with the browser's
+    own `Ctrl+Plus`/`Ctrl+Minus` zoom shortcut. A new persistent, visual
+    step-tier toggle (Jemně/Krok/Skok — fine/normal/jump, ×0.1/×1/×10,
+    `AlignSession.nudgeTier`/`_alignSetNudgeTier`) is click-driven (touch-
+    accessible, no keyboard needed) and can be momentarily overridden by
+    holding Ctrl (fine) or Shift (jump) without changing the toggle's own
+    selection (`_alignEffectiveNudgeTier`) — chosen after Ctrl/Shift-modified
+    arrow/WASD schemes were both ruled out for colliding with browser/OS
+    shortcuts (`Ctrl`+arrows history nav on some platforms, `Ctrl+W/A/S/D`
+    close-tab/select-all/save-page/bookmark, `Ctrl+Plus/Minus` zoom).
+  - Undo/redo (`_alignUndo`/`_alignRedo`, `Ctrl+Z`/`Ctrl+Y`, guarded off
+    while focus is in a numeric side-panel field so normal text-undo isn't
+    hijacked): one history entry per gesture (pushed in
+    `_alignStartGesture`) or per keyboard-nudge burst (gated on
+    `!e.repeat`), never per pointermove/repeat-keydown.
+  - Toolbar: Save (disabled + tooltip when
+    `hass.services.anyvac?.set_floorplan_seat` is missing — docs/41 §4.8),
+    Reset (`_alignReset`, back to the session's `start`), Copy YAML
+    (`_alignCopyYaml`, clipboard write of `seatToYaml(draft)` with a
+    "Copied!" flash), and Cancel — the `×` button and `Escape` both now
+    route through `_alignCancel()`, which shows an in-overlay confirmation
+    panel (`_alignCancelConfirm`, "Discard"/"Keep editing") whenever the
+    draft differs from `start` (`_alignHasChanges`), instead of always
+    discarding silently as in C2a.
+  - Home-frame degradation (docs/41 §4.8 MVP): a home-frame-registered
+    vacuum (`_homeFrameCropFor`) opens Align mode as a read-only ghost —
+    gizmo/keyboard nudges/numeric fields/Reset/Save all no-op
+    (`_alignReadOnly`, checked once and reused everywhere rather than
+    re-derived per call site) — with an "aligned by home frame — nothing
+    to adjust" note over the seat layer. Full home-frame editing is Phase G.
+  - `tests/align-overlay.spec.ts` (6 new tests, docs/41 §7's named
+    coverage): portal-on-`document.body`, a drag moves the draft by the
+    expected wrap-percent delta (this is the test that caught the Fixed
+    bug below), `Save` sends the draft as the `map` payload 1:1 rounded to
+    0.01, a backend `floorplan_seats` override wins over the card's own
+    manual seat (and Align mode's `start`/`draft` are captured from that
+    same merged seat), `Reset` restores `start`, and `Save` is a disabled
+    no-op without the service.
+
+### Fixed
+
+- **Align mode: every gizmo gesture (drag/scale/rotate/pinch) silently
+  no-opped — a C2a bug, caught while writing C2b's
+  `tests/align-overlay.spec.ts`.** `_alignPointToWrapPct` looked up
+  `.align-scene` via `this.renderRoot` (the CARD's own shadow root), but
+  the overlay renders into the `_alignHost` PORTAL's shadow root (docs/41
+  §4.1) — the query always returned `null`, so `_alignStartGesture` bailed
+  before doing anything, on every pointer type, at every zoom/pan/rotation.
+  The overlay looked interactive (gizmo handles rendered, cursor changed)
+  but nothing actually moved. Fixed by querying
+  `this._alignHost?.shadowRoot` instead, matching the (already-correct)
+  autofocus lookup in `_openAlign`.
+
 ### Planned
 
 ## [1.10.2] - 2026-09-17

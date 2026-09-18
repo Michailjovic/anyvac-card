@@ -1,4 +1,4 @@
-import { LitElement, html, svg, css, nothing, type PropertyValues } from "lit";
+import { LitElement, html, svg, css, nothing, render, type PropertyValues } from "lit";
 import { customElement, property, state } from "lit/decorators.js";
 import { styleMap } from "lit/directives/style-map.js";
 
@@ -36,6 +36,7 @@ import {
 import {
   resolveSeat,
   resolveStaticRooms,
+  resolveImageBaseSrc,
   roomBboxToRect,
   homeFrameCropFor,
   pointInCrop,
@@ -52,6 +53,27 @@ import {
   type SeatFitResult,
   type CropBox,
 } from "./seatfit";
+import {
+  applyFloorplanSeats,
+  seatToMatrix,
+  translateSeat,
+  scaleSeatAbout,
+  rotateSeatAbout,
+  pinchSeat,
+  defaultAlignView,
+  defaultAlignLayers,
+  nudgeOffset,
+  nudgeRotation,
+  nudgeScale,
+  nudgeTierMultiplier,
+  seatToYaml,
+  type AlignSession,
+  type AlignViewState,
+  type FloorplanSeats,
+  type NudgeTier,
+  type SeatEditConfigLike,
+} from "./seatedit";
+import { mountAlignOverlay, unmountAlignOverlay, type AnyVacAlignOverlayHost } from "./align-overlay";
 import {
   pickProfile,
   resolveProfile,
@@ -111,6 +133,12 @@ export class AnyVacCard extends LitElement {
   /** Set by Lovelace when the dashboard is in edit mode */
   @property({ attribute: false }) editMode = false;
   @state() private _config!: AnyVacCardConfig;
+  /** docs/41 §4.6: the config exactly as `setConfig()` received it, before
+   *  `_syncEffectiveConfig()` merges backend Align-mode overrides on top.
+   *  `_config` (above) is what the rest of the card reads everywhere — this
+   *  field exists purely so the merge has an un-merged base to recompute
+   *  from on every hass update. */
+  private _rawConfig?: AnyVacCardConfig;
   @state() private _shownSet = new Set<number>([0]);
   /** ID of the button currently being held — drives the fill animation */
   @state() private _holdId: string | null = null;
@@ -202,6 +230,40 @@ export class AnyVacCard extends LitElement {
   /** Responsive: measured card width + map aspect ratio (W/H) for portrait rotation. */
   @state() private _cardW = 0;
   @state() private _mapAR = 3.636;
+  /** docs/41 §4.2/§4.1 — the open Align-mode session (null = overlay closed).
+   *  `@state` so opening/closing/gizmo edits re-render the card's own
+   *  template, which is what actually produces `_renderAlignOverlay()`'s
+   *  markup (the portal itself owns no Lit reactivity of its own). */
+  @state() private _alignSession: AlignSession | null = null;
+  @state() private _alignView: AlignViewState = defaultAlignView();
+  /** In-overlay Cancel confirmation panel (docs/41 §4.4: "s in-overlay
+   *  potvrzením při neuloženém draftu — ne window.confirm"). */
+  @state() private _alignCancelConfirm = false;
+  /** Brief "Copied" flash on the Copy YAML button. */
+  @state() private _alignCopiedFlash = false;
+  /** The mounted portal host, or null when the overlay is closed. Plain
+   *  field, not `@state` — it's DOM plumbing, not render input. */
+  private _alignHost: AnyVacAlignOverlayHost | null = null;
+  /** In-progress gizmo gesture, if any — `null` between gestures. Pointer ids
+   *  are tracked so a two-finger pinch can tell its two live pointers apart
+   *  from a stray third touch (docs/41 §4.4/§6 risk 2). */
+  private _alignGesture: {
+    kind: "drag" | "scale" | "rotate" | "pinch";
+    /** Seat the gesture (or, for a pinch, the pinch itself) started from —
+     *  deltas are computed against this, not accumulated step-by-step, so a
+     *  gesture can't drift from floating-point error across many
+     *  pointermove events. */
+    startSeat: SeatParams;
+    /** Layer-space (percent) pivot for scale/rotate — the opposite corner /
+     *  the layer's own centre, fixed for the lifetime of one gesture. */
+    pivotPct?: { x: number; y: number };
+    /** pointerId -> wrap-percent position captured when that pointer joined
+     *  the gesture (or when a pinch was (re-)baselined). */
+    startPos: Map<number, { x: number; y: number }>;
+    /** pointerId -> most recent live wrap-percent position, updated on
+     *  every pointermove. */
+    livePos: Map<number, { x: number; y: number }>;
+  } | null = null;
   /** Active layout profile (docs/18) — picked by viewport aspect ratio. */
   @state() private _profile: LayoutProfile = "landscape";
   /** Measured inner box of the map region (grid mode) for the exact rotated fit. */
@@ -352,6 +414,7 @@ export class AnyVacCard extends LitElement {
     if (!config.vacuums || !Array.isArray(config.vacuums) || config.vacuums.length === 0) {
       throw new Error("[anyvac-card] 'vacuums' must be a non-empty array");
     }
+    this._rawConfig = config;
     this._config = config;
     this._watched = null;
     // A config edit can change which entities a vacuum resolves to (explicit
@@ -710,6 +773,12 @@ export class AnyVacCard extends LitElement {
     this._panelViewNode = null;
     if (this._barMo) { this._barMo.disconnect(); this._barMo = null; }
     if (this._editBarRo) { this._editBarRo.disconnect(); this._editBarRo = null; }
+    // docs/41 §4.1: the portal lives on `document.body`, outside this
+    // element's own DOM subtree — Lit/the browser will never garbage-collect
+    // or detach it on their own just because the card itself disconnects
+    // (HA can disconnect/reconnect a card, e.g. a dashboard tab switch).
+    unmountAlignOverlay(this._alignHost);
+    this._alignHost = null;
   }
 
   protected firstUpdated(): void {
@@ -720,7 +789,33 @@ export class AnyVacCard extends LitElement {
     this._scheduleMeasure();
   }
 
+  /** docs/41 §4.1/§4.3 — ALSO mounts/unmounts the Align-mode portal as
+   *  `_alignSession` opens/closes, and (whenever the portal is mounted)
+   *  Lit-`render()`s the overlay's template straight into its shadow root —
+   *  folded into this method (rather than a second `updated()` override,
+   *  which Lit/TS won't allow two of anyway) since it belongs in the same
+   *  "runs after every render" spot as everything else here. This is the
+   *  ONE place that template is ever rendered — the portal has no reactive
+   *  lifecycle of its own ("portal je jen hostitel + styly"). Adopted
+   *  stylesheets are read off the class once, at mount time — the card's
+   *  OWN `static styles` (docs/14 rule 1: one stylesheet, not a forked copy
+   *  for the portal). */
   protected updated(): void {
+    if (this._alignSession && !this._alignHost) {
+      const raw = (this.constructor as typeof AnyVacCard).elementStyles;
+      const sheets: CSSStyleSheet[] = [];
+      for (const r of raw) {
+        const sheet = r instanceof CSSStyleSheet ? r : r.styleSheet;
+        if (sheet) sheets.push(sheet);
+      }
+      this._alignHost = mountAlignOverlay(sheets, this);
+    } else if (!this._alignSession && this._alignHost) {
+      unmountAlignOverlay(this._alignHost);
+      this._alignHost = null;
+    }
+    if (this._alignHost?.shadowRoot) {
+      render(this._renderAlignOverlay(), this._alignHost.shadowRoot);
+    }
     // docs/25 §10 field-caught (2026-07-25): clear a reset spinner as soon as
     // the watched sensor/button it's keyed on actually moves past the press
     // time — the 40s timeout in the reset click handler is only the hard
@@ -827,6 +922,13 @@ export class AnyVacCard extends LitElement {
    * replaced on every state change anywhere in HA.
    */
   protected shouldUpdate(changed: PropertyValues): boolean {
+    // docs/41 §4.6: must run before `_watchedEntities()`/`_roomsFor()` below
+    // (and on every path through this method, including the early-return
+    // ones) — those already run INSIDE `shouldUpdate`, before `willUpdate`
+    // ever would, per `_memoSync`'s own doc comment; `_config` has to carry
+    // any backend floorplan_seats override by the time they read it, or a
+    // probe-only pass (no full render) would see stale room/seat geometry.
+    this._syncEffectiveConfig();
     if (!changed.has("hass") || changed.size > 1) return true;
     const old = changed.get("hass") as HomeAssistant | undefined;
     if (!old || !this._config) return true;
@@ -834,6 +936,45 @@ export class AnyVacCard extends LitElement {
       if (old.states[id] !== this.hass.states[id]) return true;
     }
     return false;
+  }
+
+  /** docs/41 §4.6 — applies the backend's per-floorplan Align-mode overrides
+   *  on top of `_rawConfig` (precedence: override > config manual > auto).
+   *  Pulled from whichever vacuum's integration sensor happens to carry it
+   *  first — `floorplan_seats` is coordinator-scoped/shared, so every
+   *  vacuum on the same coordinator publishes the identical dict (docs/41
+   *  §4.6, same precedent as `view_layers`/`room_pins`). Re-run on every
+   *  hass update (cheap: `applyFloorplanSeats` is a pure function that
+   *  returns the SAME object when nothing applies) but only actually swaps
+   *  `_config` — and clears the memos that are keyed on its identity — when
+   *  the merged JSON genuinely differs, so an unrelated hass update (no
+   *  floorplan_seats change at all) never forces every `_config`-keyed memo
+   *  to be seen as invalidated by callers comparing by reference. */
+  private _syncEffectiveConfig(): void {
+    // `hass` can still be unset the very first time this runs (setConfig()
+    // alone already triggers an update cycle, possibly before HA has handed
+    // the card its first `hass`) — every reader below assumes it exists.
+    if (!this._rawConfig || !this.hass) return;
+    let seats: FloorplanSeats | undefined;
+    for (const vac of this._rawConfig.vacuums) {
+      const at = this._intAttrs(vac);
+      const fs = at?.floorplan_seats as FloorplanSeats | undefined;
+      if (fs) { seats = fs; break; }
+    }
+    // `applyFloorplanSeats` is typed against `seatedit.ts`'s dependency-free
+    // structural shapes (SeatEditConfigLike/SeatEditVacuumLike, deliberately
+    // NOT importing the real card types — see that module's own doc
+    // comment), which carry an open index signature the real, closed
+    // `AnyVacCardConfig`/`ImageBaseConfig` interfaces don't — structurally
+    // compatible at runtime (every field it actually reads exists), not
+    // nominally, hence the cast through `unknown` here rather than loosening
+    // the shared module's own types.
+    const next = applyFloorplanSeats(this._rawConfig as unknown as SeatEditConfigLike, seats) as unknown as AnyVacCardConfig;
+    if (next === this._config) return;
+    if (JSON.stringify(next) === JSON.stringify(this._config)) return;
+    this._config = next;
+    this._roomsMemo.clear();
+    this._seatMemo.clear();
   }
 
   private _watchedEntities(): Set<string> {
@@ -2476,6 +2617,13 @@ export class AnyVacCard extends LitElement {
                   @click=${() => this._toggleFlipLive()}>
                 <ha-icon icon="mdi:flip-vertical"></ha-icon>
               </button>` : nothing}
+              ${(() => {
+                const alignCand = this._alignCandidates(vacs);
+                return alignCand.length ? html`<button class="mtbtn" title="Align — full-screen manual floorplan seating"
+                    @click=${() => this._openAlign(alignCand[0])}>
+                  <ha-icon icon="mdi:vector-square-edit"></ha-icon>
+                </button>` : nothing;
+              })()}
             </div>
           ` : nothing}
         ${withRun ? html`
@@ -3783,6 +3931,13 @@ export class AnyVacCard extends LitElement {
               @click=${() => this._toggleFlipLive()}>
             <ha-icon icon="mdi:flip-vertical"></ha-icon>
           </button>` : nothing}
+          ${(() => {
+            const alignCand = this._alignCandidates(vacs);
+            return alignCand.length ? html`<button class="mtbtn" title="Align — full-screen manual floorplan seating"
+                @click=${() => this._openAlign(alignCand[0])}>
+              <ha-icon icon="mdi:vector-square-edit"></ha-icon>
+            </button>` : nothing;
+          })()}
           <div class="meta-bar-divider"></div>
           <button class="mtbtn mtbtn--ghost" title="Refresh maps" @click=${refreshTap}>
             <ha-icon icon="mdi:refresh"></ha-icon>
@@ -3879,6 +4034,704 @@ export class AnyVacCard extends LitElement {
     );
     this._seatMemo.set(vac.entity, out);
     return out;
+  }
+
+  // ── Align mode (docs/41, Fáze C / Krok 2, C2a batch) ──────────────────────
+  // Portal shell, view transform, entry gating and a basic transform gizmo
+  // (drag/scale/rotate/pinch) wired straight onto the already-shipped pure
+  // math in `seatedit.ts`. Deliberately NOT here yet (C2b): numeric side-panel
+  // fields, keyboard nudges, undo/redo, Save/Reset/Cancel/Copy-YAML, and
+  // integration-version degradation handling — see docs/41 §7. The overlay
+  // NEVER reads `_effectiveSeat`/`_seatMemo` for the draft (docs/41 risk #5):
+  // `_alignSession.start` is captured once, in `_openAlign`, and `draft`
+  // evolves independently from there for the life of the session.
+
+  /** Vacuums the "Align" entry button should even be offered for (docs/41
+   *  §4.7): a floorplan to align against AND a live integration (no
+   *  integration → no trases/bboxy → nothing to seat), gated off entirely by
+   *  `align_mode: false` (kiosk tablets). */
+  private _alignCandidates(vacs: VacuumConfig[]): VacuumConfig[] {
+    if (this._config.align_mode === false) return [];
+    return vacs.filter((v) => !!resolveImageBaseSrc(this._config, v) && !!this._intAttrs(v));
+  }
+
+  private _alignVac(): VacuumConfig | undefined {
+    const s = this._alignSession;
+    return s ? this._config.vacuums.find((v) => v.entity === s.vacuum) : undefined;
+  }
+
+  private _openAlign(vac: VacuumConfig): void {
+    if (this._alignSession) return;
+    const src = resolveImageBaseSrc(this._config, vac);
+    if (!src || !this._intAttrs(vac)) return;
+    // ONE-TIME read of the effective seat — the draft below is an independent
+    // copy from this point on (docs/41 risk #5).
+    const s = this._effectiveSeat(vac);
+    const seat: SeatParams = {
+      rotation: s.rotation, scale: s.scale, scaleY: s.scaleY,
+      offset_x: s.offset_x, offset_y: s.offset_y,
+    };
+    this._alignSession = {
+      vacuum: vac.entity, floorplan: src,
+      start: { ...seat }, draft: { ...seat },
+      history: [], future: [],
+      layers: defaultAlignLayers(),
+      snap90: false,
+      nudgeTier: "normal",
+    };
+    this._alignView = defaultAlignView();
+    this._alignGesture = null;
+    // Autofocus so keyboard nudges (docs/41 SS4.4, this session's C2b) work
+    // immediately without the user first clicking into the overlay.
+    requestAnimationFrame(() => {
+      const el = this._alignHost?.shadowRoot?.querySelector(".align-overlay") as HTMLElement | null;
+      el?.focus();
+    });
+  }
+
+  /** Unconditional close — no confirmation. Used after a successful Save,
+   *  and by the in-overlay Cancel-confirmation panel's own "Discard"
+   *  action. Anything the USER triggers directly (the toolbar × / Esc)
+   *  goes through `_alignCancel()` instead, which decides whether to ask
+   *  first. */
+  private _closeAlign(): void {
+    this._alignSession = null;
+    this._alignGesture = null;
+    this._alignCancelConfirm = false;
+  }
+
+  /** docs/41 §4.8: a home-frame registered vacuum is shown as a read-only
+   *  ghost in Align mode (MVP has no home-frame edit path yet — Faze G).
+   *  Single source of truth for every gesture/keyboard/Save guard below, so
+   *  the three can't drift out of sync with each other. */
+  private _alignReadOnly(): boolean {
+    const vac = this._alignVac();
+    return !!vac && !!this._homeFrameCropFor(vac);
+  }
+
+  private _alignHasChanges(): boolean {
+    const s = this._alignSession;
+    if (!s) return false;
+    const a = s.draft, b = s.start;
+    return a.rotation !== b.rotation || a.scale !== b.scale || (a.scaleY ?? null) !== (b.scaleY ?? null)
+      || a.offset_x !== b.offset_x || a.offset_y !== b.offset_y;
+  }
+
+  /** Toolbar ×/Esc entry point (docs/41 §4.4's "Cancel"): closes right away
+   *  when the draft never diverged from the opening seat, otherwise shows
+   *  the in-overlay confirmation panel instead of an OS `window.confirm`
+   *  (docs/41 risk #3: a bottom-edge swipe/back gesture must not be
+   *  mistaken for confirming a destructive dialog). */
+  private _alignCancel(): void {
+    if (this._alignHasChanges()) this._alignCancelConfirm = true;
+    else this._closeAlign();
+  }
+  private _alignConfirmDiscard(): void {
+    this._closeAlign();
+  }
+  private _alignDismissCancelConfirm(): void {
+    this._alignCancelConfirm = false;
+  }
+
+  private _alignReset(): void {
+    const session = this._alignSession;
+    if (!session || this._alignReadOnly()) return;
+    this._alignSession = {
+      ...session, draft: { ...session.start },
+      history: [...session.history, session.draft], future: [],
+    };
+  }
+
+  private async _alignCopyYaml(): Promise<void> {
+    const session = this._alignSession;
+    if (!session) return;
+    const yaml = seatToYaml(session.draft);
+    try {
+      await navigator.clipboard.writeText(yaml);
+      this._alignCopiedFlash = true;
+      setTimeout(() => { this._alignCopiedFlash = false; }, 1500);
+    } catch (err) {
+      // Copy YAML is the docs/41 §4.6 ALWAYS-available fallback (works with
+      // no service, no HA version requirement) — a silent failure here
+      // would leave the user thinking it worked, so at least log it.
+      console.warn("[anyvac-card] Align: clipboard write failed", err);
+    }
+  }
+
+  /** docs/41 §4.6/§4.8 degradation gate: Save needs an integration new
+   *  enough to speak `anyvac.set_floorplan_seat` — `hass.services` is the
+   *  same existence-check HA's own more-info dialogs use for "is this
+   *  service registered right now". */
+  private _alignServiceAvailable(): boolean {
+    return !!this.hass.services?.["anyvac"]?.["set_floorplan_seat"];
+  }
+
+  private async _alignSave(): Promise<void> {
+    const session = this._alignSession;
+    const vac = this._alignVac();
+    if (!session || !vac || !this._alignServiceAvailable() || this._alignReadOnly()) return;
+    const d = session.draft;
+    const map: Record<string, number> = {
+      rotation: Math.round(d.rotation * 100) / 100,
+      scale: Math.round(d.scale * 100) / 100,
+      offset_x: Math.round(d.offset_x * 100) / 100,
+      offset_y: Math.round(d.offset_y * 100) / 100,
+    };
+    if (d.scaleY != null) map.scale_y = Math.round(d.scaleY * 100) / 100;
+    try {
+      await this.hass.callService("anyvac", "set_floorplan_seat", {
+        floorplan: session.floorplan, vacuum: vac.entity, map,
+      });
+      this._closeAlign();
+    } catch (err) {
+      // Left open on failure (network blip, HA restart mid-save) — the
+      // draft is not lost, the user can just try Save again.
+      console.warn("[anyvac-card] Align: set_floorplan_seat call failed", err);
+    }
+  }
+
+  /** Numeric side-panel commit (docs/41 §4.3 "side panel: numerika"). Bound
+   *  to each `<input>`'s `change` event (fires on blur/Enter), not `input`
+   *  — same one-push-per-commit philosophy as gestures/keyboard bursts, so
+   *  a user retyping a value doesn't spam `history` per keystroke. A NaN
+   *  (mid-edit empty field, stray text) or a no-op value is silently
+   *  ignored rather than corrupting the draft. */
+  private _alignSetField(
+    field: "rotation" | "scale" | "scaleY" | "offset_x" | "offset_y", raw: string,
+  ): void {
+    const session = this._alignSession;
+    if (!session || this._alignReadOnly()) return;
+    const n = parseFloat(raw);
+    if (!Number.isFinite(n)) return;
+    const d = session.draft;
+    if (d[field] === n) return;
+    const next: SeatParams = { ...d, [field]: n };
+    this._alignSession = { ...session, draft: next, history: [...session.history, d], future: [] };
+  }
+
+  /** The "Independent Y scale" checkbox — on, `scaleY` starts at the
+   *  current `scale` (so toggling it never itself changes what's on
+   *  screen); off, `scaleY` is cleared back to isotropic (`undefined`,
+   *  per `SeatParams`'s own doc comment on the field). */
+  private _alignToggleScaleY(on: boolean): void {
+    const session = this._alignSession;
+    if (!session || this._alignReadOnly()) return;
+    const d = session.draft;
+    const next: SeatParams = { ...d };
+    if (on) {
+      if (next.scaleY == null) next.scaleY = next.scale;
+    } else {
+      delete next.scaleY;
+    }
+    this._alignSession = { ...session, draft: next, history: [...session.history, d], future: [] };
+  }
+
+  /** Contain-fits the floorplan's own aspect ratio (`_mapAR`) into the
+   *  viewport at view zoom = 1 (docs/41 §4.3). The overlay is always
+   *  full-screen (docs/41 §4.1), so the viewport itself is the available
+   *  box; a live ResizeObserver refinement (rotation/resize while open) is
+   *  left for C2b along with the rest of the toolbar/side-panel chrome. */
+  private _alignSceneSize(): { w: number; h: number } {
+    const ar = this._mapAR > 0.1 ? this._mapAR : 3.636;
+    const availW = Math.max(100, window.innerWidth - 32);
+    const availH = Math.max(100, window.innerHeight - 140);
+    let w = availW, h = w / ar;
+    if (h > availH) { h = availH; w = h * ar; }
+    return { w, h };
+  }
+
+  private _alignViewTransformCss(): string {
+    const v = this._alignView;
+    return `translate(${v.panX}px,${v.panY}px) scale(${v.zoom}) rotate(${v.rot}deg)`;
+  }
+
+  private _alignRotateView(): void {
+    this._alignView = { ...this._alignView, rot: (((this._alignView.rot + 90) % 360) as 0 | 90 | 180 | 270) };
+  }
+
+  /** Pointer (client px) -> wrap-relative PERCENT (same units as
+   *  `offset_x`/`offset_y`: x = %wrap-width, y = %wrap-height) — inverts the
+   *  scene's own view transform first (docs/41 §4.3: "`new
+   *  DOMMatrix(getComputedStyle(scene).transform).inverse()` +
+   *  `getBoundingClientRect()`"), same approach `_clickToContent` already
+   *  uses for pin&go clicks. `.align-scene`'s OWN layout box (no extra
+   *  chrome around it) is exactly the wrap these percentages are relative
+   *  to, so its `offsetWidth`/`offsetHeight` double as wrapW/wrapH. */
+  private _alignPointToWrapPct(clientX: number, clientY: number): { x: number; y: number } | null {
+    // The overlay lives in the `_alignHost` PORTAL's own shadow root, not
+    // this card's `renderRoot` (docs/41 §4.1) — a C2a bug (fixed in C2b,
+    // caught by tests/align-overlay.spec.ts) had this querying `renderRoot`
+    // instead, which meant `.align-scene` could never be found and every
+    // gizmo gesture silently no-opped (`_alignStartGesture` bails on a
+    // `null` point below).
+    const scene = this._alignHost?.shadowRoot?.querySelector(".align-scene") as HTMLElement | null;
+    if (!scene) return null;
+    const r = scene.getBoundingClientRect();
+    const cx = (r.left + r.right) / 2, cy = (r.top + r.bottom) / 2;
+    const tr = getComputedStyle(scene).transform;
+    const m = new DOMMatrix(tr === "none" ? undefined : tr);
+    const det = m.a * m.d - m.b * m.c;
+    if (Math.abs(det) < 1e-9) return null;
+    const dx = clientX - cx, dy = clientY - cy;
+    const lx = (m.d * dx - m.c * dy) / det;
+    const ly = (-m.b * dx + m.a * dy) / det;
+    const sw = scene.offsetWidth || 1, sh = scene.offsetHeight || 1;
+    return { x: (lx / sw + 0.5) * 100, y: (ly / sh + 0.5) * 100 };
+  }
+
+  /** A corner of the seated layer's own unit box (`cx`/`cy` in 0..1, (0,0) =
+   *  NW .. (1,1) = SE) projected through `seat`, in wrap-relative PERCENT.
+   *  Reuses `seatToMatrix` (docs/14 rule 1 — the one shared geometry
+   *  primitive, not a second implementation) with a 1×1 "natural size" so
+   *  its content coordinates ARE the unit box directly. */
+  private _alignCornerPct(
+    seat: SeatParams, cx: number, cy: number, wrapW: number, wrapH: number,
+  ): { x: number; y: number } {
+    const m = seatToMatrix(seat, wrapW, wrapH, 1, 1);
+    const p = m.transformPoint({ x: cx, y: cy });
+    return { x: (p.x / wrapW) * 100, y: (p.y / wrapH) * 100 };
+  }
+
+  /** Isotropic (aspect-corrected) distance/angle between two wrap-percent
+   *  points — the same "divide y by `ar`" convention `seatedit.ts`'s
+   *  internal `pctToFrac` uses, so a corner-handle scale factor or a
+   *  rotation-handle angle delta agrees with what `scaleSeatAbout`/
+   *  `rotateSeatAbout` themselves expect. */
+  private _alignIsoDist(a: { x: number; y: number }, b: { x: number; y: number }, ar: number): number {
+    return Math.hypot(a.x - b.x, (a.y - b.y) / ar);
+  }
+  private _alignIsoAngleDeg(pivot: { x: number; y: number }, p: { x: number; y: number }, ar: number): number {
+    return (Math.atan2((p.y - pivot.y) / ar, p.x - pivot.x) * 180) / Math.PI;
+  }
+
+  /** Starts (or upgrades an existing single-pointer gesture to) a gizmo
+   *  gesture. `kind` drives which `seatedit.ts` primitive `_alignApplyGesture`
+   *  below calls; `pivotPct` is fixed for the whole gesture (the opposite
+   *  corner for scale, the layer's own centre for rotate). */
+  private _alignStartGesture(
+    e: PointerEvent, kind: "drag" | "scale" | "rotate", pivotPct?: { x: number; y: number },
+  ): void {
+    const session = this._alignSession;
+    if (!session || this._alignReadOnly()) return;
+    (e.currentTarget as HTMLElement).setPointerCapture(e.pointerId);
+    e.stopPropagation();
+    e.preventDefault();
+    const pt = this._alignPointToWrapPct(e.clientX, e.clientY);
+    if (!pt) return;
+    const g = this._alignGesture;
+    if (g && g.startPos.size === 1 && !g.startPos.has(e.pointerId)) {
+      // Second finger landing on the layer mid-gesture -> upgrade to pinch,
+      // re-baselined from the CURRENT draft (docs/41 §4.4).
+      const [[firstId, firstPos]] = g.startPos;
+      this._alignGesture = {
+        kind: "pinch", startSeat: { ...session.draft },
+        startPos: new Map([[firstId, g.livePos.get(firstId) ?? firstPos], [e.pointerId, pt]]),
+        livePos: new Map([[firstId, g.livePos.get(firstId) ?? firstPos], [e.pointerId, pt]]),
+      };
+      return;
+    }
+    // A NEW gesture (not a pinch upgrade, handled above) is the point to
+    // snapshot for undo — one history entry per drag/scale/rotate/pinch,
+    // not per pointermove (docs/41 SS4.4 undo/redo).
+    this._alignPushHistory(session.draft);
+    this._alignGesture = {
+      kind, startSeat: { ...session.draft }, pivotPct,
+      startPos: new Map([[e.pointerId, pt]]),
+      livePos: new Map([[e.pointerId, pt]]),
+    };
+  }
+
+  private _alignGestureMove(e: PointerEvent): void {
+    const session = this._alignSession, g = this._alignGesture;
+    if (!session || !g || !g.startPos.has(e.pointerId)) return;
+    const pt = this._alignPointToWrapPct(e.clientX, e.clientY);
+    if (!pt) return;
+    g.livePos.set(e.pointerId, pt);
+    const ar = this._mapAR > 0.1 ? this._mapAR : 3.636;
+    let next: SeatParams | null = null;
+    if (g.kind === "drag") {
+      const id = e.pointerId;
+      const s0 = g.startPos.get(id)!, s1 = g.livePos.get(id)!;
+      next = translateSeat(g.startSeat, s1.x - s0.x, s1.y - s0.y);
+    } else if (g.kind === "scale" && g.pivotPct) {
+      const id = e.pointerId;
+      const s0 = g.startPos.get(id)!, s1 = g.livePos.get(id)!;
+      const d0 = this._alignIsoDist(s0, g.pivotPct, ar);
+      const d1 = this._alignIsoDist(s1, g.pivotPct, ar);
+      if (d0 > 1e-6) next = scaleSeatAbout(g.startSeat, d1 / d0, g.pivotPct, ar);
+    } else if (g.kind === "rotate" && g.pivotPct) {
+      const id = e.pointerId;
+      const s0 = g.startPos.get(id)!, s1 = g.livePos.get(id)!;
+      const a0 = this._alignIsoAngleDeg(g.pivotPct, s0, ar);
+      const a1 = this._alignIsoAngleDeg(g.pivotPct, s1, ar);
+      next = rotateSeatAbout(g.startSeat, a1 - a0, g.pivotPct, ar);
+    } else if (g.kind === "pinch" && g.startPos.size === 2) {
+      const ids = [...g.startPos.keys()];
+      const p0a = g.startPos.get(ids[0])!, p0b = g.startPos.get(ids[1])!;
+      const p1a = g.livePos.get(ids[0])!, p1b = g.livePos.get(ids[1])!;
+      next = pinchSeat(g.startSeat, p0a, p0b, p1a, p1b, ar);
+    }
+    if (next) this._alignSession = { ...session, draft: next };
+  }
+
+  private _alignGestureEnd(e: PointerEvent): void {
+    const g = this._alignGesture;
+    if (!g) return;
+    g.startPos.delete(e.pointerId);
+    g.livePos.delete(e.pointerId);
+    if (g.startPos.size === 0) {
+      this._alignGesture = null;
+    } else if (g.kind === "pinch" && g.startPos.size === 1) {
+      // Down to one finger -> back to a plain drag, re-baselined so the
+      // remaining finger doesn't jump the layer (docs/41 §4.4).
+      const [[id, pos]] = g.startPos;
+      const session = this._alignSession;
+      this._alignGesture = {
+        kind: "drag", startSeat: session ? { ...session.draft } : g.startSeat,
+        startPos: new Map([[id, pos]]), livePos: new Map([[id, pos]]),
+      };
+    }
+  }
+
+  /** Snapshots `seat` onto the undo stack and clears redo (any new edit
+   *  invalidates a previously-undone future, same convention every other
+   *  undo/redo stack uses). Called once per user-initiated change — a whole
+   *  gesture (`_alignStartGesture`) or a whole keyboard nudge burst
+   *  (`_alignKeyDown`, gated on `!e.repeat`) — never per intermediate step,
+   *  so one Undo reverts the WHOLE gesture/burst, not one pixel of it. */
+  private _alignPushHistory(seat: SeatParams): void {
+    const session = this._alignSession;
+    if (!session) return;
+    this._alignSession = { ...session, history: [...session.history, seat], future: [] };
+  }
+
+  private _alignUndo(): void {
+    const session = this._alignSession;
+    if (!session || !session.history.length) return;
+    const prev = session.history[session.history.length - 1];
+    this._alignSession = {
+      ...session, draft: prev,
+      history: session.history.slice(0, -1),
+      future: [session.draft, ...session.future],
+    };
+  }
+
+  private _alignRedo(): void {
+    const session = this._alignSession;
+    if (!session || !session.future.length) return;
+    const next = session.future[0];
+    this._alignSession = {
+      ...session, draft: next,
+      history: [...session.history, session.draft],
+      future: session.future.slice(1),
+    };
+  }
+
+  private _alignSetNudgeTier(tier: NudgeTier): void {
+    const session = this._alignSession;
+    if (session) this._alignSession = { ...session, nudgeTier: tier };
+  }
+
+  /** `Ctrl`/`Shift` held MOMENTARILY override the toolbar's persistent
+   *  Jemně/Krok/Skok selection to fine/jump — see `NudgeTier`'s doc comment
+   *  in `seatedit.ts` for why this replaced a Ctrl+WASD-style scheme. */
+  private _alignEffectiveNudgeTier(e: KeyboardEvent): NudgeTier {
+    if (e.ctrlKey || e.metaKey) return "fine";
+    if (e.shiftKey) return "jump";
+    return this._alignSession?.nudgeTier ?? "normal";
+  }
+
+  /** Keyboard nudges (docs/41 SS4.4): arrows = offset, `[`/`]` = rotation,
+   *  `,`/`.` = scale — base step 0.1%/0.5deg/0.5%, scaled by the effective
+   *  tier. `Ctrl+Z`/`Ctrl+Y` undo/redo are guarded off whenever focus is in
+   *  an actual form field (the numeric side-panel inputs, in C2b) so typing
+   *  there keeps the browser's own normal text-undo instead of hijacking it
+   *  for the seat. `Escape` routes through `_alignCancel()`, same as the
+   *  toolbar's X button, so an in-progress edit asks for confirmation
+   *  instead of silently discarding it. */
+  private _alignKeyDown(e: KeyboardEvent): void {
+    const session = this._alignSession;
+    if (!session) return;
+    const target = e.target as HTMLElement | null;
+    const inField = !!target && (target.tagName === "INPUT" || target.tagName === "TEXTAREA");
+
+    if (e.key === "Escape") {
+      e.preventDefault();
+      this._alignCancel();
+      return;
+    }
+    const mod = e.ctrlKey || e.metaKey;
+    if (mod && !e.shiftKey && !e.altKey && (e.key === "z" || e.key === "Z")) {
+      if (inField) return;
+      e.preventDefault();
+      this._alignUndo();
+      return;
+    }
+    if (mod && !e.shiftKey && !e.altKey && (e.key === "y" || e.key === "Y")) {
+      if (inField) return;
+      e.preventDefault();
+      this._alignRedo();
+      return;
+    }
+    if (inField) return;
+    if (this._alignReadOnly()) return;
+
+    const mult = nudgeTierMultiplier(this._alignEffectiveNudgeTier(e));
+    const ar = this._mapAR > 0.1 ? this._mapAR : 3.636;
+    const d = session.draft;
+    let next: SeatParams | null = null;
+    switch (e.key) {
+      case "ArrowUp": next = nudgeOffset(d, 0, -0.1 * mult, this._alignView.rot, ar); break;
+      case "ArrowDown": next = nudgeOffset(d, 0, 0.1 * mult, this._alignView.rot, ar); break;
+      case "ArrowLeft": next = nudgeOffset(d, -0.1 * mult, 0, this._alignView.rot, ar); break;
+      case "ArrowRight": next = nudgeOffset(d, 0.1 * mult, 0, this._alignView.rot, ar); break;
+      case "[": next = nudgeRotation(d, -0.5 * mult); break;
+      case "]": next = nudgeRotation(d, 0.5 * mult); break;
+      case ",": next = nudgeScale(d, -0.5 * mult); break;
+      case ".": next = nudgeScale(d, 0.5 * mult); break;
+      default: return;
+    }
+    e.preventDefault();
+    const history = e.repeat ? session.history : [...session.history, d];
+    this._alignSession = { ...session, draft: next, history, future: [] };
+  }
+
+  /** Background pan (view, not seat) — drag anywhere on the canvas OUTSIDE
+   *  the seated layer/gizmo. Kept separate from the gizmo's own pointer
+   *  tracking (`_alignGesture`) since it moves `_alignView`, never the
+   *  draft. */
+  private _alignViewDrag: { pointerId: number; x0: number; y0: number; panX0: number; panY0: number } | null = null;
+  private _alignBgPointerDown(e: PointerEvent): void {
+    if (this._alignGesture) return;
+    (e.currentTarget as HTMLElement).setPointerCapture(e.pointerId);
+    this._alignViewDrag = {
+      pointerId: e.pointerId, x0: e.clientX, y0: e.clientY,
+      panX0: this._alignView.panX, panY0: this._alignView.panY,
+    };
+  }
+  private _alignBgPointerMove(e: PointerEvent): void {
+    const d = this._alignViewDrag;
+    if (!d || d.pointerId !== e.pointerId) return;
+    this._alignView = { ...this._alignView, panX: d.panX0 + (e.clientX - d.x0), panY: d.panY0 + (e.clientY - d.y0) };
+  }
+  private _alignBgPointerUp(e: PointerEvent): void {
+    if (this._alignViewDrag?.pointerId === e.pointerId) this._alignViewDrag = null;
+  }
+
+  /** Wheel = zoom of the VIEW (docs/41 §5 bod 3) — centred on the viewport
+   *  for this batch (cursor-anchored zoom is a C2b gesture refinement). */
+  private _alignWheel(e: WheelEvent): void {
+    e.preventDefault();
+    const k = Math.exp(-e.deltaY * 0.001);
+    const zoom = Math.min(8, Math.max(0.25, this._alignView.zoom * k));
+    this._alignView = { ...this._alignView, zoom };
+  }
+
+  private _renderAlignOverlay() {
+    const session = this._alignSession;
+    if (!session) return nothing;
+    const vac = this._alignVac();
+    if (!vac) return nothing;
+    const { w: wrapW, h: wrapH } = this._alignSceneSize();
+    const others = this._config.vacuums.filter(
+      (v) => v.entity !== vac.entity && resolveImageBaseSrc(this._config, v) === session.floorplan && this._intAttrs(v),
+    );
+    // Match by `src` against the identity captured at `_openAlign` time
+    // rather than re-deriving merged-vs-split precedence here (docs/14 rule
+    // 1 — `resolveImageBaseSrc` already owns that logic; this only needs
+    // to find WHICH `image_base` object produced the src it returned).
+    const ib = this._config.image_base?.src === session.floorplan
+      ? this._config.image_base
+      : (this._config.vacuums.find((v) => v.image_base?.src === session.floorplan)?.image_base ?? vac.image_base);
+    const mapEnt = this._mapEntityFor(vac);
+    const mapUrl = mapEnt ? this._mapUrl(mapEnt) : null;
+    const draft = session.draft;
+    const corner = (cx: number, cy: number) => this._alignCornerPct(draft, cx, cy, wrapW, wrapH);
+    const nw = corner(0, 0), ne = corner(1, 0), sw = corner(0, 1), se = corner(1, 1);
+    const centre = { x: 50 + draft.offset_x, y: 50 + draft.offset_y };
+    const rotateHandle = this._alignCornerPct(draft, 0.5, -0.18, wrapW, wrapH);
+    const candidates = this._alignCandidates(this._config.vacuums);
+    const readOnly = this._alignReadOnly();
+    const canSave = !readOnly && this._alignServiceAvailable();
+    const canUndo = session.history.length > 0;
+    const canRedo = session.future.length > 0;
+    const tier = session.nudgeTier;
+    const tierBtn = (t: NudgeTier, label: string, title: string) => html`
+      <button class="align-tier-btn ${tier === t ? "on" : ""}" title=${title}
+        @click=${() => this._alignSetNudgeTier(t)}>${label}</button>`;
+    return html`
+      <div class="align-overlay ${this._rootClasses()}" tabindex="0" @keydown=${(e: KeyboardEvent) => this._alignKeyDown(e)}>
+        <div class="align-toolbar">
+          <div class="align-toolbar-title">
+            <ha-icon icon="mdi:vector-square-edit"></ha-icon>
+            <span>Align — ${vac.name ?? vac.entity}</span>
+          </div>
+          ${candidates.length > 1 ? html`<div class="align-vac-picker">
+            ${candidates.map((v) => html`
+              <button class="align-vac-chip ${v.entity === vac.entity ? "on" : ""}"
+                @click=${() => { this._closeAlign(); this._openAlign(v); }}>
+                ${v.name ?? v.entity}
+              </button>
+            `)}
+          </div>` : nothing}
+          <div class="align-toolbar-spacer"></div>
+          <div class="align-tier-group" title="Nudge step size — hold Ctrl for Jemně, Shift for Skok">
+            ${tierBtn("fine", "Jemně", "Fine step (0,1×) — or hold Ctrl")}
+            ${tierBtn("normal", "Krok", "Normal step (1×)")}
+            ${tierBtn("jump", "Skok", "Jump step (10×) — or hold Shift")}
+          </div>
+          <button class="align-btn" title="Undo (Ctrl+Z)" ?disabled=${!canUndo} @click=${() => this._alignUndo()}>
+            <ha-icon icon="mdi:undo"></ha-icon>
+          </button>
+          <button class="align-btn" title="Redo (Ctrl+Y)" ?disabled=${!canRedo} @click=${() => this._alignRedo()}>
+            <ha-icon icon="mdi:redo"></ha-icon>
+          </button>
+          <button class="align-btn" title="Rotate view 90°" @click=${() => this._alignRotateView()}>
+            <ha-icon icon="mdi:screen-rotate"></ha-icon>
+          </button>
+          <button class="align-btn" title="Reset to the values Align mode was opened with"
+            ?disabled=${readOnly} @click=${() => this._alignReset()}>
+            <ha-icon icon="mdi:restore"></ha-icon>
+          </button>
+          <button class="align-btn ${this._alignCopiedFlash ? "align-btn--flash" : ""}"
+            title="Copy as YAML (map: block, paste into the card config)" @click=${() => this._alignCopyYaml()}>
+            <ha-icon icon=${this._alignCopiedFlash ? "mdi:check" : "mdi:content-copy"}></ha-icon>
+          </button>
+          <button class="align-btn align-close-btn" title="Cancel" @click=${() => this._alignCancel()}>
+            <ha-icon icon="mdi:close"></ha-icon>
+          </button>
+          <button class="align-btn align-save-btn" ?disabled=${!canSave}
+            title=${canSave ? "Save" : readOnly ? "Read-only — aligned by home frame" : "Update the AnyVac integration to 2.0.0 — or Copy YAML"}
+            @click=${() => this._alignSave()}>
+            <ha-icon icon="mdi:content-save"></ha-icon><span>Save</span>
+          </button>
+        </div>
+        <div class="align-body">
+          <div class="align-canvas"
+            @wheel=${(e: WheelEvent) => this._alignWheel(e)}
+            @pointerdown=${(e: PointerEvent) => this._alignBgPointerDown(e)}
+            @pointermove=${(e: PointerEvent) => this._alignBgPointerMove(e)}
+            @pointerup=${(e: PointerEvent) => this._alignBgPointerUp(e)}
+            @pointercancel=${(e: PointerEvent) => this._alignBgPointerUp(e)}>
+            <div class="align-scene" style=${styleMap({
+              width: wrapW + "px", height: wrapH + "px",
+              transform: this._alignViewTransformCss(),
+            })}>
+              ${ib?.src ? html`<img class="align-floorplan-img" src=${ib.src} alt="Floorplan"
+                  @load=${this._onFloorplanLoad}
+                  style=${styleMap({
+                    transform: "translate(" + (ib.offset_x ?? 0) + "%," + (ib.offset_y ?? 0) + "%) rotate(" + (ib.rotation ?? 0) + "deg) scale(" + ((ib.scale ?? 100) / 100) + ")",
+                  })} />` : nothing}
+              ${others.map((v) => {
+                const gm = this._mapEntityFor(v);
+                const gUrl = gm ? this._mapUrl(gm) : null;
+                const gs = this._effectiveSeat(v);
+                return html`
+                  <div class="align-ghost">
+                    ${gUrl ? html`<img class="align-seat-img" src=${gUrl} alt=""
+                        style=${styleMap({
+                          left: (50 + gs.offset_x) + "%", top: (50 + gs.offset_y) + "%", width: gs.scale + "%",
+                          transform: "translate(-50%,-50%) " + seatRotateScaleCss(gs.rotation, gs.scale, gs.scaleY),
+                        })} />` : nothing}
+                    ${this._renderIntegrationOverlay(v, gs, "both")}
+                  </div>`;
+              })}
+              <div class="align-seat-layer ${readOnly ? "align-seat-layer--readonly" : ""}"
+                @pointerdown=${(e: PointerEvent) => this._alignStartGesture(e, "drag")}
+                @pointermove=${(e: PointerEvent) => this._alignGestureMove(e)}
+                @pointerup=${(e: PointerEvent) => this._alignGestureEnd(e)}
+                @pointercancel=${(e: PointerEvent) => this._alignGestureEnd(e)}>
+                ${mapUrl ? html`<img class="align-seat-img" src=${mapUrl} alt="Vacuum map"
+                    style=${styleMap({
+                      left: (50 + draft.offset_x) + "%", top: (50 + draft.offset_y) + "%", width: draft.scale + "%",
+                      transform: "translate(-50%,-50%) " + seatRotateScaleCss(draft.rotation, draft.scale, draft.scaleY),
+                    })} />` : nothing}
+                ${this._renderIntegrationOverlay(vac, draft, "both")}
+              </div>
+              ${readOnly ? html`
+                <div class="align-readonly-note">
+                  <ha-icon icon="mdi:lock-outline"></ha-icon>
+                  <span>aligned by home frame — nothing to adjust</span>
+                </div>
+              ` : html`
+                <svg class="align-gizmo" viewBox="0 0 100 100" preserveAspectRatio="none">
+                  <line x1=${centre.x} y1=${centre.y} x2=${rotateHandle.x} y2=${rotateHandle.y} class="align-gizmo-arm" />
+                  <polygon points="${nw.x},${nw.y} ${ne.x},${ne.y} ${se.x},${se.y} ${sw.x},${sw.y}" class="align-gizmo-box" />
+                </svg>
+                ${([["nw", nw], ["ne", ne], ["se", se], ["sw", sw]] as const).map(([key, pos]) => html`
+                  <div class="align-handle align-handle--corner" data-corner=${key}
+                    style=${styleMap({ left: pos.x + "%", top: pos.y + "%" })}
+                    @pointerdown=${(e: PointerEvent) => {
+                      const opp = key === "nw" ? se : key === "ne" ? sw : key === "se" ? nw : ne;
+                      this._alignStartGesture(e, "scale", opp);
+                    }}
+                    @pointermove=${(e: PointerEvent) => this._alignGestureMove(e)}
+                    @pointerup=${(e: PointerEvent) => this._alignGestureEnd(e)}
+                    @pointercancel=${(e: PointerEvent) => this._alignGestureEnd(e)}>
+                  </div>
+                `)}
+                <div class="align-handle align-handle--rotate"
+                  style=${styleMap({ left: rotateHandle.x + "%", top: rotateHandle.y + "%" })}
+                  @pointerdown=${(e: PointerEvent) => this._alignStartGesture(e, "rotate", centre)}
+                  @pointermove=${(e: PointerEvent) => this._alignGestureMove(e)}
+                  @pointerup=${(e: PointerEvent) => this._alignGestureEnd(e)}
+                  @pointercancel=${(e: PointerEvent) => this._alignGestureEnd(e)}>
+                  <ha-icon icon="mdi:rotate-3d-variant"></ha-icon>
+                </div>
+              `}
+            </div>
+          </div>
+          <div class="align-side-panel">
+            <div class="align-field-row">
+              <label>Rotation<span>°</span></label>
+              <input type="number" step="0.1" .value=${String(Math.round(draft.rotation * 100) / 100)}
+                ?disabled=${readOnly} @change=${(e: Event) => this._alignSetField("rotation", (e.target as HTMLInputElement).value)} />
+            </div>
+            <div class="align-field-row">
+              <label>Scale<span>%</span></label>
+              <input type="number" step="0.1" min="1" .value=${String(Math.round(draft.scale * 100) / 100)}
+                ?disabled=${readOnly} @change=${(e: Event) => this._alignSetField("scale", (e.target as HTMLInputElement).value)} />
+            </div>
+            <div class="align-field-row align-field-row--check">
+              <label>
+                <input type="checkbox" .checked=${draft.scaleY != null} ?disabled=${readOnly}
+                  @change=${(e: Event) => this._alignToggleScaleY((e.target as HTMLInputElement).checked)} />
+                Independent Y scale
+              </label>
+            </div>
+            ${draft.scaleY != null ? html`
+              <div class="align-field-row">
+                <label>Scale Y<span>%</span></label>
+                <input type="number" step="0.1" min="1" .value=${String(Math.round(draft.scaleY * 100) / 100)}
+                  ?disabled=${readOnly} @change=${(e: Event) => this._alignSetField("scaleY", (e.target as HTMLInputElement).value)} />
+              </div>
+            ` : nothing}
+            <div class="align-field-row">
+              <label>Offset X<span>%</span></label>
+              <input type="number" step="0.01" .value=${String(Math.round(draft.offset_x * 10000) / 10000)}
+                ?disabled=${readOnly} @change=${(e: Event) => this._alignSetField("offset_x", (e.target as HTMLInputElement).value)} />
+            </div>
+            <div class="align-field-row">
+              <label>Offset Y<span>%</span></label>
+              <input type="number" step="0.01" .value=${String(Math.round(draft.offset_y * 10000) / 10000)}
+                ?disabled=${readOnly} @change=${(e: Event) => this._alignSetField("offset_y", (e.target as HTMLInputElement).value)} />
+            </div>
+          </div>
+        </div>
+        ${this._alignCancelConfirm ? html`
+          <div class="align-confirm-backdrop">
+            <div class="align-confirm-panel">
+              <div class="align-confirm-title">Discard changes?</div>
+              <div class="align-confirm-body">The alignment you made in this session hasn't been saved.</div>
+              <div class="align-confirm-actions">
+                <button class="align-btn align-confirm-keep" @click=${() => this._alignDismissCancelConfirm()}>Keep editing</button>
+                <button class="align-btn align-confirm-discard" @click=${() => this._alignConfirmDiscard()}>Discard</button>
+              </div>
+            </div>
+          </div>
+        ` : nothing}
+      </div>
+    `;
   }
 
   /** docs/40 §4.4 (Fáze 3): is `vac` currently rendered via the shared home
@@ -7173,6 +8026,152 @@ export class AnyVacCard extends LitElement {
       .avc-theme .error-row { animation: none; }
       .avc-theme .mode-action .mtbtn { animation: none; }
     }
+
+    /* == Align mode overlay (docs/41, Faze C - C2a batch) ==================
+     * Rendered inside the document.body portal (align-overlay.ts), NOT
+     * inside this card's own shadow root -- the SAME adopted stylesheet
+     * reaches both (docs/14 rule 1: one stylesheet), so these rules just
+     * need to exist once, here. .align-overlay carries the SAME theme
+     * class this card's own <ha-card> does (_rootClasses()), so every
+     * --avc-* token above resolves identically inside the portal. */
+    .align-overlay {
+      position: fixed; inset: 0; display: flex; flex-direction: column;
+      background: rgba(var(--avc-shade-rgb), 0.92);
+      color: rgb(var(--avc-ink-rgb));
+      font-family: inherit;
+      touch-action: none;
+    }
+    .align-toolbar {
+      display: flex; align-items: center; gap: 8px;
+      padding: max(10px, env(safe-area-inset-top)) 12px 10px 12px;
+      background: var(--avc-surface);
+      box-shadow: var(--avc-elev-1);
+      flex-wrap: wrap;
+    }
+    .align-toolbar-title {
+      display: flex; align-items: center; gap: 8px; font-weight: 700; font-size: 13px;
+    }
+    .align-toolbar-spacer { flex: 1 1 auto; }
+    .align-vac-picker { display: flex; gap: 6px; flex-wrap: wrap; }
+    .align-vac-chip {
+      font: inherit; font-size: 11px; font-weight: 600; cursor: pointer;
+      padding: 5px 10px; border-radius: 999px; color: rgb(var(--avc-ink-rgb));
+      background: var(--avc-panel); border: 1px solid var(--avc-panel-line);
+    }
+    .align-vac-chip.on { background: rgba(var(--avc-tool-rgb), 0.22); border-color: rgba(var(--avc-tool-rgb), 0.6); }
+    .align-btn {
+      display: inline-flex; align-items: center; justify-content: center;
+      width: 34px; height: 34px; border-radius: 10px; cursor: pointer;
+      color: rgb(var(--avc-ink-rgb)); background: var(--avc-panel);
+      border: 1px solid var(--avc-panel-line);
+    }
+    .align-close-btn:hover { background: rgba(var(--avc-err-rgb), 0.18); border-color: rgba(var(--avc-err-rgb), 0.5); }
+    .align-canvas {
+      position: relative; flex: 1 1 auto; overflow: hidden;
+      display: flex; align-items: center; justify-content: center;
+      touch-action: none; user-select: none; -webkit-user-select: none;
+      padding-bottom: env(safe-area-inset-bottom);
+    }
+    .align-scene {
+      position: relative; flex: 0 0 auto; transform-origin: center center;
+    }
+    .align-floorplan-img {
+      position: absolute; inset: 0; width: 100%; height: 100%; object-fit: contain;
+      transform-origin: center center; pointer-events: none; -webkit-touch-callout: none;
+    }
+    .align-ghost { position: absolute; inset: 0; opacity: 0.28; pointer-events: none; }
+    .align-seat-layer { position: absolute; inset: 0; pointer-events: none; }
+    .align-seat-img {
+      position: absolute; height: auto; pointer-events: auto; touch-action: none;
+      -webkit-touch-callout: none; -webkit-user-select: none; user-select: none;
+      cursor: grab;
+    }
+    .align-gizmo { position: absolute; inset: 0; width: 100%; height: 100%; pointer-events: none; overflow: visible; }
+    .align-gizmo-box { fill: none; stroke: rgb(var(--avc-tool-rgb)); stroke-width: 0.4; vector-effect: non-scaling-stroke; }
+    .align-gizmo-arm { stroke: rgb(var(--avc-tool-rgb)); stroke-width: 0.3; stroke-dasharray: 1.2 1; vector-effect: non-scaling-stroke; }
+    .align-handle {
+      position: absolute; width: 26px; height: 26px; margin: -13px 0 0 -13px;
+      border-radius: 50%; background: rgb(var(--avc-tool-rgb)); border: 2px solid rgb(var(--avc-ink-rgb));
+      box-shadow: var(--avc-elev-1); touch-action: none; cursor: pointer;
+      display: flex; align-items: center; justify-content: center; color: rgb(var(--avc-ink-rgb));
+      --mdc-icon-size: 16px;
+    }
+    .align-handle--rotate { background: rgba(var(--avc-tool-rgb), 0.85); }
+    .align-btn[disabled] { opacity: 0.35; cursor: default; pointer-events: none; }
+    .align-btn--flash { background: rgba(var(--avc-ok-rgb), 0.22); border-color: rgba(var(--avc-ok-rgb), 0.6); }
+    .align-save-btn {
+      width: auto; padding: 0 12px; gap: 6px; font-weight: 700; font-size: 12px;
+      background: rgba(var(--avc-tool-rgb), 0.22); border-color: rgba(var(--avc-tool-rgb), 0.6);
+    }
+    .align-tier-group {
+      display: flex; border-radius: 10px; overflow: hidden;
+      border: 1px solid var(--avc-panel-line);
+    }
+    .align-tier-btn {
+      font: inherit; font-size: 11px; font-weight: 600; cursor: pointer;
+      padding: 0 10px; height: 34px; color: rgba(var(--avc-ink-rgb), 0.6);
+      background: var(--avc-panel); border: none; border-right: 1px solid var(--avc-panel-line);
+    }
+    .align-tier-btn:last-child { border-right: none; }
+    .align-tier-btn.on {
+      color: rgb(var(--avc-ink-rgb)); font-weight: 700;
+      background: rgba(var(--avc-tool-rgb), 0.22);
+    }
+    /* == Align mode: body row (canvas + numeric side panel, C2b) ========= */
+    .align-body { display: flex; flex: 1 1 auto; min-height: 0; }
+    .align-side-panel {
+      flex: 0 0 208px; display: flex; flex-direction: column; gap: 10px;
+      padding: 14px 12px; overflow-y: auto;
+      background: var(--avc-surface); box-shadow: var(--avc-elev-1);
+    }
+    .align-field-row { display: flex; align-items: center; justify-content: space-between; gap: 8px; }
+    .align-field-row label {
+      font-size: 12px; font-weight: 600; color: rgba(var(--avc-ink-rgb), 0.75);
+      display: flex; align-items: baseline; gap: 3px;
+    }
+    .align-field-row label span { font-size: 10.5px; font-weight: 500; color: rgba(var(--avc-ink-rgb), 0.5); }
+    .align-field-row input[type="number"] {
+      width: 84px; font: inherit; font-size: 12px; text-align: right;
+      color: rgb(var(--avc-ink-rgb)); background: var(--avc-panel);
+      border: 1px solid var(--avc-panel-line); border-radius: 8px; padding: 5px 7px;
+    }
+    .align-field-row input[disabled] { opacity: 0.4; }
+    .align-field-row--check label { flex: 1 1 auto; display: flex; align-items: center; gap: 6px; }
+    .align-field-row--check input[type="checkbox"] { width: 15px; height: 15px; }
+    @media (max-width: 700px) {
+      .align-body { flex-direction: column-reverse; }
+      .align-side-panel {
+        flex: 0 0 auto; width: 100%; max-height: 32vh;
+        flex-direction: row; flex-wrap: wrap; align-items: center;
+      }
+      .align-field-row { flex: 1 1 45%; }
+    }
+    /* == Align mode: home-frame degradation (docs/41 §4.8) =============== */
+    .align-seat-layer--readonly { cursor: default; }
+    .align-seat-layer--readonly .align-seat-img { cursor: default; }
+    .align-readonly-note {
+      position: absolute; left: 50%; bottom: 6%; transform: translateX(-50%);
+      display: flex; align-items: center; gap: 6px; font-size: 12px; font-weight: 600;
+      padding: 7px 12px; border-radius: 999px; white-space: nowrap;
+      color: rgb(var(--avc-ink-rgb)); background: var(--avc-surface); box-shadow: var(--avc-elev-1);
+    }
+    /* == Align mode: Cancel confirmation (docs/41 §4.4, Esc/X row) ======== */
+    .align-confirm-backdrop {
+      position: absolute; inset: 0; display: flex; align-items: center; justify-content: center;
+      background: rgba(var(--avc-shade-rgb), 0.55); z-index: 1;
+    }
+    .align-confirm-panel {
+      width: min(320px, 86vw); padding: 18px; border-radius: 14px;
+      background: var(--avc-surface); box-shadow: var(--avc-elev-1);
+      color: rgb(var(--avc-ink-rgb));
+    }
+    .align-confirm-title { font-size: 14px; font-weight: 700; margin-bottom: 6px; }
+    .align-confirm-body { font-size: 12.5px; color: rgba(var(--avc-ink-rgb), 0.7); margin-bottom: 14px; }
+    .align-confirm-actions { display: flex; justify-content: flex-end; gap: 8px; }
+    .align-confirm-keep, .align-confirm-discard {
+      width: auto; height: 32px; padding: 0 12px; font-size: 12px; font-weight: 700;
+    }
+    .align-confirm-discard { background: rgba(var(--avc-err-rgb), 0.18); border-color: rgba(var(--avc-err-rgb), 0.5); }
   `;
 }
 

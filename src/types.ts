@@ -14,6 +14,13 @@ export interface HassConnection {
 export interface HomeAssistant {
   states: Record<string, HassEntity>;
   connection: HassConnection;
+  /** domain -> service name -> description. Only used (docs/41 SS4.6/SS4.8)
+   *  to detect whether an integration new enough to speak
+   *  `anyvac.set_floorplan_seat` is installed, before enabling Align mode's
+   *  Save button — never read for anything else, so this stays a loose
+   *  existence-check shape rather than the full HA service-description
+   *  type. */
+  services?: Record<string, Record<string, unknown>>;
   callService(
     domain: string,
     service: string,
@@ -451,4 +458,9 @@ export interface AnyVacCardConfig {
    *  the theme. `prefers-reduced-motion` already disables them at the OS
    *  level — this is for people who want them off regardless (docs/35 §5). */
   reduce_motion?: boolean;
+  /** Show the "Align" entry button (full-screen manual floorplan seating,
+   *  docs/41 v2.0) when a floorplan + integration are otherwise available.
+   *  Default on; `false` hides it — e.g. locked-down kiosk tablets where a
+   *  full-screen editing overlay would be an accidental-tap hazard. */
+  align_mode?: boolean;
 }
