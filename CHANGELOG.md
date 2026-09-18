@@ -6,6 +6,30 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [1.11.6] - 2026-09-19
+
+### Changed
+
+- **Align mode: side-panel field labels ("Scale X"/"Scale Y"/"Offset X"/
+  "Offset Y") replaced the fixed X/Y letter with a small rotation-aware
+  arrow icon** (field report 2026-09-19 — a clarification of the
+  1.11.4/1.11.5 work: the user wanted this on the NUMERIC FIELD LABELS
+  themselves, not just the on-canvas gizmo handles). A label now reads
+  "Scale ↔" / "Scale ↕" / "Offset ↔" / "Offset ↕", where the arrow always
+  points the way that field actually moves the seat on screen, in any
+  combination of the seat's own rotation and the separate "Rotate view
+  90°" toolbar rotation. Scale X/Y are the seat's own local axes, so
+  their arrow follows `draft.rotation + this._alignView.rot` combined;
+  Offset X/Y are wrap-relative (never rotated by the seat itself), so
+  their arrow only follows `_alignView.rot`, matching the same split
+  `nudgeOffset()` and the handle cursor fix in 1.11.5 already use. Unlike
+  the on-canvas handle icons, the side panel is NOT a descendant of
+  `.align-scene`, so no ancestor CSS transform does this rotation for
+  free — the new `_alignFieldArrow()` helper applies the full angle
+  explicitly. The base "Scale" field (uniform, Independent Y off) keeps
+  no arrow — there's no single axis to point at. New test coverage in
+  `tests/align-overlay.spec.ts`.
+
 ## [1.11.5] - 2026-09-18
 
 ### Fixed

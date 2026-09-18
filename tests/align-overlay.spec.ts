@@ -567,4 +567,61 @@ test.describe("Align mode overlay (docs/41, C2b)", () => {
     });
     expect(wCursor).toBe("ew-resize");
   });
+  test("side-panel field labels carry a rotation-aware arrow instead of a fixed X/Y letter (field report 2026-09-19)", async ({ page }) => {
+    await mountCard(page);
+    await openAlign(page);
+
+    // Independent Y scale must be on for the axis-specific "Scale" rows
+    // (with arrows) to exist at all -- baseline "Scale" (uniform, no
+    // scaleY) intentionally carries no arrow, there's no single axis to
+    // point at.
+    await page.evaluate(() => {
+      const card = (window as any).__card;
+      card._alignToggleScaleY(true);
+    });
+
+    const readArrows = () => page.evaluate(() => {
+      const host = document.querySelector("anyvac-align-overlay") as any;
+      const rows = [...host.shadowRoot.querySelectorAll(".align-field-row")];
+      const byLabelText = (want: string) => rows.find(
+        (r: any) => (r.querySelector("label")?.textContent ?? "").trim().startsWith(want),
+      );
+      const arrowRotate = (row: any) => {
+        const icon = row?.querySelector(".align-field-arrow");
+        return icon ? icon.style.transform : null;
+      };
+      return {
+        scaleX: arrowRotate(byLabelText("Scale")), // first "Scale" row = X
+        offsetX: arrowRotate(byLabelText("Offset")),
+      };
+    });
+
+    // Rotation 0, view 0: Scale (X) and Offset (X) arrows both point along
+    // 0deg -- no rotation applied.
+    let a = await readArrows();
+    expect(a.scaleX).toBe("rotate(0deg)");
+    expect(a.offsetX).toBe("rotate(0deg)");
+
+    // Seat rotation 90deg, view still 0: Scale X's arrow follows the SEAT
+    // (it's a local axis) -> rotate(90deg). Offset X is wrap-relative, not
+    // seat-rotated -> stays at rotate(0deg).
+    await page.evaluate(() => {
+      const card = (window as any).__card;
+      const s = card._alignSession;
+      card._alignSession = { ...s, draft: { ...s.draft, rotation: 90 } };
+    });
+    a = await readArrows();
+    expect(a.scaleX).toBe("rotate(90deg)");
+    expect(a.offsetX).toBe("rotate(0deg)");
+
+    // Also rotate the VIEW 90deg: Scale X now carries BOTH (seat 90 + view
+    // 90 = 180), Offset X carries just the view (90).
+    await page.evaluate(() => {
+      const card = (window as any).__card;
+      card._alignView = { ...card._alignView, rot: 90 };
+    });
+    a = await readArrows();
+    expect(a.scaleX).toBe("rotate(180deg)");
+    expect(a.offsetX).toBe("rotate(90deg)");
+  });
 });

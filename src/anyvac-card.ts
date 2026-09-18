@@ -4359,6 +4359,31 @@ export class AnyVacCard extends LitElement {
     return "nesw-resize";
   }
 
+  /** A small rotation-aware arrow icon for a side-panel field LABEL (field
+   *  report 2026-09-19: the user didn't want the static "Scale X"/"Offset Y"
+   *  TEXT — that's fixed and doesn't reflect what the field actually does on
+   *  screen once anything is rotated — they want "Scale"/"Offset" plus an
+   *  arrow that always points the way that field actually moves the seat on
+   *  screen, in ANY combination of the seat's own `rotation` and the
+   *  separate view rotation (`_alignView.rot`). Continuous `rotate()`, not
+   *  the 4-bucket snap `_alignResizeCursor` uses — CSS `cursor` only has 4
+   *  shapes to snap into, but an `<ha-icon>` can point at the exact angle.
+   *  `horizontal` is the field's own axis at rotation 0: true for Scale X /
+   *  Offset X (mdi:arrow-left-right), false for Scale Y / Offset Y
+   *  (mdi:arrow-up-down). `rotationDeg` is the CALLER's job to get right:
+   *  Scale X/Y are the seat's own local axes, so they rotate with BOTH
+   *  `draft.rotation` and `_alignView.rot` combined; Offset X/Y are wrap-
+   *  relative (never rotated by the seat itself, docs/41 §4.2), so only
+   *  `_alignView.rot` applies — same split `_alignResizeCursor`'s callers
+   *  and `nudgeOffset()` already observe. The side panel lives OUTSIDE
+   *  `.align-scene` (it's not a descendant), so — unlike the on-canvas
+   *  handle icons — no ancestor transform does any of this for free; the
+   *  full angle has to be passed in explicitly every time. */
+  private _alignFieldArrow(horizontal: boolean, rotationDeg: number) {
+    return html`<ha-icon class="align-field-arrow" icon=${horizontal ? "mdi:arrow-left-right" : "mdi:arrow-up-down"}
+      style=${styleMap({ transform: "rotate(" + rotationDeg + "deg)" })}></ha-icon>`;
+  }
+
   /** Isotropic (aspect-corrected) distance/angle between two wrap-percent
    *  points — the same "divide y by `ar`" convention `seatedit.ts`'s
    *  internal `pctToFrac` uses, so a corner-handle scale factor or a
@@ -4822,7 +4847,7 @@ export class AnyVacCard extends LitElement {
                 ?disabled=${readOnly} @change=${(e: Event) => this._alignSetField("rotation", (e.target as HTMLInputElement).value)} />
             </div>
             <div class="align-field-row">
-              <label>${draft.scaleY != null ? "Scale X" : "Scale"}<span>%</span></label>
+              <label>Scale${draft.scaleY != null ? this._alignFieldArrow(true, draft.rotation + this._alignView.rot) : nothing}<span>%</span></label>
               <input type="number" step="0.1" min="1" .value=${String(Math.round(draft.scale * 100) / 100)}
                 ?disabled=${readOnly} @change=${(e: Event) => this._alignSetField("scale", (e.target as HTMLInputElement).value)} />
             </div>
@@ -4835,18 +4860,18 @@ export class AnyVacCard extends LitElement {
             </div>
             ${draft.scaleY != null ? html`
               <div class="align-field-row">
-                <label>Scale Y<span>%</span></label>
+                <label>Scale${this._alignFieldArrow(false, draft.rotation + this._alignView.rot)}<span>%</span></label>
                 <input type="number" step="0.1" min="1" .value=${String(Math.round(draft.scaleY * 100) / 100)}
                   ?disabled=${readOnly} @change=${(e: Event) => this._alignSetField("scaleY", (e.target as HTMLInputElement).value)} />
               </div>
             ` : nothing}
             <div class="align-field-row">
-              <label>Offset X<span>%</span></label>
+              <label>Offset${this._alignFieldArrow(true, this._alignView.rot)}<span>%</span></label>
               <input type="number" step="0.01" .value=${String(Math.round(draft.offset_x * 10000) / 10000)}
                 ?disabled=${readOnly} @change=${(e: Event) => this._alignSetField("offset_x", (e.target as HTMLInputElement).value)} />
             </div>
             <div class="align-field-row">
-              <label>Offset Y<span>%</span></label>
+              <label>Offset${this._alignFieldArrow(false, this._alignView.rot)}<span>%</span></label>
               <input type="number" step="0.01" .value=${String(Math.round(draft.offset_y * 10000) / 10000)}
                 ?disabled=${readOnly} @change=${(e: Event) => this._alignSetField("offset_y", (e.target as HTMLInputElement).value)} />
             </div>
@@ -8272,9 +8297,13 @@ export class AnyVacCard extends LitElement {
     .align-field-row { display: flex; align-items: center; justify-content: space-between; gap: 8px; }
     .align-field-row label {
       font-size: 12px; font-weight: 600; color: rgba(var(--avc-ink-rgb), 0.75);
-      display: flex; align-items: baseline; gap: 3px;
+      display: flex; align-items: center; gap: 3px;
     }
     .align-field-row label span { font-size: 10.5px; font-weight: 500; color: rgba(var(--avc-ink-rgb), 0.5); }
+    .align-field-arrow {
+      --mdc-icon-size: 13px; color: rgb(var(--avc-tool-rgb));
+      flex-shrink: 0;
+    }
     .align-field-row input[type="number"] {
       width: 84px; font: inherit; font-size: 12px; text-align: right;
       color: rgb(var(--avc-ink-rgb)); background: var(--avc-panel);
