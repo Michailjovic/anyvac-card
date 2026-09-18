@@ -474,4 +474,53 @@ test.describe("Align mode overlay (docs/41, C2b)", () => {
     });
     expect(refocused).toBe(true);
   });
+
+  test("side-handle arrow icons and cursors rotate with the seat, and Offset X/Y get their own wrap-aligned hint arrows (field report 2026-09-18)", async ({ page }) => {
+    await mountCard(page);
+    await openAlign(page);
+
+    // Unrotated (rotation 0): W/E (Scale X) handles read as horizontal
+    // drag, N/S (Scale Y) as vertical — matching their baseline icons.
+    let info = await page.evaluate(() => {
+      const host = document.querySelector("anyvac-align-overlay") as any;
+      const w = host.shadowRoot.querySelector('.align-handle--side[data-side="w"]') as HTMLElement;
+      const n = host.shadowRoot.querySelector('.align-handle--side[data-side="n"]') as HTMLElement;
+      return {
+        wCursor: w.style.cursor,
+        nCursor: n.style.cursor,
+        wIconRotate: (w.querySelector("ha-icon") as HTMLElement).style.transform,
+      };
+    });
+    expect(info.wCursor).toBe("ew-resize");
+    expect(info.nCursor).toBe("ns-resize");
+    expect(info.wIconRotate).toBe("rotate(0deg)");
+
+    // Offset X/Y hint arrows exist, sit near centre, and are NOT rotated by
+    // the seat (offset_x/offset_y are wrap-aligned, not seat-local).
+    const hints = await page.evaluate(() => {
+      const host = document.querySelector("anyvac-align-overlay") as any;
+      const x = host.shadowRoot.querySelector(".align-axis-hint--x") as HTMLElement;
+      const y = host.shadowRoot.querySelector(".align-axis-hint--y") as HTMLElement;
+      return { xIcon: !!x?.querySelector("ha-icon"), yIcon: !!y?.querySelector("ha-icon") };
+    });
+    expect(hints.xIcon).toBe(true);
+    expect(hints.yIcon).toBe(true);
+
+    // Rotate the seat 90° -> the "Scale X" (w/e) handles now read as a
+    // vertical drag on screen, so their cursor/icon must follow.
+    await page.evaluate(() => {
+      const card = (window as any).__card;
+      const s = card._alignSession;
+      card._alignSession = { ...s, draft: { ...s.draft, rotation: 90 } };
+    });
+    info = await page.evaluate(() => {
+      const host = document.querySelector("anyvac-align-overlay") as any;
+      const w = host.shadowRoot.querySelector('.align-handle--side[data-side="w"]') as HTMLElement;
+      const xHint = host.shadowRoot.querySelector(".align-axis-hint--x ha-icon") as HTMLElement;
+      return { wCursor: w.style.cursor, wIconRotate: (w.querySelector("ha-icon") as HTMLElement).style.transform, xHintRotate: xHint.style.transform };
+    });
+    expect(info.wCursor).toBe("ns-resize");
+    expect(info.wIconRotate).toBe("rotate(90deg)");
+    expect(info.xHintRotate).toBe(""); // offset hint stays wrap-aligned, no rotate transform
+  });
 });

@@ -6,6 +6,22 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [1.11.4] - 2026-09-18
+
+### Added
+
+- **Align mode: rotation-aware direction arrows on the gizmo, for Scale X/Y
+  and Offset X/Y** (field report 2026-09-18). The four side handles (Scale
+  X = west/east, Scale Y = north/south) now carry an arrow icon AND a
+  matching resize cursor (`ew`/`ns`/`nwse`/`nesw`) that rotate together
+  with the seat's own `rotation` — at 90° the "Scale X" handles sit
+  top/bottom on screen and now visibly (and cursor-wise) read as a
+  vertical drag instead of misleadingly still looking horizontal. Two new
+  small hint arrows near the gizmo's centre label Offset X/Y the same way
+  — but stay wrap-aligned (NOT seat-rotated), since `offset_x`/`offset_y`
+  are wrap-relative positions, not the seat's own local axes, unlike
+  scale. New test coverage in `tests/align-overlay.spec.ts`.
+
 ## [1.11.3] - 2026-09-18
 
 ### Fixed

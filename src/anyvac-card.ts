@@ -4326,6 +4326,24 @@ export class AnyVacCard extends LitElement {
     return { x: (p.x / wrapW) * 100, y: (p.y / wrapH) * 100 };
   }
 
+  /** A resize cursor for a side handle whose UNROTATED axis is horizontal
+   *  (`baseAxisDeg` 0, the west/east — Scale X — handles) or vertical (90,
+   *  north/south — Scale Y). Scale X/Y are the seat's own LOCAL axes
+   *  (`seatToMatrix` rotates them with the seat, docs/41 §4.2), so at a
+   *  rotation like 90° the "Scale X" handles sit top/bottom on screen and
+   *  actually drag vertically — a fixed `ew-resize`/`ns-resize` CSS class
+   *  would then point the wrong way (field report 2026-09-18, the same
+   *  "which arrow is really X once you've rotated" confusion the new
+   *  handle icons below fix visually). Snapped to the 4 cursor shapes CSS
+   *  actually has (`ew`/`nwse`/`ns`/`nesw`), 45° each. */
+  private _alignResizeCursor(baseAxisDeg: number, rotationDeg: number): string {
+    const eff = (((baseAxisDeg + rotationDeg) % 180) + 180) % 180;
+    if (eff < 22.5 || eff >= 157.5) return "ew-resize";
+    if (eff < 67.5) return "nwse-resize";
+    if (eff < 112.5) return "ns-resize";
+    return "nesw-resize";
+  }
+
   /** Isotropic (aspect-corrected) distance/angle between two wrap-percent
    *  points — the same "divide y by `ar`" convention `seatedit.ts`'s
    *  internal `pctToFrac` uses, so a corner-handle scale factor or a
@@ -4730,15 +4748,33 @@ export class AnyVacCard extends LitElement {
                     @pointercancel=${(e: PointerEvent) => this._alignGestureEnd(e)}>
                   </div>
                 `)}
-                ${([["n", nMid, "stretchY"], ["s", sMid, "stretchY"], ["w", wMid, "stretchX"], ["e", eMid, "stretchX"]] as const).map(([key, pos, kind]) => html`
+                ${([
+                  ["n", nMid, "stretchY", 90, "mdi:arrow-up-down"],
+                  ["s", sMid, "stretchY", 90, "mdi:arrow-up-down"],
+                  ["w", wMid, "stretchX", 0, "mdi:arrow-left-right"],
+                  ["e", eMid, "stretchX", 0, "mdi:arrow-left-right"],
+                ] as const).map(([key, pos, kind, baseAxisDeg, icon]) => html`
                   <div class="align-handle align-handle--side align-handle--${key}" data-side=${key}
-                    style=${styleMap({ left: pos.x + "%", top: pos.y + "%" })}
+                    title=${kind === "stretchX" ? "Scale X" : "Scale Y"}
+                    style=${styleMap({
+                      left: pos.x + "%", top: pos.y + "%",
+                      cursor: this._alignResizeCursor(baseAxisDeg, draft.rotation),
+                    })}
                     @pointerdown=${(e: PointerEvent) => this._alignStartGesture(e, kind)}
                     @pointermove=${(e: PointerEvent) => this._alignGestureMove(e)}
                     @pointerup=${(e: PointerEvent) => this._alignGestureEnd(e)}
                     @pointercancel=${(e: PointerEvent) => this._alignGestureEnd(e)}>
+                    <ha-icon icon=${icon} style=${styleMap({ transform: "rotate(" + draft.rotation + "deg)" })}></ha-icon>
                   </div>
                 `)}
+                <div class="align-axis-hint align-axis-hint--x" title="Offset X"
+                  style=${styleMap({ left: (centre.x + 7) + "%", top: centre.y + "%" })}>
+                  <ha-icon icon="mdi:arrow-left-right"></ha-icon>
+                </div>
+                <div class="align-axis-hint align-axis-hint--y" title="Offset Y"
+                  style=${styleMap({ left: centre.x + "%", top: (centre.y - 7) + "%" })}>
+                  <ha-icon icon="mdi:arrow-up-down"></ha-icon>
+                </div>
                 <div class="align-handle align-handle--rotate"
                   style=${styleMap({ left: rotateHandle.x + "%", top: rotateHandle.y + "%" })}
                   @pointerdown=${(e: PointerEvent) => this._alignStartGesture(e, "rotate", centre)}
@@ -8180,9 +8216,17 @@ export class AnyVacCard extends LitElement {
       --mdc-icon-size: 16px;
     }
     .align-handle--rotate { background: rgba(var(--avc-tool-rgb), 0.85); }
-    .align-handle--side { width: 20px; height: 20px; margin: -10px 0 0 -10px; opacity: 0.85; }
-    .align-handle--n, .align-handle--s { cursor: ns-resize; }
-    .align-handle--w, .align-handle--e { cursor: ew-resize; }
+    .align-handle--side {
+      width: 20px; height: 20px; margin: -10px 0 0 -10px; opacity: 0.85;
+      --mdc-icon-size: 13px;
+    }
+    .align-handle--side ha-icon { pointer-events: none; }
+    .align-axis-hint {
+      position: absolute; margin: -8px 0 0 -8px; width: 16px; height: 16px;
+      display: flex; align-items: center; justify-content: center;
+      color: rgba(var(--avc-ink-rgb), 0.55); pointer-events: none;
+      --mdc-icon-size: 13px;
+    }
     .align-btn[disabled] { opacity: 0.35; cursor: default; pointer-events: none; }
     .align-btn--flash { background: rgba(var(--avc-ok-rgb), 0.22); border-color: rgba(var(--avc-ok-rgb), 0.6); }
     .align-save-btn {
