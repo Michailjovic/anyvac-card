@@ -6,6 +6,20 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [1.11.7] - 2026-09-19
+
+### Fixed
+
+- **Align mode: the "Rotate view 90°" toolbar button had no icon** (field
+  report 2026-09-19). Shipped with `icon="mdi:screen-rotate"` — not a real
+  Material Design Icons name (the correct one is `mdi:screen-rotation`).
+  HA's icon resolver just renders nothing for an unknown name, no console
+  error, so this silently shipped blank all the way back through
+  1.11.4/1.11.5/1.11.6. New regression test in `tests/align-overlay.spec.ts`
+  asserts every Align toolbar button resolves to a non-empty `mdi:` icon,
+  and pins this specific button to `mdi:screen-rotation`, so a future
+  typo'd icon name fails the suite instead of shipping silently blank.
+
 ## [1.11.6] - 2026-09-19
 
 ### Changed

@@ -624,4 +624,29 @@ test.describe("Align mode overlay (docs/41, C2b)", () => {
     expect(a.scaleX).toBe("rotate(180deg)");
     expect(a.offsetX).toBe("rotate(90deg)");
   });
+  test("every align-btn toolbar icon resolves to a real, non-empty mdi: icon (field report 2026-09-19 -- 'Rotate view 90°' shipped with a typo'd, nonexistent icon name)", async ({ page }) => {
+    await mountCard(page);
+    await openAlign(page);
+
+    const icons = await page.evaluate(() => {
+      const host = document.querySelector("anyvac-align-overlay") as any;
+      const btns = [...host.shadowRoot.querySelectorAll(".align-toolbar button.align-btn")];
+      return btns.map((b: any) => ({
+        title: b.title,
+        icon: b.querySelector("ha-icon")?.getAttribute("icon") ?? null,
+      }));
+    });
+
+    for (const { title, icon } of icons) {
+      expect(icon, `button "${title}" should have an icon`).toBeTruthy();
+      expect(icon, `button "${title}" icon should be an mdi: icon`).toMatch(/^mdi:/);
+    }
+
+    // Pin the exact fix: "mdi:screen-rotate" isn't a real MDI icon name (the
+    // real one is "mdi:screen-rotation") -- HA's icon resolver just renders
+    // nothing for an unknown name, no console error, so this silently shipped
+    // blank in 1.11.4/1.11.5/1.11.6 until the field report.
+    const rotateView = icons.find((i) => i.title === "Rotate view 90°");
+    expect(rotateView?.icon).toBe("mdi:screen-rotation");
+  });
 });

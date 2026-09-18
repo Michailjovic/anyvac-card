@@ -4703,7 +4703,7 @@ export class AnyVacCard extends LitElement {
             <ha-icon icon="mdi:redo"></ha-icon>
           </button>
           <button class="align-btn" title="Rotate view 90°" @click=${() => this._alignRotateView()}>
-            <ha-icon icon="mdi:screen-rotate"></ha-icon>
+            <ha-icon icon="mdi:screen-rotation"></ha-icon>
           </button>
           <button class="align-btn" title="Reset to the values Align mode was opened with"
             ?disabled=${readOnly} @click=${() => this._alignReset()}>
