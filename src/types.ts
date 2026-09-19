@@ -46,8 +46,14 @@ export interface HassEntity {
 
 export interface MapConfig {
   entity: string;
-  rotation: number;
-  scale: number;
+  /** Optional since 1.13.0: once a vacuum's seat is backend-managed (see
+   *  `applyFloorplanSeats`/`editor.ts`'s `_commitSeat`), these fields are
+   *  stripped from YAML entirely and the backend's `floorplan_seats`
+   *  override is the only place they live — every read site already
+   *  treats them as optional via `?? default` (seatfit.ts's `resolveSeat`),
+   *  this just makes the type match that reality. */
+  rotation?: number;
+  scale?: number;
   /** Independent Y-axis scale override (manual seating only; % of wrap width,
    *  same unit as `scale`). Undefined means "same as `scale`" — every config
    *  written before this existed renders identically. Lets a manual seat
@@ -57,8 +63,8 @@ export interface MapConfig {
    *  robot's own LOCAL axes before `rotation` spins it into place — same
    *  order as the CSS transform composes in. */
   scale_y?: number;
-  offset_x: number;
-  offset_y: number;
+  offset_x?: number;
+  offset_y?: number;
   /** Seating mode (docs/15): "auto" (default — fitted from room anchors when the
    *  integration + a floorplan + at least one matched room are available) or
    *  "manual" (use the rotation/scale/offset values above). */

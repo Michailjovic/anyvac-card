@@ -34,6 +34,7 @@ import {
   placeRoomInCrop,
   placeRoomsInCrop,
   resolveSeat,
+  resolveImageBaseSrc,
   roomBboxToRect,
   buildCalibrationAnchors,
   computeSeatFit,
@@ -46,6 +47,11 @@ import {
   type ResolvedSeat,
   type RoomConfigLike,
 } from "./seatfit";
+import {
+  applyFloorplanSeats,
+  type FloorplanSeats,
+  type SeatEditConfigLike,
+} from "./seatedit";
 import {
   moveRect,
   resizeRect,
@@ -299,6 +305,26 @@ export class AnyVacCardEditor extends LitElement {
   @state() private _calibResult: { residual_pct: number } | null = null;
   @state() private _calibError = "";
 
+  /** Set by `_commitSeat` when a backend `set_floorplan_seat` write fails
+   *  (docs/41 follow-up, 1.13.0) — shown near the seating sliders. Left
+   *  populated until the next commit attempt; never triggers a silent
+   *  fallback to a YAML write, so a failed backend save can't look like it
+   *  quietly succeeded elsewhere. */
+  @state() private _seatSaveError = "";
+
+  /** Live drag preview for the seat-geometry sliders (1.13.0) — component
+   *  state only, never written to `_config`/YAML during a drag. Needed
+   *  because once a vacuum's seat is backend-managed, `applyFloorplanSeats`
+   *  makes the EFFECTIVE config ignore whatever raw YAML briefly holds
+   *  mid-drag (a live backend override always wins, unconditionally) — so
+   *  the old "write each `@input` tick straight to YAML, let it re-render"
+   *  trick can't drive live visual feedback any more. This holds the
+   *  in-progress values instead; `_commitSeat` (on drag-release/blur)
+   *  clears it once the real write — backend or YAML fallback — lands. */
+  @state() private _seatDraft: {
+    vacIdx: number; rotation: number; scale: number; scale_y?: number; offset_x: number; offset_y: number;
+  } | null = null;
+
   /** Cesta B calibration from clicked points against the home frame (docs/40
    *  §5.B) — a card-level flow (not tied to one `vacIdx`, unlike `_calib`
    *  above), since `image_base.home_anchors` lives on the shared floorplan,
@@ -398,6 +424,11 @@ export class AnyVacCardEditor extends LitElement {
     // cancel it outright rather than trying to carry it across.
     if ((changed.has("_tab") || changed.has("_mapVac")) && this._calib) {
       this._calib = null;
+    }
+    // 1.13.0: a live seat-slider drag preview (`_seatDraft`) is likewise
+    // tied to one vacuum — same reasoning as `_calib` above.
+    if ((changed.has("_tab") || changed.has("_mapVac")) && this._seatDraft) {
+      this._seatDraft = null;
     }
     // docs/40 §5.B: card-level, not tied to `_mapVac` — only cancel on
     // leaving the Maps tab entirely, not on switching which vacuum pill is
@@ -981,13 +1012,137 @@ export class AnyVacCardEditor extends LitElement {
   private _editorSeat(vacIdx: number): SeatParams & {
     auto: boolean; residual?: number; anchorCount?: number;
   } {
-    const vac = this._config.vacuums[vacIdx];
+    // 1.13.0: resolves against the EFFECTIVE (backend-override-merged)
+    // config, not the raw one — see `_effectiveConfig`'s docstring for why.
+    // Before this fix, this preview (and the "Auto-fit"/sliders hint text
+    // below it) was blind to a live backend seat: it could show a manual
+    // fit that visually contradicted what the card itself was rendering,
+    // which is what prompted this whole sync feature.
+    const cfg = this._effectiveConfig();
+    const vac = cfg.vacuums[vacIdx];
     const ie = this._intEntityFor(vac);
     const at = ie ? (this.hass?.states?.[ie]?.attributes as Record<string, any> | undefined) : undefined;
     // Kontrakt v2 gate: anchors need rooms[].bbox_px (integration ≥ 0.18). The
     // card applies the same gate inside `_intAttrs`; here it's explicit.
     const gated = at && (at.schema_version ?? 0) >= 2 ? at : undefined;
-    return resolveSeat(this._config, vac, gated, this._editorAR());
+    return resolveSeat(cfg, vac, gated, this._editorAR());
+  }
+
+  /** Availability gate for the backend seat-geometry service — mirrors the
+   *  card's own `_alignServiceAvailable` (anyvac-card.ts) exactly, same
+   *  existence-check HA's more-info dialogs use for "is this service
+   *  registered right now". */
+  private _seatServiceAvailable(): boolean {
+    return !!this.hass?.services?.["anyvac"]?.["set_floorplan_seat"];
+  }
+
+  /** The backend's current `floorplan_seats` overrides dict, read the same
+   *  way the card's `_syncEffectiveConfig` (anyvac-card.ts) does: any one
+   *  configured vacuum with a live integration sensor carries the whole
+   *  dict as an attribute, so the first one found is enough. */
+  private _floorplanSeatsNow(): FloorplanSeats | undefined {
+    for (const vac of this._config.vacuums) {
+      const ie = this._intEntityFor(vac);
+      const at = ie ? (this.hass?.states?.[ie]?.attributes as Record<string, any> | undefined) : undefined;
+      const fs = at?.floorplan_seats as FloorplanSeats | undefined;
+      if (fs) return fs;
+    }
+    return undefined;
+  }
+
+  /** `this._config` merged with any live backend `floorplan_seats`
+   *  override, via the SAME `applyFloorplanSeats` the card itself uses
+   *  (`_syncEffectiveConfig`, anyvac-card.ts) — for DISPLAY/PREVIEW only
+   *  (`_editorSeat`'s fit + the Maps-tab overlay it feeds). Never assign
+   *  this to `this._config` and never pass it to `_fire` — doing so would
+   *  silently bake backend-owned values into the saved YAML, exactly the
+   *  dual-source-of-truth confusion this feature exists to remove. Cheap
+   *  to call per-render: `applyFloorplanSeats` returns the SAME object
+   *  unchanged when nothing in this config has a live override. */
+  private _effectiveConfig(): AnyVacCardConfig {
+    const seats = this._floorplanSeatsNow();
+    if (!seats) return this._config;
+    return applyFloorplanSeats(this._config as unknown as SeatEditConfigLike, seats) as unknown as AnyVacCardConfig;
+  }
+
+  /** True once this vacuum's seat is actually backend-managed (a live
+   *  override exists for it on its current floorplan) — as opposed to the
+   *  backend merely being *available* (service registered, but nothing
+   *  saved there for this vacuum yet). Drives the Maps-tab banner and
+   *  which seating controls still make sense to show. */
+  private _hasBackendSeat(vacIdx: number): boolean {
+    const vac = this._config.vacuums[vacIdx];
+    const src = resolveImageBaseSrc(this._config, vac);
+    if (!src) return false;
+    const seats = this._floorplanSeatsNow();
+    return !!seats?.[src]?.vacuums?.[vac.entity];
+  }
+
+  /** Strips this vacuum's manual geometry fields from YAML — called once a
+   *  backend write for them has succeeded, so there is exactly one place
+   *  they live from then on. Keeps `map.entity` (the unrelated "map image
+   *  entity" override, docs/38 §4.1) when set; drops the whole `map:`
+   *  block when nothing else is left in it. */
+  private _stripSeatGeometry(vacIdx: number): void {
+    const vac = this._config.vacuums[vacIdx];
+    const existing = vac.map;
+    if (!existing) return;
+    this._setVacuum(vacIdx, { map: existing.entity ? { entity: existing.entity } : undefined });
+  }
+
+  /** Redirects manual seat-geometry writes — the sliders' drag-release/blur
+   *  commit and "Finish calibration" — to the backend when
+   *  `anyvac.set_floorplan_seat` is registered, instead of this card's own
+   *  YAML `map:` fields (docs/41 follow-up, 1.13.0).
+   *
+   *  Why: `applyFloorplanSeats` (used by the card's `_syncEffectiveConfig`
+   *  and now by this editor's own `_effectiveConfig`) always lets a live
+   *  backend override win over whatever YAML says — unconditionally, with
+   *  no check of this vacuum's own `seat` field. So a value written only to
+   *  YAML while a backend override exists was already being silently
+   *  shadowed, with nothing in the UI explaining why — the exact confusion
+   *  the user flagged. Now there is exactly one writer at a time: once the
+   *  service call below succeeds, the just-written YAML geometry fields are
+   *  stripped (`_stripSeatGeometry`) so the backend becomes the only place
+   *  they live going forward.
+   *
+   *  On failure, YAML is left exactly as the drag/typing already wrote it
+   *  (each slider's own live `@input`/`@change` handler, unchanged) and
+   *  `_seatSaveError` is set — no silent fallback write, so a failed
+   *  backend save can never look like it quietly succeeded as a YAML edit
+   *  instead. Falls back to a direct YAML write ONLY when the service isn't
+   *  registered at all (older backend, or no anyvac integration configured)
+   *  — same gate Align mode's own Save button already uses. */
+  private async _commitSeat(
+    vacIdx: number,
+    geometry: { rotation: number; scale: number; scale_y?: number; offset_x: number; offset_y: number },
+    opts: { forceManualYaml?: boolean } = {},
+  ): Promise<void> {
+    const vac = this._config.vacuums[vacIdx];
+    const src = resolveImageBaseSrc(this._config, vac);
+    if (this._seatServiceAvailable() && src) {
+      const map: Record<string, number> = {
+        rotation: Math.round(geometry.rotation * 100) / 100,
+        scale: Math.round(geometry.scale * 100) / 100,
+        offset_x: Math.round(geometry.offset_x * 100) / 100,
+        offset_y: Math.round(geometry.offset_y * 100) / 100,
+      };
+      if (geometry.scale_y != null) map.scale_y = Math.round(geometry.scale_y * 100) / 100;
+      try {
+        await this.hass.callService("anyvac", "set_floorplan_seat", {
+          floorplan: src, vacuum: vac.entity, map,
+        });
+        this._seatSaveError = "";
+        this._stripSeatGeometry(vacIdx);
+      } catch (err) {
+        console.warn("[anyvac-card] editor: set_floorplan_seat call failed", err);
+        this._seatSaveError = "Couldn't save to the backend — try again. The values shown are unchanged.";
+      }
+      return;
+    }
+    const updates: Partial<MapConfig> = { ...geometry };
+    if (opts.forceManualYaml) updates.seat = "manual";
+    this._setMap(vacIdx, updates);
   }
 
   /** Import rooms this vacuum's map knows that are missing on the floorplan —
@@ -1120,13 +1275,16 @@ export class AnyVacCardEditor extends LitElement {
       return;
     }
     this._calibError = "";
-    this._setMap(c.vacIdx, {
-      seat: "manual",
+    // 1.13.0: redirected through `_commitSeat` — writes to the backend when
+    // `anyvac.set_floorplan_seat` is available (same as the manual sliders
+    // below), falling back to the old direct-YAML write (with `seat:
+    // "manual"` forced, as calibration always intended) only when it isn't.
+    void this._commitSeat(c.vacIdx, {
       rotation: fit.rotation,
       scale: Math.round(fit.scale * 10) / 10,
       offset_x: Math.round(fit.offset_x * 10) / 10,
       offset_y: Math.round(fit.offset_y * 10) / 10,
-    });
+    }, { forceManualYaml: true });
     this._calibResult = { residual_pct: Math.round(fit.residual_pct * 10) / 10 };
   }
 
@@ -1764,7 +1922,7 @@ export class AnyVacCardEditor extends LitElement {
   }
 
   private _numberSlider(label: string, value: number | undefined, min: number, max: number, step: number,
-    onChange: (v: number) => void, suffix = "") {
+    onChange: (v: number) => void, suffix = "", onCommit?: (v: number) => void) {
     const cur = value ?? 0;
     // Typed entry alongside the slider (2026-09-15 field report): dragging a slider whose
     // range spans hundreds of % over a ~150px track can't reach a precise value, so the
@@ -1773,14 +1931,23 @@ export class AnyVacCardEditor extends LitElement {
     const commit = (raw: string) => {
       const n = Number(raw);
       if (Number.isNaN(n)) return;
-      onChange(Math.min(max, Math.max(min, n)));
+      (onCommit ?? onChange)(Math.min(max, Math.max(min, n)));
     };
+    // `onCommit` (1.13.0), when given, fires once per interaction instead of
+    // once per drag tick — on the range's `change` (fires on mouse-up/drag
+    // release, same event browsers already use for exactly this) and on the
+    // number field's existing blur/Enter commit. `onChange` still drives
+    // `input` alone for live visual feedback while dragging. Seat-geometry
+    // sliders use this split to send a backend service call once per
+    // gesture rather than once per pixel; every other caller leaves
+    // `onCommit` unset and keeps today's per-tick behavior unchanged.
     return html`
       <div class="field field--row">
         <label>${label}</label>
         <div class="slider-wrap">
           <input type="range" class="slider" min=${min} max=${max} step=${step} .value=${String(cur)}
-            @input=${(e: Event) => onChange(Number((e.target as HTMLInputElement).value))} />
+            @input=${(e: Event) => onChange(Number((e.target as HTMLInputElement).value))}
+            @change=${(e: Event) => (onCommit ?? onChange)(Number((e.target as HTMLInputElement).value))} />
           <span class="slider-val-wrap">
             <input type="number" class="slider-val-input" min=${min} max=${max} step=${step}
               .value=${String(cur)}
@@ -2257,7 +2424,11 @@ export class AnyVacCardEditor extends LitElement {
     // dragging a room is to match it to this overlay, which can't work if the
     // overlay keeps re-fitting to the very rect being moved on every pointermove).
     const esLive = this._editorSeat(mapVac);
-    const esOverlay = this._rectDrag?.seat ?? esLive;
+    const seatDraftHere = this._seatDraft && this._seatDraft.vacIdx === mapVac ? this._seatDraft : null;
+    const esOverlay = this._rectDrag?.seat ?? (seatDraftHere ? {
+      rotation: seatDraftHere.rotation, scale: seatDraftHere.scale, scaleY: seatDraftHere.scale_y,
+      offset_x: seatDraftHere.offset_x, offset_y: seatDraftHere.offset_y, auto: false,
+    } : esLive);
     const cropBox = ib?.crop_box;
     // docs/40 §4.4-4.5 (Fáze 3): the two crop_box shapes drive very different
     // UI below — a home-frame crop (`frame_id`) replaces per-vacuum seating
@@ -2673,11 +2844,34 @@ export class AnyVacCardEditor extends LitElement {
                 home frame the floorplan above was snapshotted from${registration?.status ? html` (status:
                 <strong>${registration.status}</strong>)` : nothing} — falling back to its own seating below.</p>
             ` : nothing}
-            ${this._selectField<"auto" | "manual">("Seating", (map.seat === "manual" ? "manual" : "auto"),
+            ${(() => {
+              // docs/41 follow-up (1.13.0): a live backend override always wins
+              // over whatever's in YAML (`applyFloorplanSeats`, unconditionally,
+              // regardless of this vacuum's own `seat` field) — so once one
+              // exists, the Auto/Manual toggle and the auto-fit-vs-inactive hint
+              // below are no longer telling the truth about what's on screen;
+              // they're replaced with this banner instead. The sliders below stay
+              // visible either way — they keep working, just against the backend.
+              const hasBackendSeat = this._hasBackendSeat(mapVac);
+              const src = resolveImageBaseSrc(this._config, vac);
+              if (hasBackendSeat) return html`
+                <p class="hint">🔗 This vacuum's seating is saved in the backend, not this card's YAML —
+                  the sliders below read and write it directly. Any old geometry left over in YAML is
+                  ignored and gets cleared out automatically the next time you change something here.</p>
+              `;
+              if (this._seatServiceAvailable() && src) return html`
+                <p class="hint">ℹ️ A backend is available for this floorplan — the first change you make
+                  below will save into it instead of this card's YAML, and any manual geometry already in
+                  YAML will be cleared out once that succeeds.</p>
+              `;
+              return nothing;
+            })()}
+            ${this._seatSaveError ? html`<p class="hint" style="color:#ff6b6b">${this._seatSaveError}</p>` : nothing}
+            ${this._hasBackendSeat(mapVac) ? nothing : this._selectField<"auto" | "manual">("Seating", (map.seat === "manual" ? "manual" : "auto"),
               [{ value: "auto", label: "Auto — fit from rooms" },
                { value: "manual", label: "Manual — sliders" }],
               v => this._setMap(mapVac, { seat: v === "manual" ? "manual" : undefined }))}
-            ${map.seat !== "manual" ? (esLive.auto ? html`
+            ${this._hasBackendSeat(mapVac) ? nothing : (map.seat !== "manual" ? (esLive.auto ? html`
               <p class="hint">✅ Auto-fit from <strong>${esLive.anchorCount}</strong> room${(esLive.anchorCount ?? 0) > 1 ? "s" : ""}:
                 rot ${esLive.rotation}° · scale ${esLive.scale.toFixed(1)}% · offset ${esLive.offset_x.toFixed(1)}/${esLive.offset_y.toFixed(1)}%
                 · fit error ${(esLive.residual ?? 0).toFixed(1)}%${(esLive.residual ?? 0) > 3 ? " ⚠️ check room rectangles / keys" : ""}${
@@ -2686,7 +2880,7 @@ export class AnyVacCardEditor extends LitElement {
             ` : html`
               <p class="hint">Auto-fit inactive — it needs the integration sensor, a floorplan and at least one
                 room rectangle whose key matches a room name on this robot's map. Using the manual values below.</p>
-            `) : nothing}
+            `) : nothing)}
             ${mapUrl && previewUrl && useImg ? html`
               <button class="btn btn--sm" style="align-self:flex-start"
                 @click=${() => this._startCalibration(mapVac)}>
@@ -2739,25 +2933,61 @@ export class AnyVacCardEditor extends LitElement {
               // alone for Offset) is what lets a single toggle correct every
               // ↔/↕ label in this tab at once, whatever each field's own
               // swap condition is.
-              const swapped = isRot90(map.rotation ?? 0) !== this._hvSwap;
+              // 1.13.0: base geometry is the EFFECTIVE seat (`esLive`, already
+              // backend-aware via `_editorSeat`) once backend-managed, since
+              // raw YAML no longer has anything meaningful in it after the
+              // first successful strip — falls back to raw `map` otherwise,
+              // unchanged from before this feature. `seatDraftHere` (a live
+              // drag in progress) overrides either, so the sliders track the
+              // pointer instead of snapping back on every re-render — see
+              // `_seatDraft`'s own doc comment for why raw-YAML-write-per-tick
+              // can't drive that any more once a backend override exists.
+              const backendManaged = this._hasBackendSeat(mapVac);
+              const baseGeom = backendManaged
+                ? { rotation: esLive.rotation, scale: esLive.scale, scale_y: esLive.scaleY,
+                    offset_x: esLive.offset_x, offset_y: esLive.offset_y }
+                : { rotation: map.rotation ?? 0, scale: map.scale ?? 100, scale_y: map.scale_y,
+                    offset_x: map.offset_x ?? 0, offset_y: map.offset_y ?? 0 };
+              const geom = seatDraftHere ?? baseGeom;
+              const swapped = isRot90(geom.rotation) !== this._hvSwap;
               const hField: "scale" | "scale_y" = swapped ? "scale_y" : "scale";
               const vField: "scale" | "scale_y" = swapped ? "scale" : "scale_y";
-              const hVal = swapped ? (map.scale_y ?? map.scale ?? 100) : (map.scale ?? 100);
-              const vVal = swapped ? (map.scale ?? 100) : (map.scale_y ?? map.scale ?? 100);
+              const hVal = swapped ? (geom.scale_y ?? geom.scale) : geom.scale;
+              const vVal = swapped ? geom.scale : (geom.scale_y ?? geom.scale);
               const oHField: "offset_x" | "offset_y" = this._hvSwap ? "offset_y" : "offset_x";
               const oVField: "offset_x" | "offset_y" = this._hvSwap ? "offset_x" : "offset_y";
-              const oHVal = this._hvSwap ? (map.offset_y ?? 0) : (map.offset_x ?? 0);
-              const oVVal = this._hvSwap ? (map.offset_x ?? 0) : (map.offset_y ?? 0);
+              const oHVal = this._hvSwap ? geom.offset_y : geom.offset_x;
+              const oVVal = this._hvSwap ? geom.offset_x : geom.offset_y;
+              // `onDrag` (every `@input` tick) only updates the local
+              // `_seatDraft` preview — cheap, synchronous, no YAML/backend
+              // write yet. `onCommit` (fires once, on drag-release/blur — see
+              // `_numberSlider`'s own doc comment) is what actually persists,
+              // via `_commitSeat` (backend when available, else the same
+              // direct YAML write this used to do on every tick).
+              type GeomField = "rotation" | "scale" | "scale_y" | "offset_x" | "offset_y";
+              const onDrag = (field: GeomField) => (v: number) => {
+                this._seatDraft = { ...geom, vacIdx: mapVac, [field]: v };
+              };
+              const onCommitField = (field: GeomField) => (v: number) => {
+                const finalGeom = { ...geom, [field]: v };
+                this._seatDraft = null;
+                void this._commitSeat(mapVac, finalGeom);
+              };
               return html`
-                ${this._numberSlider("Rotation",  map.rotation  ?? 0,    0, 360,  90, v => this._setMap(mapVac, { rotation:  v }), "°")}
+                ${this._numberSlider("Rotation",  geom.rotation, 0, 360,  90,
+                  onDrag("rotation"), "°", onCommitField("rotation"))}
                 ${/* docs/39 §9: widened from 50-200 — a badly-fit auto-seat before calibration
                     (or a floorplan photographed at a very different scale from the robot's own
                     map) can genuinely need several hundred percent; the slider should be able to
                     show and adjust whatever calibration or auto-fit actually solved, not clamp it. */ nothing}
-                ${this._numberSlider("Scale ↔ (horizontal)", hVal, 20, 800, 5, v => this._setMap(mapVac, { [hField]: v }), "%")}
-                ${this._numberSlider("Scale ↕ (vertical)",   vVal, 20, 800, 5, v => this._setMap(mapVac, { [vField]: v }), "%")}
-                ${this._numberSlider("Offset ↔ (horizontal)", oHVal, -150, 150,  1, v => this._setMap(mapVac, { [oHField]: v }), "%")}
-                ${this._numberSlider("Offset ↕ (vertical)",   oVVal, -150, 150,  1, v => this._setMap(mapVac, { [oVField]: v }), "%")}
+                ${this._numberSlider("Scale ↔ (horizontal)", hVal, 20, 800, 5,
+                  onDrag(hField), "%", onCommitField(hField))}
+                ${this._numberSlider("Scale ↕ (vertical)",   vVal, 20, 800, 5,
+                  onDrag(vField), "%", onCommitField(vField))}
+                ${this._numberSlider("Offset ↔ (horizontal)", oHVal, -150, 150,  1,
+                  onDrag(oHField), "%", onCommitField(oHField))}
+                ${this._numberSlider("Offset ↕ (vertical)",   oVVal, -150, 150,  1,
+                  onDrag(oVField), "%", onCommitField(oVField))}
               `;
             })() : nothing}
             ${this._intEntityFor(vac) ? html`

@@ -6,6 +6,51 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [1.13.0] - 2026-09-19
+
+### Added
+
+- **The Maps-tab editor now reads and writes the SAME backend seat as Align
+  mode, instead of quietly editing a shadowed copy in YAML.** Raised as a
+  sharp architectural question: since a live `anyvac.set_floorplan_seat`
+  override always wins over a vacuum's YAML `map:` fields — unconditionally,
+  by design (`applyFloorplanSeats`) — the editor's own Maps tab was, in
+  effect, a broken GUI editor for any vacuum that had ever used Align mode's
+  Save: its rotation/scale/offset preview and sliders read and wrote plain
+  YAML with no idea a backend override existed, so a value set there could
+  be instantly and silently shadowed with nothing in the UI explaining why.
+  Now there is exactly one place manual seating data lives at a time:
+    - **Read side**: the Maps tab's fit preview/hint (`_editorSeat`) resolves
+      against the SAME override-merged config the card itself renders from
+      (`_effectiveConfig`, via `applyFloorplanSeats` — the exact merge
+      `anyvac-card.ts`'s `_syncEffectiveConfig` already used), so what you
+      see while editing now matches what's actually on your dashboard.
+    - **Write side**: dragging a rotation/scale/offset slider to release (or
+      typing a value and pressing Enter/blur) and "Finish calibration" both
+      now call `anyvac.set_floorplan_seat` when it's registered, instead of
+      writing straight to YAML — same backend call Align mode's own Save
+      button makes. Once that write succeeds, the vacuum's stale YAML
+      geometry fields (`rotation`/`scale`/`scale_y`/`offset_x`/`offset_y`/
+      `seat`) are stripped automatically — keeping `map.entity` (the
+      unrelated "map image entity" override) if set, dropping the whole
+      `map:` block if not — so YAML and the backend can't drift apart again.
+      A failed backend write is never silently retried as a YAML write (that
+      would reopen the exact dual-source confusion this exists to fix) — it
+      shows an inline error instead, leaving YAML untouched. Falls back to
+      the previous direct-YAML behavior unchanged when the service isn't
+      registered at all (older backend, or no integration configured).
+    - A banner above the seating controls now says plainly when this
+      vacuum's seat is backend-managed (and that stale YAML will be cleared
+      automatically), or that the first change will move it there.
+    - `MapConfig`'s `rotation`/`scale`/`offset_x`/`offset_y` are now optional
+      in the type, matching how every read site already treated them
+      (`?? default`) — needed so a fully backend-owned vacuum's `map:` block
+      can genuinely just be `{ entity: ... }` or omitted entirely.
+  New coverage in `tests/editor-seat-sync.spec.ts`: the preview preferring a
+  live override over stale YAML, the backend write + YAML strip, the
+  no-silent-fallback-on-failure behavior, the YAML-fallback path (with and
+  without forcing `seat: "manual"`), and `_finishCalibration`'s own redirect.
+
 ## [1.12.0] - 2026-09-19
 
 ### Added
