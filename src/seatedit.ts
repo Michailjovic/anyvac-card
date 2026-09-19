@@ -25,6 +25,7 @@
 
 import type { SeatParams } from "./seatfit";
 import { resolveImageBaseSrc } from "./seatfit";
+import type { RectPct } from "./rectdrag";
 
 const RAD = Math.PI / 180;
 
@@ -50,6 +51,16 @@ export interface AlignViewState {
  *  through Fáze C; `"pairs"` (point-pairing) arrives in Fáze E. */
 export type AlignTool = "transform" | "pairs";
 
+/** docs/42 §1/§4.3 — which of the Visual editor's three TOOLS is active
+ *  (not to be confused with `AlignTool` above, which is an internal detail
+ *  of the Floorplan & Calibrate tool's own calibration state — "transform"
+ *  vs. "pairs" within calibration, once that tool exists). Persisted
+ *  per-browser as "last used tool" (docs/42 §4.5/§8 bod 4), same precedent
+ *  as `_flipLive` — see `anyvac-card.ts`'s `_storeKey`/`_readStored`. Only
+ *  `"seat"` has a real implementation through docs/42 fáze H; `"rooms"`/
+ *  `"floorplan"` render a placeholder until fáze I/J. */
+export type VisualEditorTool = "seat" | "rooms" | "floorplan";
+
 /** One open Align-mode editing session for a single vacuum's seat against a
  *  single floorplan. `start` is captured ONCE, from the vacuum's effective
  *  seat at the moment the overlay opens (auto-fit or manual, whichever was
@@ -66,6 +77,19 @@ export interface AlignSession {
   draft: SeatParams;
   history: SeatParams[];
   future: SeatParams[];
+  /** docs/42 §9 fáze H — the Seat & Appearance tool's Appearance half.
+   *  Seeded ONCE from the vacuum's current effective appearance when the
+   *  session opens (`start`), edited by the form fields (`draft`), same
+   *  "start captured once, draft evolves independently" discipline as the
+   *  seat geometry above (docs/41 risk #5) — except there is no undo/redo
+   *  for it: these are plain form fields, not gestures, so `_alignSession
+   *  .history`/`.future` stay geometry-only (same precedent as `layers`/
+   *  `nudgeTier` below, which also don't participate in undo). Always
+   *  fully populated (all 11 `AppearanceOverride` keys) rather than a
+   *  partial diff, because Save always sends the WHOLE appearance dict
+   *  (docs/42 §8 bod 3 "no sentinel" — see `_alignSave`). */
+  appearanceStart: AppearanceOverride;
+  appearanceDraft: AppearanceOverride;
   layers: {
     floor: number;
     rawMap: number;
@@ -101,6 +125,77 @@ export function defaultAlignView(): AlignViewState {
 
 export function defaultAlignLayers(): AlignSession["layers"] {
   return { floor: 1, rawMap: 1, dry: true, wet: true, rooms: true, staticRooms: true, others: true };
+}
+
+// ── Rooms tool session (docs/42 §3.3/§4.3, fáze I) ─────────────────────────
+// Replicates the Seat & Appearance tool's session shape above — draft/undo/
+// redo/Reset/Copy YAML "same mechanics, just replicated" (§4.3) — rather
+// than inventing a new editing lifecycle for a second tool.
+
+/** One room's draft state in the Rooms tool — `RectPct` (`x`/`y`/`w`/`h`,
+ *  container-% centre+size, docs/38) IS `map_x/map_y/map_w/map_h` under
+ *  different field names (`roomBboxToRect`/the live `.room-overlay` CSS
+ *  both already treat them as the same centre-based space, docs/14 rule 1 —
+ *  reusing `rectdrag.ts`'s `RectPct` here rather than a parallel shape). */
+export interface RoomDraft extends RectPct {
+  areaId: string | null;
+  /** No matching config-authored room existed for this key when the
+   *  session opened — created from the Visual editor itself (docs/42 §3.3/
+   *  §8 bod 5 "založit novou místnost"). Only a room with this set can be
+   *  deleted OUTRIGHT from the Rooms tool (clearing its override removes it
+   *  entirely, since it never existed anywhere else) — deleting an
+   *  EXISTING config-authored `RoomConfig` needs a real YAML write, which
+   *  the Visual editor cannot do (docs/41 §0); that stays a Config editor
+   *  action (`editor.ts`'s own room list) until a future phase gives this
+   *  tool an "adopt/remove from config" path of its own. */
+  isNew: boolean;
+}
+
+/** One open Rooms-tool editing session — mirrors `AlignSession`'s
+ *  start-once/draft-evolves discipline (docs/41 risk #5), just for a whole
+ *  room map instead of one seat. */
+export interface RoomsEditSession {
+  /** `image_base.src` — same floorplan identity key as `AlignSession`. */
+  floorplan: string;
+  /** Set in split mode (this session edits ONE vacuum's own `rooms[]`);
+   *  undefined in merged mode (the card-level shared `rooms[]`). */
+  vacuum?: string;
+  /** room_key -> draft, seeded ONCE from every room effectively showing for
+   *  this floorplan/vacuum when the session opened (config manual + auto +
+   *  any existing override — already merged into `_config` by
+   *  `applyFloorplanSeats` by the time the session reads it). */
+  rooms: Record<string, RoomDraft>;
+  /** Snapshot of `rooms` at open time — never mutated, used by Reset/change
+   *  detection. Deliberately a plain object copy, not a `history[0]`, so
+   *  Reset stays O(1) regardless of how long the undo stack has grown. */
+  start: Record<string, RoomDraft>;
+  selected: string | null;
+  history: Record<string, RoomDraft>[];
+  future: Record<string, RoomDraft>[];
+  styleStart: { border_normal: number; border_selected: number };
+  styleDraft: { border_normal: number; border_selected: number };
+  /** Armed by the toolbar's "Add room" button — the next click-drag on
+   *  empty canvas defines the new room's rect (docs/42 §3.3 "nakreslení
+   *  nového rectu"), then this clears back to false. */
+  drawingNew: boolean;
+}
+
+/** Effective (defaulted) room border-width style, mirroring
+ *  `effectiveAppearance`'s "always fully populated" discipline — the
+ *  Rooms tool session always seeds/sends both fields, never a partial
+ *  dict, same "no sentinel" reasoning `room_style` follows on the backend
+ *  (see `RoomStyleOverride`'s own doc comment). Defaults match `types.ts`'s
+ *  `room_border_normal`/`room_border_selected` field comments (2px/4px) —
+ *  the SAME defaults `anyvac-card.ts`'s live `_renderRoomOverlay` already
+ *  falls back to (`?? 2`/`?? 4`), not a second, independently-drifting copy. */
+export function effectiveRoomStyle(config: {
+  room_border_normal?: number;
+  room_border_selected?: number;
+}): { border_normal: number; border_selected: number } {
+  return {
+    border_normal: config.room_border_normal ?? 2,
+    border_selected: config.room_border_selected ?? 4,
+  };
 }
 
 // ── Low-level centre/point conversions (shared by every op below) ─────────
@@ -403,8 +498,17 @@ export function snapRotation(deg: number, thresholdDeg = 3): number {
 
 /** `map:` config fragment for a solved seat, rounded to 0.01 (docs/41 §5 bod
  *  4 — finer than the editor's existing 0.1, headroom for zoomed-in
- *  doladění without visible "steps" after save). */
-export function seatToYaml(seat: SeatParams): string {
+ *  doladění without visible "steps" after save). Optionally followed by an
+ *  `appearance:` fragment (docs/42 §9 fáze H) when an appearance draft is
+ *  given — this is the Copy YAML ALWAYS-available fallback (works with no
+ *  service, no HA version requirement), so it needs to carry both halves
+ *  of what Save would otherwise send through `anyvac.set_floorplan_seat`. A
+ *  `null`/`undefined` field is skipped (not written as a bare key with no
+ *  value); an explicit `null` string value (only `path_color`/
+ *  `mop_path_color` can be that) is written as `null` so a user pasting
+ *  this into config sees the same "no color override" the backend would
+ *  store, rather than accidentally clearing the field's YAML entirely. */
+export function seatToYaml(seat: SeatParams, appearance?: AppearanceOverride | null): string {
   const r2 = (n: number) => Math.round(n * 100) / 100;
   const lines = [
     "map:",
@@ -414,6 +518,62 @@ export function seatToYaml(seat: SeatParams): string {
   ];
   if (seat.scaleY != null) lines.push(`  scale_y: ${r2(seat.scaleY)}`);
   lines.push(`  offset_x: ${r2(seat.offset_x)}`, `  offset_y: ${r2(seat.offset_y)}`);
+  if (appearance) {
+    const yamlVal = (v: unknown): string | null => {
+      if (v === undefined) return null;
+      if (v === null) return "null";
+      if (typeof v === "string") return `"${v}"`;
+      return String(v);
+    };
+    const order: (keyof AppearanceOverride)[] = [
+      "hide_map", "overlay_opacity", "overlay_blend", "path_color", "path_width",
+      "mop_path_color", "mop_band_opacity", "mop_band_width",
+      "robot_image_on_map", "robot_size", "robot_image_rotation",
+    ];
+    const appLines = order
+      .map((k) => [k, yamlVal(appearance[k])] as const)
+      .filter(([, v]) => v !== null)
+      .map(([k, v]) => `  ${k}: ${v}`);
+    if (appLines.length) lines.push("", "appearance:", ...appLines);
+  }
+  return lines.join("\n");
+}
+
+/** docs/42 §4.3 "Copy YAML zůstávají per-nástroj stejná mechanika" — the
+ *  Rooms tool's ALWAYS-available fallback (works with no service, no HA
+ *  version requirement), same precedent as `seatToYaml`. Emits a `rooms:`
+ *  list (the same shape whether it belongs at the card's top level in
+ *  merged mode or under one `vacuums[].rooms` in split mode — the caller
+ *  pastes it at the right nesting, this only formats the list itself) plus,
+ *  when `style` is given, the two global border-width fields as bare
+ *  top-level keys (merged mode only — see `RoomStyleOverride`'s own doc
+ *  comment on why these are card-level-only). Rooms are emitted in a stable
+ *  order (sorted by key) so repeated copies of an unchanged session produce
+ *  byte-identical YAML. */
+export function roomsSessionToYaml(
+  rooms: Record<string, RoomDraft>,
+  style?: { border_normal: number; border_selected: number } | null,
+): string {
+  const r1 = (n: number) => Math.round(n * 10) / 10;
+  const lines: string[] = [];
+  const keys = Object.keys(rooms).sort();
+  if (keys.length) {
+    lines.push("rooms:");
+    for (const key of keys) {
+      const d = rooms[key];
+      lines.push(`  - key: "${key}"`);
+      lines.push(`    map_x: ${r1(d.x)}`);
+      lines.push(`    map_y: ${r1(d.y)}`);
+      lines.push(`    map_w: ${r1(d.w)}`);
+      lines.push(`    map_h: ${r1(d.h)}`);
+      if (d.areaId != null) lines.push(`    area_id: "${d.areaId}"`);
+    }
+  }
+  if (style) {
+    if (lines.length) lines.push("");
+    lines.push(`room_border_normal: ${style.border_normal}`);
+    lines.push(`room_border_selected: ${style.border_selected}`);
+  }
   return lines.join("\n");
 }
 
@@ -427,12 +587,137 @@ export function seatToYaml(seat: SeatParams): string {
  *  but `applyFloorplanSeats` treats a `null`/missing entry the same way
  *  (defensive — costs nothing, matches the service contract's "null = clear"
  *  wording). */
+/** docs/42 §9 (fáze pre-H) — the Seat & Appearance tool's Appearance
+ *  fields, persisted through the SAME backend override as the seat
+ *  geometry (`anyvac.set_floorplan_seat`'s `appearance` key), not a new
+ *  mechanism. A distinct type from `SeatParams` on purpose — appearance is
+ *  a different category of data (map-overlay style, not geometry) even
+ *  though both live on the same per-vacuum override entry. Field set
+ *  mirrors `VacuumConfig`'s Appearance fields 1:1 (types.ts) — nothing
+ *  computed here, only carried through. */
+export interface AppearanceOverride {
+  hide_map?: boolean;
+  overlay_opacity?: number;
+  overlay_blend?: string;
+  path_color?: string | null;
+  path_width?: number;
+  mop_path_color?: string | null;
+  mop_band_opacity?: number;
+  mop_band_width?: number;
+  robot_image_on_map?: boolean;
+  robot_size?: number;
+  robot_image_rotation?: number;
+}
+
+/** Minimal vacuum-config shape `effectiveAppearance` reads from — same 11
+ *  fields `AppearanceOverride` carries, all still optional (this IS the
+ *  as-configured/as-overridden `VacuumConfig`, before any default is
+ *  applied). */
+export interface AppearanceConfigLike {
+  hide_map?: boolean;
+  overlay_opacity?: number;
+  overlay_blend?: string;
+  path_color?: string;
+  path_width?: number;
+  mop_path_color?: string;
+  mop_band_opacity?: number;
+  mop_band_width?: number;
+  robot_image_on_map?: boolean;
+  robot_size?: number;
+  robot_image_rotation?: number;
+}
+
+/** The Seat & Appearance tool's session-open seeding — every field
+ *  defaulted, exactly the same defaults the pre-H Config editor's Maps tab
+ *  used inline (`editor.ts`'s `_numberSlider`/`_selectField` calls, now
+ *  moved here — docs/42 §9 fáze H, docs/14 rule 1: one copy of the default
+ *  table, not two). Always returns all 11 keys — `AlignSession
+ *  .appearanceDraft` is never partial (docs/42 §8 bod 3 "no sentinel": Save
+ *  always sends the whole dict). */
+export function effectiveAppearance(vac: AppearanceConfigLike): Required<Omit<AppearanceOverride, "path_color" | "mop_path_color">> & Pick<AppearanceOverride, "path_color" | "mop_path_color"> {
+  return {
+    hide_map: vac.hide_map ?? false,
+    overlay_opacity: vac.overlay_opacity ?? 55,
+    overlay_blend: vac.overlay_blend ?? "normal",
+    path_color: vac.path_color ?? null,
+    path_width: vac.path_width ?? 100,
+    mop_path_color: vac.mop_path_color ?? null,
+    mop_band_opacity: vac.mop_band_opacity ?? 28,
+    mop_band_width: vac.mop_band_width ?? 100,
+    robot_image_on_map: vac.robot_image_on_map ?? false,
+    robot_size: vac.robot_size ?? 100,
+    robot_image_rotation: vac.robot_image_rotation ?? 0,
+  };
+}
+
+/** docs/42 §4.4/§8 bod 1 (fáze K) — one room's Rooms-tool override, mirroring
+ *  the card's `RoomConfig` rect/anchor fields 1:1 (`map_x/map_y/map_w/map_h`,
+ *  `area_id`) — never `outline_pct` (computed-only, never editable/overridable,
+ *  docs/40 §4.4) and never `name`/`icon`/`clean_time_*` (per-room METADATA,
+ *  §3.2, stays a Config editor field). All optional — a caller may set only
+ *  geometry, only `area_id`, or both. */
+export interface RoomOverride {
+  map_x?: number;
+  map_y?: number;
+  map_w?: number;
+  map_h?: number;
+  area_id?: string | null;
+}
+
+/** docs/42 §3.3/§9 (fáze I addendum) — the Rooms tool's two GLOBAL
+ *  border-width sliders, persisted the same override way as `image_base`
+ *  (card-level only, whole-record "no sentinel"), NOT per room_key like
+ *  `RoomOverride` above — see `AnyVacCoordinator.set_floorplan_seat`'s
+ *  docstring in the integration for why the two follow different contracts. */
+export interface RoomStyleOverride {
+  border_normal?: number;
+  border_selected?: number;
+}
+
+/** One per-vacuum override entry — `map` (seat geometry) and `appearance`
+ *  (map-overlay style) are independently optional, matching exactly how
+ *  the backend stores them (`AnyVacCoordinator.set_floorplan_seat`,
+ *  docs/42 §9 fáze pre-H): a vacuum can have only a seat override, only an
+ *  appearance override, both, or (once cleared) neither, at which point the
+ *  backend drops the entry entirely. `rooms` (fáze K) is independent again,
+ *  with its own per-room_key merge semantics — see `RoomOverride` above and
+ *  `applyFloorplanSeats`'s room-merging below. */
+export interface FloorplanSeatVacuumOverride {
+  map?: SeatParams | null;
+  appearance?: AppearanceOverride | null;
+  rooms?: Record<string, RoomOverride | null | undefined>;
+}
+
 export interface FloorplanSeatOverride {
-  vacuums?: Record<string, SeatParams | null | undefined>;
+  vacuums?: Record<string, FloorplanSeatVacuumOverride | null | undefined>;
   image_base?: Record<string, unknown> | null;
+  /** docs/42 §4.4 (fáze K) — card-level rooms (merged mode), sibling of
+   *  `image_base` on the floorplan entry itself rather than nested under a
+   *  vacuum — same "vacuum given = per-vacuum, omitted = card-level" split
+   *  `image_base` already uses. */
+  rooms?: Record<string, RoomOverride | null | undefined>;
+  /** docs/42 §3.3/§9 (fáze I addendum) — card-level only, see
+   *  `RoomStyleOverride` above. */
+  room_style?: RoomStyleOverride;
   updated?: string;
 }
 export type FloorplanSeats = Record<string, FloorplanSeatOverride | undefined>;
+
+/** Structural room shape this module reads/writes when merging `RoomOverride`
+ *  onto a config's `rooms[]` array — only the fields the merge itself
+ *  touches (mirrors `RoomConfig`'s rect/anchor fields in `types.ts`, kept
+ *  separate/duplicated here per the SAME "dependency-free" convention the
+ *  rest of this module's structural types use, docs/14 rule 1 is about not
+ *  re-deriving GEOMETRY, not about a second copy of a plain field list). */
+export interface SeatEditRoomLike {
+  key: string;
+  map_x?: number;
+  map_y?: number;
+  map_w?: number;
+  map_h?: number;
+  area_id?: string;
+  [k: string]: unknown;
+}
 
 /** Minimal config shapes this module touches — structural, not the full card
  *  config types (keeps `seatedit.ts` dependency-free), same convention
@@ -441,13 +726,59 @@ export interface SeatEditVacuumLike {
   entity: string;
   map?: SeatParams & { seat?: "auto" | "manual" };
   image_base?: { src?: string; [k: string]: unknown };
+  rooms?: SeatEditRoomLike[];
   [k: string]: unknown;
 }
 export interface SeatEditConfigLike {
   map_mode?: string;
   image_base?: { src?: string; [k: string]: unknown };
   vacuums?: SeatEditVacuumLike[];
+  rooms?: SeatEditRoomLike[];
+  room_border_normal?: number;
+  room_border_selected?: number;
   [k: string]: unknown;
+}
+
+/** docs/42 §4.4/§3.3 — applies one floorplan's `rooms` override map onto a
+ *  `RoomConfig[]`-like array, by room_key. A room_key already present in
+ *  `rooms` gets its override fields layered on top (geometry/`area_id`
+ *  override always wins, same "override > config manual" precedence
+ *  `applyFloorplanSeats` already uses for `map`); a room_key with NO
+ *  matching config room is a room CREATED entirely from the Visual editor's
+ *  Rooms tool (docs/42 §3.3/§8 bod 5 "založit novou místnost") — synthesized
+ *  as a minimal room object (its key doubles as display name via the same
+ *  `name ?? key` fallback every room-name read site already has, until the
+ *  user gives it a proper `name`/icon by adopting it into Config editor —
+ *  "dál doladitelné v Config editoru"). Returns the SAME array reference
+ *  when the override has nothing to apply (no keys, or keys all `null`/
+ *  undefined — the read side never actually publishes a `null` room value,
+ *  see `RoomOverride`'s own doc comment, but this stays defensive). */
+function mergeRoomOverrides(
+  rooms: SeatEditRoomLike[] | undefined,
+  overrides: Record<string, RoomOverride | null | undefined> | undefined,
+): SeatEditRoomLike[] | undefined {
+  if (!overrides) return rooms;
+  const base = rooms ? [...rooms] : [];
+  const indexByKey = new Map(base.map((r, i) => [r.key, i] as const));
+  let changed = false;
+  for (const [key, ov] of Object.entries(overrides)) {
+    if (!ov) continue;
+    changed = true;
+    const patch: Partial<SeatEditRoomLike> = {};
+    if (ov.map_x !== undefined) patch.map_x = ov.map_x;
+    if (ov.map_y !== undefined) patch.map_y = ov.map_y;
+    if (ov.map_w !== undefined) patch.map_w = ov.map_w;
+    if (ov.map_h !== undefined) patch.map_h = ov.map_h;
+    if ("area_id" in ov) patch.area_id = ov.area_id ?? undefined;
+    const idx = indexByKey.get(key);
+    if (idx !== undefined) {
+      base[idx] = { ...base[idx], ...patch };
+    } else {
+      indexByKey.set(key, base.length);
+      base.push({ key, ...patch });
+    }
+  }
+  return changed ? base : rooms;
 }
 
 /**
@@ -469,17 +800,72 @@ export function applyFloorplanSeats<C extends SeatEditConfigLike>(
     const src = resolveImageBaseSrc(config, vac);
     const override = src ? floorplanSeats[src]?.vacuums?.[vac.entity] : null;
     if (!override) return vac;
-    changed = true;
-    return { ...vac, map: { ...override, seat: "manual" as const } };
+    let next = vac;
+    if (override.map) {
+      changed = true;
+      next = { ...next, map: { ...override.map, seat: "manual" as const } };
+    }
+    if (override.appearance) {
+      changed = true;
+      // Appearance fields are flat top-level VacuumConfig fields (types.ts),
+      // not nested under a sub-key — same spread-onto-config shape the rest
+      // of the card already reads them from.
+      next = { ...next, ...override.appearance };
+    }
+    // docs/42 §4.4 (fáze K) — per-vacuum room overrides (split mode's own
+    // rooms). Applies regardless of `map_mode`, same as `map`/`appearance`
+    // above — a merged-mode vacuum simply has no `rooms` array of its own
+    // for this to touch (`mergeRoomOverrides` is a no-op on `undefined`
+    // unless the override itself creates a brand new room).
+    if (override.rooms) {
+      const mergedRooms = mergeRoomOverrides(next.rooms, override.rooms);
+      if (mergedRooms !== next.rooms) {
+        changed = true;
+        next = { ...next, rooms: mergedRooms };
+      }
+    }
+    return next;
   });
   let imageBase = config.image_base;
+  let rooms = config.rooms;
+  let roomBorderNormal = config.room_border_normal;
+  let roomBorderSelected = config.room_border_selected;
   if (config.map_mode === "merged" && config.image_base?.src) {
-    const ov = floorplanSeats[config.image_base.src]?.image_base;
+    const entry = floorplanSeats[config.image_base.src];
+    const ov = entry?.image_base;
     if (ov) {
       imageBase = { ...config.image_base, ...ov };
       changed = true;
     }
+    // docs/42 §4.4 (fáze K) — card-level rooms (merged mode's shared room
+    // list), sibling of `image_base` on the same floorplan entry.
+    if (entry?.rooms) {
+      const mergedRooms = mergeRoomOverrides(rooms, entry.rooms);
+      if (mergedRooms !== rooms) {
+        changed = true;
+        rooms = mergedRooms;
+      }
+    }
+    // docs/42 §3.3/§9 (fáze I addendum) — the Rooms tool's global
+    // border-width sliders, card-level only, same floorplan-keyed entry.
+    if (entry?.room_style) {
+      if (entry.room_style.border_normal !== undefined) {
+        roomBorderNormal = entry.room_style.border_normal;
+        changed = true;
+      }
+      if (entry.room_style.border_selected !== undefined) {
+        roomBorderSelected = entry.room_style.border_selected;
+        changed = true;
+      }
+    }
   }
   if (!changed) return config;
-  return { ...config, vacuums, image_base: imageBase };
+  return {
+    ...config,
+    vacuums,
+    image_base: imageBase,
+    rooms,
+    room_border_normal: roomBorderNormal,
+    room_border_selected: roomBorderSelected,
+  };
 }

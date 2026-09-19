@@ -6,6 +6,149 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [1.31.0] - 2026-09-19
+
+### Added
+
+- **Rooms tool (docs/42 §9 fáze I).** The Visual editor's second tab is now
+  a real tool instead of the "coming soon" placeholder: room rectangles can
+  be moved and resized directly on the floorplan canvas (reusing
+  `rectdrag.ts`'s pure `moveRect`/`resizeRect` — the same geometry the
+  Config editor's older Maps-tab room editor already uses, no second
+  implementation), a new room can be drawn by click-dragging on empty
+  canvas while "Add room" is armed, and each room's `area_id` can be set
+  from a picker. Undo/redo covers room geometry; two new global sliders
+  (Border width — Normal/Selected) control every room rectangle's live
+  outline width and have Reset but no undo/redo, mirroring the Seat &
+  Appearance tool's own Appearance fields. Copy YAML emits a `rooms:` block
+  plus the two `room_border_*` lines.
+- **Room create/delete is scoped to what the Visual editor can actually
+  persist.** Opened from a live dashboard, the card cannot write YAML — so
+  a room drawn in this tool exists purely as a `set_floorplan_seat`
+  override (synthesized into the rendered room list by
+  `mergeRoomOverrides`, `seatedit.ts`) and can be renamed/deleted outright
+  from here; a room that already has a config-authored entry can have its
+  geometry/`area_id` overridden here same as before, but its key can't be
+  renamed and it can't be deleted here — that still needs the Config
+  editor's own room list (or a future "adopt into config" step, out of
+  scope for this phase). Tool-switch confirmation (docs/42 risk #10) reuses
+  the Seat & Appearance tool's own in-overlay Discard/Keep-editing panel
+  rather than a second dialog.
+- **Backend addendum: `room_style` (`anyvac` 1.31.0).** The two border-width
+  sliders are card-level config with no per-room home in
+  `set_floorplan_seat`'s existing `rooms` key, so `anyvac`'s
+  `set_floorplan_seat` service gained a new, independent `room_style` key
+  (`{border_normal?, border_selected?}`, 0–12, card-level only — ignored
+  when `vacuum` is given) — same "no sentinel, resend to keep" contract as
+  `image_base`. Requires `anyvac` ≥ 1.31.0; Save on an older integration is
+  disabled the same way it already is for `map`/`appearance`/`rooms`
+  (Copy YAML still always works).
+
+## [1.30.0] - 2026-09-19
+
+### Notes
+
+- **Deliberate version jump, no functional changes.** Bumped from 1.14.0
+  straight to 1.30.0 at the user's explicit request, purely to leave a
+  visible dividing line in the version history at this point in the
+  docs/42 rollout (fáze H/K done, fáze I next) — not a release for any
+  code change. This is a one-off exception to the docs/42 §9 versioning
+  rule ("each phase gets its own version on its own repo, card and
+  integration are not paired except at the final 2.0.0 gate") — see
+  docs/42 §9 for the note on this exception. Both `anyvac-card` and
+  `anyvac` were bumped to the same 1.30.0 together for this one marker;
+  normal per-phase, per-repo, non-paired versioning resumes from here for
+  fáze I onward.
+
+## [1.14.0] - 2026-09-19
+
+### ⚠ BREAKING
+
+- **`align_mode` renamed to `visual_editor_mode`.** The old key is no longer
+  read at all — there is no migration, silently or otherwise (same
+  no-migration policy as every other breaking rename in this project).
+  Update any YAML that sets `align_mode: true/false` to
+  `visual_editor_mode: true/false`.
+- **The custom element behind Align mode was renamed**: `align-overlay.ts`
+  → `visual-editor.ts`, `anyvac-align-overlay` (tag) →
+  `anyvac-visual-editor`, `AlignOverlayHost` → `AnyVacVisualEditorHost`,
+  `mountAlignOverlay`/`unmountAlignOverlay` →
+  `mountVisualEditor`/`unmountVisualEditor`. Nothing outside this repo is
+  expected to reference the tag or the exported symbols directly, but it's
+  listed here in case something does.
+- **The Config editor's Maps tab no longer has Appearance controls.** Hide
+  map, overlay opacity/blend, path colour/width, mop band colour/opacity/
+  width, and the robot-image-on-map fields (on/size/rotation) are gone from
+  the Maps tab form entirely, replaced by a one-line hint. They now live in
+  the Visual editor's new **Seat & Appearance** tool (see Added below),
+  backed by `anyvac.set_floorplan_seat`'s `appearance` key (integration
+  1.12.0+) with the exact same override-always-wins precedence Align mode's
+  seat geometry already used. Any value previously set via the Maps tab's
+  plain YAML fields (`hide_map`, `overlay_opacity`, `overlay_blend`,
+  `path_color`, `path_width`, `mop_path_color`, `mop_band_opacity`,
+  `mop_band_width`, `robot_image_on_map`, `robot_size`,
+  `robot_image_rotation`) keeps working exactly as before as a fallback
+  default — it just can't be edited from that form any more. Re-set it once
+  from the Seat & Appearance tool if you want it as a backend override
+  instead of a YAML default.
+
+### Added
+
+- **Visual editor tool switcher.** What used to be a single-purpose "Align
+  mode" overlay is now a small toolbar with three tools: **Seat &
+  Appearance** (the original seat-fitting UI, now with the Appearance
+  fields folded in — see below), **Rooms**, and **Floorplan & Calibrate**.
+  Only Seat & Appearance is implemented in this release; the other two show
+  a "coming soon" placeholder (docs/42 §9 fáze I and J). The last tool used
+  is remembered per browser (localStorage) and restored the next time the
+  Visual editor is opened, including when switching between vacuums in the
+  same session.
+- **Appearance editing moved into the Visual editor, with a live preview.**
+  The Seat & Appearance tool's side panel now has an Appearance section
+  below the seat geometry fields — hide map, overlay opacity/blend, path
+  colour/width, mop band colour/opacity/width, and (when the vacuum has a
+  status image) robot-image-on-map with size/rotation. Changes preview live
+  on the canvas immediately, the same way seat geometry already did. Save/
+  Reset/Copy YAML all cover the Appearance fields too: Save sends them
+  alongside the seat geometry in one `anyvac.set_floorplan_seat` call (per
+  the backend's "no sentinel" contract — the full appearance state is
+  always resent, never partially), Reset reverts unsaved Appearance edits
+  together with unsaved seat edits, and Copy YAML appends an `appearance:`
+  block after `map:`. There is no undo/redo for Appearance changes — same
+  as the existing `layers`/zoom-tier state, which was never part of the
+  seat undo stack either.
+- New hex-color-field helper local to the Visual editor (`_veHexColorField`
+  in `anyvac-card.ts`), used for the path-colour and mop-band-colour
+  fields. It's a small, self-contained swatch+text input — not shared with
+  `editor.ts`'s own `_hexColorField`, per docs/14's one-implementation rule
+  being about geometry/data logic, not UI widgets.
+
+### Fixed
+
+- **The Config editor's Maps-tab seat sliders no longer silently wipe out
+  an Appearance override set via the Visual editor.** Integration 1.12.0
+  made `appearance` an independent, "no sentinel" field on
+  `anyvac.set_floorplan_seat` — omitting it on a call clears it, exactly
+  like passing an explicit `null`. `editor.ts`'s existing `_commitSeat`
+  (the Maps tab's seat-slider commit path, unrelated to this release's own
+  Appearance-field move) only ever sent `map`, so committing a seat-only
+  change from the Maps tab would have quietly cleared any Appearance
+  override the Visual editor had set. It now reads the override-merged
+  vacuum config and resends the effective Appearance alongside `map` on
+  every commit, so the two editing surfaces can no longer stomp on each
+  other. Covered by a new regression test in `editor-seat-sync.spec.ts`.
+
+### Requires
+
+- Integration `anyvac` **1.12.0+** for `anyvac.set_floorplan_seat`'s
+  `appearance` key. `SET_FLOORPLAN_SEAT_SCHEMA` has no `extra=` override, so
+  it uses voluptuous's default `PREVENT_EXTRA` — against an older
+  integration (pre-1.12.0, whose schema doesn't know `appearance`) the
+  Visual editor's Save call fails outright with a validation error rather
+  than silently dropping the field, and the seat geometry in the same call
+  is not saved either. There is no card-side version check; upgrade the
+  integration first.
+
 ## [1.13.0] - 2026-09-19
 
 ### Added

@@ -71,13 +71,21 @@ import {
   nudgeScale,
   nudgeTierMultiplier,
   seatToYaml,
+  effectiveAppearance,
+  effectiveRoomStyle,
+  roomsSessionToYaml,
   type AlignSession,
   type AlignViewState,
+  type AppearanceOverride,
   type FloorplanSeats,
   type NudgeTier,
+  type RoomDraft,
+  type RoomsEditSession,
   type SeatEditConfigLike,
+  type VisualEditorTool,
 } from "./seatedit";
-import { mountAlignOverlay, unmountAlignOverlay, type AnyVacAlignOverlayHost } from "./align-overlay";
+import { clampPct, moveRect, resizeRect, round1, type Corner, type RectPct } from "./rectdrag";
+import { mountVisualEditor, unmountVisualEditor, type AnyVacVisualEditorHost } from "./visual-editor";
 import {
   pickProfile,
   resolveProfile,
@@ -236,7 +244,7 @@ export class AnyVacCard extends LitElement {
   @state() private _mapAR = 3.636;
   /** docs/41 §4.2/§4.1 — the open Align-mode session (null = overlay closed).
    *  `@state` so opening/closing/gizmo edits re-render the card's own
-   *  template, which is what actually produces `_renderAlignOverlay()`'s
+   *  template, which is what actually produces `_renderVisualEditor()`'s
    *  markup (the portal itself owns no Lit reactivity of its own). */
   @state() private _alignSession: AlignSession | null = null;
   @state() private _alignView: AlignViewState = defaultAlignView();
@@ -245,9 +253,62 @@ export class AnyVacCard extends LitElement {
   @state() private _alignCancelConfirm = false;
   /** Brief "Copied" flash on the Copy YAML button. */
   @state() private _alignCopiedFlash = false;
+  /** docs/42 §1/§4.3/§8 bod 4 — which of the Visual editor's three tools is
+   *  showing. Set from localStorage ("last used tool") each time the editor
+   *  opens (`_openAlign`), not at field-init time — the stored value is
+   *  per-fleet-scope (`_storeKey`), which needs `_config` to exist first. */
+  @state() private _veTool: VisualEditorTool = "seat";
+  /** docs/42 §3.3/§4.3 (fáze I) — the open Rooms-tool session, mirroring
+   *  `_alignSession` above (null = nothing open for this tool yet — a
+   *  session is created lazily on first switching to the Rooms tab, see
+   *  `_openRooms`, not eagerly alongside `_alignSession` at overlay-open
+   *  time, since the overlay can be entered straight into Seat & Appearance
+   *  without ever touching Rooms). */
+  @state() private _roomsSession: RoomsEditSession | null = null;
+  /** In-progress room rect drag/resize gesture — mirrors `_alignGesture`'s
+   *  own "start captured once, deltas computed against it" discipline
+   *  (docs/38 §3.3's frozen-`orig` pattern, reused via `rectdrag.ts`'s pure
+   *  `moveRect`/`resizeRect` rather than a second geometry implementation).
+   *  `startPt`/latest pointer are wrap-relative % (via `_alignPointToWrapPct`,
+   *  NOT raw client px) since the Rooms canvas shares the Seat tool's
+   *  pannable/zoomable/rotatable view (docs/42 §4.1) — deltas must be taken
+   *  in the same transformed space the rect's own x/y/w/h live in. */
+  private _roomsGesture: {
+    key: string;
+    mode: "move" | "resize";
+    corner?: Corner;
+    orig: RectPct;
+    startPt: { x: number; y: number };
+  } | null = null;
+  /** "Draw a new room" gesture — armed by `_roomsSession.drawingNew`, then
+   *  tracks the corner-to-corner drag that defines the new rect. Separate
+   *  from `_roomsGesture` (that one always drags an EXISTING draft rect by
+   *  its centre/corner; this one has no rect yet until pointerup). Both
+   *  points are wrap-relative % (`_alignPointToWrapPct`). */
+  private _roomsDrawGesture: {
+    startPt: { x: number; y: number };
+    curPt?: { x: number; y: number };
+  } | null = null;
+  /** In-overlay delete confirmation for a room (docs/41 §4.4's "in-overlay
+   *  confirmation, not window.confirm" — same precedent as
+   *  `_alignCancelConfirm`). Holds the room_key pending deletion, or null. */
+  @state() private _roomsDeleteConfirm: string | null = null;
+  /** Brief "Copied" flash on the Rooms tool's own Copy YAML button —
+   *  independent of `_alignCopiedFlash` (each tool's toolbar button flashes
+   *  on its own click, not the other tool's). */
+  @state() private _roomsCopiedFlash = false;
+  /** docs/42 §9 fáze I, risk #10 "Tool-switch state leak" — redirects what
+   *  the shared `_alignCancelConfirm` panel's "Discard" button does: `null`
+   *  means the panel is guarding a full overlay close (`_alignCancel`'s own
+   *  job before this phase); a `VisualEditorTool` means it's guarding a
+   *  SWITCH away from the tool currently open (`_setVeTool`), and discarding
+   *  should only reset that one tool's session, then complete the switch —
+   *  never close the whole overlay out from under the other tool's own
+   *  (unrelated, still-unsaved) edits. */
+  @state() private _veToolSwitchTarget: VisualEditorTool | null = null;
   /** The mounted portal host, or null when the overlay is closed. Plain
    *  field, not `@state` — it's DOM plumbing, not render input. */
-  private _alignHost: AnyVacAlignOverlayHost | null = null;
+  private _alignHost: AnyVacVisualEditorHost | null = null;
   /** In-progress gizmo gesture, if any — `null` between gestures. Pointer ids
    *  are tracked so a two-finger pinch can tell its two live pointers apart
    *  from a stray third touch (docs/41 §4.4/§6 risk 2). */
@@ -781,7 +842,7 @@ export class AnyVacCard extends LitElement {
     // element's own DOM subtree — Lit/the browser will never garbage-collect
     // or detach it on their own just because the card itself disconnects
     // (HA can disconnect/reconnect a card, e.g. a dashboard tab switch).
-    unmountAlignOverlay(this._alignHost);
+    unmountVisualEditor(this._alignHost);
     this._alignHost = null;
   }
 
@@ -812,13 +873,13 @@ export class AnyVacCard extends LitElement {
         const sheet = r instanceof CSSStyleSheet ? r : r.styleSheet;
         if (sheet) sheets.push(sheet);
       }
-      this._alignHost = mountAlignOverlay(sheets, this);
+      this._alignHost = mountVisualEditor(sheets, this);
     } else if (!this._alignSession && this._alignHost) {
-      unmountAlignOverlay(this._alignHost);
+      unmountVisualEditor(this._alignHost);
       this._alignHost = null;
     }
     if (this._alignHost?.shadowRoot) {
-      render(this._renderAlignOverlay(), this._alignHost.shadowRoot);
+      render(this._renderVisualEditor(), this._alignHost.shadowRoot);
     }
     // docs/25 §10 field-caught (2026-07-25): clear a reset spinner as soon as
     // the watched sensor/button it's keyed on actually moves past the press
@@ -959,12 +1020,7 @@ export class AnyVacCard extends LitElement {
     // alone already triggers an update cycle, possibly before HA has handed
     // the card its first `hass`) — every reader below assumes it exists.
     if (!this._rawConfig || !this.hass) return;
-    let seats: FloorplanSeats | undefined;
-    for (const vac of this._rawConfig.vacuums) {
-      const at = this._intAttrs(vac);
-      const fs = at?.floorplan_seats as FloorplanSeats | undefined;
-      if (fs) { seats = fs; break; }
-    }
+    const seats = this._floorplanSeatsRaw();
     // `applyFloorplanSeats` is typed against `seatedit.ts`'s dependency-free
     // structural shapes (SeatEditConfigLike/SeatEditVacuumLike, deliberately
     // NOT importing the real card types — see that module's own doc
@@ -979,6 +1035,22 @@ export class AnyVacCard extends LitElement {
     this._config = next;
     this._roomsMemo.clear();
     this._seatMemo.clear();
+  }
+
+  /** The raw, un-merged `floorplan_seats` dict as published by whichever
+   *  vacuum's integration sensor carries it (coordinator-scoped, identical
+   *  across every vacuum on the same coordinator — see `_syncEffectiveConfig`'s
+   *  own doc comment). Split out as its own method (rather than inlined only
+   *  there) so `_roomsSave()`'s merged-mode branch can also read the current
+   *  raw `image_base` override to resend it (docs/41 §4.6 / docs/42 §4.4's
+   *  "no sentinel" contract — omitting `image_base` on save would clear it). */
+  private _floorplanSeatsRaw(): FloorplanSeats | undefined {
+    for (const vac of this._rawConfig?.vacuums ?? []) {
+      const at = this._intAttrs(vac);
+      const fs = at?.floorplan_seats as FloorplanSeats | undefined;
+      if (fs) return fs;
+    }
+    return undefined;
   }
 
   private _watchedEntities(): Set<string> {
@@ -2009,6 +2081,24 @@ export class AnyVacCard extends LitElement {
     } catch {
       return null;
     }
+  }
+
+  /** docs/42 §8 bod 4 — "entry button opens last-used tool", per-browser
+   *  via localStorage (same mechanism/scope as `_flipLive`/`_shownSet`
+   *  above). No legacy key: `_veTool` postdates the `roborock-card:*`
+   *  predecessor entirely, so there is nothing to fall back to. */
+  private _saveVeTool(tool: VisualEditorTool): void {
+    try {
+      localStorage.setItem(this._storeKey("ve-tool"), tool);
+    } catch { /* storage unavailable */ }
+  }
+
+  private _loadVeTool(): VisualEditorTool {
+    try {
+      const raw = localStorage.getItem(this._storeKey("ve-tool"));
+      if (raw === "seat" || raw === "rooms" || raw === "floorplan") return raw;
+    } catch { /* ignore */ }
+    return "seat";
   }
 
   private _saveRoomSel(vacEntity: string): void {
@@ -4053,9 +4143,9 @@ export class AnyVacCard extends LitElement {
   /** Vacuums the "Align" entry button should even be offered for (docs/41
    *  §4.7): a floorplan to align against AND a live integration (no
    *  integration → no trases/bboxy → nothing to seat), gated off entirely by
-   *  `align_mode: false` (kiosk tablets). */
+   *  `visual_editor_mode: false` (kiosk tablets). */
   private _alignCandidates(vacs: VacuumConfig[]): VacuumConfig[] {
-    if (this._config.align_mode === false) return [];
+    if (this._config.visual_editor_mode === false) return [];
     return vacs.filter((v) => !!resolveImageBaseSrc(this._config, v) && !!this._intAttrs(v));
   }
 
@@ -4075,16 +4165,30 @@ export class AnyVacCard extends LitElement {
       rotation: s.rotation, scale: s.scale, scaleY: s.scaleY,
       offset_x: s.offset_x, offset_y: s.offset_y,
     };
+    // Same one-time-capture discipline for Appearance (docs/42 §9 fáze H) —
+    // `vac` itself already reflects any existing override (`applyFloorplanSeats`
+    // ran before render), so this seeds from whatever is CURRENTLY effective,
+    // defaulted the same way the pre-H Config editor's Maps tab was.
+    const appearance = effectiveAppearance(vac);
     this._alignSession = {
       vacuum: vac.entity, floorplan: src,
       start: { ...seat }, draft: { ...seat },
       history: [], future: [],
+      appearanceStart: { ...appearance }, appearanceDraft: { ...appearance },
       layers: defaultAlignLayers(),
       snap90: false,
       nudgeTier: "normal",
     };
     this._alignView = defaultAlignView();
     this._alignGesture = null;
+    this._roomsSession = null;
+    this._roomsGesture = null;
+    this._roomsDrawGesture = null;
+    this._roomsDeleteConfirm = null;
+    this._veToolSwitchTarget = null;
+    // docs/42 §8 bod 4: entry opens the last tool used on THIS browser.
+    this._veTool = this._loadVeTool();
+    if (this._veTool === "rooms") this._openRooms();
     // Autofocus so keyboard nudges (docs/41 SS4.4, this session's C2b) work
     // immediately without the user first clicking into the overlay.
     requestAnimationFrame(() => this._alignRefocusOverlay());
@@ -4115,6 +4219,11 @@ export class AnyVacCard extends LitElement {
     this._alignSession = null;
     this._alignGesture = null;
     this._alignCancelConfirm = false;
+    this._roomsSession = null;
+    this._roomsGesture = null;
+    this._roomsDrawGesture = null;
+    this._roomsDeleteConfirm = null;
+    this._veToolSwitchTarget = null;
   }
 
   /** docs/41 §4.8: a home-frame registered vacuum is shown as a read-only
@@ -4130,8 +4239,10 @@ export class AnyVacCard extends LitElement {
     const s = this._alignSession;
     if (!s) return false;
     const a = s.draft, b = s.start;
-    return a.rotation !== b.rotation || a.scale !== b.scale || (a.scaleY ?? null) !== (b.scaleY ?? null)
-      || a.offset_x !== b.offset_x || a.offset_y !== b.offset_y;
+    if (a.rotation !== b.rotation || a.scale !== b.scale || (a.scaleY ?? null) !== (b.scaleY ?? null)
+      || a.offset_x !== b.offset_x || a.offset_y !== b.offset_y) return true;
+    const ap = s.appearanceDraft, bp = s.appearanceStart;
+    return (Object.keys(ap) as (keyof AppearanceOverride)[]).some((k) => (ap[k] ?? null) !== (bp[k] ?? null));
   }
 
   /** Toolbar ×/Esc entry point (docs/41 §4.4's "Cancel"): closes right away
@@ -4140,14 +4251,37 @@ export class AnyVacCard extends LitElement {
    *  (docs/41 risk #3: a bottom-edge swipe/back gesture must not be
    *  mistaken for confirming a destructive dialog). */
   private _alignCancel(): void {
-    if (this._alignHasChanges()) this._alignCancelConfirm = true;
-    else this._closeAlign();
+    if (this._alignHasChanges() || this._roomsHasUnsavedChanges()) {
+      this._veToolSwitchTarget = null;
+      this._alignCancelConfirm = true;
+    } else this._closeAlign();
   }
+  /** Shared confirmation panel's "Discard" button — closes the whole overlay
+   *  when `_veToolSwitchTarget` is null (toolbar ×/Esc, `_alignCancel`'s own
+   *  job), or, when it's set (`_setVeTool`'s tool-switch guard), discards
+   *  only the tool being LEFT and completes the switch (docs/42 risk #10 —
+   *  the other tool's own session, if any, is untouched either way). */
   private _alignConfirmDiscard(): void {
-    this._closeAlign();
+    const target = this._veToolSwitchTarget;
+    if (!target) { this._closeAlign(); return; }
+    if (this._veTool === "seat" && this._alignSession) {
+      const s = this._alignSession;
+      this._alignSession = {
+        ...s, draft: { ...s.start }, appearanceDraft: { ...s.appearanceStart },
+        history: [], future: [],
+      };
+    } else if (this._veTool === "rooms") {
+      this._roomsSession = null;
+    }
+    this._veTool = target;
+    this._saveVeTool(target);
+    this._veToolSwitchTarget = null;
+    this._alignCancelConfirm = false;
+    if (target === "rooms" && !this._roomsSession) this._openRooms();
   }
   private _alignDismissCancelConfirm(): void {
     this._alignCancelConfirm = false;
+    this._veToolSwitchTarget = null;
   }
 
   private _alignReset(): void {
@@ -4156,13 +4290,18 @@ export class AnyVacCard extends LitElement {
     this._alignSession = {
       ...session, draft: { ...session.start },
       history: [...session.history, session.draft], future: [],
+      // Appearance has no undo/redo (plain form fields, not gestures — see
+      // `AlignSession.appearanceDraft`'s own doc comment), so Reset just
+      // snaps it straight back, same as `layers`/`nudgeTier` would if they
+      // had a Reset control at all.
+      appearanceDraft: { ...session.appearanceStart },
     };
   }
 
   private async _alignCopyYaml(): Promise<void> {
     const session = this._alignSession;
     if (!session) return;
-    const yaml = seatToYaml(session.draft);
+    const yaml = seatToYaml(session.draft, session.appearanceDraft);
     try {
       await navigator.clipboard.writeText(yaml);
       this._alignCopiedFlash = true;
@@ -4195,9 +4334,15 @@ export class AnyVacCard extends LitElement {
       offset_y: Math.round(d.offset_y * 100) / 100,
     };
     if (d.scaleY != null) map.scale_y = Math.round(d.scaleY * 100) / 100;
+    // docs/42 §8 bod 3 "no sentinel": appearance is ALWAYS sent in full
+    // alongside map, whether or not it actually changed this session — an
+    // omitted `appearance` key is indistinguishable from an explicit
+    // `appearance: null` (clear) on the backend, so a partial Save would
+    // silently wipe out an unrelated field nobody touched.
+    const appearance: Record<string, unknown> = { ...session.appearanceDraft };
     try {
       await this.hass.callService("anyvac", "set_floorplan_seat", {
-        floorplan: session.floorplan, vacuum: vac.entity, map,
+        floorplan: session.floorplan, vacuum: vac.entity, map, appearance,
       });
       this._closeAlign();
     } catch (err) {
@@ -4294,7 +4439,7 @@ export class AnyVacCard extends LitElement {
   private _alignPointToWrapPct(clientX: number, clientY: number): { x: number; y: number } | null {
     // The overlay lives in the `_alignHost` PORTAL's own shadow root, not
     // this card's `renderRoot` (docs/41 §4.1) — a C2a bug (fixed in C2b,
-    // caught by tests/align-overlay.spec.ts) had this querying `renderRoot`
+    // caught by tests/visual-editor.spec.ts) had this querying `renderRoot`
     // instead, which meant `.align-scene` could never be found and every
     // gizmo gesture silently no-opped (`_alignStartGesture` bails on a
     // `null` point below).
@@ -4541,8 +4686,37 @@ export class AnyVacCard extends LitElement {
     if (session) this._alignSession = { ...session, nudgeTier: tier };
   }
 
+  /** docs/42 §1/§4.3 toolbar tool-switcher. Persists as "last used tool"
+   *  (§8 bod 4) — every switch counts as a preference, not just the one at
+   *  entry, so returning to Rooms next time is one click sooner. */
+  /** Whether the given tool has edits that would be lost by leaving it right
+   *  now — `"floorplan"` has no session yet (fáze J), so it never gates. */
+  private _veToolHasUnsavedChanges(tool: VisualEditorTool): boolean {
+    if (tool === "seat") return this._alignHasChanges();
+    if (tool === "rooms") return this._roomsHasUnsavedChanges();
+    return false;
+  }
+
+  private _setVeTool(tool: VisualEditorTool): void {
+    if (this._veTool === tool) return;
+    // docs/42 risk #10 "Tool-switch state leak": switching away from a tool
+    // with unsaved edits asks first, via the SAME in-overlay panel the
+    // toolbar ×/Esc uses (`_alignCancelConfirm`) — `_veToolSwitchTarget`
+    // tells its "Discard" button this is a tool switch, not a full close.
+    if (this._veToolHasUnsavedChanges(this._veTool)) {
+      this._veToolSwitchTarget = tool;
+      this._alignCancelConfirm = true;
+      return;
+    }
+    this._veTool = tool;
+    this._saveVeTool(tool);
+    // Rooms has no entry button of its own (docs/42 §4.3) — its session is
+    // opened lazily, the first time this tab is actually switched to.
+    if (tool === "rooms" && !this._roomsSession) this._openRooms();
+  }
+
   /** `Ctrl`/`Shift` held MOMENTARILY override the toolbar's persistent
-   *  Jemně/Krok/Skok selection to fine/jump — see `NudgeTier`'s doc comment
+   *  Fine/Step/Jump selection to fine/jump — see `NudgeTier`'s doc comment
    *  in `seatedit.ts` for why this replaced a Ctrl+WASD-style scheme. */
   private _alignEffectiveNudgeTier(e: KeyboardEvent): NudgeTier {
     if (e.ctrlKey || e.metaKey) return "fine";
@@ -4671,11 +4845,523 @@ export class AnyVacCard extends LitElement {
     this._alignView = { ...this._alignView, zoom, panX, panY };
   }
 
-  private _renderAlignOverlay() {
+  // ── Rooms mode (docs/42 §9 fáze I) ────────────────────────────────────────
+  // Room rect create/move/resize/delete + area_id + the global border-width
+  // sliders, sharing `_alignSession`'s vacuum/floorplan identity and
+  // `_alignView`'s pan/zoom/rotate (docs/42 §4.1/§4.3 — one view, three
+  // tools). Geometry is ALWAYS `rectdrag.ts`'s pure `moveRect`/`resizeRect`
+  // (docs/14 rule 1 — the same functions `editor.ts`'s older Maps-tab room
+  // editor already uses, not a second implementation), and every gesture's
+  // coordinates come from `_alignPointToWrapPct` rather than raw client px,
+  // since this canvas is transformed by the same shared view.
+
+  /** Seeds a fresh Rooms-tool session from whatever is CURRENTLY effective
+   *  for the Visual editor's vacuum/floorplan (`_alignSession`) — there is no
+   *  separate entry point for Rooms (docs/42 §4.3); it opens lazily the
+   *  first time this tab is switched to (`_setVeTool`, `_openAlign`). Only
+   *  rectangle-mode rooms (`map_w`/`map_h` set) are editable here — a room
+   *  with no size is drawn from `bbox_px` alone and has nothing for this
+   *  tool's rect gestures to grab; it stays visible/editable only via the
+   *  Config editor's Maps tab. `isNew` is decided against `resolveStaticRooms`
+   *  on `_rawConfig` (the true pre-override, pre-integration-merge list) —
+   *  a room_key absent there exists ONLY via the override layer (created by
+   *  a previous Rooms-tool session, or this one), so it's the one case this
+   *  tool is allowed to delete outright (see `RoomDraft.isNew`'s own doc
+   *  comment for why a config-authored room's delete stays a Config editor
+   *  action). Split vs merged mirrors `image_base`'s own precedent exactly
+   *  (docs/42 §4.4): `map_mode: "merged"` -> card-level session (`vacuum`
+   *  undefined), else per-vacuum (`vacuum` = this session's entity). */
+  private _openRooms(): void {
+    const session = this._alignSession;
+    const vac = this._alignVac();
+    if (!session || !vac) return;
+    const merged = this._config.map_mode === "merged";
+    // Same call shape as `_staticRoomsFor` — `resolveStaticRooms`'s param
+    // types are structural/unexported, so no cast is needed here either;
+    // `_rawConfig` (falling back to `_config`) is what makes this the TRUE
+    // pre-override list, unlike `_staticRoomsFor` itself which always reads
+    // the already-merged `_config`.
+    const staticRooms = resolveStaticRooms(this._rawConfig ?? this._config, vac) as RoomConfig[];
+    const staticKeys = new Set(staticRooms.filter((r) => r.key).map((r) => r.key));
+    const rooms: Record<string, RoomDraft> = {};
+    for (const r of this._roomsFor(vac)) {
+      if (r.map_x == null || r.map_y == null || r.map_w == null || r.map_h == null) continue;
+      rooms[r.key] = {
+        x: r.map_x, y: r.map_y, w: r.map_w, h: r.map_h,
+        areaId: r.area_id ?? null,
+        isNew: !staticKeys.has(r.key),
+      };
+    }
+    const style = effectiveRoomStyle(this._config);
+    this._roomsSession = {
+      floorplan: session.floorplan,
+      vacuum: merged ? undefined : vac.entity,
+      rooms, start: { ...rooms },
+      selected: null,
+      history: [], future: [],
+      styleStart: { ...style }, styleDraft: { ...style },
+      drawingNew: false,
+    };
+    this._roomsGesture = null;
+    this._roomsDrawGesture = null;
+    this._roomsDeleteConfirm = null;
+  }
+
+  private _roomsHasUnsavedChanges(): boolean {
+    const s = this._roomsSession;
+    if (!s) return false;
+    if (JSON.stringify(s.rooms) !== JSON.stringify(s.start)) return true;
+    return JSON.stringify(s.styleDraft) !== JSON.stringify(s.styleStart);
+  }
+
+  private _roomsSelect(key: string | null): void {
+    const s = this._roomsSession;
+    if (s) this._roomsSession = { ...s, selected: key };
+  }
+
+  /** Mirrors `_alignPushHistory` — snapshots the WHOLE `rooms` record onto
+   *  the undo stack once per user-initiated change (a gesture, a create, a
+   *  delete, a rename), never per intermediate pointermove. Style (the
+   *  border-width sliders) deliberately has NO undo/redo, same precedent as
+   *  `AlignSession.appearanceDraft` — see `RoomsEditSession.styleDraft`. */
+  private _roomsPushHistory(rooms: Record<string, RoomDraft>): void {
+    const s = this._roomsSession;
+    if (!s) return;
+    this._roomsSession = { ...s, history: [...s.history, rooms], future: [] };
+  }
+
+  private _roomsUndo(): void {
+    const s = this._roomsSession;
+    if (!s || !s.history.length) return;
+    const prev = s.history[s.history.length - 1];
+    this._roomsSession = {
+      ...s, rooms: prev,
+      history: s.history.slice(0, -1),
+      future: [s.rooms, ...s.future],
+    };
+  }
+
+  private _roomsRedo(): void {
+    const s = this._roomsSession;
+    if (!s || !s.future.length) return;
+    const next = s.future[0];
+    this._roomsSession = {
+      ...s, rooms: next,
+      history: [...s.history, s.rooms],
+      future: s.future.slice(1),
+    };
+  }
+
+  private _roomsReset(): void {
+    const s = this._roomsSession;
+    if (!s) return;
+    this._roomsSession = {
+      ...s, rooms: { ...s.start },
+      history: [...s.history, s.rooms], future: [],
+      // Style has no undo/redo (see doc comment above) — Reset just snaps it
+      // straight back, same as Appearance's own Reset in the Seat tool.
+      styleDraft: { ...s.styleStart },
+    };
+  }
+
+  private _roomsSetAreaId(key: string, value: string): void {
+    const s = this._roomsSession;
+    const d = s?.rooms[key];
+    if (!s || !d) return;
+    const areaId = value === "" ? null : value;
+    if (d.areaId === areaId) return;
+    this._roomsSession = {
+      ...s, rooms: { ...s.rooms, [key]: { ...d, areaId } },
+      history: [...s.history, s.rooms], future: [],
+    };
+  }
+
+  private _roomsSetStyle(field: "border_normal" | "border_selected", raw: string): void {
+    const s = this._roomsSession;
+    if (!s) return;
+    const n = parseFloat(raw);
+    if (!Number.isFinite(n) || n < 0 || n > 12) return;
+    if (s.styleDraft[field] === n) return;
+    this._roomsSession = { ...s, styleDraft: { ...s.styleDraft, [field]: n } };
+  }
+
+  /** Toolbar "Add room" toggle — arms/disarms draw mode; the next
+   *  click-drag on empty canvas (`_roomsCanvasPointerDown/Move/Up`) defines
+   *  the new rect, or Escape/re-clicking the button cancels it. */
+  private _roomsArmDraw(): void {
+    const s = this._roomsSession;
+    if (!s) return;
+    this._roomsSession = { ...s, drawingNew: !s.drawingNew };
+    this._roomsDrawGesture = null;
+  }
+
+  private _roomsGenerateKey(s: RoomsEditSession): string {
+    let n = 1;
+    while (s.rooms["new_room_" + n]) n++;
+    return "new_room_" + n;
+  }
+
+  /** Starts a move/resize gesture on an EXISTING room rect — mirrors
+   *  `_alignStartGesture`'s "snapshot history once, then track the gesture
+   *  in a separate plain field" split. `orig` freezes the rect's state at
+   *  gesture start (`rectdrag.ts`'s own frozen-`orig` contract — deltas are
+   *  always taken against this, never a previous intermediate result). */
+  private _roomsStartGesture(e: PointerEvent, key: string, mode: "move" | "resize", corner?: Corner): void {
+    const s = this._roomsSession;
+    const d = s?.rooms[key];
+    if (!s || !d) return;
+    this._alignRefocusOverlay();
+    (e.currentTarget as HTMLElement).setPointerCapture(e.pointerId);
+    e.stopPropagation();
+    e.preventDefault();
+    const pt = this._alignPointToWrapPct(e.clientX, e.clientY);
+    if (!pt) return;
+    this._roomsPushHistory(s.rooms);
+    this._roomsSession = { ...this._roomsSession!, selected: key };
+    this._roomsGesture = { key, mode, corner, orig: { x: d.x, y: d.y, w: d.w, h: d.h }, startPt: pt };
+  }
+
+  private _roomsGestureMove(e: PointerEvent): void {
+    const s = this._roomsSession, g = this._roomsGesture;
+    if (!s || !g) return;
+    const pt = this._alignPointToWrapPct(e.clientX, e.clientY);
+    if (!pt) return;
+    const dx = pt.x - g.startPt.x, dy = pt.y - g.startPt.y;
+    const d = s.rooms[g.key];
+    if (!d) return;
+    let patch: Partial<RoomDraft>;
+    if (g.mode === "move") {
+      const r = moveRect(g.orig, dx, dy);
+      patch = { x: r.map_x, y: r.map_y };
+    } else {
+      const r = resizeRect(g.orig, g.corner!, dx, dy);
+      patch = { x: r.map_x, y: r.map_y, w: r.map_w, h: r.map_h };
+    }
+    this._roomsSession = { ...s, rooms: { ...s.rooms, [g.key]: { ...d, ...patch } } };
+  }
+
+  private _roomsGestureEnd(): void {
+    this._roomsGesture = null;
+  }
+
+  /** Canvas-level pointer handlers: fall back to the shared view's own
+   *  background pan (`_alignBgPointerDown/Move/Up`) unless `drawingNew` is
+   *  armed, in which case they instead track the "draw a new room"
+   *  corner-to-corner drag and finalize it into a brand-new `isNew` room on
+   *  pointerup. Kept separate from `_roomsStartGesture` (that one always
+   *  drags an EXISTING rect by its centre/corner handle; this one has no
+   *  rect at all until the drag ends). */
+  private _roomsCanvasPointerDown(e: PointerEvent): void {
+    const s = this._roomsSession;
+    if (!s?.drawingNew) { this._alignBgPointerDown(e); return; }
+    if (this._roomsGesture) return;
+    const pt = this._alignPointToWrapPct(e.clientX, e.clientY);
+    if (!pt) return;
+    this._alignRefocusOverlay();
+    (e.currentTarget as HTMLElement).setPointerCapture(e.pointerId);
+    e.preventDefault();
+    this._roomsDrawGesture = { startPt: pt, curPt: pt };
+  }
+  private _roomsCanvasPointerMove(e: PointerEvent): void {
+    if (this._roomsDrawGesture) {
+      const pt = this._alignPointToWrapPct(e.clientX, e.clientY);
+      if (pt) this._roomsDrawGesture = { ...this._roomsDrawGesture, curPt: pt };
+      return;
+    }
+    this._alignBgPointerMove(e);
+  }
+  private _roomsCanvasPointerUp(e: PointerEvent): void {
+    const g = this._roomsDrawGesture;
+    const s = this._roomsSession;
+    if (!g || !s) { this._alignBgPointerUp(e); return; }
+    this._roomsDrawGesture = null;
+    const a = g.startPt, b = g.curPt ?? g.startPt;
+    const x = round1(clampPct((a.x + b.x) / 2));
+    const y = round1(clampPct((a.y + b.y) / 2));
+    const w = round1(Math.min(100, Math.max(2, Math.abs(b.x - a.x))));
+    const h = round1(Math.min(100, Math.max(2, Math.abs(b.y - a.y))));
+    const key = this._roomsGenerateKey(s);
+    const draft: RoomDraft = { x, y, w, h, areaId: null, isNew: true };
+    this._roomsSession = {
+      ...s, drawingNew: false, selected: key,
+      rooms: { ...s.rooms, [key]: draft },
+      history: [...s.history, s.rooms], future: [],
+    };
+  }
+
+  /** Renames an `isNew` room's key (its only "name" — a synthesized room has
+   *  no `name` field of its own, see `mergeRoomOverrides`'s doc comment).
+   *  Slugified the same way a room_key is expected to look; a collision or
+   *  an empty result is silently ignored, same NaN-guard posture
+   *  `_alignSetField` already uses for a bad numeric commit. A config-
+   *  authored room's key is fixed here (rename needs a YAML write). */
+  private _roomsRenameKey(oldKey: string, newKeyRaw: string): void {
+    const s = this._roomsSession;
+    const d = s?.rooms[oldKey];
+    if (!s || !d || !d.isNew) return;
+    const newKey = newKeyRaw.trim().toLowerCase().replace(/[^a-z0-9]+/g, "_").replace(/^_+|_+$/g, "");
+    if (!newKey || newKey === oldKey || s.rooms[newKey]) return;
+    const next = { ...s.rooms };
+    delete next[oldKey];
+    next[newKey] = d;
+    this._roomsSession = {
+      ...s, rooms: next, selected: newKey,
+      history: [...s.history, s.rooms], future: [],
+    };
+  }
+
+  /** Delete is gated on `isNew` both here and by the confirmation panel
+   *  itself only ever being reachable from a delete button that's gated the
+   *  same way (docs/42 §3.3/§8 bod 5 — see `RoomDraft.isNew`). In-overlay
+   *  confirmation, not `window.confirm` (same precedent as
+   *  `_alignCancelConfirm`). */
+  private _roomsRequestDelete(key: string): void {
+    const d = this._roomsSession?.rooms[key];
+    if (!d?.isNew) return;
+    this._roomsDeleteConfirm = key;
+  }
+  private _roomsConfirmDelete(): void {
+    const s = this._roomsSession;
+    const key = this._roomsDeleteConfirm;
+    this._roomsDeleteConfirm = null;
+    if (!s || !key || !s.rooms[key]) return;
+    const next = { ...s.rooms };
+    delete next[key];
+    this._roomsSession = {
+      ...s, rooms: next,
+      selected: s.selected === key ? null : s.selected,
+      history: [...s.history, s.rooms], future: [],
+    };
+  }
+  private _roomsDismissDelete(): void {
+    this._roomsDeleteConfirm = null;
+  }
+
+  private async _roomsCopyYaml(): Promise<void> {
+    const session = this._roomsSession;
+    if (!session) return;
+    const yaml = roomsSessionToYaml(session.rooms, session.styleDraft);
+    try {
+      await navigator.clipboard.writeText(yaml);
+      this._roomsCopiedFlash = true;
+      setTimeout(() => { this._roomsCopiedFlash = false; }, 1500);
+    } catch (err) {
+      console.warn("[anyvac-card] Rooms: clipboard write failed", err);
+    }
+  }
+
+  /** docs/42 §4.4 (fáze K/I addendum) "no sentinel, resend to keep": Save
+   *  always sends the FULL current state of every OTHER field sharing this
+   *  session's override branch alongside the `rooms` diff, or an omitted key
+   *  would be silently cleared by `AnyVacCoordinator.set_floorplan_seat`'s
+   *  own contract (see that method's docstring) — split mode resends
+   *  map+appearance (the exact payload `_alignSave` itself sends, since this
+   *  is the OTHER tool touching that SAME per-vacuum override record);
+   *  merged mode resends the raw `image_base` override and the full
+   *  `room_style` draft. `rooms` itself is the one exception: it's a
+   *  PER-KEY merge (docs/42 §4.4), so only keys that actually changed need
+   *  to be sent (a dict to set/replace that room, `null` to clear a deleted
+   *  one) — but per-key means per-key REPLACE, not per-field merge
+   *  (`_merge_room_overrides`), so any changed room sends all four geometry
+   *  fields plus `area_id`, never a partial patch. */
+  private async _roomsSave(): Promise<void> {
+    const session = this._roomsSession;
+    if (!session || !this._alignServiceAvailable()) return;
+    const roomsPayload: Record<string, unknown> = {};
+    for (const key of Object.keys(session.rooms)) {
+      const d = session.rooms[key];
+      const before = session.start[key];
+      if (!before || before.x !== d.x || before.y !== d.y || before.w !== d.w
+        || before.h !== d.h || before.areaId !== d.areaId) {
+        roomsPayload[key] = { map_x: d.x, map_y: d.y, map_w: d.w, map_h: d.h, area_id: d.areaId };
+      }
+    }
+    for (const key of Object.keys(session.start)) {
+      if (!(key in session.rooms)) roomsPayload[key] = null;
+    }
+    try {
+      if (session.vacuum) {
+        const vac = this._config.vacuums.find((v) => v.entity === session.vacuum);
+        if (!vac) return;
+        const s = this._effectiveSeat(vac);
+        const map: Record<string, number> = {
+          rotation: Math.round(s.rotation * 100) / 100, scale: Math.round(s.scale * 100) / 100,
+          offset_x: Math.round(s.offset_x * 100) / 100, offset_y: Math.round(s.offset_y * 100) / 100,
+        };
+        if (s.scaleY != null) map.scale_y = Math.round(s.scaleY * 100) / 100;
+        const appearance = effectiveAppearance(vac);
+        await this.hass.callService("anyvac", "set_floorplan_seat", {
+          floorplan: session.floorplan, vacuum: session.vacuum,
+          map, appearance, rooms: roomsPayload,
+        });
+      } else {
+        const raw = this._floorplanSeatsRaw();
+        const entry = raw?.[session.floorplan];
+        await this.hass.callService("anyvac", "set_floorplan_seat", {
+          floorplan: session.floorplan,
+          rooms: roomsPayload,
+          image_base: entry?.image_base ?? null,
+          room_style: { ...session.styleDraft },
+        });
+      }
+      this._roomsSession = {
+        ...session, start: { ...session.rooms },
+        styleStart: { ...session.styleDraft }, history: [], future: [],
+      };
+    } catch (err) {
+      // Left open on failure, same as `_alignSave` — the draft isn't lost.
+      console.warn("[anyvac-card] Rooms: set_floorplan_seat call failed", err);
+    }
+  }
+
+  /** docs/42 §9 fáze H — the Visual editor's own top-level render (renamed
+   *  from `_renderAlignOverlay`, docs/42 §8 bod 2). Owns the portal's outer
+   *  chrome (toolbar + tool-switcher row) common to all three tools; the
+   *  actual tool body is `_renderSeatTool()` (the only one implemented
+   *  through fáze H) or `_renderVePlaceholder()` (Rooms/Floorplan &
+   *  Calibrate, fáze I/J). */
+  private _renderVisualEditor() {
     const session = this._alignSession;
     if (!session) return nothing;
     const vac = this._alignVac();
     if (!vac) return nothing;
+    const candidates = this._alignCandidates(this._config.vacuums);
+    const readOnly = this._alignReadOnly();
+    const canSave = !readOnly && this._alignServiceAvailable();
+    const canUndo = session.history.length > 0;
+    const canRedo = session.future.length > 0;
+    const rs = this._roomsSession;
+    const roomsCanUndo = !!rs && rs.history.length > 0;
+    const roomsCanRedo = !!rs && rs.future.length > 0;
+    const roomsCanSave = !!rs && this._alignServiceAvailable();
+    const tier = session.nudgeTier;
+    const tierBtn = (t: NudgeTier, label: string, title: string) => html`
+      <button class="align-tier-btn ${tier === t ? "on" : ""}" title=${title}
+        @click=${() => this._alignSetNudgeTier(t)}>${label}</button>`;
+    const toolTab = (tool: VisualEditorTool, label: string) => html`
+      <button class="ve-tool-tab ${this._veTool === tool ? "on" : ""}"
+        @click=${() => this._setVeTool(tool)}>${label}</button>`;
+    return html`
+      <div class="align-overlay ${this._rootClasses()}" tabindex="0" @keydown=${(e: KeyboardEvent) => this._alignKeyDown(e)}>
+        <div class="align-toolbar">
+          <div class="align-toolbar-title">
+            <ha-icon icon="mdi:vector-square-edit"></ha-icon>
+            <span>Visual editor — ${vac.name ?? vac.entity}</span>
+          </div>
+          ${candidates.length > 1 ? html`<div class="align-vac-picker">
+            ${candidates.map((v) => html`
+              <button class="align-vac-chip ${v.entity === vac.entity ? "on" : ""}"
+                @click=${() => {
+                  // Switching vacuum via this chip keeps whatever tool is
+                  // currently open (docs/42 §8 bod 4 only covers a FRESH entry
+                  // via the entry button — `_openAlign` itself always reloads
+                  // from localStorage, so that reload is overridden right back
+                  // here for the switch-in-place case).
+                  const tool = this._veTool;
+                  this._closeAlign(); this._openAlign(v);
+                  this._veTool = tool;
+                  if (tool === "rooms") this._openRooms();
+                }}>
+                ${v.name ?? v.entity}
+              </button>
+            `)}
+          </div>` : nothing}
+          <div class="align-toolbar-spacer"></div>
+          ${this._veTool === "seat" ? html`
+            <div class="align-tier-group" title="Nudge step size — hold Ctrl for Fine, Shift for Jump">
+              ${tierBtn("fine", "Fine", "Fine step (0,1×) — or hold Ctrl")}
+              ${tierBtn("normal", "Step", "Normal step (1×)")}
+              ${tierBtn("jump", "Jump", "Jump step (10×) — or hold Shift")}
+            </div>
+            <button class="align-btn" title="Undo (Ctrl+Z)" ?disabled=${!canUndo} @click=${() => this._alignUndo()}>
+              <ha-icon icon="mdi:undo"></ha-icon>
+            </button>
+            <button class="align-btn" title="Redo (Ctrl+Y)" ?disabled=${!canRedo} @click=${() => this._alignRedo()}>
+              <ha-icon icon="mdi:redo"></ha-icon>
+            </button>
+            <button class="align-btn" title="Rotate view 90°" @click=${() => this._alignRotateView()}>
+              <ha-icon icon="mdi:screen-rotation"></ha-icon>
+            </button>
+            <button class="align-btn" title="Reset to the values the editor was opened with"
+              ?disabled=${readOnly} @click=${() => this._alignReset()}>
+              <ha-icon icon="mdi:restore"></ha-icon>
+            </button>
+            <button class="align-btn ${this._alignCopiedFlash ? "align-btn--flash" : ""}"
+              title="Copy as YAML (map:/appearance: blocks, paste into the card config)" @click=${() => this._alignCopyYaml()}>
+              <ha-icon icon=${this._alignCopiedFlash ? "mdi:check" : "mdi:content-copy"}></ha-icon>
+            </button>
+          ` : nothing}
+          ${this._veTool === "rooms" ? html`
+            <button class="align-btn" title="Undo" ?disabled=${!roomsCanUndo} @click=${() => this._roomsUndo()}>
+              <ha-icon icon="mdi:undo"></ha-icon>
+            </button>
+            <button class="align-btn" title="Redo" ?disabled=${!roomsCanRedo} @click=${() => this._roomsRedo()}>
+              <ha-icon icon="mdi:redo"></ha-icon>
+            </button>
+            <button class="align-btn" title="Rotate view 90°" @click=${() => this._alignRotateView()}>
+              <ha-icon icon="mdi:screen-rotation"></ha-icon>
+            </button>
+            <button class="align-btn" title="Reset to the values this tab was opened with" @click=${() => this._roomsReset()}>
+              <ha-icon icon="mdi:restore"></ha-icon>
+            </button>
+            <button class="align-btn ${this._roomsCopiedFlash ? "align-btn--flash" : ""}"
+              title="Copy as YAML (rooms: block, paste into the card config)" @click=${() => this._roomsCopyYaml()}>
+              <ha-icon icon=${this._roomsCopiedFlash ? "mdi:check" : "mdi:content-copy"}></ha-icon>
+            </button>
+          ` : nothing}
+          <button class="align-btn align-close-btn" title="Cancel" @click=${() => this._alignCancel()}>
+            <ha-icon icon="mdi:close"></ha-icon>
+          </button>
+          ${this._veTool === "seat" ? html`
+            <button class="align-btn align-save-btn" ?disabled=${!canSave}
+              title=${canSave ? "Save" : readOnly ? "Read-only — aligned by home frame" : "Update the AnyVac integration to 2.0.0 — or Copy YAML"}
+              @click=${() => this._alignSave()}>
+              <ha-icon icon="mdi:content-save"></ha-icon><span>Save</span>
+            </button>
+          ` : nothing}
+          ${this._veTool === "rooms" ? html`
+            <button class="align-btn align-save-btn" ?disabled=${!roomsCanSave}
+              title=${roomsCanSave ? "Save" : "Update the AnyVac integration to 2.0.0 — or Copy YAML"}
+              @click=${() => this._roomsSave()}>
+              <ha-icon icon="mdi:content-save"></ha-icon><span>Save</span>
+            </button>
+          ` : nothing}
+        </div>
+        <div class="ve-tool-row">
+          ${toolTab("seat", "Seat & Appearance")}
+          ${toolTab("rooms", "Rooms")}
+          ${toolTab("floorplan", "Floorplan & Calibrate")}
+        </div>
+        ${this._veTool === "seat" ? this._renderSeatTool(session, vac)
+          : this._veTool === "rooms" ? this._renderRoomsTool(session, vac)
+          : this._renderVePlaceholder()}
+        ${this._alignCancelConfirm ? html`
+          <div class="align-confirm-backdrop">
+            <div class="align-confirm-panel">
+              <div class="align-confirm-title">Discard changes?</div>
+              <div class="align-confirm-body">
+                ${this._veToolSwitchTarget
+                  ? "The edits you made in this tab haven't been saved."
+                  : "The edits you made in this session haven't been saved."}
+              </div>
+              <div class="align-confirm-actions">
+                <button class="align-btn align-confirm-keep" @click=${() => this._alignDismissCancelConfirm()}>Keep editing</button>
+                <button class="align-btn align-confirm-discard" @click=${() => this._alignConfirmDiscard()}>Discard</button>
+              </div>
+            </div>
+          </div>
+        ` : nothing}
+      </div>
+    `;
+  }
+
+  /** docs/42 §9 fáze H — the ONLY implemented Visual editor tool: today's
+   *  seat gizmo/side-panel body (unchanged from the pre-fáze-H overlay)
+   *  plus the Appearance section moved here from the Config editor's Maps
+   *  tab (docs/42 §3/§9 — same `_intAttrs`-gated availability the rest of
+   *  this tool already has, per docs/42 §8 bod 3: Appearance gating is the
+   *  same as Seat gating, no separate check needed). */
+  private _renderSeatTool(session: AlignSession, vac: VacuumConfig) {
     const { w: wrapW, h: wrapH } = this._alignSceneSize();
     const others = this._config.vacuums.filter(
       (v) => v.entity !== vac.entity && resolveImageBaseSrc(this._config, v) === session.floorplan && this._intAttrs(v),
@@ -4690,67 +5376,28 @@ export class AnyVacCard extends LitElement {
     const mapEnt = this._mapEntityFor(vac);
     const mapUrl = mapEnt ? this._mapUrl(mapEnt) : null;
     const draft = session.draft;
+    const appearance = session.appearanceDraft;
+    // Live preview (docs/42 §9 fáze H): the paths/marker layer reads its
+    // colours/widths/robot-image straight off the `vac` object it's given
+    // (`_renderIntegrationOverlay`, docs/14 rule 1 — no second copy of that
+    // logic here), so spreading the in-progress appearance draft onto a
+    // copy of `vac` is enough to preview every field that layer actually
+    // uses (path/mop colours+widths, robot image/size/rotation). `hide_map`/
+    // `overlay_opacity`/`overlay_blend` affect the MAIN dashboard's own
+    // raw-map image styling, not this overlay's independent layer-opacity
+    // sliders below, so there is nothing further to preview for those here.
+    const previewVac: VacuumConfig = {
+      ...vac, ...appearance,
+      path_color: appearance.path_color ?? undefined,
+      mop_path_color: appearance.mop_path_color ?? undefined,
+    };
     const corner = (cx: number, cy: number) => this._alignCornerPct(draft, cx, cy, wrapW, wrapH);
     const nw = corner(0, 0), ne = corner(1, 0), sw = corner(0, 1), se = corner(1, 1);
     const nMid = corner(0.5, 0), sMid = corner(0.5, 1), wMid = corner(0, 0.5), eMid = corner(1, 0.5);
     const centre = { x: 50 + draft.offset_x, y: 50 + draft.offset_y };
     const rotateHandle = this._alignCornerPct(draft, 0.5, -0.18, wrapW, wrapH);
-    const candidates = this._alignCandidates(this._config.vacuums);
     const readOnly = this._alignReadOnly();
-    const canSave = !readOnly && this._alignServiceAvailable();
-    const canUndo = session.history.length > 0;
-    const canRedo = session.future.length > 0;
-    const tier = session.nudgeTier;
-    const tierBtn = (t: NudgeTier, label: string, title: string) => html`
-      <button class="align-tier-btn ${tier === t ? "on" : ""}" title=${title}
-        @click=${() => this._alignSetNudgeTier(t)}>${label}</button>`;
     return html`
-      <div class="align-overlay ${this._rootClasses()}" tabindex="0" @keydown=${(e: KeyboardEvent) => this._alignKeyDown(e)}>
-        <div class="align-toolbar">
-          <div class="align-toolbar-title">
-            <ha-icon icon="mdi:vector-square-edit"></ha-icon>
-            <span>Align — ${vac.name ?? vac.entity}</span>
-          </div>
-          ${candidates.length > 1 ? html`<div class="align-vac-picker">
-            ${candidates.map((v) => html`
-              <button class="align-vac-chip ${v.entity === vac.entity ? "on" : ""}"
-                @click=${() => { this._closeAlign(); this._openAlign(v); }}>
-                ${v.name ?? v.entity}
-              </button>
-            `)}
-          </div>` : nothing}
-          <div class="align-toolbar-spacer"></div>
-          <div class="align-tier-group" title="Nudge step size — hold Ctrl for Jemně, Shift for Skok">
-            ${tierBtn("fine", "Jemně", "Fine step (0,1×) — or hold Ctrl")}
-            ${tierBtn("normal", "Krok", "Normal step (1×)")}
-            ${tierBtn("jump", "Skok", "Jump step (10×) — or hold Shift")}
-          </div>
-          <button class="align-btn" title="Undo (Ctrl+Z)" ?disabled=${!canUndo} @click=${() => this._alignUndo()}>
-            <ha-icon icon="mdi:undo"></ha-icon>
-          </button>
-          <button class="align-btn" title="Redo (Ctrl+Y)" ?disabled=${!canRedo} @click=${() => this._alignRedo()}>
-            <ha-icon icon="mdi:redo"></ha-icon>
-          </button>
-          <button class="align-btn" title="Rotate view 90°" @click=${() => this._alignRotateView()}>
-            <ha-icon icon="mdi:screen-rotation"></ha-icon>
-          </button>
-          <button class="align-btn" title="Reset to the values Align mode was opened with"
-            ?disabled=${readOnly} @click=${() => this._alignReset()}>
-            <ha-icon icon="mdi:restore"></ha-icon>
-          </button>
-          <button class="align-btn ${this._alignCopiedFlash ? "align-btn--flash" : ""}"
-            title="Copy as YAML (map: block, paste into the card config)" @click=${() => this._alignCopyYaml()}>
-            <ha-icon icon=${this._alignCopiedFlash ? "mdi:check" : "mdi:content-copy"}></ha-icon>
-          </button>
-          <button class="align-btn align-close-btn" title="Cancel" @click=${() => this._alignCancel()}>
-            <ha-icon icon="mdi:close"></ha-icon>
-          </button>
-          <button class="align-btn align-save-btn" ?disabled=${!canSave}
-            title=${canSave ? "Save" : readOnly ? "Read-only — aligned by home frame" : "Update the AnyVac integration to 2.0.0 — or Copy YAML"}
-            @click=${() => this._alignSave()}>
-            <ha-icon icon="mdi:content-save"></ha-icon><span>Save</span>
-          </button>
-        </div>
         <div class="align-body">
           <div class="align-canvas"
             @wheel=${(e: WheelEvent) => this._alignWheel(e)}
@@ -4793,7 +5440,7 @@ export class AnyVacCard extends LitElement {
                       left: (50 + draft.offset_x) + "%", top: (50 + draft.offset_y) + "%", width: draft.scale + "%",
                       transform: "translate(-50%,-50%) " + seatRotateScaleCss(draft.rotation, draft.scale, draft.scaleY),
                     })} />` : nothing}
-                ${this._renderIntegrationOverlay(vac, draft, "both")}
+                ${this._renderIntegrationOverlay(previewVac, draft, "both")}
               </div>
               ${readOnly ? html`
                 <div class="align-readonly-note">
@@ -4904,22 +5551,271 @@ export class AnyVacCard extends LitElement {
               <input type="number" step="0.01" .value=${String(Math.round(draft.offset_y * 10000) / 10000)}
                 ?disabled=${readOnly} @change=${(e: Event) => this._alignSetField("offset_y", (e.target as HTMLInputElement).value)} />
             </div>
+            <div class="align-side-panel-divider"></div>
+            <div class="section-title">Appearance</div>
+            <div class="align-field-row align-field-row--check">
+              <label>
+                <input type="checkbox" .checked=${!!appearance.hide_map} ?disabled=${readOnly}
+                  @change=${(e: Event) => this._alignSetAppearanceField("hide_map", (e.target as HTMLInputElement).checked)} />
+                Hide vacuum map (show only floorplan + robot/path)
+              </label>
+            </div>
+            <div class="align-field-row align-field-row--opacity">
+              <label>Overlay opacity<span>%</span></label>
+              <input type="range" min="0" max="100" step="5"
+                ?disabled=${readOnly} .value=${String(appearance.overlay_opacity ?? 55)}
+                @input=${(e: Event) => this._alignSetAppearanceField("overlay_opacity", Number((e.target as HTMLInputElement).value))} />
+            </div>
+            <div class="align-field-row">
+              <label>Overlay blend</label>
+              <select ?disabled=${readOnly} .value=${appearance.overlay_blend ?? "normal"}
+                @change=${(e: Event) => this._alignSetAppearanceField("overlay_blend", (e.target as HTMLSelectElement).value)}>
+                <option value="normal">normal</option>
+                <option value="lighten">lighten</option>
+                <option value="screen">screen</option>
+                <option value="plus-lighter">plus-lighter</option>
+              </select>
+            </div>
+            ${this._veHexColorField("Path colour", appearance.path_color ?? undefined, readOnly,
+              (v) => this._alignSetAppearanceField("path_color", v || null), this._color(vac))}
+            <div class="align-field-row align-field-row--opacity">
+              <label>Path width<span>%</span></label>
+              <input type="range" min="20" max="300" step="10"
+                ?disabled=${readOnly} .value=${String(appearance.path_width ?? 100)}
+                @input=${(e: Event) => this._alignSetAppearanceField("path_width", Number((e.target as HTMLInputElement).value))} />
+            </div>
+            ${this._veHexColorField("Mop band colour", appearance.mop_path_color ?? undefined, readOnly,
+              (v) => this._alignSetAppearanceField("mop_path_color", v || null), "#40a9ff")}
+            <div class="align-field-row align-field-row--opacity">
+              <label>Mop band opacity<span>%</span></label>
+              <input type="range" min="0" max="100" step="5"
+                ?disabled=${readOnly} .value=${String(appearance.mop_band_opacity ?? 28)}
+                @input=${(e: Event) => this._alignSetAppearanceField("mop_band_opacity", Number((e.target as HTMLInputElement).value))} />
+            </div>
+            <div class="align-field-row align-field-row--opacity">
+              <label>Mop band width<span>%</span></label>
+              <input type="range" min="20" max="400" step="10"
+                ?disabled=${readOnly} .value=${String(appearance.mop_band_width ?? 100)}
+                @input=${(e: Event) => this._alignSetAppearanceField("mop_band_width", Number((e.target as HTMLInputElement).value))} />
+            </div>
+            ${vac.image ? html`
+              <div class="align-field-row align-field-row--check">
+                <label>
+                  <input type="checkbox" .checked=${!!appearance.robot_image_on_map} ?disabled=${readOnly}
+                    @change=${(e: Event) => this._alignSetAppearanceField("robot_image_on_map", (e.target as HTMLInputElement).checked)} />
+                  Robot image on map (uses status image)
+                </label>
+              </div>
+              ${appearance.robot_image_on_map ? html`
+                <div class="align-field-row align-field-row--opacity">
+                  <label>Robot image size<span>%</span></label>
+                  <input type="range" min="40" max="220" step="10"
+                    ?disabled=${readOnly} .value=${String(appearance.robot_size ?? 100)}
+                    @input=${(e: Event) => this._alignSetAppearanceField("robot_size", Number((e.target as HTMLInputElement).value))} />
+                </div>
+                <div class="align-field-row align-field-row--opacity">
+                  <label>Robot image rotation<span>°</span></label>
+                  <input type="range" min="-180" max="180" step="15"
+                    ?disabled=${readOnly} .value=${String(appearance.robot_image_rotation ?? 0)}
+                    @input=${(e: Event) => this._alignSetAppearanceField("robot_image_rotation", Number((e.target as HTMLInputElement).value))} />
+                </div>
+              ` : nothing}
+            ` : nothing}
           </div>
         </div>
-        ${this._alignCancelConfirm ? html`
+    `;
+  }
+
+  /** docs/42 §9 fáze I — room rect create/move/resize/delete, area_id, and
+   *  the two global border-width sliders. Structurally mirrors
+   *  `_renderSeatTool` (`.align-body` = `.align-canvas` + `.align-side-panel`,
+   *  same `.align-scene` sharing the view transform) but every gesture is
+   *  routed through `_rooms*` rather than `_align*`, and the canvas falls
+   *  back to plain view-panning (`_alignBgPointerDown/Move/Up`, via
+   *  `_roomsCanvasPointerDown/Move/Up`) whenever no room drag/draw is in
+   *  progress. */
+  private _renderRoomsTool(session: AlignSession, vac: VacuumConfig) {
+    const { w: wrapW, h: wrapH } = this._alignSceneSize();
+    const rs = this._roomsSession;
+    if (!rs) return html`<div class="align-body"></div>`;
+    // Same floorplan-identity lookup `_renderSeatTool` uses — matched by
+    // `src` against the identity captured at `_openAlign` time (docs/14
+    // rule 1: `resolveImageBaseSrc` already owns the merged-vs-split
+    // precedence, this only finds WHICH `image_base` object produced it).
+    const ib = this._config.image_base?.src === session.floorplan
+      ? this._config.image_base
+      : (this._config.vacuums.find((v) => v.image_base?.src === session.floorplan)?.image_base ?? vac.image_base);
+    const style = rs.styleDraft;
+    const areas = Object.values((this.hass as any)?.areas ?? {}) as Array<{ area_id: string; name: string }>;
+    const selectedKey = rs.selected;
+    const selected = selectedKey ? rs.rooms[selectedKey] : undefined;
+    const draw = this._roomsDrawGesture;
+    return html`
+        <div class="align-body">
+          <div class="align-canvas"
+            @wheel=${(e: WheelEvent) => this._alignWheel(e)}
+            @pointerdown=${(e: PointerEvent) => this._roomsCanvasPointerDown(e)}
+            @pointermove=${(e: PointerEvent) => this._roomsCanvasPointerMove(e)}
+            @pointerup=${(e: PointerEvent) => this._roomsCanvasPointerUp(e)}
+            @pointercancel=${(e: PointerEvent) => this._roomsCanvasPointerUp(e)}>
+            <div class="align-scene ${rs.drawingNew ? "align-scene--drawing" : ""}" style=${styleMap({
+              width: wrapW + "px", height: wrapH + "px",
+              transform: this._alignViewTransformCss(),
+            })}>
+              ${ib?.src ? html`<img class="align-floorplan-img" src=${ib.src} alt="Floorplan"
+                  @load=${this._onFloorplanLoad}
+                  style=${styleMap({
+                    transform: "translate(" + (ib.offset_x ?? 0) + "%," + (ib.offset_y ?? 0) + "%) rotate(" + (ib.rotation ?? 0) + "deg) scale(" + ((ib.scale ?? 100) / 100) + ")",
+                  })} />` : nothing}
+              ${Object.entries(rs.rooms).map(([key, d]) => {
+                const isSel = key === selectedKey;
+                return html`
+                  <div class="rooms-rect ${isSel ? "rooms-rect--selected" : ""}"
+                    style=${styleMap({
+                      left: d.x + "%", top: d.y + "%", width: d.w + "%", height: d.h + "%",
+                      borderWidth: (isSel ? style.border_selected : style.border_normal) + "px",
+                    })}
+                    @pointerdown=${(e: PointerEvent) => this._roomsStartGesture(e, key, "move")}
+                    @pointermove=${(e: PointerEvent) => this._roomsGestureMove(e)}
+                    @pointerup=${() => this._roomsGestureEnd()}
+                    @pointercancel=${() => this._roomsGestureEnd()}>
+                    <span class="rooms-rect-label">${key}</span>
+                    ${isSel ? (["nw", "ne", "sw", "se"] as const).map((corner) => html`
+                      <div class="align-handle align-handle--corner rooms-handle--${corner}"
+                        @pointerdown=${(e: PointerEvent) => this._roomsStartGesture(e, key, "resize", corner)}
+                        @pointermove=${(e: PointerEvent) => this._roomsGestureMove(e)}
+                        @pointerup=${() => this._roomsGestureEnd()}
+                        @pointercancel=${() => this._roomsGestureEnd()}>
+                      </div>
+                    `) : nothing}
+                  </div>`;
+              })}
+              ${draw ? (() => {
+                const a = draw.startPt, b = draw.curPt ?? draw.startPt;
+                const x = (a.x + b.x) / 2, y = (a.y + b.y) / 2;
+                const w = Math.abs(b.x - a.x), h = Math.abs(b.y - a.y);
+                return html`<div class="rooms-rect rooms-rect--drawing"
+                  style=${styleMap({ left: x + "%", top: y + "%", width: w + "%", height: h + "%" })}></div>`;
+              })() : nothing}
+            </div>
+          </div>
+          <div class="align-side-panel">
+            <button class="align-btn ${rs.drawingNew ? "align-btn--armed" : ""}"
+              style="width:auto;align-self:flex-start;padding:0 10px;gap:6px" @click=${() => this._roomsArmDraw()}>
+              <ha-icon icon="mdi:vector-square-plus"></ha-icon>
+              <span>${rs.drawingNew ? "Click-drag on the map…" : "Add room"}</span>
+            </button>
+            <div class="align-side-panel-divider"></div>
+            <div class="section-title">Border width</div>
+            <div class="align-field-row">
+              <label>Normal<span>px</span></label>
+              <input type="number" step="0.5" min="0" max="12" .value=${String(style.border_normal)}
+                @change=${(e: Event) => this._roomsSetStyle("border_normal", (e.target as HTMLInputElement).value)} />
+            </div>
+            <div class="align-field-row">
+              <label>Selected<span>px</span></label>
+              <input type="number" step="0.5" min="0" max="12" .value=${String(style.border_selected)}
+                @change=${(e: Event) => this._roomsSetStyle("border_selected", (e.target as HTMLInputElement).value)} />
+            </div>
+            <div class="align-side-panel-divider"></div>
+            ${selectedKey && selected ? html`
+              <div class="section-title">${selectedKey}</div>
+              ${selected.isNew ? html`
+                <div class="align-field-row align-field-row--color">
+                  <label>Key</label>
+                  <input type="text" class="align-color-text" .value=${selectedKey}
+                    @change=${(e: Event) => this._roomsRenameKey(selectedKey, (e.target as HTMLInputElement).value)} />
+                </div>
+              ` : nothing}
+              <div class="align-field-row align-field-row--color">
+                <label>Area</label>
+                <select class="align-color-text"
+                  @change=${(e: Event) => this._roomsSetAreaId(selectedKey, (e.target as HTMLSelectElement).value)}>
+                  <option value="">— not mapped —</option>
+                  ${[...areas].sort((a, b) => a.name.localeCompare(b.name)).map((a) => html`
+                    <option value=${a.area_id} ?selected=${a.area_id === selected.areaId}>${a.name}</option>
+                  `)}
+                </select>
+              </div>
+              ${selected.isNew ? html`
+                <button class="align-btn" style="width:auto;align-self:flex-start;padding:0 10px;gap:6px"
+                  @click=${() => this._roomsRequestDelete(selectedKey)}>
+                  <ha-icon icon="mdi:delete"></ha-icon><span>Delete room</span>
+                </button>
+              ` : html`<div class="rooms-side-note">A config-defined room's key can't be renamed or deleted here — use the Config editor.</div>`}
+            ` : html`<div class="rooms-side-note">Click a room to select it, or "Add room" to draw a new one.</div>`}
+          </div>
+        </div>
+        ${this._roomsDeleteConfirm ? html`
           <div class="align-confirm-backdrop">
             <div class="align-confirm-panel">
-              <div class="align-confirm-title">Discard changes?</div>
-              <div class="align-confirm-body">The alignment you made in this session hasn't been saved.</div>
+              <div class="align-confirm-title">Delete room?</div>
+              <div class="align-confirm-body">"${this._roomsDeleteConfirm}" will be removed once you Save.</div>
               <div class="align-confirm-actions">
-                <button class="align-btn align-confirm-keep" @click=${() => this._alignDismissCancelConfirm()}>Keep editing</button>
-                <button class="align-btn align-confirm-discard" @click=${() => this._alignConfirmDiscard()}>Discard</button>
+                <button class="align-btn align-confirm-keep" @click=${() => this._roomsDismissDelete()}>Cancel</button>
+                <button class="align-btn align-confirm-discard" @click=${() => this._roomsConfirmDelete()}>Delete</button>
               </div>
             </div>
           </div>
         ` : nothing}
+    `;
+  }
+
+  /** docs/42 §9 fáze J — Floorplan & Calibrate doesn't exist yet; this is
+   *  the toolbar's third state until it does (docs/42 §9 phasing table).
+   *  Kept intentionally minimal — a placeholder needs no test coverage
+   *  beyond "it renders and doesn't crash". */
+  private _renderVePlaceholder() {
+    return html`
+      <div class="align-body ve-placeholder-body">
+        <div class="ve-placeholder">
+          <ha-icon icon="mdi:hammer-wrench"></ha-icon>
+          <div class="ve-placeholder-title">Floorplan & Calibrate — coming soon</div>
+          <div class="ve-placeholder-sub">docs/42 §9 fáze J</div>
+        </div>
       </div>
     `;
+  }
+
+  /** Hex colour field with a native colour-picker swatch alongside the text
+   *  input — same UX as the Config editor's own `_hexColorField` (editor.ts),
+   *  reimplemented here (not imported — the two are separate custom
+   *  elements/modules, docs/14 rule 1 is about not re-deriving GEOMETRY/
+   *  DATA logic, not about sharing every UI widget) since this field moved
+   *  from there into the Visual editor (docs/42 §9 fáze H). Falls back to
+   *  `placeholder` for the swatch when the current value isn't a valid
+   *  `#rrggbb`. */
+  private _veHexColorField(
+    label: string, value: string | undefined, disabled: boolean,
+    onChange: (v: string) => void, placeholder: string,
+  ) {
+    const swatch = /^#[0-9a-fA-F]{6}$/.test(value ?? "") ? (value as string) : placeholder;
+    return html`
+      <div class="align-field-row align-field-row--color">
+        <label>${label}</label>
+        <div class="align-color-row">
+          <input type="color" class="align-color-swatch" .value=${swatch} ?disabled=${disabled}
+            @input=${(e: Event) => onChange((e.target as HTMLInputElement).value)} />
+          <input type="text" class="align-color-text" .value=${value ?? ""} placeholder=${placeholder} ?disabled=${disabled}
+            @change=${(e: Event) => onChange((e.target as HTMLInputElement).value)} />
+        </div>
+      </div>`;
+  }
+
+  /** docs/42 §9 fáze H — the Seat & Appearance tool's Appearance field
+   *  setter, symmetric with `_alignSetField` (seat geometry) above: commits
+   *  straight into `appearanceDraft`, no undo/redo (see `AlignSession
+   *  .appearanceDraft`'s own doc comment for why). */
+  private _alignSetAppearanceField<K extends keyof AppearanceOverride>(
+    field: K, value: AppearanceOverride[K],
+  ): void {
+    const session = this._alignSession;
+    if (!session || this._alignReadOnly()) return;
+    if (session.appearanceDraft[field] === value) return;
+    this._alignSession = {
+      ...session,
+      appearanceDraft: { ...session.appearanceDraft, [field]: value },
+    };
   }
 
   /** docs/40 §4.4 (Fáze 3): is `vac` currently rendered via the shared home
@@ -8216,7 +9112,7 @@ export class AnyVacCard extends LitElement {
     }
 
     /* == Align mode overlay (docs/41, Faze C - C2a batch) ==================
-     * Rendered inside the document.body portal (align-overlay.ts), NOT
+     * Rendered inside the document.body portal (visual-editor.ts), NOT
      * inside this card's own shadow root -- the SAME adopted stylesheet
      * reaches both (docs/14 rule 1: one stylesheet), so these rules just
      * need to exist once, here. .align-overlay carries the SAME theme
@@ -8353,6 +9249,77 @@ export class AnyVacCard extends LitElement {
       }
       .align-field-row { flex: 1 1 45%; }
     }
+    /* == Align mode: home-frame degradation (docs/41 §4.8) =============== */
+    /* == Visual editor: tool-switcher row (docs/42 §9 fáze H) ============ */
+    .ve-tool-row {
+      display: flex; gap: 6px; padding: 8px 12px;
+      background: var(--avc-surface); border-top: 1px solid var(--avc-panel-line);
+      flex-wrap: wrap;
+    }
+    .ve-tool-tab {
+      font: inherit; font-size: 12px; font-weight: 600; cursor: pointer;
+      padding: 7px 14px; border-radius: 999px; color: rgba(var(--avc-ink-rgb), 0.7);
+      background: var(--avc-panel); border: 1px solid var(--avc-panel-line);
+    }
+    .ve-tool-tab.on {
+      color: rgb(var(--avc-ink-rgb)); font-weight: 700;
+      background: rgba(var(--avc-tool-rgb), 0.22); border-color: rgba(var(--avc-tool-rgb), 0.6);
+    }
+    .ve-placeholder-body { align-items: center; justify-content: center; }
+    .ve-placeholder {
+      display: flex; flex-direction: column; align-items: center; gap: 8px;
+      color: rgba(var(--avc-ink-rgb), 0.6); text-align: center; padding: 24px;
+      --mdc-icon-size: 40px;
+    }
+    .ve-placeholder-title { font-size: 15px; font-weight: 700; color: rgb(var(--avc-ink-rgb)); }
+    .ve-placeholder-sub { font-size: 12px; }
+    /* == Visual editor: Seat & Appearance tool's Appearance section ======= */
+    .align-side-panel-divider {
+      height: 1px; background: var(--avc-panel-line); margin: 4px 0;
+    }
+    .align-side-panel .section-title {
+      font-size: 11px; font-weight: 700; letter-spacing: 0.03em; text-transform: uppercase;
+      color: rgba(var(--avc-ink-rgb), 0.5);
+    }
+    .align-field-row--color { flex-direction: column; align-items: stretch; gap: 4px; }
+    .align-color-row { display: flex; gap: 6px; align-items: center; }
+    .align-color-swatch {
+      width: 30px; height: 30px; padding: 0; border-radius: 8px; cursor: pointer;
+      border: 1px solid var(--avc-panel-line); background: none;
+    }
+    .align-color-text {
+      flex: 1 1 auto; font: inherit; font-size: 12px; color: rgb(var(--avc-ink-rgb));
+      background: var(--avc-panel); border: 1px solid var(--avc-panel-line);
+      border-radius: 8px; padding: 5px 7px;
+    }
+    .align-field-row select {
+      font: inherit; font-size: 12px; color: rgb(var(--avc-ink-rgb)); background: var(--avc-panel);
+      border: 1px solid var(--avc-panel-line); border-radius: 8px; padding: 5px 7px;
+    }
+    /* == Rooms tool (docs/42 §9 fáze I) ==================================== */
+    .align-btn--armed { background: rgba(var(--avc-tool-rgb), 0.28); border-color: rgba(var(--avc-tool-rgb), 0.7); }
+    .align-scene--drawing { cursor: crosshair; }
+    .rooms-rect {
+      position: absolute; box-sizing: border-box; transform: translate(-50%, -50%);
+      border-style: solid; border-color: rgb(var(--avc-tool-rgb));
+      background: rgba(var(--avc-tool-rgb), 0.1); cursor: move; touch-action: none;
+    }
+    .rooms-rect--selected { background: rgba(var(--avc-tool-rgb), 0.2); }
+    .rooms-rect--drawing {
+      border: 2px dashed rgb(var(--avc-tool-rgb)); background: rgba(var(--avc-tool-rgb), 0.14);
+      pointer-events: none;
+    }
+    .rooms-rect-label {
+      position: absolute; top: 2px; left: 4px; max-width: calc(100% - 8px);
+      font-size: 11px; font-weight: 700; color: rgb(var(--avc-ink-rgb)); background: var(--avc-surface);
+      padding: 1px 5px; border-radius: 6px; pointer-events: none; white-space: nowrap; overflow: hidden;
+      text-overflow: ellipsis;
+    }
+    .rooms-handle--nw { left: 0; top: 0; }
+    .rooms-handle--ne { left: 100%; top: 0; }
+    .rooms-handle--sw { left: 0; top: 100%; }
+    .rooms-handle--se { left: 100%; top: 100%; }
+    .rooms-side-note { font-size: 12px; color: rgba(var(--avc-ink-rgb), 0.6); line-height: 1.4; }
     /* == Align mode: home-frame degradation (docs/41 §4.8) =============== */
     .align-seat-layer--readonly { cursor: default; }
     .align-seat-layer--readonly .align-seat-img { cursor: default; }

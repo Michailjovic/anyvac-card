@@ -1,10 +1,14 @@
 /**
- * docs/41 §4.1 — the Align-mode overlay's `document.body` portal: mount,
+ * docs/42 §9 fáze H — the Visual editor's `document.body` portal: mount,
  * unmount, and enough style plumbing that content rendered inside it looks
  * exactly like it does inside the card (docs/14 rule 1: one theme system,
  * not two). This module owns NONE of the overlay's actual UI or state —
+ *
+ * (Renamed from `align-overlay.ts`/`AnyVacAlignOverlayHost`/
+ * `mountAlignOverlay`/`unmountAlignOverlay` — docs/42 §8 bod 2, BREAKING,
+ * card 1.14.0 — purely mechanical, no behaviour change.)
  * "portal je jen hostitel + styly" — that stays in `anyvac-card.ts`
- * (`_renderAlignOverlay()`), which Lit-`render()`s its template straight
+ * (`_renderVisualEditor()`), which Lit-`render()`s its template straight
  * into the host's shadow root from `updated()`. Kept dependency-free (no
  * Lit import) on purpose: mounting a portal is DOM plumbing, not a
  * component.
@@ -16,16 +20,16 @@
  * open `ha-dialog` more-info window, zero console errors.
  */
 
-const TAG = "anyvac-align-overlay";
+const TAG = "anyvac-visual-editor";
 
 /** Bare host element. No shadow-DOM content of its own beyond what
- *  `mountAlignOverlay` sets up — the card owns everything rendered inside. */
-export class AnyVacAlignOverlayHost extends HTMLElement {
+ *  `mountVisualEditor` sets up — the card owns everything rendered inside. */
+export class AnyVacVisualEditorHost extends HTMLElement {
   connectedCallback(): void {
     if (!this.shadowRoot) this.attachShadow({ mode: "open" });
   }
 }
-if (!customElements.get(TAG)) customElements.define(TAG, AnyVacAlignOverlayHost);
+if (!customElements.get(TAG)) customElements.define(TAG, AnyVacVisualEditorHost);
 
 /** HA/theme custom properties that genuinely need copying onto the portal —
  *  everything the card's OWN `--avc-*` tokens resolve to comes along for
@@ -58,8 +62,8 @@ const HA_TOKEN_ALLOWLIST = [
  * the portal (see `HA_TOKEN_ALLOWLIST`). The template itself is rendered
  * separately, into `host.shadowRoot`, by the caller (Lit's `render()`).
  */
-export function mountAlignOverlay(sheets: CSSStyleSheet[], styleSource: Element): AnyVacAlignOverlayHost {
-  const host = document.createElement(TAG) as AnyVacAlignOverlayHost;
+export function mountVisualEditor(sheets: CSSStyleSheet[], styleSource: Element): AnyVacVisualEditorHost {
+  const host = document.createElement(TAG) as AnyVacVisualEditorHost;
   // Confirmed z-index (docs/41 §5 bod 1 live test) — above HA's header,
   // sidebar, and a real open `ha-dialog`.
   host.style.cssText = "position:fixed;inset:0;z-index:2147483647;";
@@ -78,6 +82,6 @@ export function mountAlignOverlay(sheets: CSSStyleSheet[], styleSource: Element)
   return host;
 }
 
-export function unmountAlignOverlay(host: AnyVacAlignOverlayHost | null | undefined): void {
+export function unmountVisualEditor(host: AnyVacVisualEditorHost | null | undefined): void {
   host?.remove();
 }

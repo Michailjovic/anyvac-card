@@ -1,10 +1,15 @@
 import { test, expect, type Page } from "@playwright/test";
 
 /**
- * Align mode (docs/41), C2b coverage — the six checks docs/41 §7 names for
- * `tests/align-overlay.spec.ts`: open, portal-on-body, drag → expected Δ,
- * Save payload 1:1, override precedence, Reset, disabled Save without the
- * `anyvac.set_floorplan_seat` service.
+ * Visual editor / Seat & Appearance tool (docs/41, docs/42 §9 fáze H) —
+ * the six checks docs/41 §7 originally named for this file (as
+ * `align-overlay.spec.ts`, renamed docs/42 §8 bod 2): open, portal-on-body,
+ * drag → expected Δ, Save payload 1:1 (now map AND appearance), override
+ * precedence (now the nested `{map, appearance}` per-vacuum shape,
+ * docs/42 §9 fáze pre-H), Reset, disabled Save without the
+ * `anyvac.set_floorplan_seat` service. Tool-switcher/localStorage coverage
+ * for the OTHER two tools lives in `visual-editor-tool.spec.ts` instead —
+ * this file stays scoped to the Seat & Appearance tool's own behaviour.
  *
  * Writing the drag test is what caught a real C2a bug: `_alignPointToWrapPct`
  * queried `this.renderRoot` (the card's OWN shadow root) for `.align-scene`,
@@ -131,7 +136,7 @@ async function openAlign(page: Page): Promise<void> {
     await card.updateComplete;
   });
   await page.waitForFunction(
-    () => !!(document.querySelector("anyvac-align-overlay") as any)?.shadowRoot?.querySelector(".align-overlay")
+    () => !!(document.querySelector("anyvac-visual-editor") as any)?.shadowRoot?.querySelector(".align-overlay")
   );
 }
 
@@ -143,12 +148,12 @@ test.describe("Align mode overlay (docs/41, C2b)", () => {
   test("opening Align mode mounts the overlay as a portal on document.body", async ({ page }) => {
     await mountCard(page);
     // Not open yet — no portal.
-    expect(await page.evaluate(() => !!document.querySelector("anyvac-align-overlay"))).toBe(false);
+    expect(await page.evaluate(() => !!document.querySelector("anyvac-visual-editor"))).toBe(false);
 
     await openAlign(page);
 
     const info = await page.evaluate(() => {
-      const host = document.querySelector("anyvac-align-overlay");
+      const host = document.querySelector("anyvac-visual-editor");
       return {
         onBody: host?.parentElement === document.body,
         hasOverlay: !!host?.shadowRoot?.querySelector(".align-overlay"),
@@ -173,7 +178,7 @@ test.describe("Align mode overlay (docs/41, C2b)", () => {
     const result = await page.evaluate(
       ({ dxPx, dyPx }) => {
         const card = (window as any).__card;
-        const host = document.querySelector("anyvac-align-overlay") as any;
+        const host = document.querySelector("anyvac-visual-editor") as any;
         const scene = host.shadowRoot.querySelector(".align-scene") as HTMLElement;
         const layer = host.shadowRoot.querySelector(".align-seat-layer") as any;
         layer.setPointerCapture = () => {};
@@ -225,8 +230,41 @@ test.describe("Align mode overlay (docs/41, C2b)", () => {
     expect(calls[0].data.map).toEqual({
       rotation: 12.35, scale: 143.21, offset_x: -2.5, offset_y: 5,
     });
+    // docs/42 §8 bod 3 "no sentinel": appearance is ALWAYS sent alongside
+    // map, defaulted (no override existed yet, so this is
+    // `effectiveAppearance`'s own default table).
+    expect(calls[0].data.appearance).toEqual({
+      hide_map: false, overlay_opacity: 55, overlay_blend: "normal",
+      path_color: null, path_width: 100, mop_path_color: null,
+      mop_band_opacity: 28, mop_band_width: 100,
+      robot_image_on_map: false, robot_size: 100, robot_image_rotation: 0,
+    });
     // A successful Save closes the session (docs/41 §4.4).
     expect(await session(page)).toBeNull();
+  });
+
+  test("Save resends an existing appearance override unchanged when only the seat moved", async ({ page }) => {
+    await mountCard(page, {
+      floorplanSeats: {
+        [FLOORPLAN_SVG]: {
+          vacuums: {
+            "vacuum.my_roborock": {
+              appearance: { path_color: "#4fc3f7", overlay_opacity: 80 },
+            },
+          },
+        },
+      },
+    });
+    await openAlign(page);
+    await page.evaluate(() => {
+      const card = (window as any).__card;
+      const s = card._alignSession;
+      card._alignSession = { ...s, draft: { ...s.draft, rotation: 45 } };
+    });
+    await page.evaluate(async () => { await (window as any).__card._alignSave(); });
+    const calls = await page.evaluate(() => (window as any).__calls);
+    expect(calls[0].data.appearance.path_color).toBe("#4fc3f7");
+    expect(calls[0].data.appearance.overlay_opacity).toBe(80);
   });
 
   test("a backend floorplan_seats override wins over the card's own manual seat", async ({ page }) => {
@@ -235,7 +273,7 @@ test.describe("Align mode overlay (docs/41, C2b)", () => {
       floorplanSeats: {
         [FLOORPLAN_SVG]: {
           vacuums: {
-            "vacuum.my_roborock": { rotation: 42, scale: 150, offset_x: 5, offset_y: -3 },
+            "vacuum.my_roborock": { map: { rotation: 42, scale: 150, offset_x: 5, offset_y: -3 } },
           },
         },
       },
@@ -279,7 +317,7 @@ test.describe("Align mode overlay (docs/41, C2b)", () => {
     expect(await page.evaluate(() => (window as any).__card._alignServiceAvailable())).toBe(false);
 
     const btnDisabled = await page.evaluate(() => {
-      const host = document.querySelector("anyvac-align-overlay") as any;
+      const host = document.querySelector("anyvac-visual-editor") as any;
       const btn = host.shadowRoot.querySelector(".align-save-btn") as HTMLButtonElement;
       return btn?.disabled;
     });
@@ -301,7 +339,7 @@ test.describe("Align mode overlay (docs/41, C2b)", () => {
     expect(before.layers.rawMap).toBe(1);
 
     const opacities = await page.evaluate(() => {
-      const h = document.querySelector("anyvac-align-overlay") as any;
+      const h = document.querySelector("anyvac-visual-editor") as any;
       const fp = h.shadowRoot.querySelector(".align-floorplan-img") as HTMLElement;
       const rm = h.shadowRoot.querySelector(".align-seat-img") as HTMLElement;
       return { floor: fp.style.opacity, rawMap: rm.style.opacity };
@@ -323,7 +361,7 @@ test.describe("Align mode overlay (docs/41, C2b)", () => {
     expect(after.draft).toEqual(before.draft);
 
     const rmOpacityAfter = await page.evaluate(() => {
-      const h = document.querySelector("anyvac-align-overlay") as any;
+      const h = document.querySelector("anyvac-visual-editor") as any;
       return (h.shadowRoot.querySelector(".align-seat-img") as HTMLElement).style.opacity;
     });
     expect(rmOpacityAfter).toBe("0.4");
@@ -333,7 +371,7 @@ test.describe("Align mode overlay (docs/41, C2b)", () => {
     await mountCard(page);
     await openAlign(page);
     const sides = await page.evaluate(() => {
-      const host = document.querySelector("anyvac-align-overlay") as any;
+      const host = document.querySelector("anyvac-visual-editor") as any;
       return [...host.shadowRoot.querySelectorAll(".align-handle--side")]
         .map((el: any) => el.dataset.side).sort();
     });
@@ -347,7 +385,7 @@ test.describe("Align mode overlay (docs/41, C2b)", () => {
     // Independent Y off (default) — a corner "scale" gesture must not set scaleY.
     await page.evaluate(() => {
       const card = (window as any).__card;
-      const host = document.querySelector("anyvac-align-overlay") as any;
+      const host = document.querySelector("anyvac-visual-editor") as any;
       const layer = host.shadowRoot.querySelector(".align-seat-layer") as any;
       layer.setPointerCapture = () => {};
       const scene = host.shadowRoot.querySelector(".align-scene") as HTMLElement;
@@ -374,7 +412,7 @@ test.describe("Align mode overlay (docs/41, C2b)", () => {
 
     await page.evaluate(() => {
       const card = (window as any).__card;
-      const host = document.querySelector("anyvac-align-overlay") as any;
+      const host = document.querySelector("anyvac-visual-editor") as any;
       const layer = host.shadowRoot.querySelector(".align-seat-layer") as any;
       layer.setPointerCapture = () => {};
       const scene = host.shadowRoot.querySelector(".align-scene") as HTMLElement;
@@ -402,7 +440,7 @@ test.describe("Align mode overlay (docs/41, C2b)", () => {
 
     await page.evaluate(() => {
       const card = (window as any).__card;
-      const host = document.querySelector("anyvac-align-overlay") as any;
+      const host = document.querySelector("anyvac-visual-editor") as any;
       const nHandle = host.shadowRoot.querySelector('.align-handle--side[data-side="n"]') as any;
       nHandle.setPointerCapture = () => {};
       const scene = host.shadowRoot.querySelector(".align-scene") as HTMLElement;
@@ -432,7 +470,7 @@ test.describe("Align mode overlay (docs/41, C2b)", () => {
     const before = await session(page);
 
     const after = await page.evaluate(() => {
-      const host = document.querySelector("anyvac-align-overlay") as any;
+      const host = document.querySelector("anyvac-visual-editor") as any;
       const rangeInput = host.shadowRoot.querySelector('input[type="range"]') as HTMLInputElement;
       rangeInput.focus();
       // Arrow key: deferred to the field (its own native slider-step
@@ -452,7 +490,7 @@ test.describe("Align mode overlay (docs/41, C2b)", () => {
     await openAlign(page);
 
     const stillOnInput = await page.evaluate(() => {
-      const host = document.querySelector("anyvac-align-overlay") as any;
+      const host = document.querySelector("anyvac-visual-editor") as any;
       const rangeInput = host.shadowRoot.querySelector('input[type="range"]') as HTMLInputElement;
       rangeInput.focus();
       return host.shadowRoot.activeElement === rangeInput;
@@ -461,7 +499,7 @@ test.describe("Align mode overlay (docs/41, C2b)", () => {
 
     const refocused = await page.evaluate(() => {
       const card = (window as any).__card;
-      const host = document.querySelector("anyvac-align-overlay") as any;
+      const host = document.querySelector("anyvac-visual-editor") as any;
       const layer = host.shadowRoot.querySelector(".align-seat-layer") as any;
       layer.setPointerCapture = () => {};
       const ev = {
@@ -482,7 +520,7 @@ test.describe("Align mode overlay (docs/41, C2b)", () => {
     // Unrotated (rotation 0): W/E (Scale X) handles read as horizontal
     // drag, N/S (Scale Y) as vertical — matching their baseline icons.
     let info = await page.evaluate(() => {
-      const host = document.querySelector("anyvac-align-overlay") as any;
+      const host = document.querySelector("anyvac-visual-editor") as any;
       const w = host.shadowRoot.querySelector('.align-handle--side[data-side="w"]') as HTMLElement;
       const n = host.shadowRoot.querySelector('.align-handle--side[data-side="n"]') as HTMLElement;
       return {
@@ -498,7 +536,7 @@ test.describe("Align mode overlay (docs/41, C2b)", () => {
     // Offset X/Y hint arrows exist, sit near centre, and are NOT rotated by
     // the seat (offset_x/offset_y are wrap-aligned, not seat-local).
     const hints = await page.evaluate(() => {
-      const host = document.querySelector("anyvac-align-overlay") as any;
+      const host = document.querySelector("anyvac-visual-editor") as any;
       const x = host.shadowRoot.querySelector(".align-axis-hint--x") as HTMLElement;
       const y = host.shadowRoot.querySelector(".align-axis-hint--y") as HTMLElement;
       return { xIcon: !!x?.querySelector("ha-icon"), yIcon: !!y?.querySelector("ha-icon") };
@@ -514,7 +552,7 @@ test.describe("Align mode overlay (docs/41, C2b)", () => {
       card._alignSession = { ...s, draft: { ...s.draft, rotation: 90 } };
     });
     info = await page.evaluate(() => {
-      const host = document.querySelector("anyvac-align-overlay") as any;
+      const host = document.querySelector("anyvac-visual-editor") as any;
       const w = host.shadowRoot.querySelector('.align-handle--side[data-side="w"]') as HTMLElement;
       const xHint = host.shadowRoot.querySelector(".align-axis-hint--x ha-icon") as HTMLElement;
       return { wCursor: w.style.cursor, wIconRotate: (w.querySelector("ha-icon") as HTMLElement).style.transform, xHintRotate: xHint.style.transform };
@@ -530,7 +568,7 @@ test.describe("Align mode overlay (docs/41, C2b)", () => {
 
     // Seat unrotated, view unrotated: baseline, as in the previous test.
     let wCursor = await page.evaluate(() => {
-      const host = document.querySelector("anyvac-align-overlay") as any;
+      const host = document.querySelector("anyvac-visual-editor") as any;
       const w = host.shadowRoot.querySelector('.align-handle--side[data-side="w"]') as HTMLElement;
       return w.style.cursor;
     });
@@ -547,7 +585,7 @@ test.describe("Align mode overlay (docs/41, C2b)", () => {
       card._alignView = { ...card._alignView, rot: 90 };
     });
     wCursor = await page.evaluate(() => {
-      const host = document.querySelector("anyvac-align-overlay") as any;
+      const host = document.querySelector("anyvac-visual-editor") as any;
       const w = host.shadowRoot.querySelector('.align-handle--side[data-side="w"]') as HTMLElement;
       return w.style.cursor;
     });
@@ -561,7 +599,7 @@ test.describe("Align mode overlay (docs/41, C2b)", () => {
       card._alignSession = { ...s, draft: { ...s.draft, rotation: 90 } };
     });
     wCursor = await page.evaluate(() => {
-      const host = document.querySelector("anyvac-align-overlay") as any;
+      const host = document.querySelector("anyvac-visual-editor") as any;
       const w = host.shadowRoot.querySelector('.align-handle--side[data-side="w"]') as HTMLElement;
       return w.style.cursor;
     });
@@ -581,7 +619,7 @@ test.describe("Align mode overlay (docs/41, C2b)", () => {
     });
 
     const readArrows = () => page.evaluate(() => {
-      const host = document.querySelector("anyvac-align-overlay") as any;
+      const host = document.querySelector("anyvac-visual-editor") as any;
       const rows = [...host.shadowRoot.querySelectorAll(".align-field-row")];
       const byLabelText = (want: string) => rows.find(
         (r: any) => (r.querySelector("label")?.textContent ?? "").trim().startsWith(want),
@@ -629,7 +667,7 @@ test.describe("Align mode overlay (docs/41, C2b)", () => {
     await openAlign(page);
 
     const icons = await page.evaluate(() => {
-      const host = document.querySelector("anyvac-align-overlay") as any;
+      const host = document.querySelector("anyvac-visual-editor") as any;
       const btns = [...host.shadowRoot.querySelectorAll(".align-toolbar button.align-btn")];
       return btns.map((b: any) => ({
         title: b.title,
@@ -668,7 +706,7 @@ test.describe("Align mode overlay (docs/41, C2b)", () => {
     // object, same style the gesture tests use for fake PointerEvents).
     await page.evaluate((p) => {
       const card = (window as any).__card;
-      const host = document.querySelector("anyvac-align-overlay") as any;
+      const host = document.querySelector("anyvac-visual-editor") as any;
       const canvas = host.shadowRoot.querySelector(".align-canvas");
       const ev = { clientX: p.x, clientY: p.y, deltaY: -400, preventDefault: () => {} } as any;
       Object.defineProperty(ev, "currentTarget", { value: canvas });
@@ -697,7 +735,7 @@ test.describe("Align mode overlay (docs/41, C2b)", () => {
     }, probe2);
     await page.evaluate((p) => {
       const card = (window as any).__card;
-      const host = document.querySelector("anyvac-align-overlay") as any;
+      const host = document.querySelector("anyvac-visual-editor") as any;
       const canvas = host.shadowRoot.querySelector(".align-canvas");
       const ev = { clientX: p.x, clientY: p.y, deltaY: 250, preventDefault: () => {} } as any;
       Object.defineProperty(ev, "currentTarget", { value: canvas });

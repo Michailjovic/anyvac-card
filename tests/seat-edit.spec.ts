@@ -15,6 +15,8 @@ import {
   snapRotation,
   seatToYaml,
   applyFloorplanSeats,
+  effectiveAppearance,
+  type AppearanceOverride,
   type SeatEditConfigLike,
 } from "../src/seatedit";
 import { computeSeatFit, buildCalibrationAnchors, type SeatParams } from "../src/seatfit";
@@ -322,9 +324,32 @@ test.describe("seatedit: seatToYaml", () => {
     expect(seatToYaml(seat)).not.toContain("scale_y");
     expect(seatToYaml(seat)).toBe('map:\n  seat: "manual"\n  rotation: 0\n  scale: 100\n  offset_x: 0\n  offset_y: 0');
   });
+
+  test("appends an appearance: block when a draft is given (docs/42 §9 fáze H)", () => {
+    const seat: SeatParams = { rotation: 0, scale: 100, offset_x: 0, offset_y: 0 };
+    const yaml = seatToYaml(seat, {
+      hide_map: true, overlay_opacity: 55, overlay_blend: "normal",
+      path_color: "#4fc3f7", path_width: 100,
+      mop_path_color: null, mop_band_opacity: 28, mop_band_width: 100,
+      robot_image_on_map: false, robot_size: 100, robot_image_rotation: 0,
+    });
+    expect(yaml).toContain("appearance:");
+    expect(yaml).toContain('  hide_map: true');
+    expect(yaml).toContain('  path_color: "#4fc3f7"');
+    // An explicit null is written as the bare word null (a real "no override"
+    // value the backend/YAML both understand), not skipped like undefined.
+    expect(yaml).toContain('  mop_path_color: null');
+  });
+
+  test("omits an empty/undefined appearance dict entirely (no bare appearance: header)", () => {
+    const seat: SeatParams = { rotation: 0, scale: 100, offset_x: 0, offset_y: 0 };
+    expect(seatToYaml(seat, {})).not.toContain("appearance:");
+    expect(seatToYaml(seat, null)).not.toContain("appearance:");
+    expect(seatToYaml(seat)).not.toContain("appearance:");
+  });
 });
 
-test.describe("seatedit: applyFloorplanSeats (docs/41 §4.6)", () => {
+test.describe("seatedit: applyFloorplanSeats (docs/41 §4.6 + docs/42 §9 fáze pre-H appearance)", () => {
   function splitConfig(): SeatEditConfigLike {
     return {
       map_mode: "split",
@@ -351,24 +376,24 @@ test.describe("seatedit: applyFloorplanSeats (docs/41 §4.6)", () => {
     expect(applyFloorplanSeats(c, null)).toBe(c);
     expect(applyFloorplanSeats(c, {})).toBe(c);
     expect(
-      applyFloorplanSeats(c, { "/local/anyvac/other.png": { vacuums: { "vacuum.s6": { rotation: 1, scale: 1, offset_x: 0, offset_y: 0 } } } })
+      applyFloorplanSeats(c, { "/local/anyvac/other.png": { vacuums: { "vacuum.s6": { map: { rotation: 1, scale: 1, offset_x: 0, offset_y: 0 } } } } })
     ).toBe(c);
   });
 
-  test("a per-vacuum override wins, is forced to manual, other vacuums untouched (split mode, own image_base)", () => {
+  test("a per-vacuum map override wins, is forced to manual, other vacuums untouched (split mode, own image_base)", () => {
     const c = splitConfig();
     const override: SeatParams = { rotation: 33.5, scale: 142.2, offset_x: -12.1, offset_y: 4.4 };
-    const seats = { "/local/anyvac/s6.png": { vacuums: { "vacuum.s6": override } } };
+    const seats = { "/local/anyvac/s6.png": { vacuums: { "vacuum.s6": { map: override } } } };
     const next = applyFloorplanSeats(c, seats);
     expect(next).not.toBe(c);
     expect(next.vacuums![0].map).toEqual({ ...override, seat: "manual" });
     expect(next.vacuums![1]).toBe(c.vacuums![1]); // untouched vacuum, same reference
   });
 
-  test("per-vacuum override in merged mode resolves against the card-level floorplan", () => {
+  test("per-vacuum map override in merged mode resolves against the card-level floorplan", () => {
     const c = mergedConfig();
     const override: SeatParams = { rotation: 270, scale: 55, offset_x: 1, offset_y: -1 };
-    const seats = { "/local/anyvac/floor.png": { vacuums: { "vacuum.s7": override } } };
+    const seats = { "/local/anyvac/floor.png": { vacuums: { "vacuum.s7": { map: override } } } };
     const next = applyFloorplanSeats(c, seats);
     expect(next.vacuums![1].map).toEqual({ ...override, seat: "manual" });
     expect(next.vacuums![0]).toBe(c.vacuums![0]);
@@ -382,6 +407,73 @@ test.describe("seatedit: applyFloorplanSeats (docs/41 §4.6)", () => {
     const merged = mergedConfig();
     const next = applyFloorplanSeats(merged, seats);
     expect(next.image_base).toEqual({ src: "/local/anyvac/floor.png", crop_box: { x0: 1 } });
+  });
+
+  test("an appearance-only override applies without touching map (independent halves)", () => {
+    const c = splitConfig();
+    const seats = {
+      "/local/anyvac/s6.png": { vacuums: { "vacuum.s6": { appearance: { path_color: "#abc123", overlay_opacity: 40 } } } },
+    };
+    const next = applyFloorplanSeats(c, seats);
+    expect(next).not.toBe(c);
+    // map untouched — still the plain config seat, not forced to manual.
+    expect(next.vacuums![0].map).toEqual(c.vacuums![0].map);
+    expect((next.vacuums![0] as any).path_color).toBe("#abc123");
+    expect((next.vacuums![0] as any).overlay_opacity).toBe(40);
+  });
+
+  test("map and appearance overrides both apply together from the same entry", () => {
+    const c = splitConfig();
+    const mapOverride: SeatParams = { rotation: 12, scale: 88, offset_x: 2, offset_y: -1 };
+    const seats = {
+      "/local/anyvac/s6.png": {
+        vacuums: { "vacuum.s6": { map: mapOverride, appearance: { hide_map: true, robot_size: 140 } } },
+      },
+    };
+    const next = applyFloorplanSeats(c, seats);
+    expect(next.vacuums![0].map).toEqual({ ...mapOverride, seat: "manual" });
+    expect((next.vacuums![0] as any).hide_map).toBe(true);
+    expect((next.vacuums![0] as any).robot_size).toBe(140);
+  });
+
+  test("a null/missing per-vacuum entry is a no-op, same as before appearance existed", () => {
+    const c = splitConfig();
+    const seats = { "/local/anyvac/s6.png": { vacuums: { "vacuum.s6": null } } };
+    expect(applyFloorplanSeats(c as any, seats as any)).toBe(c);
+  });
+});
+
+test.describe("seatedit: effectiveAppearance (docs/42 §9 fáze H default table)", () => {
+  test("defaults every field when the vacuum config carries none of them", () => {
+    expect(effectiveAppearance({})).toEqual({
+      hide_map: false, overlay_opacity: 55, overlay_blend: "normal",
+      path_color: null, path_width: 100, mop_path_color: null,
+      mop_band_opacity: 28, mop_band_width: 100,
+      robot_image_on_map: false, robot_size: 100, robot_image_rotation: 0,
+    });
+  });
+
+  test("a configured value wins over its default, field by field", () => {
+    const a = effectiveAppearance({
+      hide_map: true, overlay_opacity: 80, path_color: "#ff0000", robot_size: 150,
+    });
+    expect(a.hide_map).toBe(true);
+    expect(a.overlay_opacity).toBe(80);
+    expect(a.path_color).toBe("#ff0000");
+    expect(a.robot_size).toBe(150);
+    // Untouched fields still fall back to their own defaults.
+    expect(a.overlay_blend).toBe("normal");
+    expect(a.mop_band_width).toBe(100);
+  });
+
+  test("returns all 11 keys — no sentinel, Save always sends the full dict (docs/42 §8 bod 3)", () => {
+    const a = effectiveAppearance({});
+    const keys: (keyof AppearanceOverride)[] = [
+      "hide_map", "overlay_opacity", "overlay_blend", "path_color", "path_width",
+      "mop_path_color", "mop_band_opacity", "mop_band_width",
+      "robot_image_on_map", "robot_size", "robot_image_rotation",
+    ];
+    for (const k of keys) expect(a).toHaveProperty(k);
   });
 });
 

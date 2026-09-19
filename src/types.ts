@@ -152,7 +152,7 @@ export interface RoomThreshold {
 export interface RoomConfig {
   key: string;
   name: string;
-  icon?: string;                     // volitelné v rectangle módu
+  icon?: string;                     // optional in rectangle mode
   icon_anchor?: "none"|"tl"|"t"|"tr"|"l"|"c"|"r"|"bl"|"b"|"br";
   segment_id?: number;
   area_id?: string;
@@ -160,7 +160,7 @@ export interface RoomConfig {
   /** Estimated minutes for a DRY clean of this room (used when the vacuum's role is dry). */
   clean_time_dry?: number;
   /** Estimated minutes for a WET (mop) clean of this room (used when the vacuum's role is wet). */
-  clean_time_wet?: number;            // odhadovaný čas úklidu (minuty) — fallback when no entity
+  clean_time_wet?: number;            // estimated clean time (minutes) — fallback when no entity
   /** Legacy input_number, READ-ONLY fallback estimate. The card never writes it —
    *  estimates are learned by the anyvac integration (docs/14 §3.2). */
   clean_time_entity?: string;
@@ -173,8 +173,8 @@ export interface RoomConfig {
    *  computed live from the integration each render (docs/20, "Rooms z integrace"). */
   map_x?: number;
   map_y?: number;
-  map_w?: number;                    // šířka % → aktivuje rectangle mód
-  map_h?: number;                    // výška %
+  map_w?: number;                    // width % → activates rectangle mode
+  map_h?: number;                    // height %
   /** COMPUTED ONLY, never config — docs/40 §4.4 (Fáze 3): this room's real
    *  traced shape (`rooms[].outline_home_px`, kontrakt v3) re-normalised into
    *  wrap-container percent points, when this room is live-merged from a
@@ -464,9 +464,17 @@ export interface AnyVacCardConfig {
    *  the theme. `prefers-reduced-motion` already disables them at the OS
    *  level — this is for people who want them off regardless (docs/35 §5). */
   reduce_motion?: boolean;
-  /** Show the "Align" entry button (full-screen manual floorplan seating,
-   *  docs/41 v2.0) when a floorplan + integration are otherwise available.
-   *  Default on; `false` hides it — e.g. locked-down kiosk tablets where a
-   *  full-screen editing overlay would be an accidental-tap hazard. */
-  align_mode?: boolean;
+  /** Show the Visual editor's entry button (full-screen Seat & Appearance /
+   *  Rooms / Floorplan & Calibrate tools, docs/42) when a floorplan +
+   *  integration are otherwise available. Default on; `false` hides it —
+   *  e.g. locked-down kiosk tablets where a full-screen editing overlay
+   *  would be an accidental-tap hazard.
+   *
+   *  Renamed from `align_mode` (docs/42 §8 bod 2, BREAKING, card 1.14.0) —
+   *  the old name predates the Visual editor gaining Rooms/Floorplan tools
+   *  alongside Seat & Appearance, so "align" no longer described what it
+   *  gates. Not migrated: a config still using `align_mode` is silently
+   *  ignored (the button defaults back on), same "no migration" policy as
+   *  the docs/42 pre-H backend appearance change. */
+  visual_editor_mode?: boolean;
 }

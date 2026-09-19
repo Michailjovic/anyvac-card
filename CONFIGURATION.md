@@ -57,6 +57,7 @@ Everything is optional unless stated otherwise — the whole card boots from
 | `calm_state` | boolean | `true` | Always | Step the leftover map trace and secondary numbers back when nothing is running and nothing is selected. Purely de-emphasis — nothing is hidden or disabled. |
 | `reduce_motion` | boolean | `false` | Always | Turn off press feedback and live pulses. The OS `prefers-reduced-motion` setting already does this on its own; this is for switching them off without it. |
 | `debug` | boolean | `false` | Always | Shows raw debug readouts (geometry, plan response, etc.) in the production grid UI. |
+| `visual_editor_mode` | boolean | `true` | Always | Shows/hides the card's own entry point into the **Visual editor** (seat fitting + Appearance, and — as they land — Rooms and Floorplan & Calibrate) whenever the `anyvac` integration is otherwise available. `false` hides it, e.g. on a locked-down kiosk tablet where a full-screen editing overlay would be an accidental-tap hazard. Renamed from `align_mode` in card 1.14.0 (**breaking**, not migrated — a config still using `align_mode` is silently ignored and the button defaults back on). |
 
 `OrchestratorPolicy`:
 
@@ -103,6 +104,15 @@ Each entry in `vacuums[]`:
 | `map` | `MapConfig` | — | Split mode only | See [Map config](#map-config). |
 | `rooms` | `RoomConfig[]` | `[]` | Split mode only (merged uses the card-level one) | See [Room config](#room-config). |
 | `clean_action` | `CleanAction` | `{type: "native"}` | Degraded only | See [Clean action strategies](#clean-action-strategies-degraded-mode-only). |
+
+**Appearance fields (`hide_map` through `robot_image_rotation` above, card 1.14.0+):** as of
+integration 1.12.0 / card 1.14.0 these are also editable live from the **Visual editor's Seat &
+Appearance tool**, which persists them as a backend override via `anyvac.set_floorplan_seat`'s
+`appearance` key — the exact same override-always-wins precedence the seat geometry (`map`,
+below) already uses, and independent of it: setting one doesn't clear the other, and either can
+be cleared on its own. The GUI editor's Maps tab no longer has Appearance controls of its own
+(moved out in 1.14.0, breaking); the values above remain in effect as plain YAML **defaults**,
+used whenever no backend override exists for that vacuum on the current floorplan.
 
 ---
 

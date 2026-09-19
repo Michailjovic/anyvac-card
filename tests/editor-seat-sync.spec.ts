@@ -130,7 +130,7 @@ test.describe("editor: backend-aware seat sync (docs/41 follow-up, 1.13.0)", () 
       floorplanSeats: {
         [FLOORPLAN_SVG]: {
           vacuums: {
-            "vacuum.my_roborock": { rotation: 180, scale: 80, offset_x: 12, offset_y: 3 },
+            "vacuum.my_roborock": { map: { rotation: 180, scale: 80, offset_x: 12, offset_y: 3 } },
           },
         },
       },
@@ -148,14 +148,14 @@ test.describe("editor: backend-aware seat sync (docs/41 follow-up, 1.13.0)", () 
   test("_hasBackendSeat is true only when this vacuum has a live override on its own floorplan", async ({ page }) => {
     await mountEditor(page, {
       floorplanSeats: {
-        [FLOORPLAN_SVG]: { vacuums: { "vacuum.my_roborock": { rotation: 0, scale: 100, offset_x: 0, offset_y: 0 } } },
+        [FLOORPLAN_SVG]: { vacuums: { "vacuum.my_roborock": { map: { rotation: 0, scale: 100, offset_x: 0, offset_y: 0 } } } },
       },
     });
     expect(await page.evaluate(() => (window as any).__editor._hasBackendSeat(0))).toBe(true);
 
     await mountEditor(page, {
       floorplanSeats: {
-        [FLOORPLAN_SVG]: { vacuums: { "vacuum.someone_else": { rotation: 0, scale: 100, offset_x: 0, offset_y: 0 } } },
+        [FLOORPLAN_SVG]: { vacuums: { "vacuum.someone_else": { map: { rotation: 0, scale: 100, offset_x: 0, offset_y: 0 } } } },
       },
     });
     expect(await page.evaluate(() => (window as any).__editor._hasBackendSeat(0))).toBe(false);
@@ -194,6 +194,25 @@ test.describe("editor: backend-aware seat sync (docs/41 follow-up, 1.13.0)", () 
     expect(editorState.map).toEqual({ entity: "image.my_roborock_map" });
     expect(editorState.error).toBe("");
     expect(editorState.fired).toBeGreaterThan(0);
+  });
+
+  test("_commitSeat resends an existing appearance override so a seat-only commit doesn't wipe it (docs/42 §8 bod 3)", async ({ page }) => {
+    await mountEditor(page, {
+      manualMap: { rotation: 45, scale: 120, offset_x: 1, offset_y: 2 },
+      floorplanSeats: {
+        [FLOORPLAN_SVG]: {
+          vacuums: {
+            "vacuum.my_roborock": { appearance: { path_color: "#ff0000", overlay_opacity: 70 } },
+          },
+        },
+      },
+    });
+    await page.evaluate(async () => {
+      await (window as any).__editor._commitSeat(0, { rotation: 10, scale: 100, offset_x: 0, offset_y: 0 });
+    });
+    const calls = await page.evaluate(() => (window as any).__calls);
+    expect(calls[0].data.appearance.path_color).toBe("#ff0000");
+    expect(calls[0].data.appearance.overlay_opacity).toBe(70);
   });
 
   test("_commitSeat drops the whole map: block when nothing but geometry was in it", async ({ page }) => {

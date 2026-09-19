@@ -49,6 +49,7 @@ import {
 } from "./seatfit";
 import {
   applyFloorplanSeats,
+  effectiveAppearance,
   type FloorplanSeats,
   type SeatEditConfigLike,
 } from "./seatedit";
@@ -1128,9 +1129,19 @@ export class AnyVacCardEditor extends LitElement {
         offset_y: Math.round(geometry.offset_y * 100) / 100,
       };
       if (geometry.scale_y != null) map.scale_y = Math.round(geometry.scale_y * 100) / 100;
+      // docs/42 §8 bod 3 "no sentinel": the backend clears `appearance`
+      // whenever a call omits it, so a seat-only commit from here MUST
+      // resend whatever appearance is CURRENTLY in effect (from the
+      // override-merged vacuum, `_effectiveConfig` — not raw YAML, which
+      // would resend stale values whenever a live override differs from
+      // it) or it would silently wipe out any Appearance customisation
+      // made through the Visual editor's Seat & Appearance tool the next
+      // time a Maps-tab slider commits a seat change.
+      const effectiveVac = this._effectiveConfig().vacuums[vacIdx] ?? vac;
+      const appearance = effectiveAppearance(effectiveVac);
       try {
         await this.hass.callService("anyvac", "set_floorplan_seat", {
-          floorplan: src, vacuum: vac.entity, map,
+          floorplan: src, vacuum: vac.entity, map, appearance,
         });
         this._seatSaveError = "";
         this._stripSeatGeometry(vacIdx);
@@ -2513,16 +2524,18 @@ export class AnyVacCardEditor extends LitElement {
         ${this._entityPicker("AnyVac integration sensor", vac.integration_entity, ["sensor"],
           v => this._setVacuum(mapVac, { integration_entity: v }))}
 
-        ${(this._intEntityFor(vac) || this._config.map_mode === "merged") ? this._selectField("Hide vacuum map (show only floorplan + robot/path)", vac.hide_map ? "yes" : "no",
-          [{ value: "no", label: "no" }, { value: "yes", label: "yes" }],
-          v => this._setVacuum(mapVac, { hide_map: v === "yes" })) : nothing}
-
-        ${(vac.base === "combined" || this._config.map_mode === "merged") ? html`
-          ${this._numberSlider("Overlay opacity", vac.overlay_opacity ?? 55, 0, 100, 5,
-            v => this._setVacuum(mapVac, { overlay_opacity: v }), "%")}
-          ${this._selectField("Overlay blend", (vac.overlay_blend ?? "normal"),
-            [{ value: "normal", label: "normal" }, { value: "lighten", label: "lighten (isolate path)" }, { value: "screen", label: "screen" }, { value: "plus-lighter", label: "plus-lighter" }],
-            v => this._setVacuum(mapVac, { overlay_blend: v }))}
+        <!-- docs/42 §3/§9 faze H: "Hide vacuum map"/Overlay opacity/Overlay
+             blend moved to the Visual editor's Seat and Appearance tool -- they're
+             backend-override-backed there now (anyvac.set_floorplan_seat's
+             appearance key), not plain YAML fields, so editing them through THIS
+             form would silently be shadowed by a live override the same way seat
+             geometry used to be before docs/41's follow-up (_commitSeat). One
+             hint line instead of a dead control. -->
+        ${(this._intEntityFor(vac) || this._config.map_mode === "merged") ? html`
+          <p class="hint">Map appearance (hide map, overlay opacity/blend, path/mop
+            colours, robot image) is now set in the Visual editor's Seat &amp;
+            Appearance tool, not here — open it from the card's own "Align"/edit
+            entry point.</p>
         ` : nothing}
 
         ${vac.base === "image" || vac.base === "combined" || this._config.map_mode === "merged" ? html`
@@ -2534,7 +2547,7 @@ export class AnyVacCardEditor extends LitElement {
               <ha-icon icon="mdi:vector-combine"></ha-icon>
               ${this._homeFrameSnapshotBusy ? "Snapshotting…" : "Snapshot home frame as floorplan"}
             </button>
-            <p class="hint">Docs/40 Fáze 3 — the recommended way to set up merged mode with 2+ vacuums:
+            <p class="hint">Docs/40 Phase 3 — the recommended way to set up merged mode with 2+ vacuums:
               renders a composite of every vacuum currently registered into the shared "home frame"
               (see each vacuum's <code>registration</code> sensor attribute) and turns it into the
               floorplan below. No per-vacuum seating needed afterwards — a vacuum registered into this
@@ -3132,20 +3145,16 @@ export class AnyVacCardEditor extends LitElement {
           ` : html`${this._config.map_mode === "merged" ? html`<p class="hint">No rooms yet — use "Add room" above.</p>` : html`<p class="hint">Add rooms in the Vacuums tab to position them here.</p>`}`}
         ` : html`<p class="hint">Select a map or image above to enable the placement preview.</p>`}
 
+        <!-- docs/42 §3/§9 faze H: Path/mop colours+widths and the robot-image
+             fields moved to the Visual editor's Seat and Appearance tool for the
+             same reason as the Hide-map/Overlay block above -- they're
+             backend-override-backed (anyvac.set_floorplan_seat's appearance key)
+             now, not plain YAML fields on vac. -->
         ${this._intEntityFor(vac) ? html`
           <div class="section-title" style="margin-top:4px">Appearance</div>
-          ${this._hexColorField("Path colour", vac.path_color,
-            v => this._setVacuum(mapVac, { path_color: v || undefined }),
-            vac.color ? this._resolveColor(vac.color, "green") : DEFAULT_VACUUM_PALETTE[mapVac % DEFAULT_VACUUM_PALETTE.length])}
-          ${this._numberSlider("Path width", vac.path_width ?? 100, 20, 300, 10, v => this._setVacuum(mapVac, { path_width: v }), "%")}
-          ${this._hexColorField("Mop band colour", vac.mop_path_color, v => this._setVacuum(mapVac, { mop_path_color: v || undefined }), "#40a9ff")}
-          ${this._numberSlider("Mop band opacity", vac.mop_band_opacity ?? 28, 0, 100, 5, v => this._setVacuum(mapVac, { mop_band_opacity: v }), "%")}
-          ${this._numberSlider("Mop band width", vac.mop_band_width ?? 100, 20, 400, 10, v => this._setVacuum(mapVac, { mop_band_width: v }), "%")}
-          ${vac.image ? this._selectField("Robot image on map (uses status image)", vac.robot_image_on_map ? "yes" : "no",
-            [{ value: "no", label: "no" }, { value: "yes", label: "yes" }],
-            v => this._setVacuum(mapVac, { robot_image_on_map: v === "yes" })) : nothing}
-          ${vac.robot_image_on_map ? this._numberSlider("Robot image size", vac.robot_size ?? 100, 40, 220, 10, v => this._setVacuum(mapVac, { robot_size: v }), "%") : nothing}
-          ${vac.robot_image_on_map ? this._numberSlider("Robot image rotation", vac.robot_image_rotation ?? 0, -180, 180, 15, v => this._setVacuum(mapVac, { robot_image_rotation: v }), "°") : nothing}
+          <p class="hint">Path/mop colours &amp; widths and the robot image on the
+            map are now set in the Visual editor's Seat &amp; Appearance tool,
+            not here — open it from the card's own "Align"/edit entry point.</p>
         ` : nothing}
 
         ${this._numberSlider("Card height (0=auto)", (this._config.map_mode === "merged" ? this._config.base_height : vac.base_height) ?? 0, 0, 700, 10,
