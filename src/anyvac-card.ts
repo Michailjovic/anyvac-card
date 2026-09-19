@@ -4633,13 +4633,42 @@ export class AnyVacCard extends LitElement {
     if (this._alignViewDrag?.pointerId === e.pointerId) this._alignViewDrag = null;
   }
 
-  /** Wheel = zoom of the VIEW (docs/41 §5 bod 3) — centred on the viewport
-   *  for this batch (cursor-anchored zoom is a C2b gesture refinement). */
+  /** Wheel = zoom of the VIEW (docs/41 §5 bod 3), anchored on the cursor —
+   *  the point under the pointer stays put as you zoom (field report
+   *  2026-09-19: with a huge/offset seat, zooming in to inspect one edge or
+   *  corner in detail — and reach its handles — used to always re-centre on
+   *  the viewport middle, pulling the very spot you zoomed in on back out
+   *  of view; this was flagged as a deferred "C2b gesture refinement" in
+   *  this docstring from the start).
+   *
+   *  Standard "zoom to point" algebra: `_alignViewTransformCss` applies
+   *  `translate(panX,panY) scale(zoom) rotate(rot)`, and CSS composes
+   *  transform functions left-to-right as nested application of the
+   *  RIGHTMOST first (`rotate` then `scale` then `translate`), so
+   *  `translate` is the OUTERMOST step — a plain screen-space pixel offset,
+   *  never itself scaled or rotated. That makes "keep screen point S fixed
+   *  while zoom goes old→new" reduce to one line, independent of the
+   *  current rotation: `pan' = pan + (S − centre) * (1 − zoomNew/zoomOld)`
+   *  (`centre` = the scene's on-screen centre with the CURRENT, pre-change
+   *  pan already applied, i.e. its live `getBoundingClientRect()` centre).
+   *  Falls back to the old centre-anchored behaviour if the scene node
+   *  isn't found (shouldn't happen — wheel only fires once it's mounted). */
   private _alignWheel(e: WheelEvent): void {
     e.preventDefault();
+    const zoomOld = this._alignView.zoom;
     const k = Math.exp(-e.deltaY * 0.001);
-    const zoom = Math.min(8, Math.max(0.25, this._alignView.zoom * k));
-    this._alignView = { ...this._alignView, zoom };
+    const zoom = Math.min(8, Math.max(0.25, zoomOld * k));
+    const scene = this._alignHost?.shadowRoot?.querySelector(".align-scene") as HTMLElement | null;
+    if (!scene || zoom === zoomOld) {
+      this._alignView = { ...this._alignView, zoom };
+      return;
+    }
+    const r = scene.getBoundingClientRect();
+    const cx = (r.left + r.right) / 2, cy = (r.top + r.bottom) / 2;
+    const ratio = zoom / zoomOld;
+    const panX = this._alignView.panX + (e.clientX - cx) * (1 - ratio);
+    const panY = this._alignView.panY + (e.clientY - cy) * (1 - ratio);
+    this._alignView = { ...this._alignView, zoom, panX, panY };
   }
 
   private _renderAlignOverlay() {

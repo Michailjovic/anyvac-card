@@ -649,4 +649,65 @@ test.describe("Align mode overlay (docs/41, C2b)", () => {
     const rotateView = icons.find((i) => i.title === "Rotate view 90°");
     expect(rotateView?.icon).toBe("mdi:screen-rotation");
   });
+  test("wheel-zoom is anchored on the cursor -- the wrap point under the pointer stays fixed as zoom changes (field report 2026-09-19)", async ({ page }) => {
+    await mountCard(page);
+    await openAlign(page);
+
+    // Pick some off-centre screen point inside the canvas and read what wrap
+    // point it currently corresponds to (_alignPointToWrapPct is the card's
+    // own screen->wrap-% conversion, already inverting the FULL view
+    // transform -- pan/zoom/rotate -- so it's a faithful oracle here).
+    const probe = { x: 620, y: 260 };
+    const before = await page.evaluate((p) => {
+      const card = (window as any).__card;
+      return card._alignPointToWrapPct(p.x, p.y);
+    }, probe);
+    expect(before).not.toBeNull();
+
+    // Zoom in around that exact screen point (a real WheelEvent-shaped
+    // object, same style the gesture tests use for fake PointerEvents).
+    await page.evaluate((p) => {
+      const card = (window as any).__card;
+      const host = document.querySelector("anyvac-align-overlay") as any;
+      const canvas = host.shadowRoot.querySelector(".align-canvas");
+      const ev = { clientX: p.x, clientY: p.y, deltaY: -400, preventDefault: () => {} } as any;
+      Object.defineProperty(ev, "currentTarget", { value: canvas });
+      card._alignWheel(ev);
+    }, probe);
+
+    const viewAfterZoomIn = await page.evaluate(() => (window as any).__card._alignView);
+    expect(viewAfterZoomIn.zoom).toBeGreaterThan(1); // actually zoomed
+
+    const afterZoomIn = await page.evaluate((p) => {
+      const card = (window as any).__card;
+      return card._alignPointToWrapPct(p.x, p.y);
+    }, probe);
+    expect(afterZoomIn).not.toBeNull();
+    // The wrap point under the cursor is unchanged (small tolerance for
+    // floating point / sub-pixel rect measurement).
+    expect(Math.abs(afterZoomIn.x - before.x)).toBeLessThan(0.05);
+    expect(Math.abs(afterZoomIn.y - before.y)).toBeLessThan(0.05);
+
+    // Zoom back out around a DIFFERENT screen point -- same invariant holds
+    // for that new anchor, proving this isn't just an artifact of one point.
+    const probe2 = { x: 900, y: 500 };
+    const before2 = await page.evaluate((p) => {
+      const card = (window as any).__card;
+      return card._alignPointToWrapPct(p.x, p.y);
+    }, probe2);
+    await page.evaluate((p) => {
+      const card = (window as any).__card;
+      const host = document.querySelector("anyvac-align-overlay") as any;
+      const canvas = host.shadowRoot.querySelector(".align-canvas");
+      const ev = { clientX: p.x, clientY: p.y, deltaY: 250, preventDefault: () => {} } as any;
+      Object.defineProperty(ev, "currentTarget", { value: canvas });
+      card._alignWheel(ev);
+    }, probe2);
+    const after2 = await page.evaluate((p) => {
+      const card = (window as any).__card;
+      return card._alignPointToWrapPct(p.x, p.y);
+    }, probe2);
+    expect(Math.abs(after2.x - before2.x)).toBeLessThan(0.05);
+    expect(Math.abs(after2.y - before2.y)).toBeLessThan(0.05);
+  });
 });

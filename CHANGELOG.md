@@ -6,6 +6,29 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [1.12.0] - 2026-09-19
+
+### Added
+
+- **Align mode: wheel-zoom is now anchored on the cursor instead of the
+  viewport centre** (field report 2026-09-19 — the "cursor-anchored zoom
+  is a C2b gesture refinement" note in `_alignWheel`'s own docstring since
+  it was first written). With a large/offset seat, zooming in to inspect
+  one edge or corner in detail — and reach its handles there — used to
+  always re-centre on the viewport middle, pulling the very spot you
+  zoomed in on back out of view and turning "look at a corner" into a
+  zoom/pan/zoom/pan dance. Now the wrap-relative point under the pointer
+  stays fixed as you scroll: hover near a handle and zoom straight in on
+  it. Standard "zoom to point" pan correction — `pan' = pan + (cursor -
+  centre) * (1 - zoomNew/zoomOld)` — independent of the current view
+  rotation, since `translate()` is the outermost (unscaled/unrotated)
+  step of the view transform. New test coverage in
+  `tests/align-overlay.spec.ts` asserts the point under the cursor is
+  bit-for-bit(-ish) unchanged across a zoom-in and a zoom-out at two
+  different anchor points, using the card's own `_alignPointToWrapPct` as
+  the oracle. Background-drag panning was already 1:1 with the cursor at
+  any zoom level and needed no change.
+
 ## [1.11.7] - 2026-09-19
 
 ### Fixed
