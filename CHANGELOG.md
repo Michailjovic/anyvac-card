@@ -6,6 +6,57 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [1.36.0] - 2026-09-20
+
+### Changed
+
+- **Config editor cleanup: the Maps tab is gone (docs/42 §9 fáze L).** Every
+  Maps-tab feature that the Visual editor (fáze H/I/J1–J4) had already made
+  redundant is deleted outright — the click-to-calibrate flows (docs/39),
+  the home-frame N-point calibration and fiducial-marker workflow (docs/40
+  §5), the home-frame snapshot button, the room-rectangle drag-on-preview
+  handlers, and the whole backend-seat-sync convenience layer
+  (`_editorSeat`/`_hasBackendSeat`/`_commitSeat`/`_stripSeatGeometry`) that
+  existed only to keep that now-removed UI in sync with a live backend
+  override — editor.ts drops from 3938 to 2384 lines. `editor-seat-sync.spec.ts`
+  (10 tests exercising that exact machinery) is deleted with it; equivalent
+  backend-contract coverage already exists independently against the Visual
+  editor (`visual-editor*.spec.ts`, `floorplan-*.spec.ts`).
+  Everything the Maps tab did that ISN'T redundant gets a new home instead
+  of disappearing:
+  - `map.entity` (map image entity override), `integration_entity`, "Base
+    layer" and the fixed stage height move into each vacuum's own new
+    **Map & floorplan** section (Vacuums tab). Stage height is split in
+    two: a per-vacuum slider there (split mode) and a card-level one in the
+    Global tab's new **Floorplan** section (merged mode).
+  - A per-vacuum `image_base` (split mode's own `base: "image"/"combined"`)
+    has no Visual-editor equivalent at all — the backend's
+    `set_floorplan_seat` override has no per-vacuum `image_base` slot — so
+    its snapshot/export-guide-layers/crop-box/image-src-rotation-scale-offset
+    tooling is relocated, not deleted, into that same per-vacuum section.
+  - Merged mode's shared room list (`_config.rooms`) was previously only
+    reachable from the Maps tab — the Vacuums tab's room accordion always
+    edited `vac.rooms`, which merged mode's `resolveStaticRooms` ignores
+    whenever `_config.rooms` is non-empty. It now gets its own **Rooms
+    (shared)** section in the Global tab, and the Vacuums tab points there
+    instead of showing a per-vehicle room list that merged mode wouldn't
+    actually use.
+  - The card-level floorplan bootstrap field (`image_base.src`, needed once
+    before the Visual editor's own Floorplan tool has anything to open)
+    moves into the Global tab's **Floorplan** section too.
+  - The backend-owned cleaning-sequence reorder list (docs/19) moves into
+    the Global tab, shown once an AnyVac integration sensor and a shared
+    room list both exist.
+  - `icon`/`icon_anchor` and the dry/wet clean-time estimates
+    (`clean_time_dry`/`clean_time_wet`) were editable only from the Maps
+    tab and have no Visual-editor equivalent (`RoomsEditSession.styleDraft`
+    only carries the global border widths) — they're now fields on every
+    room accordion, split and merged alike.
+  A handful of live in-card hints/tooltips that pointed at "the Config
+  editor's Maps tab" (cleaning-sequence warnings, the Visual editor's
+  Floorplan-tool placeholder, the fiducial-workflow note) now point at the
+  Vacuums/Global tab instead.
+
 ## [1.35.0] - 2026-09-20
 
 ### Added

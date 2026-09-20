@@ -327,7 +327,7 @@ export class AnyVacCard extends LitElement {
    *  granularity `_floorCalib` itself uses right below. */
   @state() private _floorplanMode: "geo" | "calib" | "home" = "geo";
   /** docs/39 point-pair calibration, ported into the Visual editor (fáze
-   *  J2) — same shape as editor.ts's `CalibState`, minus `vacIdx`: the
+   *  J2) — same shape as editor.ts's now-removed `CalibState`, minus `vacIdx`: the
    *  reference vacuum here is always whichever one the Visual editor's own
    *  vac-picker has selected (`_alignVac()`), so switching vacuums already
    *  tears down the whole overlay (`_openAlign`) and this along with it,
@@ -414,7 +414,7 @@ export class AnyVacCard extends LitElement {
    *  at open time, not the original YAML-declared one, so a src the Visual
    *  editor itself just changed would no longer match the key everything
    *  else in this same session keeps writing under. The Config editor's
-   *  Maps tab has no such risk — it edits `image_base.src` directly in the
+   *  Global tab has no such risk — it edits `image_base.src` directly in the
    *  dashboard YAML, so that's still where the user points the floorplan at
    *  this file, same one-time step "Use this vacuum's current map as
    *  floorplan" already asks for in the non-fiducial case). */
@@ -2942,7 +2942,7 @@ export class AnyVacCard extends LitElement {
                   ${sel && unassigned.has(r.key) ? html`<ha-icon class="dock-unassigned" icon="mdi:robot-off"
                     title="No available robot for this room's ${mode} pass — check that a vacuum is configured with the right role and knows this room."></ha-icon>` : nothing}
                   ${sel && unsequenced.has(r.key) ? html`<ha-icon class="dock-unseq" icon="mdi:sort-variant-off"
-                    title="No cleaning order set for this room — the time estimate may be off. Set the order in the card editor's Maps tab."></ha-icon>` : nothing}
+                    title="No cleaning order set for this room — the time estimate may be off. Set the order in the card editor's Global tab."></ha-icon>` : nothing}
                   <span class="dock-ages">
                     <span class="dock-age">${this._renderProgChip(this._roomProgForType(r, vacs, "dry"))}<ha-icon icon="mdi:broom"></ha-icon><b style=${styleMap({ color: this._colorForAgeDays(dry) })}>${badge(dry)}</b><small class="dock-cov" title="Last completed dry clean's coverage">${covBadge(cov?.dry)}</small></span>
                     <span class="dock-age">${this._renderProgChip(this._roomProgForType(r, vacs, "wet"))}<ha-icon icon="mdi:water"></ha-icon><b style=${styleMap({ color: this._colorForAgeDays(wet) })}>${badge(wet)}</b><small class="dock-cov" title="Last completed wet clean's coverage">${covBadge(cov?.wet)}</small></span>
@@ -2962,7 +2962,7 @@ export class AnyVacCard extends LitElement {
               ${unassigned.size ? html`<ha-icon class="dock-unassigned" icon="mdi:robot-off"
                 title="${unassigned.size} selected room${unassigned.size > 1 ? "s have" : " has"} no available robot for the ${mode} pass — it/they will be silently skipped. Check vacuum roles/config."></ha-icon>` : nothing}
               ${unsequenced.size ? html`<ha-icon class="dock-unseq" icon="mdi:sort-variant-off"
-                title="${unsequenced.size} selected room${unsequenced.size > 1 ? "s have" : " has"} no cleaning order set — the time above may be off. Set the order in the card editor's Maps tab."></ha-icon>` : nothing}</span>
+                title="${unsequenced.size} selected room${unsequenced.size > 1 ? "s have" : " has"} no cleaning order set — the time above may be off. Set the order in the card editor's Global tab."></ha-icon>` : nothing}</span>
             <button class="action-btn dock-run ${this._holdId === runHid ? "action-btn--holding" : ""}"
               ?disabled=${!runKeys.length}
               @pointerdown=${runKeys.length ? this._holdStart(runHid, () => this._runOrchestrated(runKeys, this._planMode)) : nothing}
@@ -4196,7 +4196,7 @@ export class AnyVacCard extends LitElement {
             <ha-icon icon="mdi:robot-off"></ha-icon><b>${unassigned.length}</b>
           </span>` : nothing}
           ${unsequenced.length ? html`<span class="mtbtn mtbtn--stat mtbtn--warn"
-              title="${unsequenced.length} selected room${unsequenced.length > 1 ? "s have" : " has"} no cleaning order set — the time may be off. Set the order in the card editor's Maps tab.">
+              title="${unsequenced.length} selected room${unsequenced.length > 1 ? "s have" : " has"} no cleaning order set — the time may be off. Set the order in the card editor's Global tab.">
             <ha-icon icon="mdi:sort-variant-off"></ha-icon><b>${unsequenced.length}</b>
           </span>` : nothing}
           ${this._renderLayerToggleCompact(vacs)}
@@ -6207,7 +6207,7 @@ export class AnyVacCard extends LitElement {
    *  version, the returned path is shown as plain text rather than written
    *  into `image_base.src` — see `_fiducialSnapshotPath`'s doc comment for
    *  why the Visual editor deliberately leaves that one step to the Config
-   *  editor's Maps tab. */
+   *  editor's Global tab. */
   private async _snapshotHomeFrameWithFiducials(): Promise<void> {
     if (!this._fiducialServiceAvailable()) return;
     this._fiducialSnapshotBusy = true;
@@ -6299,7 +6299,7 @@ export class AnyVacCard extends LitElement {
   // branch to key an override under (`config.map_mode === "merged" &&
   // config.image_base?.src` — seatedit.ts), so a snapshot fired from there
   // could never actually persist. Bootstrapping a brand new merged floorplan
-  // from zero stays a Config editor action (its Maps tab writes `image_base`
+  // from zero stays a Config editor action (its Global tab writes `image_base`
   // straight into YAML, which needs no lookup key at all) until a later
   // phase extends that backend contract — same kind of scope boundary
   // `FloorplanEditSession`'s own doc comment already draws.
@@ -6709,8 +6709,8 @@ export class AnyVacCard extends LitElement {
           : fs ? this._renderFloorplanTool(fs)
           : this._renderVePlaceholder(
               this._config.map_mode !== "merged"
-                ? "Only available for a shared (merged-mode) floorplan right now — this config's own per-vacuum image_base stays editable from the Config editor's Maps tab."
-                : "No card-level floorplan image to edit — set one from the Config editor's Maps tab first.",
+                ? "Only available for a shared (merged-mode) floorplan right now — this config's own per-vacuum image_base stays editable from the Config editor's Vacuums tab → Map & floorplan section."
+                : "No card-level floorplan image to edit — set one from the Config editor's Global tab → Floorplan section first.",
             )}
         ${this._alignCancelConfirm ? html`
           <div class="align-confirm-backdrop">
@@ -7613,7 +7613,7 @@ export class AnyVacCard extends LitElement {
                 calibration above isn't precise enough (e.g. you need to rotate the file, not just crop or
                 resize it). Saves a home-frame snapshot with 4 invisible markers baked into its border.
                 ${this._fiducialSnapshotPath ? html`If this floorplan's Image src isn't already
-                  <code>${this._fiducialSnapshotPath}</code>, set it from the Config editor's Maps tab
+                  <code>${this._fiducialSnapshotPath}</code>, set it from the Config editor's Global tab
                   first.` : nothing}
                 Then crop, resize and/or rotate that file in an external image editor as needed (GIMP etc.),
                 keep it as PNG, don't flatten it, and run step 2.</div>
