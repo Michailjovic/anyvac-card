@@ -74,9 +74,12 @@ import {
   effectiveAppearance,
   effectiveRoomStyle,
   roomsSessionToYaml,
+  effectiveFloorplanGeometry,
+  floorplanGeometryToYaml,
   type AlignSession,
   type AlignViewState,
   type AppearanceOverride,
+  type FloorplanEditSession,
   type FloorplanSeats,
   type NudgeTier,
   type RoomDraft,
@@ -297,6 +300,9 @@ export class AnyVacCard extends LitElement {
    *  independent of `_alignCopiedFlash` (each tool's toolbar button flashes
    *  on its own click, not the other tool's). */
   @state() private _roomsCopiedFlash = false;
+  /** Same brief "Copied" flash, for the Floorplan & Calibrate tool's own
+   *  Copy YAML button (docs/42 §9 fáze J1). */
+  @state() private _floorplanCopiedFlash = false;
   /** docs/42 §9 fáze I, risk #10 "Tool-switch state leak" — redirects what
    *  the shared `_alignCancelConfirm` panel's "Discard" button does: `null`
    *  means the panel is guarding a full overlay close (`_alignCancel`'s own
@@ -306,6 +312,14 @@ export class AnyVacCard extends LitElement {
    *  never close the whole overlay out from under the other tool's own
    *  (unrelated, still-unsaved) edits. */
   @state() private _veToolSwitchTarget: VisualEditorTool | null = null;
+  /** docs/42 §9 fáze J1 — the Floorplan & Calibrate tool's own session
+   *  (geometry sub-phase only so far). `null` until `_openFloorplan()` seeds
+   *  it — lazily, the first time the tool is actually switched to, same
+   *  "opened on demand" precedent `_roomsSession` set in fáze I — and stays
+   *  `null` in split mode / when there's no card-level `image_base` to edit
+   *  (see `FloorplanEditSession`'s own doc comment on that scope boundary),
+   *  in which case the tool renders an explanatory placeholder instead. */
+  @state() private _floorplanSession: FloorplanEditSession | null = null;
   /** The mounted portal host, or null when the overlay is closed. Plain
    *  field, not `@state` — it's DOM plumbing, not render input. */
   private _alignHost: AnyVacVisualEditorHost | null = null;
@@ -327,6 +341,20 @@ export class AnyVacCard extends LitElement {
     startPos: Map<number, { x: number; y: number }>;
     /** pointerId -> most recent live wrap-percent position, updated on
      *  every pointermove. */
+    livePos: Map<number, { x: number; y: number }>;
+  } | null = null;
+  /** docs/42 §9 fáze J1 — in-progress Floorplan geometry gizmo gesture.
+   *  Mirrors `_alignGesture` but scoped to `_floorplanSession.draft`, and
+   *  without the pinch/anisotropic-stretch kinds `_alignGesture` supports:
+   *  `image_base` geometry has no independent Y scale (no `scale_y` field,
+   *  `types.ts`), so there is nothing for a stretch/pinch gesture to unlock
+   *  — corner handles always scale uniformly (`scaleSeatAbout`), same as
+   *  the Seat tool's own corner handles whenever `scaleY` is unset. */
+  private _floorGesture: {
+    kind: "drag" | "scale" | "rotate";
+    startSeat: SeatParams;
+    pivotPct?: { x: number; y: number };
+    startPos: Map<number, { x: number; y: number }>;
     livePos: Map<number, { x: number; y: number }>;
   } | null = null;
   /** Active layout profile (docs/18) — picked by viewport aspect ratio. */
@@ -4185,10 +4213,13 @@ export class AnyVacCard extends LitElement {
     this._roomsGesture = null;
     this._roomsDrawGesture = null;
     this._roomsDeleteConfirm = null;
+    this._floorplanSession = null;
+    this._floorGesture = null;
     this._veToolSwitchTarget = null;
     // docs/42 §8 bod 4: entry opens the last tool used on THIS browser.
     this._veTool = this._loadVeTool();
     if (this._veTool === "rooms") this._openRooms();
+    else if (this._veTool === "floorplan") this._openFloorplan();
     // Autofocus so keyboard nudges (docs/41 SS4.4, this session's C2b) work
     // immediately without the user first clicking into the overlay.
     requestAnimationFrame(() => this._alignRefocusOverlay());
@@ -4223,6 +4254,8 @@ export class AnyVacCard extends LitElement {
     this._roomsGesture = null;
     this._roomsDrawGesture = null;
     this._roomsDeleteConfirm = null;
+    this._floorplanSession = null;
+    this._floorGesture = null;
     this._veToolSwitchTarget = null;
   }
 
@@ -4251,7 +4284,7 @@ export class AnyVacCard extends LitElement {
    *  (docs/41 risk #3: a bottom-edge swipe/back gesture must not be
    *  mistaken for confirming a destructive dialog). */
   private _alignCancel(): void {
-    if (this._alignHasChanges() || this._roomsHasUnsavedChanges()) {
+    if (this._alignHasChanges() || this._roomsHasUnsavedChanges() || this._floorplanHasChanges()) {
       this._veToolSwitchTarget = null;
       this._alignCancelConfirm = true;
     } else this._closeAlign();
@@ -4272,12 +4305,15 @@ export class AnyVacCard extends LitElement {
       };
     } else if (this._veTool === "rooms") {
       this._roomsSession = null;
+    } else if (this._veTool === "floorplan") {
+      this._floorplanSession = null;
     }
     this._veTool = target;
     this._saveVeTool(target);
     this._veToolSwitchTarget = null;
     this._alignCancelConfirm = false;
     if (target === "rooms" && !this._roomsSession) this._openRooms();
+    if (target === "floorplan" && !this._floorplanSession) this._openFloorplan();
   }
   private _alignDismissCancelConfirm(): void {
     this._alignCancelConfirm = false;
@@ -4694,6 +4730,7 @@ export class AnyVacCard extends LitElement {
   private _veToolHasUnsavedChanges(tool: VisualEditorTool): boolean {
     if (tool === "seat") return this._alignHasChanges();
     if (tool === "rooms") return this._roomsHasUnsavedChanges();
+    if (tool === "floorplan") return this._floorplanHasChanges();
     return false;
   }
 
@@ -4710,9 +4747,11 @@ export class AnyVacCard extends LitElement {
     }
     this._veTool = tool;
     this._saveVeTool(tool);
-    // Rooms has no entry button of its own (docs/42 §4.3) — its session is
-    // opened lazily, the first time this tab is actually switched to.
+    // Rooms/Floorplan have no entry button of their own (docs/42 §4.3) —
+    // their sessions are opened lazily, the first time each tab is actually
+    // switched to.
     if (tool === "rooms" && !this._roomsSession) this._openRooms();
+    if (tool === "floorplan" && !this._floorplanSession) this._openFloorplan();
   }
 
   /** `Ctrl`/`Shift` held MOMENTARILY override the toolbar's persistent
@@ -4733,6 +4772,17 @@ export class AnyVacCard extends LitElement {
    *  toolbar's X button, so an in-progress edit asks for confirmation
    *  instead of silently discarding it. */
   private _alignKeyDown(e: KeyboardEvent): void {
+    // docs/42 §9 fáze J1: while the Floorplan & Calibrate tool is active,
+    // nudges/undo/redo target ITS OWN session instead of the (invisible)
+    // Seat & Appearance one — Escape still closes the whole overlay either
+    // way (`_alignCancel` itself is tool-agnostic). The Rooms tool has no
+    // keyboard nudges of its own yet (toolbar-button Undo/Redo only, a
+    // pre-existing fáze I scope limit this doesn't change), so it falls
+    // through to the branch below unaffected.
+    if (this._veTool === "floorplan") {
+      this._floorplanKeyDown(e);
+      return;
+    }
     const session = this._alignSession;
     if (!session) return;
     const target = e.target as HTMLElement | null;
@@ -4782,6 +4832,51 @@ export class AnyVacCard extends LitElement {
     e.preventDefault();
     const history = e.repeat ? session.history : [...session.history, d];
     this._alignSession = { ...session, draft: next, history, future: [] };
+  }
+
+  /** docs/42 §9 fáze J1 — `_alignKeyDown`'s floorplan-tool branch, same
+   *  key layout (arrows/`[`/`]`/`,`/`.`, Ctrl+Z/Y, Escape) minus the
+   *  Independent-Y-scale-only nuances that don't apply to `image_base`
+   *  geometry (no `scaleY`, hence plain `nudgeScale` for both `,`/`.`). */
+  private _floorplanKeyDown(e: KeyboardEvent): void {
+    const session = this._floorplanSession;
+    if (e.key === "Escape") { e.preventDefault(); this._alignCancel(); return; }
+    if (!session) return;
+    const target = e.target as HTMLElement | null;
+    const inField = !!target && (target.tagName === "INPUT" || target.tagName === "TEXTAREA");
+    const mod = e.ctrlKey || e.metaKey;
+    if (mod && !e.shiftKey && !e.altKey && (e.key === "z" || e.key === "Z")) {
+      if (inField) return;
+      e.preventDefault();
+      this._floorGeoUndo();
+      return;
+    }
+    if (mod && !e.shiftKey && !e.altKey && (e.key === "y" || e.key === "Y")) {
+      if (inField) return;
+      e.preventDefault();
+      this._floorGeoRedo();
+      return;
+    }
+    if (inField && e.key.startsWith("Arrow")) return;
+
+    const mult = nudgeTierMultiplier(this._alignEffectiveNudgeTier(e));
+    const ar = this._mapAR > 0.1 ? this._mapAR : 3.636;
+    const d = session.draft;
+    let next: SeatParams | null = null;
+    switch (e.key) {
+      case "ArrowUp": next = nudgeOffset(d, 0, -0.1 * mult, this._alignView.rot, ar); break;
+      case "ArrowDown": next = nudgeOffset(d, 0, 0.1 * mult, this._alignView.rot, ar); break;
+      case "ArrowLeft": next = nudgeOffset(d, -0.1 * mult, 0, this._alignView.rot, ar); break;
+      case "ArrowRight": next = nudgeOffset(d, 0.1 * mult, 0, this._alignView.rot, ar); break;
+      case "[": next = nudgeRotation(d, -0.5 * mult); break;
+      case "]": next = nudgeRotation(d, 0.5 * mult); break;
+      case ",": next = nudgeScale(d, -0.5 * mult); break;
+      case ".": next = nudgeScale(d, 0.5 * mult); break;
+      default: return;
+    }
+    e.preventDefault();
+    const history = e.repeat ? session.history : [...session.history, d];
+    this._floorplanSession = { ...session, draft: next, history, future: [] };
   }
 
   /** Background pan (view, not seat) — drag anywhere on the canvas OUTSIDE
@@ -5214,6 +5309,211 @@ export class AnyVacCard extends LitElement {
     }
   }
 
+  // ── Floorplan & Calibrate tool: geometry (docs/42 §9 fáze J1) ─────────────
+
+  /** Card-level `image_base` currently in effect — the SAME merged/split +
+   *  first-vacuum-fallback resolution `resolveImageBaseSrc` already applies,
+   *  restated here only to get the whole OBJECT (not just its `src`) back.
+   *  `null` whenever there's nothing at card level for this session's
+   *  floorplan identity to edit (split mode, or a merged config that only
+   *  ever set `image_base` on a vacuum, never at the top level) — see
+   *  `FloorplanEditSession`'s own doc comment on why that's this tool's
+   *  scope boundary for fáze J1, not a bug to work around here. */
+  private _floorplanCardImageBase(): NonNullable<VacuumConfig["image_base"]> | null {
+    const src = this._alignSession?.floorplan;
+    if (!src || this._config.map_mode !== "merged") return null;
+    const ib = this._config.image_base;
+    return ib?.src === src ? ib : null;
+  }
+
+  /** Seeds the Floorplan & Calibrate tool's geometry session from the
+   *  current card-level `image_base` — one-time capture, same "start once,
+   *  draft evolves independently" discipline `_openAlign`/`_openRooms`
+   *  already follow (docs/41 risk #5). Opened lazily, the first time this
+   *  tool is actually switched to (`_setVeTool`, `_openAlign`), same as
+   *  `_openRooms` — neither tool has an entry button of its own (docs/42
+   *  §4.3), both piggyback on whichever vacuum's "Align" button was
+   *  clicked. Leaves `_floorplanSession` `null` (placeholder rendered
+   *  instead) when this session's floorplan has no card-level `image_base`
+   *  to edit — see `_floorplanCardImageBase`. */
+  private _openFloorplan(): void {
+    if (this._floorplanSession) return;
+    const ib = this._floorplanCardImageBase();
+    const src = this._alignSession?.floorplan;
+    if (!ib || !src) return;
+    const { src: _src, rotation: _r, scale: _s, offset_x: _ox, offset_y: _oy, ...rest } = ib;
+    const seat = effectiveFloorplanGeometry(ib);
+    this._floorplanSession = {
+      floorplan: src, start: { ...seat }, draft: { ...seat }, history: [], future: [], rest,
+    };
+    this._floorGesture = null;
+  }
+
+  private _floorplanHasChanges(): boolean {
+    const s = this._floorplanSession;
+    if (!s) return false;
+    const a = s.draft, b = s.start;
+    return a.rotation !== b.rotation || a.scale !== b.scale
+      || a.offset_x !== b.offset_x || a.offset_y !== b.offset_y;
+  }
+
+  private _floorplanReset(): void {
+    const session = this._floorplanSession;
+    if (!session) return;
+    this._floorplanSession = {
+      ...session, draft: { ...session.start },
+      history: [...session.history, session.draft], future: [],
+    };
+  }
+
+  private async _floorplanCopyYaml(): Promise<void> {
+    const session = this._floorplanSession;
+    if (!session) return;
+    try {
+      await navigator.clipboard.writeText(floorplanGeometryToYaml(session.draft));
+      this._floorplanCopiedFlash = true;
+      setTimeout(() => { this._floorplanCopiedFlash = false; }, 1500);
+    } catch (err) {
+      console.warn("[anyvac-card] Floorplan: clipboard write failed", err);
+    }
+  }
+
+  /** Saves `image_base` as a card-level `set_floorplan_seat` call (no
+   *  `vacuum` key — docs/41 §4.6's "omitted = card-level" contract). Resends
+   *  the WHOLE `image_base` record (`session.rest` + the edited geometry,
+   *  docs/42 §8 bod 3 "no sentinel") and, when the Rooms tool (fáze I) has
+   *  already saved a `room_style` for this same card-level floorplan entry,
+   *  resends THAT too — `room_style` is a sibling of `image_base` on the
+   *  same entry and clears on omission by the SAME "no sentinel" contract
+   *  (`services.py`'s `SET_FLOORPLAN_SEAT_SCHEMA` docstring), so a pure
+   *  geometry Save would otherwise silently wipe it out. `rooms` needs no
+   *  such resend — unlike `image_base`/`room_style` it has its own per-key
+   *  merge semantics and is left completely untouched when omitted. */
+  private async _floorplanSave(): Promise<void> {
+    const session = this._floorplanSession;
+    if (!session || !this._alignServiceAvailable()) return;
+    const d = session.draft;
+    const image_base: Record<string, unknown> = {
+      ...session.rest,
+      src: session.floorplan,
+      rotation: Math.round(d.rotation * 100) / 100,
+      scale: Math.round(d.scale * 100) / 100,
+      offset_x: Math.round(d.offset_x * 100) / 100,
+      offset_y: Math.round(d.offset_y * 100) / 100,
+    };
+    const entry = this._floorplanSeatsRaw()?.[session.floorplan];
+    const payload: Record<string, unknown> = { floorplan: session.floorplan, image_base };
+    if (entry?.room_style) payload.room_style = entry.room_style;
+    try {
+      await this.hass.callService("anyvac", "set_floorplan_seat", payload);
+      this._closeAlign();
+    } catch (err) {
+      // Left open on failure, same as `_alignSave`/`_roomsSave` — the draft
+      // isn't lost.
+      console.warn("[anyvac-card] Floorplan: set_floorplan_seat call failed", err);
+    }
+  }
+
+  /** Starts (or upgrades) a floorplan geometry gizmo gesture — mirrors
+   *  `_alignStartGesture` exactly, minus the pivot-less pinch upgrade path
+   *  (no independent Y scale to unlock via a two-finger gesture here, see
+   *  `_floorGesture`'s own doc comment) and minus the read-only gate (the
+   *  floorplan session only exists at all when it's editable — split mode/
+   *  no-card-level-image_base is a placeholder, not a read-only session). */
+  private _floorGeoStartGesture(
+    e: PointerEvent, kind: "drag" | "scale" | "rotate", pivotPct?: { x: number; y: number },
+  ): void {
+    const session = this._floorplanSession;
+    if (!session) return;
+    this._alignRefocusOverlay();
+    (e.currentTarget as HTMLElement).setPointerCapture(e.pointerId);
+    e.stopPropagation();
+    e.preventDefault();
+    const pt = this._alignPointToWrapPct(e.clientX, e.clientY);
+    if (!pt) return;
+    this._floorGeoPushHistory(session.draft);
+    this._floorGesture = {
+      kind, startSeat: { ...session.draft }, pivotPct,
+      startPos: new Map([[e.pointerId, pt]]),
+      livePos: new Map([[e.pointerId, pt]]),
+    };
+  }
+
+  private _floorGeoGestureMove(e: PointerEvent): void {
+    const session = this._floorplanSession, g = this._floorGesture;
+    if (!session || !g || !g.startPos.has(e.pointerId)) return;
+    const pt = this._alignPointToWrapPct(e.clientX, e.clientY);
+    if (!pt) return;
+    g.livePos.set(e.pointerId, pt);
+    const ar = this._mapAR > 0.1 ? this._mapAR : 3.636;
+    const id = e.pointerId;
+    const s0 = g.startPos.get(id)!, s1 = g.livePos.get(id)!;
+    let next: SeatParams | null = null;
+    if (g.kind === "drag") {
+      next = translateSeat(g.startSeat, s1.x - s0.x, s1.y - s0.y);
+    } else if (g.kind === "scale" && g.pivotPct) {
+      const d0 = this._alignIsoDist(s0, g.pivotPct, ar);
+      const d1 = this._alignIsoDist(s1, g.pivotPct, ar);
+      if (d0 > 1e-6) next = scaleSeatAbout(g.startSeat, d1 / d0, g.pivotPct, ar);
+    } else if (g.kind === "rotate" && g.pivotPct) {
+      const a0 = this._alignIsoAngleDeg(g.pivotPct, s0, ar);
+      const a1 = this._alignIsoAngleDeg(g.pivotPct, s1, ar);
+      next = rotateSeatAbout(g.startSeat, a1 - a0, g.pivotPct, ar);
+    }
+    if (next) this._floorplanSession = { ...session, draft: next };
+  }
+
+  private _floorGeoGestureEnd(e: PointerEvent): void {
+    const g = this._floorGesture;
+    if (!g) return;
+    g.startPos.delete(e.pointerId);
+    g.livePos.delete(e.pointerId);
+    if (g.startPos.size === 0) this._floorGesture = null;
+  }
+
+  private _floorGeoPushHistory(seat: SeatParams): void {
+    const session = this._floorplanSession;
+    if (!session) return;
+    this._floorplanSession = { ...session, history: [...session.history, seat], future: [] };
+  }
+
+  private _floorGeoUndo(): void {
+    const session = this._floorplanSession;
+    if (!session || !session.history.length) return;
+    const prev = session.history[session.history.length - 1];
+    this._floorplanSession = {
+      ...session, draft: prev,
+      history: session.history.slice(0, -1),
+      future: [session.draft, ...session.future],
+    };
+  }
+
+  private _floorGeoRedo(): void {
+    const session = this._floorplanSession;
+    if (!session || !session.future.length) return;
+    const next = session.future[0];
+    this._floorplanSession = {
+      ...session, draft: next,
+      history: [...session.history, session.draft],
+      future: session.future.slice(1),
+    };
+  }
+
+  /** Numeric side-panel commit — mirrors `_alignSetField` exactly, scoped to
+   *  the 4 geometry fields `image_base` actually has (no `scaleY`). */
+  private _floorGeoSetField(
+    field: "rotation" | "scale" | "offset_x" | "offset_y", raw: string,
+  ): void {
+    const session = this._floorplanSession;
+    if (!session) return;
+    const n = parseFloat(raw);
+    if (!Number.isFinite(n)) return;
+    const d = session.draft;
+    if (d[field] === n) return;
+    const next: SeatParams = { ...d, [field]: n };
+    this._floorplanSession = { ...session, draft: next, history: [...session.history, d], future: [] };
+  }
+
   /** docs/42 §9 fáze H — the Visual editor's own top-level render (renamed
    *  from `_renderAlignOverlay`, docs/42 §8 bod 2). Owns the portal's outer
    *  chrome (toolbar + tool-switcher row) common to all three tools; the
@@ -5234,6 +5534,10 @@ export class AnyVacCard extends LitElement {
     const roomsCanUndo = !!rs && rs.history.length > 0;
     const roomsCanRedo = !!rs && rs.future.length > 0;
     const roomsCanSave = !!rs && this._alignServiceAvailable();
+    const fs = this._floorplanSession;
+    const floorCanUndo = !!fs && fs.history.length > 0;
+    const floorCanRedo = !!fs && fs.future.length > 0;
+    const floorCanSave = !!fs && this._alignServiceAvailable();
     const tier = session.nudgeTier;
     const tierBtn = (t: NudgeTier, label: string, title: string) => html`
       <button class="align-tier-btn ${tier === t ? "on" : ""}" title=${title}
@@ -5261,6 +5565,7 @@ export class AnyVacCard extends LitElement {
                   this._closeAlign(); this._openAlign(v);
                   this._veTool = tool;
                   if (tool === "rooms") this._openRooms();
+                  if (tool === "floorplan") this._openFloorplan();
                 }}>
                 ${v.name ?? v.entity}
               </button>
@@ -5309,6 +5614,24 @@ export class AnyVacCard extends LitElement {
               <ha-icon icon=${this._roomsCopiedFlash ? "mdi:check" : "mdi:content-copy"}></ha-icon>
             </button>
           ` : nothing}
+          ${this._veTool === "floorplan" && fs ? html`
+            <button class="align-btn" title="Undo (Ctrl+Z)" ?disabled=${!floorCanUndo} @click=${() => this._floorGeoUndo()}>
+              <ha-icon icon="mdi:undo"></ha-icon>
+            </button>
+            <button class="align-btn" title="Redo (Ctrl+Y)" ?disabled=${!floorCanRedo} @click=${() => this._floorGeoRedo()}>
+              <ha-icon icon="mdi:redo"></ha-icon>
+            </button>
+            <button class="align-btn" title="Rotate view 90°" @click=${() => this._alignRotateView()}>
+              <ha-icon icon="mdi:screen-rotation"></ha-icon>
+            </button>
+            <button class="align-btn" title="Reset to the values this tab was opened with" @click=${() => this._floorplanReset()}>
+              <ha-icon icon="mdi:restore"></ha-icon>
+            </button>
+            <button class="align-btn ${this._floorplanCopiedFlash ? "align-btn--flash" : ""}"
+              title="Copy as YAML (image_base: block, paste into the card config)" @click=${() => this._floorplanCopyYaml()}>
+              <ha-icon icon=${this._floorplanCopiedFlash ? "mdi:check" : "mdi:content-copy"}></ha-icon>
+            </button>
+          ` : nothing}
           <button class="align-btn align-close-btn" title="Cancel" @click=${() => this._alignCancel()}>
             <ha-icon icon="mdi:close"></ha-icon>
           </button>
@@ -5326,6 +5649,13 @@ export class AnyVacCard extends LitElement {
               <ha-icon icon="mdi:content-save"></ha-icon><span>Save</span>
             </button>
           ` : nothing}
+          ${this._veTool === "floorplan" && fs ? html`
+            <button class="align-btn align-save-btn" ?disabled=${!floorCanSave}
+              title=${floorCanSave ? "Save" : "Update the AnyVac integration to 2.0.0 — or Copy YAML"}
+              @click=${() => this._floorplanSave()}>
+              <ha-icon icon="mdi:content-save"></ha-icon><span>Save</span>
+            </button>
+          ` : nothing}
         </div>
         <div class="ve-tool-row">
           ${toolTab("seat", "Seat & Appearance")}
@@ -5334,7 +5664,12 @@ export class AnyVacCard extends LitElement {
         </div>
         ${this._veTool === "seat" ? this._renderSeatTool(session, vac)
           : this._veTool === "rooms" ? this._renderRoomsTool(session, vac)
-          : this._renderVePlaceholder()}
+          : fs ? this._renderFloorplanTool(fs)
+          : this._renderVePlaceholder(
+              this._config.map_mode !== "merged"
+                ? "Only available for a shared (merged-mode) floorplan right now — this config's own per-vacuum image_base stays editable from the Config editor's Maps tab."
+                : "No card-level floorplan image to edit — set one from the Config editor's Maps tab first.",
+            )}
         ${this._alignCancelConfirm ? html`
           <div class="align-confirm-backdrop">
             <div class="align-confirm-panel">
@@ -5765,13 +6100,140 @@ export class AnyVacCard extends LitElement {
    *  the toolbar's third state until it does (docs/42 §9 phasing table).
    *  Kept intentionally minimal — a placeholder needs no test coverage
    *  beyond "it renders and doesn't crash". */
-  private _renderVePlaceholder() {
+  /** docs/42 §9 fáze J1 — the Floorplan & Calibrate tool's geometry gizmo:
+   *  drag/rotate/scale `image_base` itself. The mirror image of
+   *  `_renderSeatTool`: THERE the floorplan is the fixed reference and one
+   *  vacuum's seat is edited; HERE the floorplan is what's edited and every
+   *  vacuum sharing it renders as a read-only reference ghost (its own
+   *  already-effective seat, `_effectiveSeat` — never touched from this
+   *  tool) — same `.align-scene`/`.align-gizmo`/`.align-handle` mechanics
+   *  either way (docs/14 rule 1), just swapped which layer gets the gizmo.
+   *  No side (stretch) handles and no pinch gesture: `image_base` has no
+   *  independent Y scale for either to unlock (`_floorGesture`'s own doc
+   *  comment) — corner handles always scale uniformly. */
+  private _renderFloorplanTool(session: FloorplanEditSession) {
+    const { w: wrapW, h: wrapH } = this._alignSceneSize();
+    const draft = session.draft;
+    const corner = (cx: number, cy: number) => this._alignCornerPct(draft, cx, cy, wrapW, wrapH);
+    const nw = corner(0, 0), ne = corner(1, 0), sw = corner(0, 1), se = corner(1, 1);
+    const centre = { x: 50 + draft.offset_x, y: 50 + draft.offset_y };
+    const rotateHandle = this._alignCornerPct(draft, 0.5, -0.18, wrapW, wrapH);
+    const ghosts = this._config.vacuums.filter(
+      (v) => resolveImageBaseSrc(this._config, v) === session.floorplan && this._intAttrs(v),
+    );
+    return html`
+        <div class="align-body">
+          <div class="align-canvas"
+            @wheel=${(e: WheelEvent) => this._alignWheel(e)}
+            @pointerdown=${(e: PointerEvent) => this._alignBgPointerDown(e)}
+            @pointermove=${(e: PointerEvent) => this._alignBgPointerMove(e)}
+            @pointerup=${(e: PointerEvent) => this._alignBgPointerUp(e)}
+            @pointercancel=${(e: PointerEvent) => this._alignBgPointerUp(e)}>
+            <div class="align-scene" style=${styleMap({
+              width: wrapW + "px", height: wrapH + "px",
+              transform: this._alignViewTransformCss(),
+            })}>
+              ${ghosts.map((v) => {
+                const gm = this._mapEntityFor(v);
+                const gUrl = gm ? this._mapUrl(gm) : null;
+                const gs = this._effectiveSeat(v);
+                return html`
+                  <div class="align-ghost">
+                    ${gUrl ? html`<img class="align-seat-img" src=${gUrl} alt=""
+                        style=${styleMap({
+                          left: (50 + gs.offset_x) + "%", top: (50 + gs.offset_y) + "%", width: gs.scale + "%",
+                          transform: "translate(-50%,-50%) " + seatRotateScaleCss(gs.rotation, gs.scale, gs.scaleY),
+                        })} />` : nothing}
+                    ${this._renderIntegrationOverlay(v, gs, "both")}
+                  </div>`;
+              })}
+              <div class="align-seat-layer"
+                @pointerdown=${(e: PointerEvent) => this._floorGeoStartGesture(e, "drag")}
+                @pointermove=${(e: PointerEvent) => this._floorGeoGestureMove(e)}
+                @pointerup=${(e: PointerEvent) => this._floorGeoGestureEnd(e)}
+                @pointercancel=${(e: PointerEvent) => this._floorGeoGestureEnd(e)}>
+                <img class="align-seat-img" src=${session.floorplan} alt="Floorplan"
+                  @load=${this._onFloorplanLoad}
+                  style=${styleMap({
+                    left: (50 + draft.offset_x) + "%", top: (50 + draft.offset_y) + "%", width: draft.scale + "%",
+                    transform: "translate(-50%,-50%) rotate(" + draft.rotation + "deg)",
+                  })} />
+              </div>
+              <svg class="align-gizmo" viewBox="0 0 100 100" preserveAspectRatio="none">
+                <line x1=${centre.x} y1=${centre.y} x2=${rotateHandle.x} y2=${rotateHandle.y} class="align-gizmo-arm" />
+                <polygon points="${nw.x},${nw.y} ${ne.x},${ne.y} ${se.x},${se.y} ${sw.x},${sw.y}" class="align-gizmo-box" />
+              </svg>
+              ${([["nw", nw], ["ne", ne], ["se", se], ["sw", sw]] as const).map(([key, pos]) => html`
+                <div class="align-handle align-handle--corner" data-corner=${key}
+                  style=${styleMap({ left: pos.x + "%", top: pos.y + "%" })}
+                  @pointerdown=${(e: PointerEvent) => {
+                    const opp = key === "nw" ? se : key === "ne" ? sw : key === "se" ? nw : ne;
+                    this._floorGeoStartGesture(e, "scale", opp);
+                  }}
+                  @pointermove=${(e: PointerEvent) => this._floorGeoGestureMove(e)}
+                  @pointerup=${(e: PointerEvent) => this._floorGeoGestureEnd(e)}
+                  @pointercancel=${(e: PointerEvent) => this._floorGeoGestureEnd(e)}>
+                </div>
+              `)}
+              <div class="align-axis-hint align-axis-hint--x" title="Offset X"
+                style=${styleMap({ left: (centre.x + 7) + "%", top: centre.y + "%" })}>
+                <ha-icon icon="mdi:arrow-left-right"></ha-icon>
+              </div>
+              <div class="align-axis-hint align-axis-hint--y" title="Offset Y"
+                style=${styleMap({ left: centre.x + "%", top: (centre.y - 7) + "%" })}>
+                <ha-icon icon="mdi:arrow-up-down"></ha-icon>
+              </div>
+              <div class="align-handle align-handle--rotate"
+                style=${styleMap({ left: rotateHandle.x + "%", top: rotateHandle.y + "%" })}
+                @pointerdown=${(e: PointerEvent) => this._floorGeoStartGesture(e, "rotate", centre)}
+                @pointermove=${(e: PointerEvent) => this._floorGeoGestureMove(e)}
+                @pointerup=${(e: PointerEvent) => this._floorGeoGestureEnd(e)}
+                @pointercancel=${(e: PointerEvent) => this._floorGeoGestureEnd(e)}>
+                <ha-icon icon="mdi:rotate-3d-variant"></ha-icon>
+              </div>
+            </div>
+          </div>
+          <div class="align-side-panel">
+            <div class="align-field-row">
+              <label>Rotation<span>°</span></label>
+              <input type="number" step="0.1" .value=${String(Math.round(draft.rotation * 100) / 100)}
+                @change=${(e: Event) => this._floorGeoSetField("rotation", (e.target as HTMLInputElement).value)} />
+            </div>
+            <div class="align-field-row">
+              <label>Scale<span>%</span></label>
+              <input type="number" step="0.1" min="1" .value=${String(Math.round(draft.scale * 100) / 100)}
+                @change=${(e: Event) => this._floorGeoSetField("scale", (e.target as HTMLInputElement).value)} />
+            </div>
+            <div class="align-field-row">
+              <label>Offset ↔<span>%</span></label>
+              <input type="number" step="0.01" .value=${String(Math.round(draft.offset_x * 10000) / 10000)}
+                @change=${(e: Event) => this._floorGeoSetField("offset_x", (e.target as HTMLInputElement).value)} />
+            </div>
+            <div class="align-field-row">
+              <label>Offset ↕<span>%</span></label>
+              <input type="number" step="0.01" .value=${String(Math.round(draft.offset_y * 10000) / 10000)}
+                @change=${(e: Event) => this._floorGeoSetField("offset_y", (e.target as HTMLInputElement).value)} />
+            </div>
+            <div class="rooms-side-note">Drag the floorplan itself, or a corner/rotate handle. Every vacuum
+              sharing this floorplan is shown dimmed underneath, unedited, as a reference.</div>
+          </div>
+        </div>
+    `;
+  }
+
+  /** docs/42 §9 fáze J1 — the Floorplan & Calibrate tool's fallback body
+   *  whenever there's no `_floorplanSession` to show `_renderFloorplanTool`
+   *  instead: split mode's own per-vacuum `image_base`, or a merged config
+   *  with no card-level `image_base` at all yet (see
+   *  `FloorplanEditSession`'s own doc comment on that scope boundary).
+   *  `reason` names WHICH of the two, so the user isn't left guessing. */
+  private _renderVePlaceholder(reason: string) {
     return html`
       <div class="align-body ve-placeholder-body">
         <div class="ve-placeholder">
           <ha-icon icon="mdi:hammer-wrench"></ha-icon>
-          <div class="ve-placeholder-title">Floorplan & Calibrate — coming soon</div>
-          <div class="ve-placeholder-sub">docs/42 §9 fáze J</div>
+          <div class="ve-placeholder-title">Floorplan & Calibrate — not available here</div>
+          <div class="ve-placeholder-sub">${reason}</div>
         </div>
       </div>
     `;

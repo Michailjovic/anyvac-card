@@ -198,6 +198,89 @@ export function effectiveRoomStyle(config: {
   };
 }
 
+// ── Floorplan & Calibrate tool: geometry session (docs/42 §3.3/§9, fáze J1) ─
+// J1 ships ONLY the geometry gizmo (`image_base.rotation/scale/offset_x/
+// offset_y`). The three calibration methods (docs/39 2/N-point, docs/40 §5.B
+// home-frame pairing, fiducials) and the three snapshot/acquisition buttons
+// ("Snapshot map as floorplan"/"Snapshot home frame as floorplan"/"Export
+// guide layers") the user asked to have ported into the Visual editor too
+// are later sub-phases (J2-J4) — docs/42 §9's own phase-table convention of
+// shipping one complete, tested slice at a time (H, I, J1, ...) rather than
+// one giant phase.
+
+/** docs/42 §3.3/§9 (fáze J1) — the Floorplan & Calibrate tool's geometry
+ *  sub-session: `image_base.rotation/scale/offset_x/offset_y`, edited via a
+ *  gizmo mechanically identical to the Seat & Appearance tool's own (docs/14
+ *  rule 1 — `image_base` has no `scale_y` field, `types.ts`, so its geometry
+ *  is exactly a `SeatParams` with `scaleY` always left `undefined`; every
+ *  pure gizmo primitive in this file — `seatToMatrix`, `translateSeat`,
+ *  `scaleSeatAbout`, `rotateSeatAbout`, `nudgeOffset/Rotation/Scale` — is
+ *  reused UNCHANGED). No pinch/anisotropic-stretch gesture: those primitives
+ *  (`scaleSeatCornerAniso`/`stretchSeatX/Y`/`localAxisScaleRatio`) exist to
+ *  unlock an independent Y scale image_base doesn't have, so the floorplan
+ *  gizmo only offers drag/rotate/uniform-scale — same mechanics the Seat
+ *  tool's OWN corner handles already fall back to whenever `scaleY` is
+ *  unset.
+ *
+ *  Scope: MERGED mode's card-level `image_base` only. The backend override
+ *  this session Saves through (`anyvac.set_floorplan_seat`'s `image_base`
+ *  key, `services.py`) is card-level-only by contract — there is no
+ *  per-vacuum `image_base` override slot the way `map`/`appearance`/`rooms`
+ *  each have one (`FloorplanSeatOverride`/`FloorplanSeatVacuumOverride`
+ *  above). Split mode's own per-vacuum `image_base` therefore stays a
+ *  Config-editor-only field (its existing numeric sliders) until/unless a
+ *  later phase extends that backend contract itself; `anyvac-card.ts`
+ *  renders an explanatory placeholder instead of this session there. */
+export interface FloorplanEditSession {
+  /** `image_base.src` at open time — same floorplan-identity key
+   *  `AlignSession.floorplan`/`RoomsEditSession.floorplan` already use. */
+  floorplan: string;
+  start: SeatParams;
+  draft: SeatParams;
+  history: SeatParams[];
+  future: SeatParams[];
+  /** Every OTHER key already on `image_base` (`crop_box`, `home_anchors`,
+   *  `home_anchors_frame_id`, and anything a future phase adds) — carried
+   *  through UNCHANGED on Save. Save resends the WHOLE `image_base` record
+   *  (docs/42 §8 bod 3 "no sentinel"), and this sub-phase only edits
+   *  geometry. */
+  rest: Record<string, unknown>;
+}
+
+/** Defaults for `image_base`'s geometry fields — the SAME defaults the
+ *  Config editor's own "Floorplan position" sliders already use inline
+ *  (`editor.ts`'s `_numberSlider` calls for `ib?.rotation ?? 0` etc.,
+ *  docs/14 rule 1: one copy of this default table, not two). `scaleY` is
+ *  never set (`image_base` has no `scale_y` field). */
+export function effectiveFloorplanGeometry(ib: {
+  rotation?: number; scale?: number; offset_x?: number; offset_y?: number;
+} | undefined | null): SeatParams {
+  return {
+    rotation: ib?.rotation ?? 0,
+    scale: ib?.scale ?? 100,
+    offset_x: ib?.offset_x ?? 0,
+    offset_y: ib?.offset_y ?? 0,
+  };
+}
+
+/** docs/42 §4.3 "Copy YAML zůstávají per-nástroj stejná mechanika" — the
+ *  Floorplan tool's ALWAYS-available fallback, mirroring `seatToYaml`
+ *  exactly but for `image_base`'s geometry fields only (never `src`/
+ *  `crop_box`/`home_anchors` — those are unaffected by this sub-phase and
+ *  already sit in the user's own config, same "just the changed fragment"
+ *  precedent `seatToYaml` set for `map:`/`appearance:`). Rounded to 0.01,
+ *  same precision `seatToYaml` uses. */
+export function floorplanGeometryToYaml(geo: SeatParams): string {
+  const r2 = (n: number) => Math.round(n * 100) / 100;
+  return [
+    "image_base:",
+    `  rotation: ${r2(geo.rotation)}`,
+    `  scale: ${r2(geo.scale)}`,
+    `  offset_x: ${r2(geo.offset_x)}`,
+    `  offset_y: ${r2(geo.offset_y)}`,
+  ].join("\n");
+}
+
 // ── Low-level centre/point conversions (shared by every op below) ─────────
 
 /** Seat's centre in isotropic wrap-WIDTH-normalised fraction units (both axes

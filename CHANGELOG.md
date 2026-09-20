@@ -6,6 +6,51 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [1.32.0] - 2026-09-19
+
+### Added
+
+- **Floorplan & Calibrate tool, geometry sub-phase (docs/42 §9 fáze J1).**
+  The Visual editor's third tab now has a real gizmo for
+  `image_base.rotation/scale/offset_x/offset_y`: drag the floorplan itself
+  to move it, drag a corner to scale it uniformly, drag the rotate handle
+  to spin it — mechanically identical to the Seat & Appearance tool's own
+  gizmo (`image_base` has no `scale_y` field, so its geometry is exactly a
+  `SeatParams` with no independent Y scale; every pure primitive
+  — `seatToMatrix`, `translateSeat`, `scaleSeatAbout`, `rotateSeatAbout`,
+  `nudgeOffset/Rotation/Scale` — is reused unchanged, docs/14 rule 1). Every
+  vacuum sharing the floorplan renders dimmed underneath as an unedited
+  reference, the mirror image of how the Seat tool shows the floorplan as a
+  fixed reference behind the one vacuum being seated. Undo/redo, Reset,
+  Copy YAML (an `image_base:` fragment) and keyboard nudges (arrows/`[`/`]`/
+  `,`/`.`) all work the same way they do on the Seat tool.
+- **Scope: merged mode's shared `image_base` only, for now.** The backend
+  override this tool Saves through (`anyvac.set_floorplan_seat`'s
+  `image_base` key) is card-level-only by contract — there's no per-vacuum
+  `image_base` override slot the way `map`/`appearance`/`rooms` each have
+  one. Split mode's own per-vacuum `image_base` therefore stays a
+  Config-editor-only field (its existing numeric sliders, unaffected) until
+  a later phase, if any, extends that backend contract; the Visual editor
+  shows an explanatory placeholder there instead of the gizmo. A geometry
+  Save also resends any existing `room_style` the Rooms tool (fáze I) may
+  have already saved for the same floorplan entry — `room_style` clears on
+  omission by the same "no sentinel" contract `image_base` itself follows,
+  so a pure geometry Save could otherwise silently wipe it out.
+- **Not yet in this phase.** The three calibration methods this tool is
+  meant to consolidate (docs/39 2/N-point robot-map calibration, docs/40
+  §5.B home-frame N-point pairing, docs/40 §5.A.2 fiducial markers) and the
+  three snapshot/acquisition buttons ("Snapshot map as floorplan",
+  "Snapshot home frame as floorplan", "Export guide layers") the user asked
+  to have ported here too are later sub-phases (J2-J4) — the Config
+  editor's own Maps tab keeps all of that working exactly as before in the
+  meantime; nothing there was touched or removed by this phase.
+- **Known rough edge.** A floorplan rotated enough pushes its corner/rotate
+  handles outside the visible canvas, since the floorplan fills the whole
+  scene at scale 100 (unlike the Seat tool's vacuum-map image, which
+  usually has margin to spare) — dragging still works via the numeric
+  side-panel fields at any angle; a follow-up field report can decide
+  whether this needs a zoom-to-fit-rotated-bbox fix.
+
 ## [1.31.0] - 2026-09-19
 
 ### Added
