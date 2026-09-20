@@ -71,8 +71,30 @@ export type VisualEditorTool = "seat" | "rooms" | "floorplan";
 export interface AlignSession {
   /** Entity id of the vacuum whose seat is being edited. */
   vacuum: string;
-  /** `image_base.src` — the floorplan identity (docs/41 §4.6 key). */
+  /** `image_base.src` CURRENTLY IN EFFECT — used to render the floorplan
+   *  image itself (`<img src>`) and to match "other vacuums sharing this
+   *  floorplan" (`resolveImageBaseSrc(this._config, ...)`). Captured once at
+   *  open time like everything else here, but — unlike `floorplanKey` below
+   *  — also updated in place whenever a fáze J4 snapshot/acquisition action
+   *  writes a NEW `image_base.src` within this same session, so the overlay
+   *  keeps showing the right picture without needing a close/reopen. */
   floorplan: string;
+  /** docs/42 §9 fáze J4 — the STABLE floorplan-identity key every
+   *  `anyvac.set_floorplan_seat` call's `floorplan:` parameter must use,
+   *  resolved from `_rawConfig` (`resolveImageBaseSrc(this._rawConfig, vac)`)
+   *  rather than the live/effective `_config`. Fixed for the life of the
+   *  session — NEVER updated, even when `floorplan` above changes — because
+   *  `applyFloorplanSeats`'s own lookup (`seatedit.ts`) always keys off the
+   *  raw, YAML-declared `image_base.src`, not whatever a card-side override
+   *  currently resolves to. Before fáze J4 the Visual editor never wrote a
+   *  new `src` at all, so `floorplan`/`floorplanKey` always coincided and
+   *  this distinction was moot (see `_fiducialSnapshotPath`'s doc comment
+   *  for the exact divergence this field exists to prevent); J4's snapshot
+   *  buttons are the first card-side writes that change `src`, so from here
+   *  on every `set_floorplan_seat` call must send THIS field, never
+   *  `floorplan`, or a snapshot taken today would silently orphan every
+   *  override written in a LATER session under an unreachable key. */
+  floorplanKey: string;
   start: SeatParams;
   draft: SeatParams;
   history: SeatParams[];
@@ -155,8 +177,15 @@ export interface RoomDraft extends RectPct {
  *  start-once/draft-evolves discipline (docs/41 risk #5), just for a whole
  *  room map instead of one seat. */
 export interface RoomsEditSession {
-  /** `image_base.src` — same floorplan identity key as `AlignSession`. */
+  /** `image_base.src` currently in effect — same LIVE semantics as
+   *  `AlignSession.floorplan` (see its doc comment); mutated in place by a
+   *  fáze J4 snapshot action, never used as a `set_floorplan_seat` key. */
   floorplan: string;
+  /** Same STABLE identity key as `AlignSession.floorplanKey` — see its doc
+   *  comment. Always copied from `_alignSession.floorplanKey` at open time
+   *  (`_openRooms`) and never updated afterwards; this is what every
+   *  `set_floorplan_seat` call this session makes must send as `floorplan:`. */
+  floorplanKey: string;
   /** Set in split mode (this session edits ONE vacuum's own `rooms[]`);
    *  undefined in merged mode (the card-level shared `rooms[]`). */
   vacuum?: string;
@@ -232,9 +261,17 @@ export function effectiveRoomStyle(config: {
  *  later phase extends that backend contract itself; `anyvac-card.ts`
  *  renders an explanatory placeholder instead of this session there. */
 export interface FloorplanEditSession {
-  /** `image_base.src` at open time — same floorplan-identity key
-   *  `AlignSession.floorplan`/`RoomsEditSession.floorplan` already use. */
+  /** `image_base.src` currently in effect — same LIVE semantics as
+   *  `AlignSession.floorplan` (see its doc comment); mutated in place by a
+   *  fáze J4 snapshot action (and echoed back into `image_base.src` on every
+   *  Save — see `_floorplanSave`/`_saveHomeAnchors`/`_clearHomeAnchors`),
+   *  never used as a `set_floorplan_seat` key. */
   floorplan: string;
+  /** Same STABLE identity key as `AlignSession.floorplanKey` — see its doc
+   *  comment. Always copied from `_alignSession.floorplanKey` at open time
+   *  (`_openFloorplan`) and never updated afterwards; this is what every
+   *  `set_floorplan_seat` call this session makes must send as `floorplan:`. */
+  floorplanKey: string;
   start: SeatParams;
   draft: SeatParams;
   history: SeatParams[];

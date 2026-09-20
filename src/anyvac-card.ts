@@ -429,6 +429,32 @@ export class AnyVacCard extends LitElement {
   @state() private _fiducialDetectBusy = false;
   @state() private _fiducialDetectError = "";
   @state() private _fiducialDetectResult: { found: number; missing: string[] } | null = null;
+  // ── Floorplan & Calibrate tool: snapshot/acquisition (docs/42 §9 fáze J4)
+  // Ported from editor.ts's `_snapshotFloorplan`/`_snapshotHomeFrame`/
+  // `_exportMapGuide` — see `_snapshotMapAsFloorplan`'s own doc comment for
+  // why these live here (re-snapshot only, once a card-level floorplan
+  // already exists) rather than on `_renderVePlaceholder`'s bootstrap-from-
+  // nothing screen.
+  /** True while `_snapshotMapAsFloorplan` is awaiting its service response. */
+  @state() private _floorplanSnapshotBusy = false;
+  @state() private _floorplanSnapshotError = "";
+  /** True while `_snapshotHomeFrameAsFloorplan` is awaiting its response. */
+  @state() private _homeFrameSnapshotBusy = false;
+  @state() private _homeFrameSnapshotError = "";
+  /** True while `_exportGuideLayers` is awaiting its response. */
+  @state() private _guideExportBusy = false;
+  @state() private _guideExportError = "";
+  /** Last successful "Export guide layers" result — mirrors editor.ts's own
+   *  `_guideExportResult` (paths per layer + the pixel size they were
+   *  rendered at), shown as a plain link list since this tool has no config
+   *  side effect to apply it to (docs/37 §2.4). */
+  @state() private _guideExportResult: {
+    paths: Record<string, string>; size: { w: number; h: number };
+  } | null = null;
+  /** Outcome of `_snapshotMapAsFloorplan`'s room-placement side effect
+   *  (mirrors editor.ts's own `_placeRoomsResult`) — `null` when the last
+   *  snapshot returned no crop (nothing to place against) or hasn't run yet. */
+  @state() private _placeRoomsResult: { placed: number; added: number } | null = null;
   /** docs/42 §9 fáze I, risk #10 "Tool-switch state leak" — redirects what
    *  the shared `_alignCancelConfirm` panel's "Discard" button does: `null`
    *  means the panel is guarding a full overlay close (`_alignCancel`'s own
@@ -4324,8 +4350,14 @@ export class AnyVacCard extends LitElement {
     // ran before render), so this seeds from whatever is CURRENTLY effective,
     // defaulted the same way the pre-H Config editor's Maps tab was.
     const appearance = effectiveAppearance(vac);
+    // docs/42 §9 fáze J4: the STABLE identity key, resolved from `_rawConfig`
+    // — see `AlignSession.floorplanKey`'s own doc comment. Falls back to the
+    // live `src` only as a defensive belt-and-braces (in practice `_rawConfig`
+    // always resolves SOME src here too, since `_alignCandidates` already
+    // gates entry on one existing — split or merged — before this can run).
+    const floorplanKey = resolveImageBaseSrc(this._rawConfig ?? this._config, vac) ?? src;
     this._alignSession = {
-      vacuum: vac.entity, floorplan: src,
+      vacuum: vac.entity, floorplan: src, floorplanKey,
       start: { ...seat }, draft: { ...seat },
       history: [], future: [],
       appearanceStart: { ...appearance }, appearanceDraft: { ...appearance },
@@ -4418,6 +4450,14 @@ export class AnyVacCard extends LitElement {
     this._fiducialDetectBusy = false;
     this._fiducialDetectError = "";
     this._fiducialDetectResult = null;
+    this._floorplanSnapshotBusy = false;
+    this._floorplanSnapshotError = "";
+    this._homeFrameSnapshotBusy = false;
+    this._homeFrameSnapshotError = "";
+    this._guideExportBusy = false;
+    this._guideExportError = "";
+    this._guideExportResult = null;
+    this._placeRoomsResult = null;
   }
 
   /** docs/41 §4.8: a home-frame registered vacuum is shown as a read-only
@@ -4540,7 +4580,7 @@ export class AnyVacCard extends LitElement {
     const appearance: Record<string, unknown> = { ...session.appearanceDraft };
     try {
       await this.hass.callService("anyvac", "set_floorplan_seat", {
-        floorplan: session.floorplan, vacuum: vac.entity, map, appearance,
+        floorplan: session.floorplanKey, vacuum: vac.entity, map, appearance,
       });
       this._closeAlign();
     } catch (err) {
@@ -5158,6 +5198,7 @@ export class AnyVacCard extends LitElement {
     const style = effectiveRoomStyle(this._config);
     this._roomsSession = {
       floorplan: session.floorplan,
+      floorplanKey: session.floorplanKey,
       vacuum: merged ? undefined : vac.entity,
       rooms, start: { ...rooms },
       selected: null,
@@ -5454,14 +5495,14 @@ export class AnyVacCard extends LitElement {
         if (s.scaleY != null) map.scale_y = Math.round(s.scaleY * 100) / 100;
         const appearance = effectiveAppearance(vac);
         await this.hass.callService("anyvac", "set_floorplan_seat", {
-          floorplan: session.floorplan, vacuum: session.vacuum,
+          floorplan: session.floorplanKey, vacuum: session.vacuum,
           map, appearance, rooms: roomsPayload,
         });
       } else {
         const raw = this._floorplanSeatsRaw();
-        const entry = raw?.[session.floorplan];
+        const entry = raw?.[session.floorplanKey];
         await this.hass.callService("anyvac", "set_floorplan_seat", {
-          floorplan: session.floorplan,
+          floorplan: session.floorplanKey,
           rooms: roomsPayload,
           image_base: entry?.image_base ?? null,
           room_style: { ...session.styleDraft },
@@ -5508,11 +5549,13 @@ export class AnyVacCard extends LitElement {
     if (this._floorplanSession) return;
     const ib = this._floorplanCardImageBase();
     const src = this._alignSession?.floorplan;
-    if (!ib || !src) return;
+    const floorplanKey = this._alignSession?.floorplanKey;
+    if (!ib || !src || !floorplanKey) return;
     const { src: _src, rotation: _r, scale: _s, offset_x: _ox, offset_y: _oy, ...rest } = ib;
     const seat = effectiveFloorplanGeometry(ib);
     this._floorplanSession = {
-      floorplan: src, start: { ...seat }, draft: { ...seat }, history: [], future: [], rest,
+      floorplan: src, floorplanKey,
+      start: { ...seat }, draft: { ...seat }, history: [], future: [], rest,
     };
     this._floorGesture = null;
   }
@@ -5569,8 +5612,8 @@ export class AnyVacCard extends LitElement {
       offset_x: Math.round(d.offset_x * 100) / 100,
       offset_y: Math.round(d.offset_y * 100) / 100,
     };
-    const entry = this._floorplanSeatsRaw()?.[session.floorplan];
-    const payload: Record<string, unknown> = { floorplan: session.floorplan, image_base };
+    const entry = this._floorplanSeatsRaw()?.[session.floorplanKey];
+    const payload: Record<string, unknown> = { floorplan: session.floorplanKey, image_base };
     if (entry?.room_style) payload.room_style = entry.room_style;
     try {
       await this.hass.callService("anyvac", "set_floorplan_seat", payload);
@@ -5842,7 +5885,7 @@ export class AnyVacCard extends LitElement {
     const appearance: Record<string, unknown> = { ...session.appearanceDraft };
     try {
       await this.hass.callService("anyvac", "set_floorplan_seat", {
-        floorplan: session.floorplan, vacuum: vac.entity, map, appearance,
+        floorplan: session.floorplanKey, vacuum: vac.entity, map, appearance,
       });
       this._closeAlign();
     } catch (err) {
@@ -5916,8 +5959,8 @@ export class AnyVacCard extends LitElement {
       home_anchors: anchors,
       home_anchors_frame_id: frameId,
     };
-    const entry = this._floorplanSeatsRaw()?.[session.floorplan];
-    const payload: Record<string, unknown> = { floorplan: session.floorplan, image_base };
+    const entry = this._floorplanSeatsRaw()?.[session.floorplanKey];
+    const payload: Record<string, unknown> = { floorplan: session.floorplanKey, image_base };
     if (entry?.room_style) payload.room_style = entry.room_style;
     try {
       await this.hass.callService("anyvac", "set_floorplan_seat", payload);
@@ -5943,8 +5986,8 @@ export class AnyVacCard extends LitElement {
       rotation: Math.round(d.rotation * 100) / 100, scale: Math.round(d.scale * 100) / 100,
       offset_x: Math.round(d.offset_x * 100) / 100, offset_y: Math.round(d.offset_y * 100) / 100,
     };
-    const entry = this._floorplanSeatsRaw()?.[session.floorplan];
-    const payload: Record<string, unknown> = { floorplan: session.floorplan, image_base };
+    const entry = this._floorplanSeatsRaw()?.[session.floorplanKey];
+    const payload: Record<string, unknown> = { floorplan: session.floorplanKey, image_base };
     if (entry?.room_style) payload.room_style = entry.room_style;
     try {
       await this.hass.callService("anyvac", "set_floorplan_seat", payload);
@@ -5970,7 +6013,10 @@ export class AnyVacCard extends LitElement {
    *  with `hide_map` forced on. Best-effort: a failure partway through is
    *  logged and left for the user to fix individually via that vacuum's own
    *  Seat & Appearance tool — the calibration write itself already
-   *  succeeded by the time this runs, so it's never worth undoing that. */
+   *  succeeded by the time this runs, so it's never worth undoing that.
+   *  `floorplan` must be the STABLE identity key (`session.floorplanKey`,
+   *  docs/42 §9 fáze J4) — every caller already passes that, never the live
+   *  `session.floorplan`. */
   private async _hideMapCascade(floorplan: string): Promise<void> {
     const raw = this._floorplanSeatsRaw();
     for (const vac of this._config.vacuums ?? []) {
@@ -6144,7 +6190,7 @@ export class AnyVacCard extends LitElement {
       this._homeCalibError = "Couldn't save the calibration — try again.";
       return;
     }
-    await this._hideMapCascade(session.floorplan);
+    await this._hideMapCascade(session.floorplanKey);
     this._homeCalib = null;
     this._homeCalibSnapshotUrl = "";
     this._homeCalibCrop = null;
@@ -6226,7 +6272,7 @@ export class AnyVacCard extends LitElement {
       if (!anchors?.length) throw new Error("no markers detected");
       const ok = await this._saveHomeAnchors(anchors as HomeFrameAnchor[], known.frameId);
       if (!ok) throw new Error("couldn't save the detected anchors");
-      await this._hideMapCascade(session.floorplan);
+      await this._hideMapCascade(session.floorplanKey);
       this._fiducialDetectResult = {
         found: res?.response?.found ?? anchors.length,
         missing: res?.response?.missing ?? [],
@@ -6239,6 +6285,232 @@ export class AnyVacCard extends LitElement {
       console.warn("[anyvac-card] Fiducials: detect_floorplan_fiducials failed", err);
     } finally {
       this._fiducialDetectBusy = false;
+    }
+  }
+
+  // ── Floorplan & Calibrate tool: snapshot/acquisition (docs/42 §9 fáze J4) ──
+  // Ports editor.ts's three Maps-tab buttons ("Snapshot map as floorplan",
+  // "Snapshot home frame as floorplan", "Export guide layers") into this
+  // tool's Geometry sub-tab side panel (`_renderFloorplanGeoTool`) —
+  // reachable only once a card-level `image_base` already exists
+  // (`_floorplanSession` non-null), NOT from `_renderVePlaceholder`'s
+  // bootstrap-from-nothing screen: a config with no card-level `image_base`
+  // at all also has no raw `src` for `applyFloorplanSeats`'s merged-mode
+  // branch to key an override under (`config.map_mode === "merged" &&
+  // config.image_base?.src` — seatedit.ts), so a snapshot fired from there
+  // could never actually persist. Bootstrapping a brand new merged floorplan
+  // from zero stays a Config editor action (its Maps tab writes `image_base`
+  // straight into YAML, which needs no lookup key at all) until a later
+  // phase extends that backend contract — same kind of scope boundary
+  // `FloorplanEditSession`'s own doc comment already draws.
+
+  /** Gate for both snapshot buttons below — they share the same two
+   *  services (the snapshot itself, then the `set_floorplan_seat` write
+   *  that persists it), mirroring `_homeCalibServiceAvailable`'s own
+   *  two-service check. */
+  private _floorplanSnapshotServiceAvailable(): boolean {
+    return !!this.hass.services?.["anyvac"]?.["snapshot_map_as_floorplan"] && this._alignServiceAvailable();
+  }
+  /** "Export guide layers" has no config side effect at all (docs/37 §2.4),
+   *  so it needs only the one service, not `set_floorplan_seat` too. */
+  private _guideExportServiceAvailable(): boolean {
+    return !!this.hass.services?.["anyvac"]?.["export_map_guide"];
+  }
+
+  /** Re-snapshots `_alignVac()`'s currently-resolved map image entity as the
+   *  shared card-level floorplan (docs/30 §8/§38 §4.2, editor.ts's own
+   *  `_snapshotFloorplan`) — through `set_floorplan_seat`'s `image_base`
+   *  override rather than a direct YAML write, since the Visual editor has
+   *  none. Resends the WHOLE `image_base` record (`_floorplanSession.rest`
+   *  + the CURRENT geometry, docs/42 §8 bod 3 "no sentinel") with only
+   *  `src`/`crop_box` actually changed — mirroring editor.ts's own
+   *  merge-not-replace `_setEditedImageBase`, including its one quirk: an
+   *  existing `home_anchors` calibration is carried through untouched even
+   *  though it was solved against the OLD file's pixel space (same as
+   *  there — re-run "Calibrate against home frame" afterwards if needed).
+   *  Bundles the room-placement side effect into the SAME write, then the
+   *  `hide_map` cascade (`_hideMapCascade`, same J3 precedent), then updates
+   *  every open session's LIVE `floorplan` field in place so the overlay
+   *  keeps showing the right picture without a close/reopen —
+   *  `floorplanKey` (the STABLE identity the write itself used) never
+   *  changes, see `AlignSession.floorplanKey`'s own doc comment for why. */
+  private async _snapshotMapAsFloorplan(): Promise<void> {
+    const session = this._alignSession;
+    const fs = this._floorplanSession;
+    const vac = this._alignVac();
+    if (!session || !fs || !vac || this._config.map_mode !== "merged"
+      || !this._floorplanSnapshotServiceAvailable()) return;
+    const entity = this._mapEntityFor(vac);
+    if (!entity) return;
+    this._floorplanSnapshotBusy = true;
+    this._floorplanSnapshotError = "";
+    this._placeRoomsResult = null;
+    try {
+      const res = (await (this.hass as any).callService(
+        "anyvac", "snapshot_map_as_floorplan",
+        { image_entity: entity, name: vac.name || vac.entity },
+        undefined, false, true,
+      )) as { response?: { path?: string; crop?: CropBox } } | undefined;
+      const path = res?.response?.path;
+      if (!path) throw new Error("no path in service response");
+      const crop = res?.response?.crop;
+      const d = fs.draft;
+      const image_base: Record<string, unknown> = {
+        ...fs.rest,
+        src: path,
+        rotation: Math.round(d.rotation * 100) / 100,
+        scale: Math.round(d.scale * 100) / 100,
+        offset_x: Math.round(d.offset_x * 100) / 100,
+        offset_y: Math.round(d.offset_y * 100) / 100,
+        ...(crop ? { crop_box: { entity: vac.entity, ...crop } } : {}),
+      };
+      // docs/30 §8/§38 §4.2: place this vacuum's own rooms onto the crop we
+      // just got back, same as editor.ts's `_placeOwnRooms` — built directly
+      // as a `set_floorplan_seat` `rooms` DIFF (geometry + area_id only)
+      // rather than a whole re-written array: the override contract has no
+      // slot for `icon`/`name` at all (`RoomOverride`, seatedit.ts — the
+      // same limitation the Rooms tool's own "Add room" already lives
+      // with), so a brand new room lands with just its key/geometry,
+      // refinable from the Config editor afterwards like any other
+      // Rooms-tool-created room.
+      const roomsPayload: Record<string, unknown> = {};
+      let placed = 0, added = 0;
+      if (crop) {
+        const at = this._intAttrs(vac);
+        const intRooms: Array<Record<string, any>> = Array.isArray(at?.rooms) ? at!.rooms : [];
+        const existingByKey = new Map((this._config.rooms ?? []).map((r) => [r.key, r] as const));
+        for (const ir of intRooms) {
+          const nm = ir?.name as string | undefined;
+          const bp = ir?.bbox_px as { x0: number; y0: number; x1: number; y1: number } | undefined | null;
+          if (!nm || !bp) continue;
+          const rect = placeRoomInCrop(bp, crop);
+          if (!rect) continue;
+          roomsPayload[nm] = { ...rect, area_id: existingByKey.get(nm)?.area_id ?? null };
+          if (existingByKey.has(nm)) placed++; else added++;
+        }
+      }
+      const entry = this._floorplanSeatsRaw()?.[session.floorplanKey];
+      const payload: Record<string, unknown> = { floorplan: session.floorplanKey, image_base };
+      if (Object.keys(roomsPayload).length) payload.rooms = roomsPayload;
+      if (entry?.room_style) payload.room_style = entry.room_style;
+      await this.hass.callService("anyvac", "set_floorplan_seat", payload);
+      // Live picture update — see this method's own doc comment on why
+      // `floorplan` (not `floorplanKey`) is what moves here.
+      this._alignSession = { ...session, floorplan: path };
+      if (this._roomsSession) this._roomsSession = { ...this._roomsSession, floorplan: path };
+      const { src: _s, rotation: _r, scale: _sc, offset_x: _ox, offset_y: _oy, ...restAfter } = image_base;
+      this._floorplanSession = { ...fs, floorplan: path, rest: restAfter };
+      if (crop) this._placeRoomsResult = { placed, added };
+      await this._hideMapCascade(session.floorplanKey);
+    } catch (err) {
+      this._floorplanSnapshotError =
+        "Couldn't snapshot this vacuum's map — make sure the anyvac integration " +
+        "is updated to at least 0.88.0, then try again.";
+      console.warn("[anyvac-card] Floorplan: snapshot_map_as_floorplan failed", err);
+    } finally {
+      this._floorplanSnapshotBusy = false;
+    }
+  }
+
+  /** Home-frame equivalent of `_snapshotMapAsFloorplan` above (docs/40 §4.4
+   *  Fáze 3, editor.ts's own `_snapshotHomeFrame`) — no `image_entity`: the
+   *  backend renders a composite of every vacuum currently registered into
+   *  the shared home frame instead of one vacuum's own map. No room
+   *  placement afterwards, unlike the map version above — a home-frame
+   *  vacuum's rooms are computed LIVE from `bbox_home_px`/`outline_home_px`
+   *  every render (`homeFrameCropFor`, seatfit.ts), never a one-shot static
+   *  placement, so there is nothing here to diff into a `rooms` override. */
+  private async _snapshotHomeFrameAsFloorplan(): Promise<void> {
+    const session = this._alignSession;
+    const fs = this._floorplanSession;
+    if (!session || !fs || this._config.map_mode !== "merged"
+      || !this._floorplanSnapshotServiceAvailable()) return;
+    this._homeFrameSnapshotBusy = true;
+    this._homeFrameSnapshotError = "";
+    try {
+      const res = (await (this.hass as any).callService(
+        "anyvac", "snapshot_map_as_floorplan",
+        { frame: "home", name: "home_frame" },
+        undefined, false, true,
+      )) as {
+        response?: { path?: string; frame_id?: string; crop?: CropBox };
+      } | undefined;
+      const path = res?.response?.path;
+      const frameId = res?.response?.frame_id;
+      const crop = res?.response?.crop;
+      if (!path || !frameId || !crop) throw new Error("incomplete response — integration too old?");
+      const d = fs.draft;
+      const image_base: Record<string, unknown> = {
+        ...fs.rest,
+        src: path,
+        crop_box: { frame_id: frameId, ...crop },
+        rotation: Math.round(d.rotation * 100) / 100,
+        scale: Math.round(d.scale * 100) / 100,
+        offset_x: Math.round(d.offset_x * 100) / 100,
+        offset_y: Math.round(d.offset_y * 100) / 100,
+      };
+      const entry = this._floorplanSeatsRaw()?.[session.floorplanKey];
+      const payload: Record<string, unknown> = { floorplan: session.floorplanKey, image_base };
+      if (entry?.room_style) payload.room_style = entry.room_style;
+      await this.hass.callService("anyvac", "set_floorplan_seat", payload);
+      this._alignSession = { ...session, floorplan: path };
+      if (this._roomsSession) this._roomsSession = { ...this._roomsSession, floorplan: path };
+      const { src: _s, rotation: _r, scale: _sc, offset_x: _ox, offset_y: _oy, ...restAfter } = image_base;
+      this._floorplanSession = { ...fs, floorplan: path, rest: restAfter };
+      await this._hideMapCascade(session.floorplanKey);
+    } catch (err) {
+      this._homeFrameSnapshotError =
+        "Couldn't snapshot the home frame — make sure at least two vacuums have a " +
+        "home-frame registration (integration ≥ 1.8.0, check the 'registration' " +
+        "sensor attribute), then try again.";
+      console.warn("[anyvac-card] Floorplan: snapshot_map_as_floorplan (frame: home) failed", err);
+    } finally {
+      this._homeFrameSnapshotBusy = false;
+    }
+  }
+
+  /** Calls `anyvac.export_map_guide` (docs/37) for `_alignVac()`'s currently
+   *  resolved map image entity — same entity `_snapshotMapAsFloorplan` above
+   *  uses. No config side effects at all (docs/37 §2.4): never touches
+   *  `image_base`/`hide_map`/`rooms`, so this needs no `set_floorplan_seat`
+   *  call and no identity key at all — just a busy/error/result display,
+   *  mirroring editor.ts's own `_exportMapGuide`. docs/38 §4.3: when this
+   *  floorplan's existing `crop_box` was cut from THIS SAME entity, that
+   *  exact crop is sent along so the layers line up with the saved PNG even
+   *  if the robot has remapped since; otherwise the backend derives its own. */
+  private async _exportGuideLayers(): Promise<void> {
+    const fs = this._floorplanSession;
+    const vac = this._alignVac();
+    if (!fs || !vac || !this._guideExportServiceAvailable()) return;
+    const entity = this._mapEntityFor(vac);
+    if (!entity) return;
+    this._guideExportBusy = true;
+    this._guideExportError = "";
+    this._guideExportResult = null;
+    const cropBox = fs.rest?.crop_box as
+      { entity?: string; x0: number; y0: number; x1: number; y1: number } | undefined;
+    const sendCrop = cropBox && cropBox.entity === vac.entity
+      ? { x0: cropBox.x0, y0: cropBox.y0, x1: cropBox.x1, y1: cropBox.y1 }
+      : undefined;
+    try {
+      const data: Record<string, unknown> = { image_entity: entity, name: vac.name || vac.entity };
+      if (sendCrop) data.crop = sendCrop;
+      const res = (await (this.hass as any).callService(
+        "anyvac", "export_map_guide", data, undefined, false, true,
+      )) as {
+        response?: { paths?: Record<string, string>; size?: { w: number; h: number } };
+      } | undefined;
+      const paths = res?.response?.paths;
+      const size = res?.response?.size;
+      if (!paths || !size || !Object.keys(paths).length) throw new Error("no guide layers in service response");
+      this._guideExportResult = { paths, size };
+    } catch (err) {
+      this._guideExportError =
+        "Couldn't export guide layers — make sure the anyvac integration " +
+        "is updated to at least 1.4.0, then try again.";
+      console.warn("[anyvac-card] Floorplan: export_map_guide failed", err);
+    } finally {
+      this._guideExportBusy = false;
     }
   }
 
@@ -7022,8 +7294,70 @@ export class AnyVacCard extends LitElement {
             </div>
             <div class="rooms-side-note">Drag the floorplan itself, or a corner/rotate handle. Every vacuum
               sharing this floorplan is shown dimmed underneath, unedited, as a reference.</div>
+            ${this._renderFloorplanSnapshotSection(session)}
           </div>
         </div>
+    `;
+  }
+
+  /** docs/42 §9 fáze J4 — the Geometry sub-tab's own "Snapshot" section,
+   *  below the geometry fields: re-run either of the two snapshot buttons
+   *  (map or home frame) to replace this floorplan's `image_base.src`, or
+   *  export guide layers for the currently-selected vacuum's map without
+   *  touching config at all. See `_snapshotMapAsFloorplan`'s doc comment for
+   *  why this only exists here (a card-level floorplan must already exist)
+   *  and never on `_renderVePlaceholder`'s bootstrap screen. */
+  private _renderFloorplanSnapshotSection(session: FloorplanEditSession) {
+    const vac = this._alignVac();
+    const vacName = vac?.name || vac?.entity || "this vacuum";
+    const snapshotOk = this._floorplanSnapshotServiceAvailable();
+    return html`
+      <div class="align-side-panel-divider"></div>
+      <div class="section-title">Snapshot / acquisition</div>
+      <button class="align-btn" style="width:auto;padding:0 10px;gap:6px"
+        ?disabled=${this._floorplanSnapshotBusy || !snapshotOk || !vac || !this._mapEntityFor(vac)}
+        @click=${() => this._snapshotMapAsFloorplan()}>
+        <ha-icon icon="mdi:camera"></ha-icon>
+        <span>${this._floorplanSnapshotBusy ? "Snapshotting…" : `Re-snapshot ${vacName}'s map as floorplan`}</span>
+      </button>
+      <div class="rooms-side-note">Replaces this floorplan's Image src with a fresh capture of
+        ${vacName}'s current map, re-places its own rooms onto the new crop by name, and turns
+        "Hide vacuum map" on for every vacuum sharing this floorplan. Geometry above and any
+        existing calibration are carried through unchanged — re-align/re-calibrate afterwards
+        if the new capture doesn't line up.</div>
+      ${this._floorplanSnapshotError ? html`<div class="floor-calib-error">${this._floorplanSnapshotError}</div>` : nothing}
+      ${this._placeRoomsResult ? html`
+        <div class="rooms-side-note">✅ Rooms placed: <strong>${this._placeRoomsResult.placed}</strong> updated,
+          <strong>${this._placeRoomsResult.added}</strong> added.</div>
+      ` : nothing}
+      <button class="align-btn" style="width:auto;padding:0 10px;gap:6px"
+        ?disabled=${this._homeFrameSnapshotBusy || !snapshotOk}
+        @click=${() => this._snapshotHomeFrameAsFloorplan()}>
+        <ha-icon icon="mdi:home-map-marker"></ha-icon>
+        <span>${this._homeFrameSnapshotBusy ? "Snapshotting…" : "Re-snapshot home frame as floorplan"}</span>
+      </button>
+      <div class="rooms-side-note">Replaces this floorplan's Image src with a fresh composite of every
+        vacuum currently registered into the shared home frame. No room placement (home-frame rooms
+        compute live) — just the image and its identity crop.</div>
+      ${this._homeFrameSnapshotError ? html`<div class="floor-calib-error">${this._homeFrameSnapshotError}</div>` : nothing}
+      <div class="align-side-panel-divider"></div>
+      <button class="align-btn" style="width:auto;padding:0 10px;gap:6px"
+        ?disabled=${this._guideExportBusy || !this._guideExportServiceAvailable() || !vac || !this._mapEntityFor(vac)}
+        @click=${() => this._exportGuideLayers()}>
+        <ha-icon icon="mdi:layers-outline"></ha-icon>
+        <span>${this._guideExportBusy ? "Exporting…" : `Export ${vacName}'s guide layers`}</span>
+      </button>
+      <div class="rooms-side-note">Renders wall/floor guide layers for a photo overlay in an external
+        image editor — no config changes at all.</div>
+      ${this._guideExportError ? html`<div class="floor-calib-error">${this._guideExportError}</div>` : nothing}
+      ${this._guideExportResult ? html`
+        <div class="rooms-side-note">✅ ${Object.keys(this._guideExportResult.paths).length} layer(s) at
+          ${this._guideExportResult.size.w}×${this._guideExportResult.size.h}px:
+          ${Object.entries(this._guideExportResult.paths).map(([name, path]) => html`
+            <div><code>${name}</code>: ${path}</div>
+          `)}
+        </div>
+      ` : nothing}
     `;
   }
 

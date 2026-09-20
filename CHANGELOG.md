@@ -6,6 +6,52 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [1.35.0] - 2026-09-20
+
+### Added
+
+- **Floorplan & Calibrate tool, snapshot/acquisition (docs/42 §9 fáze J4).**
+  The Geometry sub-tab's side panel now offers the three buttons the Config
+  editor's Maps tab already had, ported into the Visual editor: "Snapshot
+  map as floorplan" (re-captures the currently-selected vacuum's own map as
+  the shared card-level floorplan), "Snapshot home frame as floorplan"
+  (re-captures a composite of every vacuum registered into the shared home
+  frame instead), and "Export guide layers" (renders wall/floor guide
+  layers for an external photo overlay, with no config side effects at
+  all). Both snapshot buttons write through `set_floorplan_seat`'s
+  `image_base` override rather than a direct YAML write (the Visual editor
+  has none), resending the whole record ("no sentinel") with only `src`/
+  `crop_box` actually changed — geometry and any existing calibration are
+  carried through unchanged, same merge-not-replace behaviour the Config
+  editor's own version has, including its one quirk: a `home_anchors`
+  calibration solved against the OLD file is left in place rather than
+  cleared (re-run "Calibrate against home frame" afterwards if the new
+  capture doesn't line up). The map snapshot also re-places this vacuum's
+  own rooms onto the new crop by name, as a `rooms` diff (geometry +
+  `area_id` only — the override contract has no `icon`/`name` slot, same
+  limitation the Rooms tool's own "Add room" already has), and both
+  snapshots turn "Hide vacuum map" on for every vacuum sharing the
+  floorplan, reusing fáze J3's `_hideMapCascade`. Reachable only once a
+  card-level floorplan already exists (this session's Floorplan tool has
+  actually opened) — bootstrapping a brand new merged floorplan from
+  nothing stays a Config editor action, since the backend override contract
+  has no key to persist under until one exists.
+- **Floorplan-identity-key stability fix, made necessary by the above.**
+  Every open Visual-editor session now carries TWO floorplan fields instead
+  of one: `floorplan` (the LIVE/effective `image_base.src`, used to render
+  the picture and to match "other vacuums sharing this floorplan") and the
+  new `floorplanKey` (the STABLE, `_rawConfig`-derived identity every
+  `set_floorplan_seat` call's `floorplan:` parameter now sends instead).
+  Before this phase the Visual editor never wrote a new `src` at all, so
+  the two always coincided; fáze J4's snapshot buttons are the first
+  card-side writes that change `src`, and without this split, re-snapshotting
+  would silently fork every later Save in that session — and every Save in
+  every LATER session, until the user manually re-pointed the YAML — onto
+  an unreachable `floorplan_seats` entry (`applyFloorplanSeats` always
+  looks overrides up by the raw, declared `src`, never the live one). Fixes
+  the risk flagged (and deliberately routed around, for the fiducial
+  workflow only) in fáze J3's own `_fiducialSnapshotPath` doc comment.
+
 ## [1.34.0] - 2026-09-20
 
 ### Added
