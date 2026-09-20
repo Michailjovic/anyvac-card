@@ -6,6 +6,44 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [1.37.0] - 2026-09-20
+
+### Added
+
+- **Home-frame Re-crop tool (docs/42 §9 fáze N, docs/41 §4.5 "cesta A").** A
+  cesta-A floorplan (`image_base.crop_box.frame_id` set — "Snapshot home
+  frame as floorplan") places every room/marker straight from `crop_box`
+  (`placeRoomInCrop`/`pointInCrop`), never consulting `image_base`'s own
+  rotation/scale/offset at all — so when the saved FILE gets re-cropped or
+  re-exported outside the card, the free-drag Geometry gizmo (fáze J1)
+  could only desync the picture from an already-correct overlay, and there
+  was no way to fix the stale `crop_box` itself. The Floorplan & Calibrate
+  tool's Geometry sub-tab now detects this case and swaps in a dedicated
+  **Re-crop** tool instead: the new file sits fixed, and the user drags/
+  scales the OLD ghost overlay (every home-frame-registered vacuum's rooms
+  and markers, still placed via the currently-saved `crop_box`) into visual
+  alignment with it — a plain translate + uniform scale, no rotation/fit
+  (cesta A's own "known crop, no fit/rotation" contract). Save runs that
+  gesture through `recropFromGesture` (seatfit.ts), the linear inverse of
+  `pointInCrop`, and writes the corrected `crop_box` alone — every other
+  `image_base` field is resent untouched. A `canvasScaleForCrop` hint
+  (previously written but never wired into any UI) tells a harmless
+  uniform re-export apart from a genuine re-crop that actually needs
+  fixing. New `tests/recrop-fit.spec.ts` (8 pure-geometry tests covering
+  the inverse formula itself — translate/scale/combined round-trips,
+  degenerate inputs) and `tests/recrop-tool.spec.ts` (7 tests covering the
+  tool's own session/gesture/Save wiring, including a no-registered-vacuum
+  placeholder and a foreign-origin-floorplan regression check).
+  Investigation while scoping this phase found that docs/41's other named
+  fáze-G deliverable ("home_anchors syntéza") and the Rooms tool's own
+  handling of home-frame-derived rooms were both already complete — J3
+  (1.34.0) already ported cesta B in full, and the Rooms tool's existing
+  `map_x`/`map_y` per-room override already takes precedence over a
+  live-computed home-frame room position with no gating needed, exactly
+  the same as it does for any other vacuum's room. Fáze N is therefore
+  fully delivered with this one addition — see docs/42 for the detailed
+  writeup.
+
 ## [1.36.0] - 2026-09-20
 
 ### Changed

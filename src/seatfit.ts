@@ -571,6 +571,70 @@ export function canvasScaleForCrop(
   return (nat.w / cropW + nat.h / cropH) / 2;
 }
 
+/**
+ * docs/42 §9 fáze N (docs/41 §4.5 "cesta A") — recovers a corrected
+ * `crop_box` after a cesta-A floorplan FILE gets re-cropped/re-exported
+ * outside the card (so the saved `crop_box` numbers no longer describe what
+ * the file actually shows, and every room/marker `pointInCrop`/
+ * `placeRoomInCrop` places against it drifts off the picture).
+ *
+ * The Visual editor lets the user drag/scale the OLD (still-`crop`-placed)
+ * ghost overlay — every home-frame-registered vacuum's rooms/markers — into
+ * visual alignment with the NEW file, as a plain translate + uniform scale
+ * in the exact same wrap-percent units `image_base.offset_x/offset_y/scale`
+ * already use (no rotation, no anisotropic fit — cesta A's own "known crop,
+ * no fit/rotation" contract, `placeRoomInCrop`'s doc comment). This is that
+ * gesture's linear inverse: it returns the new `crop` such that
+ * `pointInCrop(homePx, <returned>)` reproduces, for every `homePx`, exactly
+ * what applying `gesture` to `pointInCrop(homePx, crop)` produced —
+ * i.e. the ghost ends up exactly where the user dragged/scaled it to,
+ * without moving a single room/marker again afterwards.
+ *
+ * Derivation (both axes independently, `s = gesture.scale / 100`): a point
+ * at old-crop percent `p` moves, under the gesture, to `T(p) = (p - 50)*s +
+ * 50 + offset` (scale about the wrap centre, then translate — the same
+ * order `image_base`'s own CSS placement already uses). Requiring
+ * `pointInCrop(homePx, new) === T(pointInCrop(homePx, crop))` for every
+ * `homePx` pins down `new` uniquely: `newSize = oldSize / s`, `newOrigin =
+ * oldOrigin + oldSize/100 * (50*(1 - 1/s) - offset/s)`.
+ *
+ * Returns `null` for a degenerate `crop` (zero/negative size) or a
+ * non-positive `gesture.scale` — both mean there is nothing to invert.
+ */
+export function recropFromGesture(
+  crop: CropBox,
+  gesture: { offset_x: number; offset_y: number; scale: number },
+): CropBox | null {
+  const oldW = crop.x1 - crop.x0;
+  const oldH = crop.y1 - crop.y0;
+  const s = gesture.scale / 100;
+  if (!(oldW > 0) || !(oldH > 0) || !(s > 1e-6)) return null;
+  const newW = oldW / s;
+  const newH = oldH / s;
+  const x0 = crop.x0 + (oldW / 100) * (50 * (1 - 1 / s) - gesture.offset_x / s);
+  const y0 = crop.y0 + (oldH / 100) * (50 * (1 - 1 / s) - gesture.offset_y / s);
+  return { x0, y0, x1: x0 + newW, y1: y0 + newH };
+}
+
+/** `crop_box:` YAML fragment for the manual-copy fallback (same "just the
+ *  changed fragment" precedent as `floorplanGeometryToYaml`/`seatToYaml`,
+ *  seatedit.ts) — the Re-crop tool's own Copy-as-YAML button, since a solved
+ *  cesta-A `crop_box` is just as service-write-only as `image_base`'s other
+ *  fields otherwise are. Rounded to the nearest px — `crop_box` numbers are
+ *  always whole home-frame pixels elsewhere in this file. */
+export function cropBoxToYaml(crop: CropBox & { frame_id: string }): string {
+  const r = (n: number) => Math.round(n);
+  return [
+    "image_base:",
+    "  crop_box:",
+    `    frame_id: "${crop.frame_id}"`,
+    `    x0: ${r(crop.x0)}`,
+    `    y0: ${r(crop.y0)}`,
+    `    x1: ${r(crop.x1)}`,
+    `    y1: ${r(crop.y1)}`,
+  ].join("\n");
+}
+
 /** Projects one point already expressed in a seat's own "q" space (NW-
  *  normalised, origin at the source content's centre) onto the floorplan
  *  wrap, as percent (0..100 on both axes) — "apply an already-solved seat

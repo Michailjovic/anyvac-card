@@ -52,6 +52,9 @@ import {
   seatScaleYRatio,
   computeSeatFit,
   buildCalibrationAnchors,
+  recropFromGesture,
+  cropBoxToYaml,
+  canvasScaleForCrop,
   type SeatParams,
   type SeatFitResult,
   type CropBox,
@@ -509,6 +512,41 @@ export class AnyVacCard extends LitElement {
     startPos: Map<number, { x: number; y: number }>;
     livePos: Map<number, { x: number; y: number }>;
   } | null = null;
+  /** docs/42 §9 fáze N (docs/41 §4.5 "cesta A") — the Re-crop tool's own
+   *  gesture draft: how far the OLD ghost overlay (every home-frame vacuum's
+   *  rooms/markers, placed via the CURRENT saved `crop_box`) has been
+   *  dragged/scaled to line up with a re-cropped/re-exported floorplan
+   *  FILE. Lives independently of `_floorplanSession.draft` (that one is
+   *  `image_base`'s own rotation/scale/offset, which cesta A's room/marker
+   *  placement never consults at all — `placeRoomInCrop`/`pointInCrop` go
+   *  straight from `crop_box`, seatfit.ts) — this is scratch-only and never
+   *  written to config directly; `recropFromGesture` (seatfit.ts) turns it
+   *  into a corrected `crop_box` on Save. Identity (`{0,0,100,0}`) means "no
+   *  re-crop attempted yet"; reset alongside the rest of
+   *  `_resetFloorplanSubmodes`. No rotation handle is ever offered for it
+   *  (cesta A has no fit/rotation, `placeRoomInCrop`'s own doc comment), so
+   *  `rotation` here is always 0 — kept only because `SeatParams`/
+   *  `_alignCornerPct`/`translateSeat`/`scaleSeatAbout` all require the full
+   *  shape (docs/14 rule 1: reuse the one gizmo primitive set, don't fork a
+   *  rotation-less variant of it). */
+  @state() private _recropDraft: SeatParams = { rotation: 0, scale: 100, offset_x: 0, offset_y: 0 };
+  @state() private _recropHistory: SeatParams[] = [];
+  @state() private _recropFuture: SeatParams[] = [];
+  /** In-progress Re-crop gizmo gesture — mirrors `_floorGesture` exactly,
+   *  minus "rotate" (see `_recropDraft`'s own doc comment). */
+  private _recropGesture: {
+    kind: "drag" | "scale";
+    startSeat: SeatParams;
+    pivotPct?: { x: number; y: number };
+    startPos: Map<number, { x: number; y: number }>;
+    livePos: Map<number, { x: number; y: number }>;
+  } | null = null;
+  /** Natural pixel size of the currently-loaded (possibly re-cropped)
+   *  floorplan file, for the Re-crop tool's own `canvasScaleForCrop`
+   *  mismatch diagnostic — same "capture off the `<img>`'s own `load`
+   *  event" convention `_pvNat` (editor.ts) already uses for the analogous
+   *  per-vacuum crop_box hint. */
+  @state() private _recropNat: { w: number; h: number } | null = null;
   /** Active layout profile (docs/18) — picked by viewport aspect ratio. */
   @state() private _profile: LayoutProfile = "landscape";
   /** Measured inner box of the map region (grid mode) for the exact rotated fit. */
@@ -4458,6 +4496,11 @@ export class AnyVacCard extends LitElement {
     this._guideExportError = "";
     this._guideExportResult = null;
     this._placeRoomsResult = null;
+    this._recropDraft = { rotation: 0, scale: 100, offset_x: 0, offset_y: 0 };
+    this._recropHistory = [];
+    this._recropFuture = [];
+    this._recropGesture = null;
+    this._recropNat = null;
   }
 
   /** docs/41 §4.8: a home-frame registered vacuum is shown as a read-only
@@ -5564,8 +5607,13 @@ export class AnyVacCard extends LitElement {
     const s = this._floorplanSession;
     if (!s) return false;
     const a = s.draft, b = s.start;
-    return a.rotation !== b.rotation || a.scale !== b.scale
-      || a.offset_x !== b.offset_x || a.offset_y !== b.offset_y;
+    if (a.rotation !== b.rotation || a.scale !== b.scale
+      || a.offset_x !== b.offset_x || a.offset_y !== b.offset_y) return true;
+    // docs/42 §9 fáze N: an in-progress Re-crop gesture is just as much an
+    // unsaved edit as a Geometry-gizmo drag, even though it never touches
+    // `s.draft` itself (see `_recropDraft`'s own doc comment).
+    const r = this._recropDraft;
+    return r.offset_x !== 0 || r.offset_y !== 0 || r.scale !== 100;
   }
 
   private _floorplanReset(): void {
@@ -5723,6 +5771,186 @@ export class AnyVacCard extends LitElement {
     if (d[field] === n) return;
     const next: SeatParams = { ...d, [field]: n };
     this._floorplanSession = { ...session, draft: next, history: [...session.history, d], future: [] };
+  }
+
+  // ── Floorplan & Calibrate tool: Re-crop (docs/42 §9 fáze N, docs/41 §4.5
+  // "cesta A") ────────────────────────────────────────────────────────────
+  //
+  // A cesta-A floorplan (`image_base.crop_box.frame_id` set — "Snapshot home
+  // frame as floorplan") is "exact by construction" (docs/41 §4.5): its
+  // rooms/markers are placed straight from `crop_box` (`placeRoomInCrop`/
+  // `pointInCrop`, seatfit.ts), with no per-vacuum seat and no reference at
+  // all to `image_base`'s own rotation/scale/offset — so the normal Geometry
+  // gizmo (which edits exactly those fields) cannot fix anything here, and
+  // would only desync the picture from an already-correct overlay if used.
+  // The one thing that CAN go stale is the FILE itself (re-exported/
+  // re-cropped externally); this tool recovers a corrected `crop_box` for
+  // that case, replacing the Geometry sub-tab's body whenever the floorplan
+  // is cesta-A identity (`_recropEligible`, checked by `_renderFloorplanTool`
+  // /`_renderFloorplanGeoTool`).
+
+  /** The saved `crop_box` this tool re-derives from — `null` for a
+   *  foreign-origin floorplan (no `frame_id`) or a malformed record, either
+   *  of which means there's nothing for the Re-crop tool to do (falls back
+   *  to the normal Geometry gizmo instead, see `_renderFloorplanGeoTool`). */
+  private _recropOldCrop(session: FloorplanEditSession): (CropBox & { frame_id: string }) | null {
+    const cb = session.rest?.crop_box as
+      { frame_id?: string; x0?: number; y0?: number; x1?: number; y1?: number } | undefined;
+    if (!cb?.frame_id || cb.x0 == null || cb.y0 == null || cb.x1 == null || cb.y1 == null) return null;
+    return { frame_id: cb.frame_id, x0: cb.x0, y0: cb.y0, x1: cb.x1, y1: cb.y1 };
+  }
+
+  /** Gate for the Geometry sub-tab rendering the Re-crop tool instead of the
+   *  normal free-drag gizmo — see this section's own header comment. */
+  private _recropEligible(session: FloorplanEditSession): boolean {
+    return !!this._recropOldCrop(session);
+  }
+
+  /** Every currently-configured vacuum actually registered into the crop's
+   *  own frame right now (`_homeFrameCropFor` re-checks the LIVE
+   *  `home_frame.id` against `crop_box.frame_id`, not just that a crop_box
+   *  is configured) — the "group of registered robots" docs/41 §4.5 has the
+   *  user drag/scale as one. Empty when every registered vacuum happens to
+   *  be offline/unregistered right now — the tool still renders (there's
+   *  still a `crop_box` to fix), just with nothing to preview against. */
+  private _recropGhostVacuums(): VacuumConfig[] {
+    return this._config.vacuums.filter((v) => this._homeFrameCropFor(v));
+  }
+
+  private _recropHasChanges(): boolean {
+    const r = this._recropDraft;
+    return r.offset_x !== 0 || r.offset_y !== 0 || r.scale !== 100;
+  }
+
+  private _recropReset(): void {
+    if (!this._recropHasChanges() && !this._recropHistory.length && !this._recropFuture.length) return;
+    this._recropHistory = [...this._recropHistory, this._recropDraft];
+    this._recropFuture = [];
+    this._recropDraft = { rotation: 0, scale: 100, offset_x: 0, offset_y: 0 };
+  }
+
+  private async _recropCopyYaml(): Promise<void> {
+    const session = this._floorplanSession;
+    const oldCrop = session ? this._recropOldCrop(session) : null;
+    if (!oldCrop) return;
+    const newCrop = recropFromGesture(oldCrop, this._recropDraft);
+    if (!newCrop) return;
+    try {
+      await navigator.clipboard.writeText(cropBoxToYaml({ ...newCrop, frame_id: oldCrop.frame_id }));
+      this._floorplanCopiedFlash = true;
+      setTimeout(() => { this._floorplanCopiedFlash = false; }, 1500);
+    } catch (err) {
+      console.warn("[anyvac-card] Re-crop: clipboard write failed", err);
+    }
+  }
+
+  /** Writes the corrected `crop_box` as a card-level `set_floorplan_seat`
+   *  call — same "resend the WHOLE `image_base` record" discipline
+   *  `_floorplanSave`/`_saveHomeAnchors` already follow (docs/42 §8 bod 3
+   *  "no sentinel"): `session.draft`'s rotation/scale/offset (untouched by
+   *  this tool, see `_recropDraft`'s own doc comment) are resent verbatim,
+   *  only `crop_box` itself changes. */
+  private async _recropSave(): Promise<void> {
+    const session = this._floorplanSession;
+    if (!session || !this._alignServiceAvailable()) return;
+    const oldCrop = this._recropOldCrop(session);
+    if (!oldCrop) return;
+    const newCrop = recropFromGesture(oldCrop, this._recropDraft);
+    if (!newCrop) return;
+    const d = session.draft;
+    const image_base: Record<string, unknown> = {
+      ...session.rest,
+      crop_box: { frame_id: oldCrop.frame_id, x0: Math.round(newCrop.x0), y0: Math.round(newCrop.y0),
+        x1: Math.round(newCrop.x1), y1: Math.round(newCrop.y1) },
+      src: session.floorplan,
+      rotation: Math.round(d.rotation * 100) / 100,
+      scale: Math.round(d.scale * 100) / 100,
+      offset_x: Math.round(d.offset_x * 100) / 100,
+      offset_y: Math.round(d.offset_y * 100) / 100,
+    };
+    const entry = this._floorplanSeatsRaw()?.[session.floorplanKey];
+    const payload: Record<string, unknown> = { floorplan: session.floorplanKey, image_base };
+    if (entry?.room_style) payload.room_style = entry.room_style;
+    try {
+      await this.hass.callService("anyvac", "set_floorplan_seat", payload);
+      this._closeAlign();
+    } catch (err) {
+      console.warn("[anyvac-card] Re-crop: set_floorplan_seat call failed", err);
+    }
+  }
+
+  /** Starts (or upgrades) a Re-crop gizmo gesture — mirrors
+   *  `_floorGeoStartGesture` exactly, minus "rotate" (`_recropDraft`'s own
+   *  doc comment) and operating on `_recropDraft`/`_recropHistory`/
+   *  `_recropFuture` instead of `_floorplanSession`. */
+  private _recropStartGesture(e: PointerEvent, kind: "drag" | "scale", pivotPct?: { x: number; y: number }): void {
+    this._alignRefocusOverlay();
+    (e.currentTarget as HTMLElement).setPointerCapture(e.pointerId);
+    e.stopPropagation();
+    e.preventDefault();
+    const pt = this._alignPointToWrapPct(e.clientX, e.clientY);
+    if (!pt) return;
+    this._recropHistory = [...this._recropHistory, this._recropDraft];
+    this._recropFuture = [];
+    this._recropGesture = {
+      kind, startSeat: { ...this._recropDraft }, pivotPct,
+      startPos: new Map([[e.pointerId, pt]]),
+      livePos: new Map([[e.pointerId, pt]]),
+    };
+  }
+
+  private _recropGestureMove(e: PointerEvent): void {
+    const g = this._recropGesture;
+    if (!g || !g.startPos.has(e.pointerId)) return;
+    const pt = this._alignPointToWrapPct(e.clientX, e.clientY);
+    if (!pt) return;
+    g.livePos.set(e.pointerId, pt);
+    const ar = this._mapAR > 0.1 ? this._mapAR : 3.636;
+    const id = e.pointerId;
+    const s0 = g.startPos.get(id)!, s1 = g.livePos.get(id)!;
+    let next: SeatParams | null = null;
+    if (g.kind === "drag") {
+      next = translateSeat(g.startSeat, s1.x - s0.x, s1.y - s0.y);
+    } else if (g.kind === "scale" && g.pivotPct) {
+      const d0 = this._alignIsoDist(s0, g.pivotPct, ar);
+      const d1 = this._alignIsoDist(s1, g.pivotPct, ar);
+      if (d0 > 1e-6) next = scaleSeatAbout(g.startSeat, d1 / d0, g.pivotPct, ar);
+    }
+    if (next) this._recropDraft = next;
+  }
+
+  private _recropGestureEnd(e: PointerEvent): void {
+    const g = this._recropGesture;
+    if (!g) return;
+    g.startPos.delete(e.pointerId);
+    g.livePos.delete(e.pointerId);
+    if (g.startPos.size === 0) this._recropGesture = null;
+  }
+
+  private _recropUndo(): void {
+    if (!this._recropHistory.length) return;
+    const prev = this._recropHistory[this._recropHistory.length - 1];
+    this._recropFuture = [this._recropDraft, ...this._recropFuture];
+    this._recropHistory = this._recropHistory.slice(0, -1);
+    this._recropDraft = prev;
+  }
+
+  private _recropRedo(): void {
+    if (!this._recropFuture.length) return;
+    const next = this._recropFuture[0];
+    this._recropHistory = [...this._recropHistory, this._recropDraft];
+    this._recropFuture = this._recropFuture.slice(1);
+    this._recropDraft = next;
+  }
+
+  private _recropSetField(field: "offset_x" | "offset_y" | "scale", raw: string): void {
+    const n = parseFloat(raw);
+    if (!Number.isFinite(n)) return;
+    const d = this._recropDraft;
+    if (d[field] === n) return;
+    this._recropHistory = [...this._recropHistory, d];
+    this._recropFuture = [];
+    this._recropDraft = { ...d, [field]: n };
   }
 
   // ── Floorplan & Calibrate tool: 2/N-point calibration (docs/42 §9 fáze
@@ -6535,8 +6763,13 @@ export class AnyVacCard extends LitElement {
     const roomsCanRedo = !!rs && rs.future.length > 0;
     const roomsCanSave = !!rs && this._alignServiceAvailable();
     const fs = this._floorplanSession;
-    const floorCanUndo = !!fs && fs.history.length > 0;
-    const floorCanRedo = !!fs && fs.future.length > 0;
+    // docs/42 §9 fáze N: a cesta-A floorplan swaps the Geometry sub-tab's
+    // free-drag gizmo for the Re-crop tool (`_recropEligible`) — its own
+    // undo/redo/reset/save history lives in `_recropHistory`/`_recropFuture`/
+    // `_recropDraft` instead of `fs.history`/`fs.future`/`fs.draft`.
+    const isRecrop = !!fs && this._recropEligible(fs);
+    const floorCanUndo = isRecrop ? this._recropHistory.length > 0 : (!!fs && fs.history.length > 0);
+    const floorCanRedo = isRecrop ? this._recropFuture.length > 0 : (!!fs && fs.future.length > 0);
     const floorCanSave = !!fs && this._alignServiceAvailable();
     // docs/42 §9 fáze J2: the calibration sub-view's own Save gate — at
     // least 2 complete point-pairs, same as editor.ts's own `pairs >= 2`.
@@ -6628,20 +6861,25 @@ export class AnyVacCard extends LitElement {
             </button>
           ` : nothing}
           ${this._veTool === "floorplan" && fs && this._floorplanMode === "geo" ? html`
-            <button class="align-btn" title="Undo (Ctrl+Z)" ?disabled=${!floorCanUndo} @click=${() => this._floorGeoUndo()}>
+            <button class="align-btn" title="Undo (Ctrl+Z)" ?disabled=${!floorCanUndo}
+              @click=${() => isRecrop ? this._recropUndo() : this._floorGeoUndo()}>
               <ha-icon icon="mdi:undo"></ha-icon>
             </button>
-            <button class="align-btn" title="Redo (Ctrl+Y)" ?disabled=${!floorCanRedo} @click=${() => this._floorGeoRedo()}>
+            <button class="align-btn" title="Redo (Ctrl+Y)" ?disabled=${!floorCanRedo}
+              @click=${() => isRecrop ? this._recropRedo() : this._floorGeoRedo()}>
               <ha-icon icon="mdi:redo"></ha-icon>
             </button>
             <button class="align-btn" title="Rotate view 90°" @click=${() => this._alignRotateView()}>
               <ha-icon icon="mdi:screen-rotation"></ha-icon>
             </button>
-            <button class="align-btn" title="Reset to the values this tab was opened with" @click=${() => this._floorplanReset()}>
+            <button class="align-btn" title="Reset to the values this tab was opened with"
+              @click=${() => isRecrop ? this._recropReset() : this._floorplanReset()}>
               <ha-icon icon="mdi:restore"></ha-icon>
             </button>
             <button class="align-btn ${this._floorplanCopiedFlash ? "align-btn--flash" : ""}"
-              title="Copy as YAML (image_base: block, paste into the card config)" @click=${() => this._floorplanCopyYaml()}>
+              title=${isRecrop ? "Copy as YAML (image_base.crop_box: block, paste into the card config)"
+                : "Copy as YAML (image_base: block, paste into the card config)"}
+              @click=${() => isRecrop ? this._recropCopyYaml() : this._floorplanCopyYaml()}>
               <ha-icon icon=${this._floorplanCopiedFlash ? "mdi:check" : "mdi:content-copy"}></ha-icon>
             </button>
           ` : nothing}
@@ -6675,7 +6913,7 @@ export class AnyVacCard extends LitElement {
           ${this._veTool === "floorplan" && fs && this._floorplanMode === "geo" ? html`
             <button class="align-btn align-save-btn" ?disabled=${!floorCanSave}
               title=${floorCanSave ? "Save" : "Update the AnyVac integration to 2.0.0 — or Copy YAML"}
-              @click=${() => this._floorplanSave()}>
+              @click=${() => isRecrop ? this._recropSave() : this._floorplanSave()}>
               <ha-icon icon="mdi:content-save"></ha-icon><span>Save</span>
             </button>
           ` : nothing}
@@ -7171,10 +7409,17 @@ export class AnyVacCard extends LitElement {
     // why (cesta A's own identity crop already covers this floorplan, or no
     // vacuum currently reports a home-frame registration).
     const homeEligible = this._homeCalibEligible(session);
+    // docs/42 §9 fáze N: a cesta-A floorplan (`crop_box.frame_id` set) gets
+    // the Re-crop tool under this SAME pill instead of the normal free-drag
+    // gizmo — see `_recropEligible`'s own doc comment for why the two are
+    // mutually exclusive (a cesta-A floorplan's rooms/markers never consult
+    // `image_base`'s rotation/scale/offset at all, so there is nothing for
+    // the ordinary gizmo to usefully edit there).
+    const recropEligible = this._recropEligible(session);
     return html`
       <div class="ve-subtab-row">
         <button class="ve-subtab ${mode === "geo" ? "on" : ""}"
-          @click=${() => this._setFloorplanMode("geo")}>Geometry</button>
+          @click=${() => this._setFloorplanMode("geo")}>${recropEligible ? "Re-crop" : "Geometry"}</button>
         <button class="ve-subtab ${mode === "calib" ? "on" : ""}" ?disabled=${readOnly}
           title=${readOnly ? "Read-only — aligned by home frame, nothing to calibrate" : ""}
           @click=${() => this._setFloorplanMode("calib")}>Calibrate (2+ points)</button>
@@ -7185,6 +7430,7 @@ export class AnyVacCard extends LitElement {
       </div>
       ${mode === "calib" ? this._renderFloorplanCalibTool(session)
         : mode === "home" ? this._renderFloorplanHomeTool(session)
+        : recropEligible ? this._renderRecropTool(session)
         : this._renderFloorplanGeoTool(session)}
     `;
   }
@@ -7294,6 +7540,130 @@ export class AnyVacCard extends LitElement {
             </div>
             <div class="rooms-side-note">Drag the floorplan itself, or a corner/rotate handle. Every vacuum
               sharing this floorplan is shown dimmed underneath, unedited, as a reference.</div>
+            ${this._renderFloorplanSnapshotSection(session)}
+          </div>
+        </div>
+    `;
+  }
+
+  /** docs/42 §9 fáze N (docs/41 §4.5 "cesta A") — replaces
+   *  `_renderFloorplanGeoTool`'s free-drag gizmo whenever this floorplan is
+   *  cesta-A identity (`_recropEligible`): the NEW file sits fixed at the
+   *  scene's own identity placement (never dragged — cesta A never touches
+   *  `image_base`'s own rotation/scale/offset, `_recropDraft`'s own doc
+   *  comment), and the draggable/scalable layer is instead the OLD ghost
+   *  overlay — every home-frame-registered vacuum's rooms/markers, placed
+   *  via the STILL-SAVED `crop_box` (`_renderHomeFrameOverlay`, same
+   *  function the main dashboard uses, docs/14 rule 1) — which the user
+   *  drags/scales as one rigid group until it lines up with the new
+   *  picture. `_recropSave` turns that gesture into a corrected `crop_box`
+   *  via `recropFromGesture`'s linear inverse; nothing here writes anything
+   *  until then. */
+  private _renderRecropTool(session: FloorplanEditSession) {
+    const { w: wrapW, h: wrapH } = this._alignSceneSize();
+    const draft = this._recropDraft;
+    const oldCrop = this._recropOldCrop(session);
+    const ghosts = this._recropGhostVacuums();
+    const repVac = ghosts[0];
+    const rooms = repVac ? this._roomsFor(repVac) : [];
+    const corner = (cx: number, cy: number) => this._alignCornerPct(draft, cx, cy, wrapW, wrapH);
+    const nw = corner(0, 0), ne = corner(1, 0), sw = corner(0, 1), se = corner(1, 1);
+    const scaleHint = oldCrop ? canvasScaleForCrop(this._recropNat, oldCrop) : null;
+    return html`
+        <div class="align-body">
+          <div class="align-canvas"
+            @wheel=${(e: WheelEvent) => this._alignWheel(e)}
+            @pointerdown=${(e: PointerEvent) => this._alignBgPointerDown(e)}
+            @pointermove=${(e: PointerEvent) => this._alignBgPointerMove(e)}
+            @pointerup=${(e: PointerEvent) => this._alignBgPointerUp(e)}
+            @pointercancel=${(e: PointerEvent) => this._alignBgPointerUp(e)}>
+            <div class="align-scene" style=${styleMap({
+              width: wrapW + "px", height: wrapH + "px",
+              transform: this._alignViewTransformCss(),
+            })}>
+              <img class="align-floorplan-img" src=${session.floorplan} alt="Floorplan"
+                @load=${(e: Event) => {
+                  const im = e.target as HTMLImageElement;
+                  if (im.naturalWidth && im.naturalHeight
+                    && (this._recropNat?.w !== im.naturalWidth || this._recropNat?.h !== im.naturalHeight)) {
+                    this._recropNat = { w: im.naturalWidth, h: im.naturalHeight };
+                  }
+                }} />
+              ${oldCrop && ghosts.length ? html`
+                <div class="recrop-ghost"
+                  style=${styleMap({
+                    transform: `translate(${draft.offset_x}%, ${draft.offset_y}%) scale(${draft.scale / 100})`,
+                  })}
+                  @pointerdown=${(e: PointerEvent) => this._recropStartGesture(e, "drag")}
+                  @pointermove=${(e: PointerEvent) => this._recropGestureMove(e)}
+                  @pointerup=${(e: PointerEvent) => this._recropGestureEnd(e)}
+                  @pointercancel=${(e: PointerEvent) => this._recropGestureEnd(e)}>
+                  ${rooms.map((r) => (r.map_x == null || r.map_y == null || r.map_w == null || r.map_h == null)
+                    ? nothing : html`
+                    <div class="rooms-rect recrop-rect"
+                      style=${styleMap({ left: r.map_x + "%", top: r.map_y + "%", width: r.map_w + "%", height: r.map_h + "%" })}>
+                      <span class="rooms-rect-label">${r.name ?? r.key}</span>
+                    </div>
+                  `)}
+                  ${ghosts.map((v) => this._renderHomeFrameOverlay(v, oldCrop, "both"))}
+                </div>
+                <svg class="align-gizmo" viewBox="0 0 100 100" preserveAspectRatio="none">
+                  <polygon points="${nw.x},${nw.y} ${ne.x},${ne.y} ${se.x},${se.y} ${sw.x},${sw.y}" class="align-gizmo-box" />
+                </svg>
+                ${([["nw", nw], ["ne", ne], ["se", se], ["sw", sw]] as const).map(([key, pos]) => html`
+                  <div class="align-handle align-handle--corner" data-corner=${key}
+                    style=${styleMap({ left: pos.x + "%", top: pos.y + "%" })}
+                    @pointerdown=${(e: PointerEvent) => {
+                      const opp = key === "nw" ? se : key === "ne" ? sw : key === "se" ? nw : ne;
+                      this._recropStartGesture(e, "scale", opp);
+                    }}
+                    @pointermove=${(e: PointerEvent) => this._recropGestureMove(e)}
+                    @pointerup=${(e: PointerEvent) => this._recropGestureEnd(e)}
+                    @pointercancel=${(e: PointerEvent) => this._recropGestureEnd(e)}>
+                  </div>
+                `)}
+              ` : nothing}
+            </div>
+          </div>
+          <div class="align-side-panel">
+            ${!oldCrop ? html`
+              <div class="rooms-side-note">No usable <code>crop_box</code> found on this floorplan — nothing
+                to re-crop.</div>
+            ` : !ghosts.length ? html`
+              <div class="rooms-side-note">No vacuum is currently registered into this home frame — there's
+                nothing live to drag against right now. Re-open this tool once at least one is back online.</div>
+            ` : nothing}
+            ${this._recropNat && oldCrop ? html`
+              <div class="rooms-side-note">
+                ${scaleHint == null
+                  ? html`⚠️ This file (${this._recropNat.w}×${this._recropNat.h}px) no longer matches its
+                      recorded crop (${Math.round(oldCrop.x1 - oldCrop.x0)}×${Math.round(oldCrop.y1 - oldCrop.y0)}px)
+                      — it was re-cropped or re-exported at a different extent. Drag/scale the rooms below onto
+                      their real spots in the picture, then Save.`
+                  : Math.abs(scaleHint - 1) < 0.01
+                    ? html`✅ This file still matches its recorded crop exactly.`
+                    : html`ℹ️ This file is a ${scaleHint.toFixed(2)}× uniform re-export of its recorded crop —
+                        still valid, no re-crop needed.`}
+              </div>
+            ` : nothing}
+            <div class="align-field-row">
+              <label>Shift ↔<span>%</span></label>
+              <input type="number" step="0.01" .value=${String(Math.round(draft.offset_x * 10000) / 10000)}
+                @change=${(e: Event) => this._recropSetField("offset_x", (e.target as HTMLInputElement).value)} />
+            </div>
+            <div class="align-field-row">
+              <label>Shift ↕<span>%</span></label>
+              <input type="number" step="0.01" .value=${String(Math.round(draft.offset_y * 10000) / 10000)}
+                @change=${(e: Event) => this._recropSetField("offset_y", (e.target as HTMLInputElement).value)} />
+            </div>
+            <div class="align-field-row">
+              <label>Scale<span>%</span></label>
+              <input type="number" step="0.1" min="1" .value=${String(Math.round(draft.scale * 100) / 100)}
+                @change=${(e: Event) => this._recropSetField("scale", (e.target as HTMLInputElement).value)} />
+            </div>
+            <div class="rooms-side-note">The picture stays fixed — drag/scale the rooms &amp; robots on top of
+              it instead, until they sit exactly where they really are, then Save. This recomputes
+              <code>crop_box</code> alone; nothing else about this floorplan changes.</div>
             ${this._renderFloorplanSnapshotSection(session)}
           </div>
         </div>
@@ -11117,6 +11487,9 @@ export class AnyVacCard extends LitElement {
       transform-origin: center center; pointer-events: none; -webkit-touch-callout: none;
     }
     .align-ghost { position: absolute; inset: 0; opacity: 0.28; pointer-events: none; }
+    /* == Floorplan & Calibrate tool: Re-crop (docs/42 §9 fáze N) =========== */
+    .recrop-ghost { position: absolute; inset: 0; cursor: grab; touch-action: none; }
+    .recrop-rect { pointer-events: none; cursor: inherit; }
     .align-seat-layer { position: absolute; inset: 0; pointer-events: none; }
     .align-seat-img {
       position: absolute; height: auto; pointer-events: auto; touch-action: none;
