@@ -6,6 +6,41 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [1.33.0] - 2026-09-20
+
+### Added
+
+- **Floorplan & Calibrate tool, 2/N-point calibration sub-phase (docs/42 §9
+  fáze J2, docs/39).** The tool now has two sub-tabs — Geometry (fáze J1's
+  gizmo) and Calibrate — consolidating the Config editor's own `_calib`
+  point-and-click bootstrap into the Visual editor. Click a distinctive spot
+  on the selected vacuum's own map (its own small inset panel, in the side
+  column), then the SAME physical point on the floorplan, repeated for at
+  least 2 pairs (up to 6) — a live fit-error preview updates after every
+  complete pair, same as the Config editor's own flow. Save solves the
+  similarity transform (`buildCalibrationAnchors`/`computeSeatFit`,
+  `seatfit.ts`, completely unchanged — docs/14 rule 1) and writes it as a
+  manual seat for that one vacuum via the same `anyvac.set_floorplan_seat`
+  `map` key the Seat & Appearance tool's own Save already uses, resending
+  its current `appearance` unchanged (the same "no sentinel" discipline
+  `_alignSave` follows, so a calibration Save can never silently clear it).
+- **The floorplan click surface shares this tool's own view.** Unlike the
+  Config editor's separate fixed full-viewport calibration overlay (its own
+  un-transformed click math), clicking the floorplan here happens on the
+  SAME pannable/zoomable canvas fáze J1's gizmo uses — a click is converted
+  through `_alignPointToWrapPct`, so it lands on the physically correct spot
+  no matter how the view has been panned, zoomed, or rotated first (the
+  user's own docs/39 §9 field report — "bigger preview, less click error" —
+  carries over for free instead of needing its own re-implementation). The
+  reference vacuum's own raw map is different: it's never part of that
+  pannable scene, so its inset panel keeps the older, simpler un-transformed
+  click mapping (a plain ratio of its own on-screen rect) — there is nothing
+  to invert there.
+- **Not yet in this phase.** Home-frame N-point pairing + fiducial markers
+  (docs/40 §5.B/§5.A.2, fáze J3) and the three snapshot/acquisition buttons
+  (fáze J4) are still to come — the Config editor's own Maps tab keeps all
+  of that working exactly as before in the meantime.
+
 ## [1.32.0] - 2026-09-19
 
 ### Added

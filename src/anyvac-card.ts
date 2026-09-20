@@ -49,6 +49,8 @@ import {
   outlineThroughFit,
   seatRotateScaleCss,
   seatScaleYRatio,
+  computeSeatFit,
+  buildCalibrationAnchors,
   type SeatParams,
   type SeatFitResult,
   type CropBox,
@@ -135,6 +137,16 @@ const CARE_TOTAL_HOURS: Record<string, number> = {
   filter_time_left: 150,
   sensor_time_left: 30,
 };
+
+/** docs/42 §9 fáze J2 — soft cap on calibration point-pairs in the Visual
+ *  editor's Floorplan & Calibrate tool, same value and same purpose as
+ *  editor.ts's own `MAX_CALIB_PAIRS` (docs/39 §8): plenty of pairs to
+ *  average out click imprecision, mainly guards the UI against an
+ *  unbounded marker list. Named distinctly (not imported from editor.ts —
+ *  the two editors don't share a module) to avoid any suggestion the two
+ *  are meant to be kept byte-identical; they're independent UI policy that
+ *  happens to agree. */
+const FLOOR_CALIB_MAX_PAIRS = 6;
 
 console.info(
   `%c ANYVAC-CARD %c v${CARD_VERSION} `,
@@ -303,6 +315,46 @@ export class AnyVacCard extends LitElement {
   /** Same brief "Copied" flash, for the Floorplan & Calibrate tool's own
    *  Copy YAML button (docs/42 §9 fáze J1). */
   @state() private _floorplanCopiedFlash = false;
+  /** docs/42 §9 fáze J2 — which of the Floorplan & Calibrate tool's two
+   *  sub-views is showing: the fáze J1 geometry gizmo, or the docs/39
+   *  point-pair calibration flow ported from the Config editor's `_calib`
+   *  state machine (`editor.ts`). Deliberately NOT reset on a plain VE-tool
+   *  switch away and back (docs/42 risk #10's confirm-guard only tracks
+   *  GEOMETRY changes, `_floorplanHasChanges()`) — only a fresh
+   *  `_openAlign()`/`_closeAlign()` (new vacuum or overlay close) or an
+   *  explicit Cancel inside the calibration screen resets it, same
+   *  granularity `_floorCalib` itself uses right below. */
+  @state() private _floorplanMode: "geo" | "calib" = "geo";
+  /** docs/39 point-pair calibration, ported into the Visual editor (fáze
+   *  J2) — same shape as editor.ts's `CalibState`, minus `vacIdx`: the
+   *  reference vacuum here is always whichever one the Visual editor's own
+   *  vac-picker has selected (`_alignVac()`), so switching vacuums already
+   *  tears down the whole overlay (`_openAlign`) and this along with it,
+   *  same as `CalibState.vacIdx` being tied to `_mapVac` there. `phase`
+   *  says which surface accepts the next click: "raw" = the reference
+   *  vacuum's own map (the inset panel, `_floorCalibRawClick`), "floor" =
+   *  the floorplan on the main canvas (`_floorCalibFloorClick`, which goes
+   *  through `_alignPointToWrapPct` so a panned/zoomed/rotated view still
+   *  maps correctly — the one thing the old fixed full-viewport overlay in
+   *  editor.ts never had to account for). A pair completes once
+   *  `floorPts.length` catches up with `rawPts.length`, same convention. */
+  @state() private _floorCalib: {
+    phase: "raw" | "floor";
+    rawPts: { x: number; y: number }[];
+    floorPts: { x: number; y: number }[];
+  } | null = null;
+  /** Natural pixel size of the reference vacuum's raw map while calibrating
+   *  — same role as editor.ts's `_refNat`, needed to convert an inset-panel
+   *  click into the pixel space `buildCalibrationAnchors` expects (same
+   *  space as `bbox_px`). Captured by the inset `<img>`'s own `@load`. */
+  @state() private _floorCalibRefNat: { w: number; h: number } | null = null;
+  /** Outcome of the last completed calibration Save — a result banner
+   *  (mirrors `_placeRoomsResult` in editor.ts) or an error, cleared
+   *  implicitly on the next attempt. Save itself closes the whole overlay
+   *  on success (same as `_alignSave`/`_roomsSave`/`_floorplanSave`), so in
+   *  practice only the error case is ever seen while still open. */
+  @state() private _floorCalibResult: { residual_pct: number } | null = null;
+  @state() private _floorCalibError = "";
   /** docs/42 §9 fáze I, risk #10 "Tool-switch state leak" — redirects what
    *  the shared `_alignCancelConfirm` panel's "Discard" button does: `null`
    *  means the panel is guarding a full overlay close (`_alignCancel`'s own
@@ -4215,6 +4267,11 @@ export class AnyVacCard extends LitElement {
     this._roomsDeleteConfirm = null;
     this._floorplanSession = null;
     this._floorGesture = null;
+    this._floorplanMode = "geo";
+    this._floorCalib = null;
+    this._floorCalibRefNat = null;
+    this._floorCalibResult = null;
+    this._floorCalibError = "";
     this._veToolSwitchTarget = null;
     // docs/42 §8 bod 4: entry opens the last tool used on THIS browser.
     this._veTool = this._loadVeTool();
@@ -4256,6 +4313,11 @@ export class AnyVacCard extends LitElement {
     this._roomsDeleteConfirm = null;
     this._floorplanSession = null;
     this._floorGesture = null;
+    this._floorplanMode = "geo";
+    this._floorCalib = null;
+    this._floorCalibRefNat = null;
+    this._floorCalibResult = null;
+    this._floorCalibError = "";
     this._veToolSwitchTarget = null;
   }
 
@@ -4307,6 +4369,11 @@ export class AnyVacCard extends LitElement {
       this._roomsSession = null;
     } else if (this._veTool === "floorplan") {
       this._floorplanSession = null;
+      this._floorplanMode = "geo";
+      this._floorCalib = null;
+      this._floorCalibRefNat = null;
+      this._floorCalibResult = null;
+      this._floorCalibError = "";
     }
     this._veTool = target;
     this._saveVeTool(target);
@@ -4839,8 +4906,14 @@ export class AnyVacCard extends LitElement {
    *  Independent-Y-scale-only nuances that don't apply to `image_base`
    *  geometry (no `scaleY`, hence plain `nudgeScale` for both `,`/`.`). */
   private _floorplanKeyDown(e: KeyboardEvent): void {
-    const session = this._floorplanSession;
     if (e.key === "Escape") { e.preventDefault(); this._alignCancel(); return; }
+    // docs/42 §9 fáze J2: the calibration sub-view has no keyboard nudges of
+    // its own (editor.ts's own `_calib` flow never had any either, clicks
+    // only) — bail before any of the geometry-session nudge/undo/redo logic
+    // below, which would otherwise silently edit the (hidden) gizmo draft
+    // while the user is looking at the calibration screen.
+    if (this._floorplanMode === "calib") return;
+    const session = this._floorplanSession;
     if (!session) return;
     const target = e.target as HTMLElement | null;
     const inField = !!target && (target.tagName === "INPUT" || target.tagName === "TEXTAREA");
@@ -5514,6 +5587,169 @@ export class AnyVacCard extends LitElement {
     this._floorplanSession = { ...session, draft: next, history: [...session.history, d], future: [] };
   }
 
+  // ── Floorplan & Calibrate tool: 2/N-point calibration (docs/42 §9 fáze
+  // J2, docs/39) ─────────────────────────────────────────────────────────
+  //
+  // Consolidates editor.ts's `_calib` state machine into this tool, per the
+  // scope ratified in conversation: (1) the floorplan click surface shares
+  // this Visual editor's own pan/zoom/rotate view transform via
+  // `_alignPointToWrapPct`, rather than the Config editor's separate fixed
+  // full-viewport overlay with its own un-transformed click math — there is
+  // no separate "calibration overlay" here at all, it's a sub-mode of the
+  // SAME canvas fáze J1 already renders; (2) the reference vacuum's raw map
+  // gets its own small inset panel with its own (simple, un-transformed)
+  // click mapping, since that image is never part of the pannable floorplan
+  // scene. The actual maths — `buildCalibrationAnchors` + `computeSeatFit`
+  // — is reused completely unchanged from `seatfit.ts` (docs/14 rule 1);
+  // this only changes how the anchors are collected (clicks on this tool's
+  // own canvas + inset, vs. editor.ts's fixed overlay) and where the solved
+  // result is written (the SAME `anyvac.set_floorplan_seat` `map` key
+  // `_alignSave` already writes, since a calibrated seat is just a computed
+  // manual one — no new backend contract).
+
+  /** Enters/leaves the calibration sub-view. Leaving back to "geo" does NOT
+   *  clear `_floorCalib` (see that field's own doc comment) — only an
+   *  explicit Cancel inside the calibration screen, a vacuum switch, or
+   *  closing the whole overlay does. Entering when read-only (home-frame
+   *  registered vacuum, `_alignReadOnly()`) is a no-op: there is nothing to
+   *  calibrate FOR — that vacuum's seat is derived automatically, and
+   *  `_floorCalibSave` refuses the same way `_alignSave` does. */
+  private _setFloorplanMode(mode: "geo" | "calib"): void {
+    if (mode === "calib" && this._alignReadOnly()) return;
+    this._floorplanMode = mode;
+    if (mode === "calib" && !this._floorCalib) {
+      this._floorCalib = { phase: "raw", rawPts: [], floorPts: [] };
+      this._floorCalibResult = null;
+      this._floorCalibError = "";
+    }
+  }
+
+  /** Cancels an in-progress (or completed-but-unsaved) calibration and
+   *  drops back to the geometry sub-view — the calibration screen's own
+   *  Cancel button. */
+  private _floorCalibCancel(): void {
+    this._floorCalib = null;
+    this._floorCalibRefNat = null;
+    this._floorCalibResult = null;
+    this._floorCalibError = "";
+    this._floorplanMode = "geo";
+  }
+
+  /** Click on the reference vacuum's raw-map inset panel (`phase ===
+   *  "raw"`) — mirrors editor.ts's `_onCalibRawClick` exactly: records the
+   *  click in the map's own natural pixel space via `_floorCalibRefNat`,
+   *  the convention `buildCalibrationAnchors` expects. A plain ratio of the
+   *  clicked element's own rect — this panel is never part of the pannable
+   *  `.align-scene`, so there is no view transform to invert here (unlike
+   *  the floorplan click below). Silently ignored before the inset image's
+   *  `@load` has reported a natural size, or once the pair cap is hit. */
+  private _floorCalibRawClick(e: MouseEvent): void {
+    const c = this._floorCalib;
+    if (!c || c.phase !== "raw" || !this._floorCalibRefNat || c.rawPts.length >= FLOOR_CALIB_MAX_PAIRS) return;
+    const rect = (e.currentTarget as HTMLElement).getBoundingClientRect();
+    const nx = (e.clientX - rect.left) / rect.width;
+    const ny = (e.clientY - rect.top) / rect.height;
+    const pt = { x: nx * this._floorCalibRefNat.w, y: ny * this._floorCalibRefNat.h };
+    this._floorCalib = { ...c, rawPts: [...c.rawPts, pt], phase: "floor" };
+  }
+
+  /** Click on the floorplan (`phase === "floor"`), on the SAME main canvas
+   *  fáze J1's gizmo uses — routed through `_alignPointToWrapPct` so a
+   *  panned/zoomed/rotated view still lands on the physically correct spot
+   *  (the one thing editor.ts's fixed full-viewport overlay never had to
+   *  handle, since it never offered pan/zoom). Result is already
+   *  wrap-relative percent, the exact convention `buildCalibrationAnchors`
+   *  expects for `floorPts` (same units as `map_x`/`map_y`/`offset_x`/
+   *  `offset_y`) — clamped/rounded the same way editor.ts's own click
+   *  handler was, for the same reason (keep marker math well-behaved at
+   *  the very edge of the wrap). */
+  private _floorCalibFloorClick(e: MouseEvent): void {
+    const c = this._floorCalib;
+    if (!c || c.phase !== "floor") return;
+    const pt = this._alignPointToWrapPct(e.clientX, e.clientY);
+    if (!pt) return;
+    const x = round1(clampPct(pt.x)), y = round1(clampPct(pt.y));
+    this._floorCalib = { ...c, floorPts: [...c.floorPts, { x, y }], phase: "raw" };
+  }
+
+  /** Removes the last clicked point, whichever surface it's on — mirrors
+   *  editor.ts's `_undoCalibPoint`. */
+  private _floorCalibUndoPoint(): void {
+    const c = this._floorCalib;
+    if (!c) return;
+    if (c.phase === "floor" && c.rawPts.length > c.floorPts.length) {
+      this._floorCalib = { ...c, rawPts: c.rawPts.slice(0, -1), phase: "raw" };
+    } else if (c.floorPts.length > 0) {
+      this._floorCalib = { ...c, floorPts: c.floorPts.slice(0, -1) };
+    }
+  }
+
+  /** Live fit-error preview over whatever complete pairs exist so far —
+   *  mirrors editor.ts's `_calibPreview`. `null` below 2 complete pairs. */
+  private _floorCalibPreview(c: {
+    rawPts: { x: number; y: number }[]; floorPts: { x: number; y: number }[];
+  }): { residual_pct: number } | null {
+    const n = Math.min(c.rawPts.length, c.floorPts.length);
+    if (n < 2 || !this._floorCalibRefNat) return null;
+    const ar = this._mapAR > 0.1 ? this._mapAR : 3.636;
+    const anchors = buildCalibrationAnchors(
+      c.rawPts.slice(0, n), c.floorPts.slice(0, n),
+      { NW: this._floorCalibRefNat.w, NH: this._floorCalibRefNat.h }, ar,
+    );
+    const fit = computeSeatFit(anchors, ar);
+    return fit ? { residual_pct: Math.round(fit.residual_pct * 10) / 10 } : null;
+  }
+
+  /** Solves the similarity transform from every complete pair and writes it
+   *  as a manual seat via the SAME `anyvac.set_floorplan_seat` `map` key
+   *  `_alignSave` uses — a calibrated seat is just a computed manual one,
+   *  no new backend contract. `appearance` is resent in full alongside it
+   *  from the (always-open) Seat & Appearance session's own draft, same
+   *  "no sentinel" discipline `_alignSave` follows — an omitted `appearance`
+   *  would otherwise silently clear whatever that tool already holds for
+   *  this vacuum, edited or not. Closes the whole overlay on success, same
+   *  as every other Save in this editor. */
+  private async _floorCalibSave(): Promise<void> {
+    const c = this._floorCalib;
+    const session = this._alignSession;
+    const vac = this._alignVac();
+    if (!c || !session || !vac || !this._alignServiceAvailable() || this._alignReadOnly()) return;
+    const n = Math.min(c.rawPts.length, c.floorPts.length);
+    if (!this._floorCalibRefNat || n < 2) {
+      this._floorCalibError = "Need at least 2 complete point pairs — try again.";
+      return;
+    }
+    const ar = this._mapAR > 0.1 ? this._mapAR : 3.636;
+    const anchors = buildCalibrationAnchors(
+      c.rawPts.slice(0, n), c.floorPts.slice(0, n),
+      { NW: this._floorCalibRefNat.w, NH: this._floorCalibRefNat.h }, ar,
+    );
+    const fit = computeSeatFit(anchors, ar);
+    if (!fit) {
+      this._floorCalibError = "Couldn't compute a calibration from those points — " +
+        "make sure they're clearly apart, then try again.";
+      return;
+    }
+    this._floorCalibError = "";
+    const map: Record<string, number> = {
+      rotation: fit.rotation,
+      scale: Math.round(fit.scale * 10) / 10,
+      offset_x: Math.round(fit.offset_x * 10) / 10,
+      offset_y: Math.round(fit.offset_y * 10) / 10,
+    };
+    const appearance: Record<string, unknown> = { ...session.appearanceDraft };
+    try {
+      await this.hass.callService("anyvac", "set_floorplan_seat", {
+        floorplan: session.floorplan, vacuum: vac.entity, map, appearance,
+      });
+      this._closeAlign();
+    } catch (err) {
+      // Left open on failure, same as every other Save in this editor — the
+      // clicked points aren't lost.
+      console.warn("[anyvac-card] Floorplan calibration: set_floorplan_seat call failed", err);
+    }
+  }
+
   /** docs/42 §9 fáze H — the Visual editor's own top-level render (renamed
    *  from `_renderAlignOverlay`, docs/42 §8 bod 2). Owns the portal's outer
    *  chrome (toolbar + tool-switcher row) common to all three tools; the
@@ -5538,6 +5774,11 @@ export class AnyVacCard extends LitElement {
     const floorCanUndo = !!fs && fs.history.length > 0;
     const floorCanRedo = !!fs && fs.future.length > 0;
     const floorCanSave = !!fs && this._alignServiceAvailable();
+    // docs/42 §9 fáze J2: the calibration sub-view's own Save gate — at
+    // least 2 complete point-pairs, same as editor.ts's own `pairs >= 2`.
+    const fc = this._floorCalib;
+    const calibPairs = fc ? Math.min(fc.rawPts.length, fc.floorPts.length) : 0;
+    const calibCanSave = calibPairs >= 2 && this._alignServiceAvailable() && !this._alignReadOnly();
     const tier = session.nudgeTier;
     const tierBtn = (t: NudgeTier, label: string, title: string) => html`
       <button class="align-tier-btn ${tier === t ? "on" : ""}" title=${title}
@@ -5614,7 +5855,7 @@ export class AnyVacCard extends LitElement {
               <ha-icon icon=${this._roomsCopiedFlash ? "mdi:check" : "mdi:content-copy"}></ha-icon>
             </button>
           ` : nothing}
-          ${this._veTool === "floorplan" && fs ? html`
+          ${this._veTool === "floorplan" && fs && this._floorplanMode === "geo" ? html`
             <button class="align-btn" title="Undo (Ctrl+Z)" ?disabled=${!floorCanUndo} @click=${() => this._floorGeoUndo()}>
               <ha-icon icon="mdi:undo"></ha-icon>
             </button>
@@ -5630,6 +5871,11 @@ export class AnyVacCard extends LitElement {
             <button class="align-btn ${this._floorplanCopiedFlash ? "align-btn--flash" : ""}"
               title="Copy as YAML (image_base: block, paste into the card config)" @click=${() => this._floorplanCopyYaml()}>
               <ha-icon icon=${this._floorplanCopiedFlash ? "mdi:check" : "mdi:content-copy"}></ha-icon>
+            </button>
+          ` : nothing}
+          ${this._veTool === "floorplan" && fs && this._floorplanMode === "calib" ? html`
+            <button class="align-btn" title="Rotate view 90°" @click=${() => this._alignRotateView()}>
+              <ha-icon icon="mdi:screen-rotation"></ha-icon>
             </button>
           ` : nothing}
           <button class="align-btn align-close-btn" title="Cancel" @click=${() => this._alignCancel()}>
@@ -5649,10 +5895,20 @@ export class AnyVacCard extends LitElement {
               <ha-icon icon="mdi:content-save"></ha-icon><span>Save</span>
             </button>
           ` : nothing}
-          ${this._veTool === "floorplan" && fs ? html`
+          ${this._veTool === "floorplan" && fs && this._floorplanMode === "geo" ? html`
             <button class="align-btn align-save-btn" ?disabled=${!floorCanSave}
               title=${floorCanSave ? "Save" : "Update the AnyVac integration to 2.0.0 — or Copy YAML"}
               @click=${() => this._floorplanSave()}>
+              <ha-icon icon="mdi:content-save"></ha-icon><span>Save</span>
+            </button>
+          ` : nothing}
+          ${this._veTool === "floorplan" && fs && this._floorplanMode === "calib" ? html`
+            <button class="align-btn align-save-btn" ?disabled=${!calibCanSave}
+              title=${calibCanSave ? "Save calibrated seat"
+                : this._alignReadOnly() ? "Read-only — aligned by home frame"
+                : calibPairs < 2 ? "Click at least 2 point pairs first"
+                : "Update the AnyVac integration to 2.0.0"}
+              @click=${() => this._floorCalibSave()}>
               <ha-icon icon="mdi:content-save"></ha-icon><span>Save</span>
             </button>
           ` : nothing}
@@ -6111,7 +6367,29 @@ export class AnyVacCard extends LitElement {
    *  No side (stretch) handles and no pinch gesture: `image_base` has no
    *  independent Y scale for either to unlock (`_floorGesture`'s own doc
    *  comment) — corner handles always scale uniformly. */
+  /** docs/42 §9 fáze J2 — the Floorplan & Calibrate tool's own entry point:
+   *  a small sub-tab row (geometry gizmo / point-pair calibration) above
+   *  whichever body is currently showing. Both sub-views share the SAME
+   *  `FloorplanEditSession` (calibration only READS `session.floorplan`/
+   *  the ghosts list, it never touches `session.draft` — its own state
+   *  lives in `_floorCalib`), so there is nothing to seed or tear down on
+   *  a pure sub-tab switch beyond what `_setFloorplanMode` already does. */
   private _renderFloorplanTool(session: FloorplanEditSession) {
+    const mode = this._floorplanMode;
+    const readOnly = this._alignReadOnly();
+    return html`
+      <div class="ve-subtab-row">
+        <button class="ve-subtab ${mode === "geo" ? "on" : ""}"
+          @click=${() => this._setFloorplanMode("geo")}>Geometry</button>
+        <button class="ve-subtab ${mode === "calib" ? "on" : ""}" ?disabled=${readOnly}
+          title=${readOnly ? "Read-only — aligned by home frame, nothing to calibrate" : ""}
+          @click=${() => this._setFloorplanMode("calib")}>Calibrate (2+ points)</button>
+      </div>
+      ${mode === "calib" ? this._renderFloorplanCalibTool(session) : this._renderFloorplanGeoTool(session)}
+    `;
+  }
+
+  private _renderFloorplanGeoTool(session: FloorplanEditSession) {
     const { w: wrapW, h: wrapH } = this._alignSceneSize();
     const draft = session.draft;
     const corner = (cx: number, cy: number) => this._alignCornerPct(draft, cx, cy, wrapW, wrapH);
@@ -6216,6 +6494,147 @@ export class AnyVacCard extends LitElement {
             </div>
             <div class="rooms-side-note">Drag the floorplan itself, or a corner/rotate handle. Every vacuum
               sharing this floorplan is shown dimmed underneath, unedited, as a reference.</div>
+          </div>
+        </div>
+    `;
+  }
+
+  /** docs/42 §9 fáze J2 — canvas-level pointer handlers for the calibration
+   *  sub-view, replacing the geometry gizmo's on the SAME `.align-canvas`
+   *  element (mirrors `_roomsCanvasPointerDown`'s own "fall back to
+   *  background pan unless armed" shape). A tap on the floorplan while
+   *  `phase === "floor"` places the next point; everything else — `phase
+   *  === "raw"` (nothing to click on the main canvas yet), or a genuine
+   *  drag rather than a tap — falls through to the ordinary view pan, so
+   *  the user can still zoom/pan to place a point precisely (docs/39 §9's
+   *  "bigger preview, less click error") before actually clicking it.
+   *  Tap-vs-drag is told apart by total pointer movement against
+   *  `HOLD_MOVE_CANCEL_PX`, the same small-threshold idea this file
+   *  already uses to tell a deliberate press from an accidental drag
+   *  elsewhere (docs/25 §10). */
+  private _floorCalibDragStart: { pointerId: number; x0: number; y0: number } | null = null;
+  private _floorCalibCanvasPointerDown(e: PointerEvent): void {
+    if (!(this._floorplanMode === "calib" && this._floorCalib?.phase === "floor")) {
+      this._alignBgPointerDown(e);
+      return;
+    }
+    this._alignRefocusOverlay();
+    this._floorCalibDragStart = { pointerId: e.pointerId, x0: e.clientX, y0: e.clientY };
+    this._alignBgPointerDown(e);
+  }
+  private _floorCalibCanvasPointerMove(e: PointerEvent): void {
+    this._alignBgPointerMove(e);
+  }
+  private _floorCalibCanvasPointerUp(e: PointerEvent): void {
+    const start = this._floorCalibDragStart;
+    this._floorCalibDragStart = null;
+    this._alignBgPointerUp(e);
+    if (!start || start.pointerId !== e.pointerId) return;
+    if (Math.hypot(e.clientX - start.x0, e.clientY - start.y0) <= HOLD_MOVE_CANCEL_PX) {
+      this._floorCalibFloorClick(e);
+    }
+  }
+
+  /** docs/42 §9 fáze J2 — the Floorplan & Calibrate tool's calibration
+   *  sub-view. The main canvas shows the floorplan at its current
+   *  (committed) geometry — no gizmo, view pan/zoom/rotate still work — and
+   *  accepts a click once `_floorCalib.phase === "floor"`
+   *  (`_floorCalibCanvasPointerDown` above). The reference vacuum's own raw
+   *  map gets its own small inset panel in the side column, with its own
+   *  plain click mapping (`_floorCalibRawClick`) — it is never part of the
+   *  pannable `.align-scene`, so there is no view transform to invert
+   *  there, unlike the floorplan click. */
+  private _renderFloorplanCalibTool(session: FloorplanEditSession) {
+    const { w: wrapW, h: wrapH } = this._alignSceneSize();
+    const draft = session.draft;
+    const c = this._floorCalib;
+    const vac = this._alignVac();
+    const mapEnt = vac ? this._mapEntityFor(vac) : undefined;
+    const mapUrl = mapEnt ? this._mapUrl(mapEnt) : null;
+    const readOnly = this._alignReadOnly();
+    const pairs = c ? Math.min(c.rawPts.length, c.floorPts.length) : 0;
+    const preview = c ? this._floorCalibPreview(c) : null;
+    const atCap = !!c && c.rawPts.length >= FLOOR_CALIB_MAX_PAIRS;
+    const isRaw = !c || c.phase === "raw";
+    return html`
+        <div class="align-body">
+          <div class="align-canvas"
+            @wheel=${(e: WheelEvent) => this._alignWheel(e)}
+            @pointerdown=${(e: PointerEvent) => this._floorCalibCanvasPointerDown(e)}
+            @pointermove=${(e: PointerEvent) => this._floorCalibCanvasPointerMove(e)}
+            @pointerup=${(e: PointerEvent) => this._floorCalibCanvasPointerUp(e)}
+            @pointercancel=${(e: PointerEvent) => this._floorCalibCanvasPointerUp(e)}>
+            <div class="align-scene" style=${styleMap({
+              width: wrapW + "px", height: wrapH + "px",
+              transform: this._alignViewTransformCss(),
+            })}>
+              <img class="align-seat-img" src=${session.floorplan} alt="Floorplan"
+                @load=${this._onFloorplanLoad}
+                style=${styleMap({
+                  left: (50 + draft.offset_x) + "%", top: (50 + draft.offset_y) + "%", width: draft.scale + "%",
+                  transform: "translate(-50%,-50%) rotate(" + draft.rotation + "deg)",
+                })} />
+              ${(c?.floorPts ?? []).map((p, i) => html`
+                <div class="calib-marker" style=${styleMap({ left: p.x + "%", top: p.y + "%" })}>${i + 1}</div>
+              `)}
+            </div>
+          </div>
+          <div class="align-side-panel">
+            ${readOnly ? html`
+              <div class="rooms-side-note">Read-only — this vacuum is aligned by the home frame, there's
+                nothing to calibrate here.</div>
+            ` : !c ? nothing : html`
+              <div class="floor-calib-banner ${isRaw ? "floor-calib-banner--raw" : "floor-calib-banner--floor"}">
+                ${isRaw
+                  ? (atCap
+                      ? html`<strong>${FLOOR_CALIB_MAX_PAIRS} points</strong> — that's the max. Save below, or undo a point.`
+                      : html`<strong>Point ${pairs + 1}:</strong> click a distinctive spot (e.g. a room corner)
+                        on this vacuum's OWN map below.`)
+                  : html`<strong>Point ${pairs + 1}:</strong> click the SAME physical point on the floorplan
+                    on the left — zoom/pan it first if you need to.`}
+                ${preview ? html`<div>Fit error with ${pairs} point${pairs === 1 ? "" : "s"}:
+                  <strong>${preview.residual_pct}%</strong></div>` : nothing}
+              </div>
+              <div class="section-title">This vacuum's own map</div>
+              ${mapUrl ? html`
+                <div class="floor-calib-inset ${isRaw ? "floor-calib-inset--active" : ""}"
+                  @click=${(e: MouseEvent) => this._floorCalibRawClick(e)}>
+                  <img src=${mapUrl} alt="Vacuum map"
+                    @load=${(e: Event) => {
+                      const im = e.target as HTMLImageElement;
+                      if (im.naturalWidth && im.naturalHeight
+                        && (this._floorCalibRefNat?.w !== im.naturalWidth || this._floorCalibRefNat?.h !== im.naturalHeight)) {
+                        this._floorCalibRefNat = { w: im.naturalWidth, h: im.naturalHeight };
+                      }
+                    }} />
+                  ${c.rawPts.map((p, i) => this._floorCalibRefNat ? html`
+                    <div class="calib-marker" style=${styleMap({
+                      left: (p.x / this._floorCalibRefNat!.w * 100) + "%",
+                      top: (p.y / this._floorCalibRefNat!.h * 100) + "%",
+                    })}>${i + 1}</div>
+                  ` : nothing)}
+                </div>
+              ` : html`<div class="rooms-side-note">No map image for this vacuum right now.</div>`}
+              <div class="align-side-panel-divider"></div>
+              <div style="display:flex;gap:8px;flex-wrap:wrap">
+                ${(c.rawPts.length > 0 || c.floorPts.length > 0) ? html`
+                  <button class="align-btn" style="width:auto;padding:0 10px;gap:6px" @click=${() => this._floorCalibUndoPoint()}>
+                    <ha-icon icon="mdi:undo"></ha-icon><span>Undo point</span>
+                  </button>
+                ` : nothing}
+                <button class="align-btn" style="width:auto;padding:0 10px;gap:6px" @click=${() => this._floorCalibCancel()}>
+                  <ha-icon icon="mdi:close"></ha-icon><span>Cancel</span>
+                </button>
+              </div>
+              ${this._floorCalibError ? html`
+                <div class="floor-calib-error">${this._floorCalibError}</div>
+              ` : nothing}
+              <div class="align-side-panel-divider"></div>
+              <div class="rooms-side-note">Click the SAME physical point twice — once on this vacuum's own
+                map, once on the floorplan — for at least 2 pairs (up to ${FLOOR_CALIB_MAX_PAIRS}). More,
+                well-spread pairs average out click imprecision. Save writes a manual seat for THIS vacuum
+                only — other vacuums sharing this floorplan are unaffected.</div>
+            `}
           </div>
         </div>
     `;
@@ -9735,6 +10154,41 @@ export class AnyVacCard extends LitElement {
     }
     .ve-placeholder-title { font-size: 15px; font-weight: 700; color: rgb(var(--avc-ink-rgb)); }
     .ve-placeholder-sub { font-size: 12px; }
+    /* == Visual editor: Floorplan & Calibrate tool's sub-tabs (fáze J2) ==== */
+    .ve-subtab-row {
+      display: flex; gap: 6px; padding: 8px 12px 0;
+    }
+    .ve-subtab {
+      font: inherit; font-size: 11.5px; font-weight: 600; cursor: pointer;
+      padding: 5px 12px; border-radius: 999px; color: rgba(var(--avc-ink-rgb), 0.65);
+      background: transparent; border: 1px solid var(--avc-panel-line);
+    }
+    .ve-subtab.on {
+      color: rgb(var(--avc-ink-rgb)); font-weight: 700;
+      background: rgba(var(--avc-warn-rgb), 0.2); border-color: rgba(var(--avc-warn-rgb), 0.55);
+    }
+    .ve-subtab:disabled { opacity: 0.4; cursor: not-allowed; }
+    /* == Visual editor: 2/N-point calibration sub-view (docs/39, fáze J2) = */
+    .calib-marker {
+      position: absolute; transform: translate(-50%, -50%);
+      width: 24px; height: 24px; border-radius: 50%;
+      background: rgba(var(--avc-warn-rgb), 0.9); border: 2px solid white;
+      display: flex; align-items: center; justify-content: center;
+      color: #000; font-size: 12px; font-weight: 700;
+      pointer-events: none; z-index: 2;
+    }
+    .floor-calib-banner {
+      font-size: 12px; line-height: 1.4; padding: 8px 10px; border-radius: 8px;
+      background: rgba(var(--avc-warn-rgb), 0.14); border: 1px solid rgba(var(--avc-warn-rgb), 0.4);
+      display: flex; flex-direction: column; gap: 4px;
+    }
+    .floor-calib-inset {
+      position: relative; border-radius: 8px; overflow: hidden; cursor: crosshair;
+      background: rgba(var(--avc-ink-rgb), 0.06); border: 1px solid var(--avc-panel-line);
+    }
+    .floor-calib-inset:not(.floor-calib-inset--active) { cursor: default; opacity: 0.55; }
+    .floor-calib-inset img { display: block; width: 100%; height: auto; pointer-events: none; }
+    .floor-calib-error { font-size: 12px; color: rgb(var(--avc-err-rgb)); }
     /* == Visual editor: Seat & Appearance tool's Appearance section ======= */
     .align-side-panel-divider {
       height: 1px; background: var(--avc-panel-line); margin: 4px 0;
