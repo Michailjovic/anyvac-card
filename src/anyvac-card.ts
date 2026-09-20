@@ -16,6 +16,7 @@ import type {
   GlobalPreset,
   GlobalAction,
   GlobalActionCall,
+  HomeFrameAnchor,
 } from "./types";
 import {
   CARD_NAME,
@@ -324,7 +325,7 @@ export class AnyVacCard extends LitElement {
    *  `_openAlign()`/`_closeAlign()` (new vacuum or overlay close) or an
    *  explicit Cancel inside the calibration screen resets it, same
    *  granularity `_floorCalib` itself uses right below. */
-  @state() private _floorplanMode: "geo" | "calib" = "geo";
+  @state() private _floorplanMode: "geo" | "calib" | "home" = "geo";
   /** docs/39 point-pair calibration, ported into the Visual editor (fáze
    *  J2) — same shape as editor.ts's `CalibState`, minus `vacIdx`: the
    *  reference vacuum here is always whichever one the Visual editor's own
@@ -355,6 +356,79 @@ export class AnyVacCard extends LitElement {
    *  practice only the error case is ever seen while still open. */
   @state() private _floorCalibResult: { residual_pct: number } | null = null;
   @state() private _floorCalibError = "";
+  /** docs/40 §5.B / docs/42 §9 fáze J3 — home-frame N-point pairing, ported
+   *  from editor.ts's `HomeCalibState`/`_homeCalib`. Unlike fáze J2's
+   *  per-vacuum `_floorCalib` (always something to calibrate, seeded the
+   *  instant the sub-tab opens), this is `null` until the user explicitly
+   *  clicks "Calibrate against home frame" (`_startHomeCalibration`) —
+   *  calibrating the whole card-level floorplan against the shared home
+   *  frame is optional and one-shot, so the "Home frame" sub-tab's own
+   *  landing view (existing `home_anchors` status + this button + the
+   *  fiducial workflow below) is shown first. `phase` mirrors editor.ts's
+   *  own: "frame" = the home-frame snapshot inset accepts the next click
+   *  (`_onHomeCalibFrameClick`, async — each click snaps to the nearest
+   *  wall corner via `anyvac.snap_wall_corner` before being recorded),
+   *  "floor" = the floorplan on the main canvas (`_onHomeCalibFloorClick`,
+   *  through `_alignPointToWrapPct` same as J2's floor clicks). */
+  @state() private _homeCalib: {
+    phase: "frame" | "floor";
+    homePts: { x: number; y: number }[];
+    floorPts: { x: number; y: number }[];
+  } | null = null;
+  /** True while `_startHomeCalibration`/`_onHomeCalibFrameClick` are
+   *  awaiting a service response — disables the frame inset's click handler
+   *  and the "Calibrate against home frame" entry button so a slow
+   *  `snap_wall_corner` round-trip can't be double-fired by an impatient
+   *  second click (mirrors editor.ts's own `_homeCalibBusy` gate). */
+  @state() private _homeCalibBusy = false;
+  @state() private _homeCalibError = "";
+  /** Outcome of the last completed manual calibration Save — shown inline
+   *  (unlike J1/J2's Save, `_finishHomeCalibration` does NOT close the
+   *  overlay: calibrating the shared floorplan is a card-level setting the
+   *  user may revisit/redo, not a per-vacuum edit that's "done" once
+   *  saved — same reasoning editor.ts's own Config-editor form follows by
+   *  leaving its result banner inline instead of closing anything). */
+  @state() private _homeCalibResult: { residual_pct: number } | null = null;
+  /** The on-demand home-frame snapshot fetched for THIS calibration attempt
+   *  to click against — a SCRATCH reference only (mirrors editor.ts's
+   *  `_homeCalibSnapshotUrl` doc comment): never written to `image_base`,
+   *  discarded once the flow ends (Save, Cancel, or a fresh
+   *  `_openAlign`/`_closeAlign`). */
+  @state() private _homeCalibSnapshotUrl = "";
+  /** The above snapshot's own crop extent in home-frame px (`{x0,y0,x1,y1}`)
+   *  — needed to convert a click on that image into `x_home_px`/`y_home_px`
+   *  (`pctToCropPoint`) for `anyvac.snap_wall_corner`, and to place the
+   *  recorded `homePts` markers back onto it. */
+  @state() private _homeCalibCrop: CropBox | null = null;
+  @state() private _homeCalibFrameId = "";
+  /** True while `_snapshotHomeFrameWithFiducials` is awaiting its service
+   *  response. */
+  @state() private _fiducialSnapshotBusy = false;
+  @state() private _fiducialSnapshotError = "";
+  /** docs/40 §5.A.2 / docs/42 §9 fáze J3 — step 1's own snapshot path,
+   *  shown as plain informational text (unlike editor.ts's config-editor
+   *  form, the Visual editor never writes this straight into `image_base.
+   *  src`: doing so from here would silently fork the stored override onto
+   *  a NEW `floorplan_seats` key on the NEXT session open — `resolveImage
+   *  BaseSrc` computes that key from the CURRENT effective `image_base.src`
+   *  at open time, not the original YAML-declared one, so a src the Visual
+   *  editor itself just changed would no longer match the key everything
+   *  else in this same session keeps writing under. The Config editor's
+   *  Maps tab has no such risk — it edits `image_base.src` directly in the
+   *  dashboard YAML, so that's still where the user points the floorplan at
+   *  this file, same one-time step "Use this vacuum's current map as
+   *  floorplan" already asks for in the non-fiducial case). */
+  @state() private _fiducialSnapshotPath = "";
+  /** The 4 markers' known home-frame positions from step 1 — mirrors
+   *  editor.ts's `_fiducialKnown` exactly, including never being persisted
+   *  to config (re-derivable any time by re-running step 1). */
+  @state() private _fiducialKnown: {
+    frameId: string;
+    markers: { id: string; home_px: { x: number; y: number } }[];
+  } | null = null;
+  @state() private _fiducialDetectBusy = false;
+  @state() private _fiducialDetectError = "";
+  @state() private _fiducialDetectResult: { found: number; missing: string[] } | null = null;
   /** docs/42 §9 fáze I, risk #10 "Tool-switch state leak" — redirects what
    *  the shared `_alignCancelConfirm` panel's "Discard" button does: `null`
    *  means the panel is guarding a full overlay close (`_alignCancel`'s own
@@ -4267,11 +4341,7 @@ export class AnyVacCard extends LitElement {
     this._roomsDeleteConfirm = null;
     this._floorplanSession = null;
     this._floorGesture = null;
-    this._floorplanMode = "geo";
-    this._floorCalib = null;
-    this._floorCalibRefNat = null;
-    this._floorCalibResult = null;
-    this._floorCalibError = "";
+    this._resetFloorplanSubmodes();
     this._veToolSwitchTarget = null;
     // docs/42 §8 bod 4: entry opens the last tool used on THIS browser.
     this._veTool = this._loadVeTool();
@@ -4313,12 +4383,41 @@ export class AnyVacCard extends LitElement {
     this._roomsDeleteConfirm = null;
     this._floorplanSession = null;
     this._floorGesture = null;
+    this._resetFloorplanSubmodes();
+    this._veToolSwitchTarget = null;
+  }
+
+  /** Resets every Floorplan & Calibrate sub-mode's scratch state back to
+   *  "just entered the Geometry view" — shared by every teardown site that
+   *  already resets `_floorplanSession`/`_floorGesture` (`_openAlign`,
+   *  `_closeAlign`, `_alignConfirmDiscard`'s floorplan branch), so fáze J2's
+   *  calibration state and fáze J3's home-frame/fiducial state don't
+   *  accumulate stale points/errors/busy-flags across a vacuum switch or an
+   *  overlay re-open (docs/14 rule 1: one reset routine, not the same
+   *  growing field list copy-pasted at every call site). Does NOT reset
+   *  `_floorplanSession` itself — callers that need that gone (a real
+   *  close/re-open) always set it right next to this call, same as before
+   *  this was extracted. */
+  private _resetFloorplanSubmodes(): void {
     this._floorplanMode = "geo";
     this._floorCalib = null;
     this._floorCalibRefNat = null;
     this._floorCalibResult = null;
     this._floorCalibError = "";
-    this._veToolSwitchTarget = null;
+    this._homeCalib = null;
+    this._homeCalibBusy = false;
+    this._homeCalibError = "";
+    this._homeCalibResult = null;
+    this._homeCalibSnapshotUrl = "";
+    this._homeCalibCrop = null;
+    this._homeCalibFrameId = "";
+    this._fiducialSnapshotBusy = false;
+    this._fiducialSnapshotError = "";
+    this._fiducialSnapshotPath = "";
+    this._fiducialKnown = null;
+    this._fiducialDetectBusy = false;
+    this._fiducialDetectError = "";
+    this._fiducialDetectResult = null;
   }
 
   /** docs/41 §4.8: a home-frame registered vacuum is shown as a read-only
@@ -4369,11 +4468,7 @@ export class AnyVacCard extends LitElement {
       this._roomsSession = null;
     } else if (this._veTool === "floorplan") {
       this._floorplanSession = null;
-      this._floorplanMode = "geo";
-      this._floorCalib = null;
-      this._floorCalibRefNat = null;
-      this._floorCalibResult = null;
-      this._floorCalibError = "";
+      this._resetFloorplanSubmodes();
     }
     this._veTool = target;
     this._saveVeTool(target);
@@ -4907,12 +5002,12 @@ export class AnyVacCard extends LitElement {
    *  geometry (no `scaleY`, hence plain `nudgeScale` for both `,`/`.`). */
   private _floorplanKeyDown(e: KeyboardEvent): void {
     if (e.key === "Escape") { e.preventDefault(); this._alignCancel(); return; }
-    // docs/42 §9 fáze J2: the calibration sub-view has no keyboard nudges of
-    // its own (editor.ts's own `_calib` flow never had any either, clicks
-    // only) — bail before any of the geometry-session nudge/undo/redo logic
-    // below, which would otherwise silently edit the (hidden) gizmo draft
-    // while the user is looking at the calibration screen.
-    if (this._floorplanMode === "calib") return;
+    // docs/42 §9 fáze J2/J3: neither calibration sub-view has keyboard nudges
+    // of its own (editor.ts's own `_calib`/`_homeCalib` flows never had any
+    // either, clicks only) — bail before any of the geometry-session nudge/
+    // undo/redo logic below, which would otherwise silently edit the
+    // (hidden) gizmo draft while the user is looking at a calibration screen.
+    if (this._floorplanMode === "calib" || this._floorplanMode === "home") return;
     const session = this._floorplanSession;
     if (!session) return;
     const target = e.target as HTMLElement | null;
@@ -5607,14 +5702,21 @@ export class AnyVacCard extends LitElement {
   // `_alignSave` already writes, since a calibrated seat is just a computed
   // manual one — no new backend contract).
 
-  /** Enters/leaves the calibration sub-view. Leaving back to "geo" does NOT
-   *  clear `_floorCalib` (see that field's own doc comment) — only an
-   *  explicit Cancel inside the calibration screen, a vacuum switch, or
-   *  closing the whole overlay does. Entering when read-only (home-frame
-   *  registered vacuum, `_alignReadOnly()`) is a no-op: there is nothing to
-   *  calibrate FOR — that vacuum's seat is derived automatically, and
-   *  `_floorCalibSave` refuses the same way `_alignSave` does. */
-  private _setFloorplanMode(mode: "geo" | "calib"): void {
+  /** Enters/leaves a sub-view. Leaving "calib"/"home" back to "geo" does NOT
+   *  clear their own state (see `_floorCalib`/`_homeCalib`'s doc comments)
+   *  — only an explicit Cancel inside that screen, a vacuum switch, or
+   *  closing the whole overlay does. Entering "calib" when read-only
+   *  (home-frame registered vacuum, `_alignReadOnly()`) is a no-op: there is
+   *  nothing to calibrate FOR — that vacuum's seat is derived automatically,
+   *  and `_floorCalibSave` refuses the same way `_alignSave` does. "home" is
+   *  deliberately NOT gated by `_alignReadOnly()` — it's a card-level
+   *  action, unaffected by which vacuum the vac-picker happens to have
+   *  selected (same reasoning "geo" itself isn't gated either); its own
+   *  eligibility is `_homeCalibEligible`/`_anyHomeFrameCard`, checked by the
+   *  sub-tab's own visibility instead of here. Unlike "calib", entering
+   *  "home" does not auto-seed a click flow — see `_homeCalib`'s doc
+   *  comment on why its landing view comes first. */
+  private _setFloorplanMode(mode: "geo" | "calib" | "home"): void {
     if (mode === "calib" && this._alignReadOnly()) return;
     this._floorplanMode = mode;
     if (mode === "calib" && !this._floorCalib) {
@@ -5750,6 +5852,396 @@ export class AnyVacCard extends LitElement {
     }
   }
 
+  // ── Floorplan & Calibrate tool: home-frame N-point pairing + fiducials
+  // (docs/40 §5.B, §5.A.2; docs/42 §9 fáze J3) ───────────────────────────
+  //
+  // Unlike fáze J2's `_floorCalib` (a per-vacuum SEAT, solved once and
+  // written to that vacuum's own `map` override), this calibrates the
+  // shared card-level FLOORPLAN ITSELF against the home frame's stable
+  // mm-space px — `image_base.home_anchors`/`home_anchors_frame_id`
+  // (types.ts, seatfit.ts's `homeAnchorFit`). Ported from editor.ts's
+  // `_homeCalib`/`_fiducialKnown` state machines, reusing `homeAnchorFit`/
+  // `pctToCropPoint` completely unchanged (docs/14 rule 1) — this only
+  // changes how the anchors are collected (this tool's own canvas + inset,
+  // vs. editor.ts's fixed overlay, same J2 precedent) and where the solved
+  // result is written (`anyvac.set_floorplan_seat`'s card-level `image_base`
+  // key, `_saveHomeAnchors` below, instead of a direct YAML mutation — the
+  // Visual editor has no YAML-write path at all).
+
+  /** Gate for the "Home frame" sub-tab: eligible only when this floorplan
+   *  is a FOREIGN-origin one — no home-frame identity crop already set on
+   *  it (mirrors editor.ts's own `homeFrameCrop` check: a `crop_box` that
+   *  carries `frame_id` means cesta A already IS this floorplan's origin,
+   *  so there is nothing left to calibrate) — and at least one configured
+   *  vacuum currently reports a home-frame registration to calibrate
+   *  against (`_anyHomeFrameCard()`). */
+  private _homeCalibEligible(session: FloorplanEditSession): boolean {
+    const cb = session.rest?.crop_box as { frame_id?: string } | undefined;
+    if (cb && "frame_id" in cb) return false;
+    return !!this._anyHomeFrameCard();
+  }
+
+  /** docs/41 §4.6/§4.8-style degradation gate, mirroring `_alignServiceAvailable`
+   *  — the manual click flow additionally needs `anyvac.snap_wall_corner`
+   *  (docs/40 §5.B), not just the snapshot service. */
+  private _homeCalibServiceAvailable(): boolean {
+    return !!this.hass.services?.["anyvac"]?.["snapshot_map_as_floorplan"]
+      && !!this.hass.services?.["anyvac"]?.["snap_wall_corner"];
+  }
+  private _fiducialServiceAvailable(): boolean {
+    return !!this.hass.services?.["anyvac"]?.["snapshot_map_as_floorplan"]
+      && !!this.hass.services?.["anyvac"]?.["detect_floorplan_fiducials"];
+  }
+
+  /** Writes `home_anchors`/`home_anchors_frame_id` as a card-level
+   *  `set_floorplan_seat` call (no `vacuum` key), resending the WHOLE
+   *  `image_base` record — same "no sentinel" discipline `_floorplanSave`
+   *  already follows (docs/42 §8 bod 3), and for the same reason: omitting
+   *  any of `session.rest`/the current geometry/`room_style` here would
+   *  silently clear it, even though this Save never touched it. Shared by
+   *  both the manual click flow (`_finishHomeCalibration`) and fiducial
+   *  detection (`_detectFiducials`) — one write path for the one thing they
+   *  both ultimately produce (an anchor-pair array), docs/14 rule 1. */
+  private async _saveHomeAnchors(anchors: HomeFrameAnchor[], frameId: string): Promise<boolean> {
+    const session = this._floorplanSession;
+    if (!session || !this._alignServiceAvailable()) return false;
+    const d = session.draft;
+    const image_base: Record<string, unknown> = {
+      ...session.rest,
+      src: session.floorplan,
+      rotation: Math.round(d.rotation * 100) / 100,
+      scale: Math.round(d.scale * 100) / 100,
+      offset_x: Math.round(d.offset_x * 100) / 100,
+      offset_y: Math.round(d.offset_y * 100) / 100,
+      home_anchors: anchors,
+      home_anchors_frame_id: frameId,
+    };
+    const entry = this._floorplanSeatsRaw()?.[session.floorplan];
+    const payload: Record<string, unknown> = { floorplan: session.floorplan, image_base };
+    if (entry?.room_style) payload.room_style = entry.room_style;
+    try {
+      await this.hass.callService("anyvac", "set_floorplan_seat", payload);
+      return true;
+    } catch (err) {
+      console.warn("[anyvac-card] Home calibration: set_floorplan_seat call failed", err);
+      return false;
+    }
+  }
+
+  /** The "Clear" link next to an existing calibration status — resends
+   *  `image_base` WITHOUT `home_anchors`/`home_anchors_frame_id` (dropping a
+   *  key from the resent record is how an override sheds a field, since
+   *  `image_base` itself is a single whole-record override — there is no
+   *  separate "clear this one field" call, unlike `map`/`appearance`). */
+  private async _clearHomeAnchors(): Promise<void> {
+    const session = this._floorplanSession;
+    if (!session || !this._alignServiceAvailable()) return;
+    const { home_anchors: _ha, home_anchors_frame_id: _hafi, ...rest } = session.rest;
+    const d = session.draft;
+    const image_base: Record<string, unknown> = {
+      ...rest, src: session.floorplan,
+      rotation: Math.round(d.rotation * 100) / 100, scale: Math.round(d.scale * 100) / 100,
+      offset_x: Math.round(d.offset_x * 100) / 100, offset_y: Math.round(d.offset_y * 100) / 100,
+    };
+    const entry = this._floorplanSeatsRaw()?.[session.floorplan];
+    const payload: Record<string, unknown> = { floorplan: session.floorplan, image_base };
+    if (entry?.room_style) payload.room_style = entry.room_style;
+    try {
+      await this.hass.callService("anyvac", "set_floorplan_seat", payload);
+      this._floorplanSession = { ...session, rest };
+      this._homeCalibResult = null;
+    } catch (err) {
+      console.warn("[anyvac-card] Home calibration: clear failed", err);
+    }
+  }
+
+  /** docs/40 §5.B/§5.A.2's one-shot side effect, once the shared floorplan
+   *  is calibrated against the home frame (either flow): every vacuum
+   *  sharing it now renders through that calibration instead of its own raw
+   *  map overlay, so this turns "Hide vacuum map" on for all of them —
+   *  mirrors editor.ts's `_finishHomeCalibration`/`_detectFiducials`
+   *  side effect exactly. Unlike editor.ts's single direct-YAML `{...v,
+   *  hide_map: true}` spread across the whole `vacuums:` array (the Visual
+   *  editor has no YAML-write path, only `set_floorplan_seat`), this fires
+   *  one call PER vacuum, each resending that vacuum's own existing `map`
+   *  override VERBATIM when one exists (docs/14 rule 1 "no sentinel" — an
+   *  omitted `map` would otherwise silently clear a manually-placed seat
+   *  that has nothing to do with this) and its full `effectiveAppearance`
+   *  with `hide_map` forced on. Best-effort: a failure partway through is
+   *  logged and left for the user to fix individually via that vacuum's own
+   *  Seat & Appearance tool — the calibration write itself already
+   *  succeeded by the time this runs, so it's never worth undoing that. */
+  private async _hideMapCascade(floorplan: string): Promise<void> {
+    const raw = this._floorplanSeatsRaw();
+    for (const vac of this._config.vacuums ?? []) {
+      const existingMap = raw?.[floorplan]?.vacuums?.[vac.entity]?.map;
+      const appearance: Record<string, unknown> = { ...effectiveAppearance(vac), hide_map: true };
+      const payload: Record<string, unknown> = { floorplan, vacuum: vac.entity, appearance };
+      if (existingMap) payload.map = existingMap;
+      try {
+        await this.hass.callService("anyvac", "set_floorplan_seat", payload);
+      } catch (err) {
+        console.warn(`[anyvac-card] Home calibration: hide_map cascade failed for ${vac.entity}`, err);
+      }
+    }
+  }
+
+  /** Starts the manual click flow: fetches an on-demand home-frame snapshot
+   *  to click against (SCRATCH reference, never saved to `image_base` — see
+   *  `_homeCalibSnapshotUrl`'s own doc comment) via the same
+   *  `anyvac.snapshot_map_as_floorplan` / `frame: "home"` call editor.ts's
+   *  `_startHomeCalibration` uses. */
+  private async _startHomeCalibration(): Promise<void> {
+    const session = this._floorplanSession;
+    if (!session || !this._homeCalibEligible(session) || !this._homeCalibServiceAvailable()) return;
+    this._homeCalibError = "";
+    this._homeCalibResult = null;
+    this._homeCalibBusy = true;
+    try {
+      const res = (await (this.hass as any).callService(
+        "anyvac", "snapshot_map_as_floorplan",
+        { frame: "home", name: "home_frame_calib" },
+        undefined, false, true,
+      )) as {
+        response?: { path?: string; frame_id?: string; crop?: CropBox };
+      } | undefined;
+      const path = res?.response?.path;
+      const frameId = res?.response?.frame_id;
+      const crop = res?.response?.crop;
+      if (!path || !frameId || !crop) throw new Error("incomplete response — integration too old?");
+      this._homeCalibSnapshotUrl = path;
+      this._homeCalibCrop = crop;
+      this._homeCalibFrameId = frameId;
+      this._homeCalib = { phase: "frame", homePts: [], floorPts: [] };
+    } catch (err) {
+      this._homeCalibError =
+        "Couldn't snapshot the home frame for calibration — make sure at least one vacuum has a " +
+        "home-frame registration and the anyvac integration is at least 1.9.0, then try again.";
+      console.warn("[anyvac-card] Home calibration: snapshot_map_as_floorplan failed", err);
+    } finally {
+      this._homeCalibBusy = false;
+    }
+  }
+
+  /** Cancels an in-progress (or completed-but-unsaved) manual calibration —
+   *  the flow's own Cancel button, dropping back to the "Home frame"
+   *  sub-tab's landing view. */
+  private _cancelHomeCalibration(): void {
+    this._homeCalib = null;
+    this._homeCalibSnapshotUrl = "";
+    this._homeCalibCrop = null;
+    this._homeCalibFrameId = "";
+    this._homeCalibError = "";
+  }
+
+  /** Click on the home-frame snapshot (`phase === "frame"`) — converts the
+   *  click into home-frame px via `pctToCropPoint` against `_homeCalibCrop`,
+   *  then snaps it to the nearest wall corner via `anyvac.snap_wall_corner`
+   *  (docs/40 §5.B) before recording it, same as editor.ts's
+   *  `_onHomeCalibFrameClick`. A failed/unavailable snap falls back to the
+   *  unsnapped point rather than losing the click outright. */
+  private async _onHomeCalibFrameClick(e: MouseEvent): Promise<void> {
+    const c = this._homeCalib;
+    const crop = this._homeCalibCrop;
+    if (!c || c.phase !== "frame" || !crop || c.homePts.length >= FLOOR_CALIB_MAX_PAIRS || this._homeCalibBusy) return;
+    const rect = (e.currentTarget as HTMLElement).getBoundingClientRect();
+    const pct = { x: ((e.clientX - rect.left) / rect.width) * 100, y: ((e.clientY - rect.top) / rect.height) * 100 };
+    const raw = pctToCropPoint(pct, crop);
+    if (!raw) return;
+    this._homeCalibBusy = true;
+    try {
+      const res = (await (this.hass as any).callService(
+        "anyvac", "snap_wall_corner",
+        { frame_id: this._homeCalibFrameId, x_home_px: raw.x, y_home_px: raw.y },
+        undefined, false, true,
+      )) as { response?: { x_home_px?: number; y_home_px?: number } } | undefined;
+      const px = res?.response?.x_home_px ?? raw.x;
+      const py = res?.response?.y_home_px ?? raw.y;
+      this._homeCalib = { ...c, homePts: [...c.homePts, { x: px, y: py }], phase: "floor" };
+    } catch (err) {
+      this._homeCalib = { ...c, homePts: [...c.homePts, raw], phase: "floor" };
+      console.warn("[anyvac-card] Home calibration: snap_wall_corner failed, using unsnapped click", err);
+    } finally {
+      this._homeCalibBusy = false;
+    }
+  }
+
+  /** Click on the floorplan (`phase === "floor"`), on the SAME main canvas
+   *  fáze J1/J2 use — routed through `_alignPointToWrapPct` so a panned/
+   *  zoomed/rotated view still lands on the physically correct spot, same
+   *  design principle fáze J2 established for its own floor click. */
+  private _onHomeCalibFloorClick(e: MouseEvent): void {
+    const c = this._homeCalib;
+    if (!c || c.phase !== "floor") return;
+    const pt = this._alignPointToWrapPct(e.clientX, e.clientY);
+    if (!pt) return;
+    const x = round1(clampPct(pt.x)), y = round1(clampPct(pt.y));
+    this._homeCalib = { ...c, floorPts: [...c.floorPts, { x, y }], phase: "frame" };
+  }
+
+  /** Removes the last clicked point, whichever surface it's on — mirrors
+   *  editor.ts's `_undoHomeCalibPoint`. */
+  private _undoHomeCalibPoint(): void {
+    const c = this._homeCalib;
+    if (!c) return;
+    if (c.phase === "floor" && c.homePts.length > c.floorPts.length) {
+      this._homeCalib = { ...c, homePts: c.homePts.slice(0, -1), phase: "frame" };
+    } else if (c.floorPts.length > 0) {
+      this._homeCalib = { ...c, floorPts: c.floorPts.slice(0, -1) };
+    }
+  }
+
+  /** Live fit-error preview over whatever complete pairs exist so far —
+   *  mirrors editor.ts's `_homeCalibPreview`, calling `homeAnchorFit`
+   *  directly (the exact function the card re-solves live every render)
+   *  instead of `buildCalibrationAnchors`+`computeSeatFit` separately, since
+   *  the persisted shape here already IS `{home_px, floor_pct}` pairs. */
+  private _homeCalibPreview(c: {
+    homePts: { x: number; y: number }[]; floorPts: { x: number; y: number }[];
+  }): { residual_pct: number } | null {
+    const n = Math.min(c.homePts.length, c.floorPts.length);
+    const frame = this._anyHomeFrameCard();
+    if (n < 2 || !frame) return null;
+    const anchors: HomeFrameAnchor[] = c.homePts.slice(0, n).map((p, i) => ({ home_px: p, floor_pct: c.floorPts[i] }));
+    const ar = this._mapAR > 0.1 ? this._mapAR : 3.636;
+    const fit = homeAnchorFit(anchors, { NW: frame.w, NH: frame.h }, ar);
+    return fit ? { residual_pct: Math.round(fit.residual_pct * 10) / 10 } : null;
+  }
+
+  /** Solves every complete pair collected so far and writes them as
+   *  `image_base.home_anchors`/`home_anchors_frame_id` (`_saveHomeAnchors`)
+   *  — the raw PAIRS, never a solved seat (docs/40 §5.B: the fit is
+   *  re-run live every render against the frame's CURRENT size, so it
+   *  survives the frame growing without re-clicking). Unlike J1/J2's Save,
+   *  this does NOT close the overlay on success (see `_homeCalibResult`'s
+   *  own doc comment) — it drops back to the landing view with the result
+   *  banner shown, and triggers the `hide_map` cascade the same one-shot
+   *  side effect editor.ts's own form applies. */
+  private async _finishHomeCalibration(): Promise<void> {
+    const c = this._homeCalib;
+    const session = this._floorplanSession;
+    if (!c || !session) return;
+    const n = Math.min(c.homePts.length, c.floorPts.length);
+    if (n < 2) {
+      this._homeCalibError = "Need at least 2 complete point pairs — try again.";
+      return;
+    }
+    const frame = this._anyHomeFrameCard();
+    if (!frame) {
+      this._homeCalibError = "No home frame available anymore — try again.";
+      return;
+    }
+    const anchors: HomeFrameAnchor[] = c.homePts.slice(0, n).map((p, i) => ({ home_px: p, floor_pct: c.floorPts[i] }));
+    const ar = this._mapAR > 0.1 ? this._mapAR : 3.636;
+    const fit = homeAnchorFit(anchors, { NW: frame.w, NH: frame.h }, ar);
+    if (!fit) {
+      this._homeCalibError = "Couldn't compute a calibration from those points — " +
+        "make sure they're clearly apart, then try again.";
+      return;
+    }
+    const ok = await this._saveHomeAnchors(anchors, frame.id);
+    if (!ok) {
+      this._homeCalibError = "Couldn't save the calibration — try again.";
+      return;
+    }
+    await this._hideMapCascade(session.floorplan);
+    this._homeCalib = null;
+    this._homeCalibSnapshotUrl = "";
+    this._homeCalibCrop = null;
+    this._homeCalibFrameId = "";
+    this._homeCalibError = "";
+    this._homeCalibResult = { residual_pct: Math.round(fit.residual_pct * 10) / 10 };
+  }
+
+  /** Step 1 of the fiducial-marker workflow (docs/40 §5.A.2): snapshots the
+   *  home frame the SAME way `_startHomeCalibration` does, but with
+   *  `fiducials: true` — the response's `fiducials` list (where the 4
+   *  markers were actually placed, in home px) is remembered in
+   *  `_fiducialKnown` for `_detectFiducials` below. Unlike editor.ts's own
+   *  version, the returned path is shown as plain text rather than written
+   *  into `image_base.src` — see `_fiducialSnapshotPath`'s doc comment for
+   *  why the Visual editor deliberately leaves that one step to the Config
+   *  editor's Maps tab. */
+  private async _snapshotHomeFrameWithFiducials(): Promise<void> {
+    if (!this._fiducialServiceAvailable()) return;
+    this._fiducialSnapshotBusy = true;
+    this._fiducialSnapshotError = "";
+    this._fiducialDetectResult = null;
+    try {
+      const res = (await (this.hass as any).callService(
+        "anyvac", "snapshot_map_as_floorplan",
+        { frame: "home", name: "home_frame_fiducial", fiducials: true },
+        undefined, false, true,
+      )) as {
+        response?: {
+          path?: string; frame_id?: string;
+          fiducials?: { id: string; home_px: { x: number; y: number } }[];
+        };
+      } | undefined;
+      const path = res?.response?.path;
+      const frameId = res?.response?.frame_id;
+      const markers = res?.response?.fiducials;
+      if (!path || !frameId || !markers?.length) throw new Error("incomplete response — integration too old?");
+      this._fiducialKnown = { frameId, markers };
+      this._fiducialSnapshotPath = path;
+    } catch (err) {
+      this._fiducialSnapshotError =
+        "Couldn't snapshot the home frame with markers — requires anyvac integration ≥ 1.9.0 " +
+        "with at least one registered vacuum.";
+      console.warn("[anyvac-card] Fiducials: snapshot_map_as_floorplan failed", err);
+    } finally {
+      this._fiducialSnapshotBusy = false;
+    }
+  }
+
+  /** Step 2: scans the floorplan's CURRENT `image_base.src` (whatever the
+   *  user has since pointed it at from the Config editor, after cropping/
+   *  resizing/rotating the step-1 file externally) for the markers step 1
+   *  says were embedded, and writes whatever it finds via `_saveHomeAnchors`
+   *  — the exact shape the manual click flow produces, so nothing
+   *  downstream needs to know which of the two ever produced it. Reads the
+   *  LIVE effective src (`_floorplanCardImageBase()`), not the session's
+   *  own `floorplan` identity key, since (unlike that key) the src is
+   *  exactly the thing this whole workflow expects to have moved by now. */
+  private async _detectFiducials(): Promise<void> {
+    const known = this._fiducialKnown;
+    const session = this._floorplanSession;
+    const src = this._floorplanCardImageBase()?.src ?? session?.floorplan;
+    if (!known || !session || !src) return;
+    this._fiducialDetectBusy = true;
+    this._fiducialDetectError = "";
+    this._fiducialDetectResult = null;
+    try {
+      const res = (await (this.hass as any).callService(
+        "anyvac", "detect_floorplan_fiducials",
+        { path: src, fiducials: known.markers },
+        undefined, false, true,
+      )) as {
+        response?: {
+          home_anchors?: { home_px: { x: number; y: number }; floor_pct: { x: number; y: number } }[];
+          found?: number; missing?: string[];
+        };
+      } | undefined;
+      const anchors = res?.response?.home_anchors;
+      if (!anchors?.length) throw new Error("no markers detected");
+      const ok = await this._saveHomeAnchors(anchors as HomeFrameAnchor[], known.frameId);
+      if (!ok) throw new Error("couldn't save the detected anchors");
+      await this._hideMapCascade(session.floorplan);
+      this._fiducialDetectResult = {
+        found: res?.response?.found ?? anchors.length,
+        missing: res?.response?.missing ?? [],
+      };
+    } catch (err) {
+      this._fiducialDetectError =
+        "Couldn't detect markers — make sure the file above still has its alpha channel " +
+        "(stayed PNG, wasn't flattened/re-exported as JPEG) and at least 2 of the 4 " +
+        "corners survived the crop.";
+      console.warn("[anyvac-card] Fiducials: detect_floorplan_fiducials failed", err);
+    } finally {
+      this._fiducialDetectBusy = false;
+    }
+  }
+
   /** docs/42 §9 fáze H — the Visual editor's own top-level render (renamed
    *  from `_renderAlignOverlay`, docs/42 §8 bod 2). Owns the portal's outer
    *  chrome (toolbar + tool-switcher row) common to all three tools; the
@@ -5779,6 +6271,14 @@ export class AnyVacCard extends LitElement {
     const fc = this._floorCalib;
     const calibPairs = fc ? Math.min(fc.rawPts.length, fc.floorPts.length) : 0;
     const calibCanSave = calibPairs >= 2 && this._alignServiceAvailable() && !this._alignReadOnly();
+    // docs/42 §9 fáze J3: the "Home frame" sub-view's own Save gate — only
+    // meaningful once a manual click flow is actually in progress (the
+    // landing view's own buttons — "Calibrate against home frame", the two
+    // fiducial steps — are inline side-panel actions, not this shared
+    // toolbar Save).
+    const hc = this._homeCalib;
+    const homeCalibPairs = hc ? Math.min(hc.homePts.length, hc.floorPts.length) : 0;
+    const homeCalibCanSave = !!hc && homeCalibPairs >= 2 && this._alignServiceAvailable();
     const tier = session.nudgeTier;
     const tierBtn = (t: NudgeTier, label: string, title: string) => html`
       <button class="align-tier-btn ${tier === t ? "on" : ""}" title=${title}
@@ -5878,6 +6378,11 @@ export class AnyVacCard extends LitElement {
               <ha-icon icon="mdi:screen-rotation"></ha-icon>
             </button>
           ` : nothing}
+          ${this._veTool === "floorplan" && fs && this._floorplanMode === "home" ? html`
+            <button class="align-btn" title="Rotate view 90°" @click=${() => this._alignRotateView()}>
+              <ha-icon icon="mdi:screen-rotation"></ha-icon>
+            </button>
+          ` : nothing}
           <button class="align-btn align-close-btn" title="Cancel" @click=${() => this._alignCancel()}>
             <ha-icon icon="mdi:close"></ha-icon>
           </button>
@@ -5909,6 +6414,15 @@ export class AnyVacCard extends LitElement {
                 : calibPairs < 2 ? "Click at least 2 point pairs first"
                 : "Update the AnyVac integration to 2.0.0"}
               @click=${() => this._floorCalibSave()}>
+              <ha-icon icon="mdi:content-save"></ha-icon><span>Save</span>
+            </button>
+          ` : nothing}
+          ${this._veTool === "floorplan" && fs && this._floorplanMode === "home" && this._homeCalib ? html`
+            <button class="align-btn align-save-btn" ?disabled=${!homeCalibCanSave}
+              title=${homeCalibCanSave ? "Save calibration"
+                : homeCalibPairs < 2 ? "Click at least 2 point pairs first"
+                : "Update the AnyVac integration to 2.0.0"}
+              @click=${() => this._finishHomeCalibration()}>
               <ha-icon icon="mdi:content-save"></ha-icon><span>Save</span>
             </button>
           ` : nothing}
@@ -6377,6 +6891,14 @@ export class AnyVacCard extends LitElement {
   private _renderFloorplanTool(session: FloorplanEditSession) {
     const mode = this._floorplanMode;
     const readOnly = this._alignReadOnly();
+    // docs/42 §9 fáze J3: the "Home frame" sub-tab only makes sense for a
+    // FOREIGN-origin floorplan with a home frame to calibrate against —
+    // same gate `_homeCalibEligible`/`_startHomeCalibration` enforce, kept
+    // in sync here (docs/14 rule 1) so a disabled/no-op pill never shows up
+    // at all instead of sitting there greyed out with nothing to explain
+    // why (cesta A's own identity crop already covers this floorplan, or no
+    // vacuum currently reports a home-frame registration).
+    const homeEligible = this._homeCalibEligible(session);
     return html`
       <div class="ve-subtab-row">
         <button class="ve-subtab ${mode === "geo" ? "on" : ""}"
@@ -6384,8 +6906,14 @@ export class AnyVacCard extends LitElement {
         <button class="ve-subtab ${mode === "calib" ? "on" : ""}" ?disabled=${readOnly}
           title=${readOnly ? "Read-only — aligned by home frame, nothing to calibrate" : ""}
           @click=${() => this._setFloorplanMode("calib")}>Calibrate (2+ points)</button>
+        ${homeEligible ? html`
+          <button class="ve-subtab ${mode === "home" ? "on" : ""}"
+            @click=${() => this._setFloorplanMode("home")}>Home frame</button>
+        ` : nothing}
       </div>
-      ${mode === "calib" ? this._renderFloorplanCalibTool(session) : this._renderFloorplanGeoTool(session)}
+      ${mode === "calib" ? this._renderFloorplanCalibTool(session)
+        : mode === "home" ? this._renderFloorplanHomeTool(session)
+        : this._renderFloorplanGeoTool(session)}
     `;
   }
 
@@ -6535,6 +7063,35 @@ export class AnyVacCard extends LitElement {
     }
   }
 
+  /** docs/42 §9 fáze J3 — the SAME tap-vs-drag/fall-through-to-pan shape as
+   *  `_floorCalibCanvasPointerDown` above, for the "Home frame" sub-view's
+   *  own floor click (`_onHomeCalibFloorClick`). A tap only registers while
+   *  `_homeCalib?.phase === "floor"` — otherwise (no calibration in
+   *  progress, or `phase === "frame"`, nothing to click on THIS canvas yet)
+   *  every pointer event falls through to the ordinary view pan. */
+  private _homeCalibDragStart: { pointerId: number; x0: number; y0: number } | null = null;
+  private _homeCalibCanvasPointerDown(e: PointerEvent): void {
+    if (!(this._floorplanMode === "home" && this._homeCalib?.phase === "floor")) {
+      this._alignBgPointerDown(e);
+      return;
+    }
+    this._alignRefocusOverlay();
+    this._homeCalibDragStart = { pointerId: e.pointerId, x0: e.clientX, y0: e.clientY };
+    this._alignBgPointerDown(e);
+  }
+  private _homeCalibCanvasPointerMove(e: PointerEvent): void {
+    this._alignBgPointerMove(e);
+  }
+  private _homeCalibCanvasPointerUp(e: PointerEvent): void {
+    const start = this._homeCalibDragStart;
+    this._homeCalibDragStart = null;
+    this._alignBgPointerUp(e);
+    if (!start || start.pointerId !== e.pointerId) return;
+    if (Math.hypot(e.clientX - start.x0, e.clientY - start.y0) <= HOLD_MOVE_CANCEL_PX) {
+      this._onHomeCalibFloorClick(e);
+    }
+  }
+
   /** docs/42 §9 fáze J2 — the Floorplan & Calibrate tool's calibration
    *  sub-view. The main canvas shows the floorplan at its current
    *  (committed) geometry — no gizmo, view pan/zoom/rotate still work — and
@@ -6640,6 +7197,158 @@ export class AnyVacCard extends LitElement {
     `;
   }
 
+  /** docs/40 §5.B/§5.A.2, docs/42 §9 fáze J3 — the "Home frame" sub-view.
+   *  Same canvas/side-panel split as `_renderFloorplanCalibTool` (fáze J2's
+   *  own ratified design point): the floorplan stays the primary, pannable
+   *  main canvas (this tool's persistent editing focus throughout the whole
+   *  Floorplan & Calibrate tool), while the home-frame snapshot — the
+   *  REFERENCE surface here, playing the role the reference vacuum's own
+   *  raw map plays in J2 — gets its own small un-transformed inset panel in
+   *  the side column. Three states share this one body: no `_homeCalib` yet
+   *  (the landing view — existing calibration status + the two entry
+   *  points), `phase === "frame"`/`"floor"` (the manual click flow itself,
+   *  same banner/preview/undo/cancel shape J2 uses). */
+  private _renderFloorplanHomeTool(session: FloorplanEditSession) {
+    const { w: wrapW, h: wrapH } = this._alignSceneSize();
+    const draft = session.draft;
+    const c = this._homeCalib;
+    const ib = this._floorplanCardImageBase();
+    const homeAnchors = ib?.home_anchors;
+    const pairs = c ? Math.min(c.homePts.length, c.floorPts.length) : 0;
+    const preview = c ? this._homeCalibPreview(c) : null;
+    const atCap = !!c && c.homePts.length >= FLOOR_CALIB_MAX_PAIRS;
+    const isFrame = !c || c.phase === "frame";
+    const crop = this._homeCalibCrop;
+    return html`
+        <div class="align-body">
+          <div class="align-canvas"
+            @wheel=${(e: WheelEvent) => this._alignWheel(e)}
+            @pointerdown=${(e: PointerEvent) => this._homeCalibCanvasPointerDown(e)}
+            @pointermove=${(e: PointerEvent) => this._homeCalibCanvasPointerMove(e)}
+            @pointerup=${(e: PointerEvent) => this._homeCalibCanvasPointerUp(e)}
+            @pointercancel=${(e: PointerEvent) => this._homeCalibCanvasPointerUp(e)}>
+            <div class="align-scene" style=${styleMap({
+              width: wrapW + "px", height: wrapH + "px",
+              transform: this._alignViewTransformCss(),
+            })}>
+              <img class="align-seat-img" src=${session.floorplan} alt="Floorplan"
+                @load=${this._onFloorplanLoad}
+                style=${styleMap({
+                  left: (50 + draft.offset_x) + "%", top: (50 + draft.offset_y) + "%", width: draft.scale + "%",
+                  transform: "translate(-50%,-50%) rotate(" + draft.rotation + "deg)",
+                })} />
+              ${(c?.floorPts ?? []).map((p, i) => html`
+                <div class="calib-marker" style=${styleMap({ left: p.x + "%", top: p.y + "%" })}>${i + 1}</div>
+              `)}
+            </div>
+          </div>
+          <div class="align-side-panel">
+            ${!c ? html`
+              ${homeAnchors?.length ? html`
+                <div class="rooms-side-note">Calibrated: <strong>${homeAnchors.length}</strong>
+                  anchor point${homeAnchors.length > 1 ? "s" : ""} against frame
+                  <code>${ib?.home_anchors_frame_id}</code>
+                  <span class="footer-link" style="margin-left:6px" @click=${() => this._clearHomeAnchors()}>Clear</span>
+                </div>
+              ` : nothing}
+              ${this._homeCalibResult ? html`
+                <div class="rooms-side-note">✅ Calibrated — fit error ${this._homeCalibResult.residual_pct}%.</div>
+              ` : nothing}
+              <div class="section-title">Calibrate against home frame</div>
+              <button class="align-btn" style="width:auto;padding:0 10px;gap:6px"
+                ?disabled=${this._homeCalibBusy || !this._homeCalibServiceAvailable()}
+                @click=${() => this._startHomeCalibration()}>
+                <ha-icon icon="mdi:crosshairs-gps"></ha-icon>
+                <span>${this._homeCalibBusy ? "Snapshotting…" : "Calibrate against home frame"}</span>
+              </button>
+              <div class="rooms-side-note">Click the same physical point once on a live snapshot of the
+                shared home frame (each click snaps to the nearest wall corner automatically) and once on
+                the floorplan, repeated for at least 2 points — corners of different rooms work well. This
+                re-fits itself automatically as the home frame grows over time, so there's no need to
+                re-click later. Also turns "Hide vacuum map" on for every vacuum sharing this floorplan.</div>
+              ${this._homeCalibError ? html`<div class="floor-calib-error">${this._homeCalibError}</div>` : nothing}
+              <div class="align-side-panel-divider"></div>
+              <div class="section-title">or, fiducial markers (advanced)</div>
+              <button class="align-btn" style="width:auto;padding:0 10px;gap:6px"
+                ?disabled=${this._fiducialSnapshotBusy || !this._fiducialServiceAvailable()}
+                @click=${() => this._snapshotHomeFrameWithFiducials()}>
+                <ha-icon icon="mdi:crosshairs"></ha-icon>
+                <span>${this._fiducialSnapshotBusy ? "Snapshotting…" : "1. Snapshot home frame with markers"}</span>
+              </button>
+              <div class="rooms-side-note">A third way to calibrate — skip this unless clicking through
+                calibration above isn't precise enough (e.g. you need to rotate the file, not just crop or
+                resize it). Saves a home-frame snapshot with 4 invisible markers baked into its border.
+                ${this._fiducialSnapshotPath ? html`If this floorplan's Image src isn't already
+                  <code>${this._fiducialSnapshotPath}</code>, set it from the Config editor's Maps tab
+                  first.` : nothing}
+                Then crop, resize and/or rotate that file in an external image editor as needed (GIMP etc.),
+                keep it as PNG, don't flatten it, and run step 2.</div>
+              ${this._fiducialSnapshotError ? html`<div class="floor-calib-error">${this._fiducialSnapshotError}</div>` : nothing}
+              ${this._fiducialKnown ? html`
+                <button class="align-btn" style="width:auto;padding:0 10px;gap:6px"
+                  ?disabled=${this._fiducialDetectBusy}
+                  @click=${() => this._detectFiducials()}>
+                  <ha-icon icon="mdi:crosshairs-gps"></ha-icon>
+                  <span>${this._fiducialDetectBusy ? "Detecting…" : "2. Detect markers in edited file"}</span>
+                </button>
+                <div class="rooms-side-note">Scans the floorplan's current Image src for the markers step 1
+                  embedded and, once at least 2 of the 4 are found, calibrates from them — no clicking.</div>
+                ${this._fiducialDetectError ? html`<div class="floor-calib-error">${this._fiducialDetectError}</div>` : nothing}
+                ${this._fiducialDetectResult ? html`
+                  <div class="rooms-side-note">✅ Found ${this._fiducialDetectResult.found}/4
+                    marker${this._fiducialDetectResult.found === 1 ? "" : "s"}${
+                      this._fiducialDetectResult.missing.length
+                        ? html` (missing: ${this._fiducialDetectResult.missing.join(", ")})` : nothing}.</div>
+                ` : nothing}
+              ` : nothing}
+            ` : html`
+              <div class="floor-calib-banner ${isFrame ? "floor-calib-banner--raw" : "floor-calib-banner--floor"}">
+                ${isFrame
+                  ? (atCap
+                      ? html`<strong>${FLOOR_CALIB_MAX_PAIRS} points</strong> — that's the max. Save below, or undo a point.`
+                      : html`<strong>Point ${pairs + 1}:</strong> click a distinctive spot (e.g. a wall corner)
+                        on the home frame below.${this._homeCalibBusy ? " Snapping…" : ""}`)
+                  : html`<strong>Point ${pairs + 1}:</strong> click the SAME physical point on the floorplan
+                    on the left — zoom/pan it first if you need to.`}
+                ${preview ? html`<div>Fit error with ${pairs} point${pairs === 1 ? "" : "s"}:
+                  <strong>${preview.residual_pct}%</strong></div>` : nothing}
+              </div>
+              <div class="section-title">Home frame (live snapshot)</div>
+              <div class="floor-calib-inset ${isFrame ? "floor-calib-inset--active" : ""}"
+                @click=${(e: MouseEvent) => this._onHomeCalibFrameClick(e)}>
+                <img src=${this._homeCalibSnapshotUrl} alt="Home frame" />
+                ${crop ? c.homePts.map((p, i) => html`
+                  <div class="calib-marker" style=${styleMap({
+                    left: (((p.x - crop.x0) / (crop.x1 - crop.x0)) * 100) + "%",
+                    top: (((p.y - crop.y0) / (crop.y1 - crop.y0)) * 100) + "%",
+                  })}>${i + 1}</div>
+                `) : nothing}
+              </div>
+              <div class="align-side-panel-divider"></div>
+              <div style="display:flex;gap:8px;flex-wrap:wrap">
+                ${(c.homePts.length > 0 || c.floorPts.length > 0) ? html`
+                  <button class="align-btn" style="width:auto;padding:0 10px;gap:6px" @click=${() => this._undoHomeCalibPoint()}>
+                    <ha-icon icon="mdi:undo"></ha-icon><span>Undo point</span>
+                  </button>
+                ` : nothing}
+                <button class="align-btn" style="width:auto;padding:0 10px;gap:6px" @click=${() => this._cancelHomeCalibration()}>
+                  <ha-icon icon="mdi:close"></ha-icon><span>Cancel</span>
+                </button>
+              </div>
+              ${this._homeCalibError ? html`
+                <div class="floor-calib-error">${this._homeCalibError}</div>
+              ` : nothing}
+              <div class="align-side-panel-divider"></div>
+              <div class="rooms-side-note">Click the SAME physical point twice — once on the home frame,
+                once on the floorplan — for at least 2 pairs (up to ${FLOOR_CALIB_MAX_PAIRS}). Save
+                calibrates the WHOLE shared floorplan — every vacuum registered into this home frame draws
+                through it automatically, no per-vacuum seating needed.</div>
+            `}
+          </div>
+        </div>
+    `;
+  }
+
   /** docs/42 §9 fáze J1 — the Floorplan & Calibrate tool's fallback body
    *  whenever there's no `_floorplanSession` to show `_renderFloorplanTool`
    *  instead: split mode's own per-vacuum `image_base`, or a merged config
@@ -6727,6 +7436,22 @@ export class AnyVacCard extends LitElement {
    *  delegate this particular choice to). */
   private _homeFrameDims(): { NW: number; NH: number } | null {
     const wantId = this._config.image_base?.home_anchors_frame_id;
+    const byId = this._homeFrameRegistry();
+    if (wantId) { const f = byId.get(wantId); if (f) return { NW: f.w, NH: f.h }; }
+    let best: { w: number; h: number; count: number } | null = null;
+    for (const f of byId.values()) if (!best || f.count > best.count) best = f;
+    return best ? { NW: best.w, NH: best.h } : null;
+  }
+
+  /** Shared scan every configured vacuum's live `home_frame` sensor
+   *  attribute and tallies which frame id(s) they're currently registered
+   *  into, alongside each frame's own `{width_px, height_px}` — the common
+   *  groundwork `_homeFrameDims()` (live per-vacuum render, honors
+   *  `image_base.home_anchors_frame_id`) and `_anyHomeFrameCard()` (docs/42
+   *  §9 fáze J3's calibration entry point, no override — that field doesn't
+   *  exist until calibration first runs) both build on, so the two can
+   *  never read the attribute two different ways (docs/14 rule 1). */
+  private _homeFrameRegistry(): Map<string, { w: number; h: number; count: number }> {
     const byId = new Map<string, { w: number; h: number; count: number }>();
     for (const v of this._config.vacuums ?? []) {
       const hf = this._intAttrs(v)?.home_frame as
@@ -6738,10 +7463,23 @@ export class AnyVacCard extends LitElement {
       if (cur) cur.count++;
       else byId.set(hf.id, { w: hf.width_px!, h: hf.height_px!, count: 1 });
     }
-    if (wantId) { const f = byId.get(wantId); if (f) return { NW: f.w, NH: f.h }; }
-    let best: { w: number; h: number; count: number } | null = null;
-    for (const f of byId.values()) if (!best || f.count > best.count) best = f;
-    return best ? { NW: best.w, NH: best.h } : null;
+    return byId;
+  }
+
+  /** docs/40 §5.B / docs/42 §9 fáze J3: the home frame to calibrate a NEW
+   *  card-level floorplan against — mirrors editor.ts's own `_anyHomeFrame()`
+   *  exactly, minus the `image_base.home_anchors_frame_id` override
+   *  `_homeFrameDims()` honors (that field only exists once cesta B has
+   *  already been calibrated once; this is what establishes it in the first
+   *  place). Returns the frame's `id` too (unlike `_homeFrameDims`), needed
+   *  to write `home_anchors_frame_id`. `null` when no configured vacuum
+   *  currently reports a `home_frame` registration — nothing to calibrate
+   *  against yet. */
+  private _anyHomeFrameCard(): { id: string; w: number; h: number } | null {
+    const byId = this._homeFrameRegistry();
+    let best: { id: string; w: number; h: number; count: number } | null = null;
+    for (const [id, f] of byId) if (!best || f.count > best.count) best = { id, ...f };
+    return best ? { id: best.id, w: best.w, h: best.h } : null;
   }
 
   /** docs/40 §5.B: `vac`'s live cesta-B fit — a FOREIGN-origin floorplan

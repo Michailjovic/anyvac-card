@@ -6,6 +6,50 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [1.34.0] - 2026-09-20
+
+### Added
+
+- **Floorplan & Calibrate tool, home-frame N-point pairing (docs/42 §9 fáze
+  J3, docs/40 §5.B).** A new "Home frame" sub-tab, offered whenever a home
+  frame exists and this floorplan isn't already a home-frame identity crop
+  (cesta A) — consolidating the Config editor's own `_homeCalib` state
+  machine into the Visual editor. "Calibrate against home frame" fetches an
+  on-demand, scratch-only snapshot of the shared home frame to click
+  against (never saved to `image_base`); each click there snaps to the
+  nearest wall corner via `anyvac.snap_wall_corner` before being recorded,
+  same as the Config editor's own flow. The floorplan side of each pair
+  uses the SAME pannable/zoomable canvas and `_alignPointToWrapPct`
+  conversion fáze J2 established. Save (2+ pairs) writes the raw anchor
+  pairs as `image_base.home_anchors`/`home_anchors_frame_id` — never a
+  solved seat, so the calibration self-heals as the home frame's canvas
+  grows over time, with no re-clicking needed — and stays open afterwards
+  (unlike every other Save in this editor) so the fit-error result is shown
+  inline; a "Clear" link removes an existing calibration.
+- **Fiducial markers, as a third/advanced option (docs/40 §5.A.2).** Below
+  the manual flow: "1. Snapshot home frame with markers" embeds 4 invisible
+  markers in a fresh home-frame snapshot's border, for cropping/resizing/
+  rotating externally in an image editor; "2. Detect markers in edited
+  file" scans the floorplan's current file for them and calibrates from
+  whatever it finds (2-4 of the 4), no clicking. Unlike the Config editor's
+  own version of this flow, step 1 does NOT write the snapshot's path into
+  `image_base.src` itself — from the Visual editor that would risk forking
+  the stored calibration onto an unreachable key on the next session open,
+  so pointing the floorplan at the new file stays a one-time Config editor
+  step, same as it already is for the non-fiducial case.
+- **Hide-vacuum-map cascade.** Both flows above turn "Hide vacuum map" on
+  for every vacuum sharing the floorplan once it's calibrated against the
+  home frame, same one-shot side effect the Config editor's own forms
+  apply — implemented here as one `set_floorplan_seat` call per vacuum
+  (the Visual editor has no YAML-write path for the single spread-across-
+  the-whole-config edit the Config editor uses instead), each resending
+  that vacuum's own existing seat override verbatim when one exists so it
+  is never silently cleared.
+- **Not yet in this phase.** The three snapshot/acquisition buttons
+  ("Snapshot map as floorplan", "Snapshot home frame as floorplan", "Export
+  guide layers", fáze J4) are still to come — the Config editor's own Maps
+  tab keeps all of that working exactly as before in the meantime.
+
 ## [1.33.0] - 2026-09-20
 
 ### Added
