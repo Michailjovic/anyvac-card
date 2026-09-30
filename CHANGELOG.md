@@ -6,6 +6,25 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [1.45.0] - 2026-09-30
+
+Pairs with integration **1.45.0** (docs/45 — room completion).
+
+### Changed
+
+- **Room chips show completion, with the pass.** With 2 or 3 passes ordered the
+  live chip reads e.g. `50% 1/2`; its tooltip names the pass and how much of
+  the reachable floor is covered. The debug strip shows the pass too.
+- **"Last clean" badge** is the completion of the last run that cleaned the
+  room (still shown only below 100 % on themed rows).
+
+### Added
+
+- **Warning when part of a room was not reached:** an alert icon next to the
+  badge when a finished room's footprint covered less than 80 % of its
+  reachable floor (closed door, blocked corner). Needs integration 1.45.0;
+  older integrations never trigger it.
+
 ## [1.44.0] - 2026-09-30
 
 Seventh and last phase of the "living home" redesign (docs/44 F7): the Visual

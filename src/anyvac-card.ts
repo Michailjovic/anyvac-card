@@ -178,6 +178,11 @@ const START_SEQ_STEP_S = 0.3;
 const START_SEQ_SPREAD_S = 1.6;
 const START_SEQ_TOTAL_MS = 2600;
 
+/** docs/45: a finished room whose footprint reached less than this % of its
+ *  reachable floor gets a warning next to its "last clean" badge. A normal clean
+ *  reads 95-99 %; clearly below that, part of the room was not reachable. */
+const COVERAGE_FLOOR_WARN = 80;
+
 
 @customElement(CARD_NAME)
 export class AnyVacCard extends LitElement {
@@ -2043,44 +2048,79 @@ export class AnyVacCard extends LitElement {
     return { dry, wet };
   }
 
-  /** Debug: per-room cleaning progress from the integration (rooms_progress). */
+  /** Per-room live progress from the integration (rooms_progress). Since integration
+   *  1.45.0 (docs/45) `*_pct` is the share of the ORDERED work done (passes included),
+   *  `*_floor` the reachable floor covered, `*_pass`/`passes` which pass is running. */
   private _roomProgress(vac: VacuumConfig, room: RoomConfig): {
     spatial_pct: number | null; time_pct: number | null;
     dry_pct?: number | null; wet_pct?: number | null;
     dry_calibrating?: boolean; wet_calibrating?: boolean;
-    visited_cells?: number; total_cells?: number; elapsed_s?: number | null; est_s?: number | null;
+    dry_floor?: number | null; wet_floor?: number | null;
+    dry_pass?: number | null; wet_pass?: number | null; passes?: number | null;
+    active?: boolean; done?: boolean;
+    elapsed_s?: number | null; est_s?: number | null;
   } | null {
     const rp = this._intAttrs(vac)?.rooms_progress as Record<string, any> | undefined;
     if (!rp) return null;
     return (rp[room.key] ?? rp[room.name ?? ""] ?? null) as any;
   }
 
-  /** Per-clean-type coverage for a room (dry from the vacuum trace, wet from the mop
+  /** Per-clean-type completion for a room (dry from the vacuum trace, wet from the mop
    *  trace), taken from whichever vacuum has the highest value and coloured by it. Used
-   *  by the per-layer (dry/wet) room menus. */
+   *  by the per-layer (dry/wet) room menus, the dock rows and the map gauges. */
   private _roomProgForType(
     room: RoomConfig, vacs: VacuumConfig[], type: "dry" | "wet",
-  ): { pct: number; kind: "S" | "T"; title: string; color: string; calibrating: boolean } | null {
+  ): {
+    pct: number; kind: "S" | "T"; title: string; color: string; calibrating: boolean;
+    pass: number | null; passes: number | null;
+  } | null {
     let best: number | null = null;
     let bestVac: VacuumConfig | null = null;
     let bestCal = false;
+    let bestP: ReturnType<AnyVacCard["_roomProgress"]> = null;
     for (const v of vacs) {
       const p = this._roomProgress(v, room);
       if (!p) continue;
       const val = type === "dry" ? p.dry_pct : p.wet_pct;
       if (val === null || val === undefined) continue;
+      // `*_calibrating` only exists on integrations older than 1.45.0 (a raw bbox %
+      // before a baseline was learned) — a real value still beats it (docs/36).
       const cal = !!(type === "dry" ? p.dry_calibrating : p.wet_calibrating);
-      // A normalised value always beats a still-calibrating one (docs/36). The two are
-      // different scales — normalised is "% of a full clean", calibrating is the raw
-      // bounding-box %, which reads high because the box includes furniture the robot
-      // cannot reach — so a plain max() across the fleet let one vacuum's raw 78 %~
-      // hide another's real 45 %. Within the same scale the highest still wins.
       if (best === null || (bestCal && !cal) || (bestCal === cal && val > best)) {
-        best = val; bestVac = v; bestCal = cal;
+        best = val; bestVac = v; bestCal = cal; bestP = p;
       }
     }
     if (best === null || !bestVac) return null;
-    return { pct: best, kind: "S", title: `${type} coverage ${best}%`, color: this._color(bestVac), calibrating: bestCal };
+    const passes = bestP?.passes ?? null;
+    const pass = (type === "dry" ? bestP?.dry_pass : bestP?.wet_pass) ?? null;
+    const floor = (type === "dry" ? bestP?.dry_floor : bestP?.wet_floor) ?? null;
+    const multi = passes != null && passes > 1 && pass != null;
+    const title = `${type} · ${best}% done`
+      + (multi ? ` · pass ${pass} of ${passes}` : "")
+      + (floor != null ? ` · ${floor}% of the reachable floor covered` : "");
+    return {
+      pct: best, kind: "S", title, color: this._color(bestVac), calibrating: bestCal,
+      pass: multi ? pass : null, passes: multi ? passes : null,
+    };
+  }
+
+  /** The dock row's "last clean" badge (docs/45): completion of the last run that
+   *  cleaned the room (shown per `fmt`, i.e. only below 100 % on themed rows), plus a
+   *  warning when the robot finished but reached clearly less of the room's reachable
+   *  floor than usual — a closed door or a blocked corner, a different message from
+   *  "not finished". `*_floor` only exists from integration 1.45.0 on. */
+  private _renderCovBadge(
+    cov: Record<string, number> | null, kind: "dry" | "wet",
+    fmt: (pct: number | null | undefined) => string,
+  ) {
+    const pct = cov?.[kind];
+    const floor = cov?.[`${kind}_floor`];
+    const low = floor != null && floor < COVERAGE_FLOOR_WARN;
+    const done = pct == null ? "" : `${pct}% of the ordered work done`;
+    const title = `Last ${kind} clean: ${done || "not measured yet"}`
+      + (floor != null ? ` · ${floor}% of the reachable floor covered` : "");
+    return html`<small class="dock-cov" title=${title}>${fmt(pct)}</small>${low ? html`<ha-icon class="dock-cov-warn" icon="mdi:alert-outline"
+      title=${`Only ${floor}% of the room's reachable floor was covered — was a door closed or part of the room blocked?`}></ha-icon>` : nothing}`;
   }
 
   private _progColor(pct: number): string {
@@ -2114,10 +2154,16 @@ export class AnyVacCard extends LitElement {
    *  `debug_room_progress` still gates the rest of the debug strip (map corner gauges,
    *  the status card's mm:ss timer) — this chip alone is production UI now. Coloured by
    *  the vacuum when provided. */
-  private _renderProgChip(p: { pct: number; kind: "S" | "T"; title: string; color?: string; calibrating?: boolean } | null) {
+  private _renderProgChip(p: {
+    pct: number; kind: "S" | "T"; title: string; color?: string; calibrating?: boolean;
+    pass?: number | null; passes?: number | null;
+  } | null) {
     if (!p) return nothing;
+    // docs/45: with more than one pass ordered the chip says which one is running
+    // ("50% 1/2") — otherwise a room reading 50 % after a full first pass looks wrong.
+    const suffix = p.passes ? `${p.pass}/${p.passes}` : p.kind;
     return html`<span class="rl-prog" title=${p.title}
-      style=${styleMap({ color: p.color ?? this._progColor(p.pct) })}>${p.pct}${p.calibrating ? "~" : ""}%<small>${p.kind}</small></span>`;
+      style=${styleMap({ color: p.color ?? this._progColor(p.pct) })}>${p.pct}${p.calibrating ? "~" : ""}%<small>${suffix}</small></span>`;
   }
 
   private _batIcon(pct: number): string {
@@ -3293,8 +3339,8 @@ export class AnyVacCard extends LitElement {
                   ${sel && unsequenced.has(r.key) ? html`<ha-icon class="dock-unseq" icon="mdi:sort-variant-off"
                     title="No cleaning order set for this room — the time estimate may be off. Set the order in the card editor's Global tab."></ha-icon>` : nothing}
                   <span class="dock-ages">
-                    <span class="dock-age">${this._renderProgChip(this._roomProgForType(r, vacs, "dry"))}<ha-icon icon="mdi:broom"></ha-icon><b style=${styleMap({ color: this._colorForAgeDays(dry) })}>${badge(dry)}</b><small class="dock-cov" title="Last completed dry clean's coverage">${covBadge(cov?.dry)}</small></span>
-                    <span class="dock-age">${this._renderProgChip(this._roomProgForType(r, vacs, "wet"))}<ha-icon icon="mdi:water"></ha-icon><b style=${styleMap({ color: this._colorForAgeDays(wet) })}>${badge(wet)}</b><small class="dock-cov" title="Last completed wet clean's coverage">${covBadge(cov?.wet)}</small></span>
+                    <span class="dock-age">${this._renderProgChip(this._roomProgForType(r, vacs, "dry"))}<ha-icon icon="mdi:broom"></ha-icon><b style=${styleMap({ color: this._colorForAgeDays(dry) })}>${badge(dry)}</b>${this._renderCovBadge(cov, "dry", covBadge)}</span>
+                    <span class="dock-age">${this._renderProgChip(this._roomProgForType(r, vacs, "wet"))}<ha-icon icon="mdi:water"></ha-icon><b style=${styleMap({ color: this._colorForAgeDays(wet) })}>${badge(wet)}</b>${this._renderCovBadge(cov, "wet", covBadge)}</span>
                   </span>
                   ${hasInt && sel ? html`
                     <span class="dock-avatars">
@@ -10418,12 +10464,17 @@ export class AnyVacCard extends LitElement {
           let est = p!.est_s ?? null;
           if (isCur && paused && est != null) est = est + since;
           const timeStr = est != null ? `${this._mmss(elapsed)}/${this._mmss(est)}` : this._mmss(elapsed);
+          // docs/45: which pass is running when more than one was ordered.
+          const pass = p!.passes && p!.passes > 1 ? (p!.dry_pass ?? p!.wet_pass) : null;
+          const floorTip = [p!.dry_floor != null ? `dry floor ${p!.dry_floor}%` : "", p!.wet_floor != null ? `wet floor ${p!.wet_floor}%` : ""]
+            .filter(Boolean).join(" · ");
           return html`
-            <span class="dbg-prog-item" title=${`dry ${p!.dry_pct ?? "—"}% · wet ${p!.wet_pct ?? "—"}%`}>
+            <span class="dbg-prog-item" title=${`dry ${p!.dry_pct ?? "—"}% · wet ${p!.wet_pct ?? "—"}%${floorTip ? " · " + floorTip : ""}`}>
               ${r.icon ? html`<ha-icon icon=${r.icon}></ha-icon>` : nothing}
               <span class="dbg-prog-name">${r.name ?? r.key}</span>
               ${p!.dry_pct != null ? this._renderMiniGauge(p!.dry_pct, color, "mdi:broom", !!p!.dry_calibrating) : nothing}
               ${p!.wet_pct != null ? this._renderMiniGauge(p!.wet_pct, "rgb(var(--avc-info-rgb))", "mdi:water", !!p!.wet_calibrating) : nothing}
+              ${pass != null ? html`<small title="Pass">${pass}/${p!.passes}</small>` : nothing}
               ${p!.elapsed_s != null ? html`<small>${timeStr}</small>` : nothing}
             </span>
           `;
@@ -11072,6 +11123,8 @@ export class AnyVacCard extends LitElement {
        age badge next to it: age is the primary "should I clean this?" signal, coverage
        is supporting detail. */
     .dock-cov { font-size: 9px; opacity: 0.45; margin-left: 1px; }
+    /* docs/45: finished, but part of the reachable floor was never reached. */
+    .dock-age ha-icon.dock-cov-warn { --mdc-icon-size: 11px; color: rgb(var(--avc-warn-rgb)); }
     .dock-avatars { display: inline-flex; gap: 3px; flex-shrink: 0; }
     .dock-chip {
       display: inline-flex;

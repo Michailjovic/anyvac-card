@@ -35,7 +35,7 @@ switch, one-tap start bar:
 | 3 | **Status cards** | One card per vacuum — current state and room, battery, when it last charged, and its own **START**, showing that vacuum's own room selection and ETA. This is where you monitor an individual robot, and in `ui_mode: manual` it's the primary way to start each robot independently on its own presets. Tap the robot's avatar to open Home Assistant's own more-info dialog for that entity — a quick escape hatch to a native action this card doesn't have a shortcut for (e.g. a one-off fan-speed change, or the vendor integration's own segment picker). |
 | 4 | **Vacuum picker** | One pill per vacuum. Hold a pill to show/hide that vacuum on the merged map — handy with 3+ robots sharing one floorplan when the overlapping paths get busy. |
 | 5 | **Mode row** | The **Dry / Wet / Both** pass selector for the orchestrated clean, plus **Dock**, which opens the dock sheet (Empty / Wash / Dry / Pump / Self-clean, plus consumable levels — see the Global tab walkthrough below). |
-| 6 | **Room list** | One row per room: dry/wet last-cleaned age, learned coverage %, and avatar chips showing the assigned vacuum for each pass. Tap an avatar to cycle or pin a specific robot to that room; rows are tap targets too, equivalent to tapping the room on the map. |
+| 6 | **Room list** | One row per room: dry/wet last-cleaned age, how complete the last clean was (shown only below 100 %, with a warning when part of the room could not be reached), and avatar chips showing the assigned vacuum for each pass. Tap an avatar to cycle or pin a specific robot to that room; rows are tap targets too, equivalent to tapping the room on the map. |
 | 7 | **Footer** | A running summary of the current selection (room count and estimated time) and the orchestrated **Start · hold** button — hold to confirm, same gesture as the portrait start bar. |
 
 The portrait layout (screenshot above) carries the same seven ideas, just
@@ -56,9 +56,12 @@ bar at the very bottom.
   which room, runs dry passes before wet ones, and dispatches a mop robot to
   finished rooms without waiting for the whole job — you just pick a scope
   and hit start.
-- **Learned timing, not guesses.** Per-room clean-time estimates and
-  coverage % are learned from your own vacuum's actual cleaning history, not
-  a static average.
+- **Learned timing, not guesses.** Per-room clean-time estimates are learned
+  from your own vacuum's actual cleaning history, not a static average.
+- **Real room progress.** A room's % is the share of the ordered work done —
+  the robot's footprint over the room's reachable floor from its own map, with
+  2 or 3 passes counted as such ("50% 1/2" after a full first pass). Rooms the
+  robot only drives through never get a number.
 - **Calibration-free by construction.** Everything is driven by the
   vacuum's own room/segment data — there's no manual "click three corners to
   calibrate" step to get right or to redo after a remap.
