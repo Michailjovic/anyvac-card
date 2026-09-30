@@ -6,6 +6,25 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [1.42.0] - 2026-09-30
+
+Fifth phase of the "living home" redesign (docs/44 F5): the start sequence.
+Card-only; integration ≥ 1.39.0 unchanged.
+
+### Added
+
+- **Start sequence (W7).** After the hold-START, the planned rooms light up
+  one after another in the order of the backend's plan timeline (`anyvac.plan`
+  `timeline`, sequence-aware — the card only sorts it), and each robot's avatar
+  flies from below the map onto its first room; robots sharing a first room
+  land side by side. At most 0.3 s between rooms (long plans compress), the
+  whole sequence ends within 2.5 s. Landscape and portrait, rotated/flipped
+  maps included (the avatars launch from below the map as seen on screen).
+- The `anyvac.clean` call is sent **before** the sequence starts and never
+  waits for it. Nothing plays on `theme: legacy`, with reduced motion (OS or
+  `reduce_motion: true`), or when the plan preview for exactly this START
+  isn't available — START itself behaves exactly as before in all three.
+
 ## [1.41.0] - 2026-09-30
 
 Fourth phase of the "living home" redesign (docs/44 F4): the living map.

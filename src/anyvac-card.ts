@@ -112,6 +112,7 @@ import {
   type ResolvedProfileGrid,
 } from "./layout";
 import { fmtPts, trailTail, type Pt } from "./trail";
+import { planOrder } from "./startseq";
 
 /** docs/25 §10 follow-up: one auto-discovered "care" row (consumable time-left +
  *  reset button, or a dock tank binary status). See `_careItems()` for how these
@@ -168,6 +169,14 @@ console.info(
  *  screen px on a typical phone/tablet map, the length the approved mockup
  *  used, while still scaling with the map the way the marker does. */
 const TRAIL_HEAD_RR = 3.2;
+
+/** docs/44 F5 start sequence timing: rooms light up one step apart (at most
+ *  0.3 s; long plans compress so the last one starts by 1.6 s), each light is
+ *  0.9 s, avatars fly 0.2 s in for 1.9 s — the whole thing ends by 2.5 s. */
+const START_SEQ_STEP_S = 0.3;
+const START_SEQ_SPREAD_S = 1.6;
+const START_SEQ_TOTAL_MS = 2600;
+
 
 @customElement(CARD_NAME)
 export class AnyVacCard extends LitElement {
@@ -588,6 +597,10 @@ export class AnyVacCard extends LitElement {
   private _fillMap: Map<string, { frac: number; done: boolean; color: string; sheen: boolean }> | null = null;
   private _doneSeen: Set<string> | null = null;
   private _sheenRooms = new Set<string>();
+  /** docs/44 F5: the start sequence being played (see `_playStartSeq`). */
+  @state() private _startSeq: {
+    id: number; delay: Map<string, number>; first: Array<{ entity: string; room: string }>;
+  } | null = null;
   /** docs/44 F4 W2: last rendered marker per overlay (see `_renderVectorLayers`). */
   private _markerPrev = new Map<string, { pose: string; x: number; y: number }>();
   /** Grid gap as last measured (portrait), for the rail's width budget. */
@@ -2521,6 +2534,9 @@ export class AnyVacCard extends LitElement {
   @state() private _planPreview: {
     key: string; dry: Map<string, string>; wet: Map<string, string>;
     eta: number | null; unsequenced: string[];
+    /** docs/44 F5: rooms in the backend timeline's order (earliest finish
+     *  first) and each robot's first room — the start sequence's script. */
+    order?: string[]; first?: Map<string, string>;
   } | null = null;
   private _planFetchKey = "";
   /** Identity of a plan preview: everything the backend's answer depends on.
@@ -2564,6 +2580,7 @@ export class AnyVacCard extends LitElement {
           key, dry: inv(plan.dry), wet: inv(plan.wet),
           eta: typeof plan.eta_min === "number" ? plan.eta_min : null,
           unsequenced: Array.isArray(plan.unsequenced) ? plan.unsequenced : [],
+          ...planOrder(plan),
         };
       } catch (err) {
         console.warn("[anyvac-card] anyvac.plan preview failed:", err);
@@ -2586,12 +2603,78 @@ export class AnyVacCard extends LitElement {
    *  §3.7). The old client-side plan builder + run_job assembly was deleted. */
   private async _runOrchestrated(roomKeys: string[], mode: "dry" | "wet" | "both"): Promise<void> {
     if (!roomKeys.length) return;
-    await this._call("anyvac", "clean", {
+    // docs/44 F5: the service call goes out FIRST (synchronously, inside
+    // `_call` before its first await); the start sequence only plays
+    // alongside it and can never delay or gate the command.
+    const sent = this._call("anyvac", "clean", {
       rooms: roomKeys,
       mode,
       vacuums: this._v2Vacuums(),
       ...(this._v2Settings() ? { settings: this._v2Settings() } : {}),
     });
+    this._playStartSeq(roomKeys, mode);
+    await sent;
+  }
+
+  /** docs/44 F5 (W7): after the hold-START, the planned rooms light up in the
+   *  order of the backend's timeline and each robot's avatar flies onto its
+   *  first room — the plan shown instead of described. ≤ 2.5 s, then the
+   *  card simply is in its cleaning state. Needs the matching `anyvac.plan`
+   *  preview (already fetched for the START label); without it — or on
+   *  `legacy`, or with reduced motion — nothing plays. */
+  private _playStartSeq(roomKeys: string[], mode: "dry" | "wet" | "both"): void {
+    if (!this._themed() || this._reducedMotion()) return;
+    const pv = this._planPreview;
+    if (!pv || pv.key !== this._planKey(roomKeys, mode) || !pv.order?.length) return;
+    const n = pv.order.length;
+    const step = Math.min(START_SEQ_STEP_S, n > 1 ? START_SEQ_SPREAD_S / (n - 1) : START_SEQ_STEP_S);
+    const id = (this._startSeq?.id ?? 0) + 1;
+    this._startSeq = {
+      id,
+      delay: new Map(pv.order.map((r, i) => [r, +(i * step).toFixed(3)] as const)),
+      first: [...(pv.first ?? new Map()).entries()].map(([entity, room]) => ({ entity, room })),
+    };
+    window.setTimeout(() => { if (this._startSeq?.id === id) this._startSeq = null; }, START_SEQ_TOTAL_MS);
+  }
+
+  private _reducedMotion(): boolean {
+    if (this._config.reduce_motion) return true;
+    try { return window.matchMedia?.("(prefers-reduced-motion: reduce)").matches ?? false; } catch { return false; }
+  }
+
+  /** The avatars' flight (merged map): from just outside the map's bottom edge
+   *  AS SEEN ON SCREEN — un-rotated into the wrap's own frame, so a rotated
+   *  or flipped map still launches them from below — onto the centre of each
+   *  robot's first room. Counter-rotated so the avatar stays upright. */
+  private _renderStartSeqAvatars(defs: Array<{ r: RoomConfig; v: VacuumConfig }>) {
+    const seq = this._startSeq;
+    if (!seq || !seq.first.length) return nothing;
+    const d = this._unrotateDelta(0, 1);
+    const fx = 50 + d.dx * 62, fy = 50 + d.dy * 62;
+    // Robots sharing a first room land side by side (screen-horizontal), not
+    // on top of each other.
+    const side = this._unrotateDelta(1, 0);
+    const perRoom = new Map<string, number>();
+    for (const f of seq.first) perRoom.set(f.room, (perRoom.get(f.room) ?? 0) + 1);
+    const seen = new Map<string, number>();
+    return html`${seq.first.map(({ entity, room }, k) => {
+      const vac = this._config.vacuums.find((v) => v.entity === entity);
+      const def = defs.find(({ r }) => r.key === room);
+      if (!vac || !def || def.r.map_x === undefined || def.r.map_y === undefined) return nothing;
+      const j = seen.get(room) ?? 0;
+      seen.set(room, j + 1);
+      const off = (j - ((perRoom.get(room) ?? 1) - 1) / 2) * 40;
+      return html`<div class="seq-avatar" style=${styleMap({
+          "--fx": fx.toFixed(2) + "%", "--fy": fy.toFixed(2) + "%",
+          "--tx": def.r.map_x + "%", "--ty": def.r.map_y + "%",
+          marginLeft: Math.round(side.dx * off) + "px", marginTop: Math.round(side.dy * off) + "px",
+          "--c": this._color(vac), animationDelay: (0.2 + k * 0.12).toFixed(2) + "s",
+        })} data-entity=${entity} data-room=${room}>
+        <span class="seq-avatar-in">${vac.image
+          ? html`<img src=${vac.image} alt="" />`
+          : html`<ha-icon icon="mdi:robot-vacuum"></ha-icon>`}</span>
+      </div>`;
+    })}`;
   }
   /** Select a global preset (does NOT run): set the plan mode + apply its room scope,
    *  so the plan preview reflects it. The user runs it via the plan's "Start · hold". */
@@ -9231,6 +9314,7 @@ export class AnyVacCard extends LitElement {
         ${this._config.layout ? nothing : this._renderLayerToggles(shown)}
         ${this._renderRoomOutlines(this._mergedRoomDefs(shown), shown)}
         ${this._renderMergedRooms(shown)}
+        ${this._renderStartSeqAvatars(this._mergedRoomDefs(shown))}
         ${/* Pin & Go / Zone interaction layer — merged mode used to render NONE of
            this (only split-mode _renderMap had it), so clicks fell straight through
            to room-select regardless of the active mode (bugfix, docs/19). Mirrors
@@ -9650,6 +9734,8 @@ export class AnyVacCard extends LitElement {
           aria-pressed=${selected ? "true" : "false"}
         >
           ${themed ? this._renderRoomFill(room) : nothing}
+          ${this._startSeq?.delay.has(room.key) ? html`<span class="room-seq"
+              style=${styleMap({ animationDelay: this._startSeq.delay.get(room.key) + "s" })}></span>` : nothing}
           <div class="hold-ring"></div>
           ${themed ? this._renderRoomLabel(room, vac, anchor, opts?.vacs) : html`
             ${!this._config.room_icon_hidden && anchor !== "none" && room.icon ? html`
@@ -11918,6 +12004,39 @@ export class AnyVacCard extends LitElement {
       .avc-marker { transition: none; }
       .avc-sonar, .room-sheen { display: none; }
     }
+
+    /* ── docs/44 F5: start sequence ──────────────────────────────────── */
+    .room-seq {
+      position: absolute; inset: 0; border-radius: inherit; pointer-events: none; opacity: 0;
+      background: rgba(var(--avc-accent-rgb), 0.2);
+      box-shadow: inset 0 0 0 2px rgb(var(--avc-accent-rgb)), inset 0 0 26px rgba(var(--avc-accent-rgb), 0.55);
+      animation: avc-seq-light 0.9s ease-out 1 both;
+    }
+    @keyframes avc-seq-light { 0% { opacity: 0; } 30% { opacity: 1; } 100% { opacity: 0; } }
+    .seq-avatar {
+      position: absolute; z-index: 6; width: 34px; height: 34px; pointer-events: none;
+      transform: translate(-50%, -50%); left: var(--tx); top: var(--ty); opacity: 0;
+      animation: avc-seq-fly 1.9s cubic-bezier(0.22, 0.8, 0.3, 1) 1 both;
+    }
+    @keyframes avc-seq-fly {
+      0% { left: var(--fx); top: var(--fy); opacity: 0; transform: translate(-50%, -50%) scale(0.6); }
+      15% { opacity: 1; }
+      60% { left: var(--tx); top: var(--ty); transform: translate(-50%, -50%) scale(1.1); }
+      70% { transform: translate(-50%, -50%) scale(1); }
+      85% { opacity: 1; }
+      100% { left: var(--tx); top: var(--ty); opacity: 0; transform: translate(-50%, -50%) scale(1); }
+    }
+    .seq-avatar-in {
+      display: flex; align-items: center; justify-content: center; width: 100%; height: 100%;
+      border-radius: 50%; overflow: hidden; box-sizing: border-box;
+      background: rgb(var(--avc-scrim-2-rgb)); border: 2px solid var(--c);
+      box-shadow: 0 0 0 4px rgba(0, 0, 0, 0.25), 0 4px 14px rgba(0, 0, 0, 0.45);
+    }
+    .seq-avatar-in img { width: 100%; height: 100%; object-fit: cover; }
+    .seq-avatar-in ha-icon { --mdc-icon-size: 20px; color: var(--c); }
+    .avc-rot .seq-avatar-in { transform: rotate(calc(-1 * var(--map-rot))); }
+    .avc-still .room-seq, .avc-still .seq-avatar { display: none; }
+    @media (prefers-reduced-motion: reduce) { .room-seq, .seq-avatar { display: none; } }
 
     /* ── docs/44 F3: portrait hero bar + rail ─────────────────────────── */
     .meta-bar--hero { flex-wrap: nowrap; min-height: 52px; box-sizing: border-box; }
