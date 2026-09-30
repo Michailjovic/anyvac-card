@@ -132,11 +132,16 @@ export function shouldRotateMap(floorplanAR: number, boxW: number, boxH: number)
  *  `boxW`/`boxH` = the full portrait content box (map + dock combined, minus
  *  START bar). Returns `undefined` when there isn't enough data yet, same
  *  convention as `shouldRotateMap()`. */
+/** docs/44 F3: narrowest usable rail (robot tiles + plan card + tools grid).
+ *  Used both by the split/stack decision and by `_refineGridColumns`, which
+ *  never hands the map so much width that the rail drops below this. */
+export const RAIL_MIN_PX = 160;
+
 export function shouldStackLayout(
   floorplanAR: number,
   boxW: number,
   boxH: number,
-  opts: { dockWidthFrac?: number; dockHeightPx?: number; stackBias?: number } = {},
+  opts: { dockWidthFrac?: number; dockMinPx?: number; dockHeightPx?: number; stackBias?: number } = {},
 ): boolean | undefined {
   // ~150px estimate: vac-icon-strip (~50-64px) + dock-layers row (~30px) +
   // dock-head mode row (~40px) + dock container padding/gaps (~24px), per
@@ -144,9 +149,20 @@ export function shouldStackLayout(
   // list). Only needs to be roughly right: the actual STACK_PORTRAIT_PROFILE
   // dock row is CSS "auto" (sized to real content, not this estimate) — this
   // number only steers the split-vs-stack DECISION, not final layout.
-  const { dockWidthFrac = 0.28, dockHeightPx = 150, stackBias = 1.5 } = opts;
+  // 4. docs/44 F3 (2026-09-30): the split column is no longer a mostly-empty
+  //    strip — it is the "rail" (robot tiles, selection/plan, tools), which
+  //    uses its width properly. The wasted-width cost that `stackBias: 1.5`
+  //    compensated for (point 3) is gone, so the bias drops back to a slight
+  //    stack preference (1.1), and the rail is guaranteed `dockMinPx` (160 px,
+  //    the plan's "rail needs ≥ 160 px" rule) so the decision never assumes a
+  //    map wider than what leaves the rail usable. `theme: legacy` keeps the
+  //    old column and therefore calls this with the old `{ stackBias: 1.5,
+  //    dockMinPx: 0 }`, so its split/stack answers are unchanged.
+  //    Net effect on the reference boxes from point 3 (360×514/580, AR ≈ 0.27):
+  //    split/rail now wins clearly, which is exactly the approved mockup.
+  const { dockWidthFrac = 0.28, dockMinPx = RAIL_MIN_PX, dockHeightPx = 150, stackBias = 1.1 } = opts;
   if (boxW <= 4 || boxH <= 4 || floorplanAR <= 0) return undefined;
-  const splitMapW = boxW * (1 - dockWidthFrac);
+  const splitMapW = boxW - Math.max(boxW * dockWidthFrac, dockMinPx);
   const scaleSplit = Math.min(splitMapW / floorplanAR, boxH);
   const stackMapH = Math.max(boxH - dockHeightPx, 0);
   const scaleStack = Math.min(boxW / floorplanAR, stackMapH);
@@ -168,8 +184,10 @@ export interface ProfileGridConfig {
    *  hatch pattern as `crop.mapOrientation`. Any explicit `columns`/`rows`/
    *  `place` on this profile already opts out of the computed choice
    *  entirely (the card treats a manual layout as intentional) — this field
-   *  only matters when none of those are set. */
-  topology?: "auto" | "split" | "stack";
+   *  only matters when none of those are set. docs/44 F3: "rail" is accepted
+   *  as a synonym of "split" — the split column IS the rail in every
+   *  non-legacy theme, so there is no third arrangement to pick. */
+  topology?: "auto" | "split" | "stack" | "rail";
 }
 
 /** `columns`/`rows`/`place` filled in; `crop`/`topology` stay optional/absent
@@ -204,11 +222,14 @@ export type ResolvedProfileGrid = Required<Omit<ProfileGridConfig, "crop" | "top
  *  region, breaking the lock-in for good. */
 export const STACK_PORTRAIT_PROFILE: ResolvedProfileGrid = {
   columns: [100],
-  rows: ["minmax(0, 1fr)", "auto", "auto"],
+  // docs/44 F3: row 1 = the hero bar (auto — collapses when there is no
+  // integration to report anything). The map keeps `minmax(0, 1fr)`.
+  rows: ["auto", "minmax(0, 1fr)", "auto", "auto"],
   place: {
-    map: { row: 1, col: 1 },
-    dock: { row: 2, col: 1, overflow: "auto" },
-    start: { row: 3, col: 1 },
+    hero: { row: 1, col: 1 },
+    map: { row: 2, col: 1 },
+    dock: { row: 3, col: 1, overflow: "auto" },
+    start: { row: 4, col: 1 },
   },
 };
 
@@ -356,15 +377,59 @@ export const DEFAULT_PROFILES: Record<LayoutProfile, ResolvedProfileGrid> = {
     // `_refineGridHeight`), col2 = 1fr picks up whatever col1 doesn't need
     // (field feedback 2026-07-15: "the freed-up width should go to the
     // sidebar, not sit empty").
+    // docs/44 F3 ("rail"): hero bar on top (auto), map + rail in the middle,
+    // START bar at the bottom sized to its own content. The middle row is
+    // `minmax(0, 1fr)` for the same reason as the stack profile's map row
+    // (0.73.6 lock-in: a bare `1fr`'s implicit `auto` minimum let the first,
+    // unmeasured map paint blow the grid up). Columns stay the declarative
+    // fallback that `_refineGridColumns` overrides with the measured map width.
     columns: [72, 28],
-    rows: [90, 10],
+    rows: ["auto", "minmax(0, 1fr)", "auto"],
     place: {
-      map: { row: 1, col: 1 },
-      dock: { row: 1, col: 2, overflow: "auto" },
-      start: { row: 2, col: "1/3" },
+      hero: { row: 1, col: "1/3" },
+      map: { row: 2, col: 1 },
+      dock: { row: 2, col: 2, overflow: "auto" },
+      start: { row: 3, col: "1/3" },
     },
   },
 };
+
+/** docs/44 F3: drop a region AND its own track from a resolved profile —
+ *  used for the portrait `hero` row when there is nothing to show in it
+ *  (no integration). Just leaving the region out would keep the empty
+ *  "auto" track, and the grid would still insert a `gap` for it (a stray
+ *  6 px band above the map). The track is only removed when no other region
+ *  starts, ends or spans across it; later row lines shift up by one. Pure
+ *  data transformation — the result still goes through `gridRootStyles`'
+ *  declarative styleMap like any other profile (docs/21 §5b). */
+export function withoutRegion(prof: ResolvedProfileGrid, name: string): ResolvedProfileGrid {
+  const pl = prof.place[name];
+  if (!pl) return prof;
+  const place: Record<string, RegionPlace> = { ...prof.place };
+  delete place[name];
+  const row = typeof pl.row === "number" ? pl.row : Number(pl.row);
+  if (!Number.isInteger(row) || row < 1 || row > prof.rows.length) return { ...prof, place };
+  const lines = (r: number | string | undefined): number[] | null => {
+    if (r === undefined) return null;
+    const parts = String(r).split("/").map((x) => Number(x.trim()));
+    return parts.every((n) => Number.isInteger(n) && n > 0) ? parts : null;
+  };
+  // A region we can't parse (span keyword, named line) → keep the track.
+  for (const p of Object.values(place)) {
+    const l = lines(p.row);
+    if (!l) return { ...prof, place };
+    const start = l[0];
+    const end = l.length > 1 ? l[1] : start + 1;
+    if (start <= row && end > row) return { ...prof, place };
+  }
+  const shift = (n: number) => (n > row ? n - 1 : n);
+  const moved: Record<string, RegionPlace> = {};
+  for (const [k, p] of Object.entries(place)) {
+    const l = lines(p.row)!;
+    moved[k] = { ...p, row: l.length > 1 ? l.map(shift).join("/") : shift(l[0]) };
+  }
+  return { ...prof, rows: prof.rows.filter((_, i) => i !== row - 1), place: moved };
+}
 
 /** Pick the active profile from the available viewport. */
 export function pickProfile(cfg: LayoutConfig | undefined, availW: number, availH: number): LayoutProfile {

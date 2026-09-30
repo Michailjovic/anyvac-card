@@ -104,6 +104,8 @@ import {
   shouldRotateMap,
   shouldStackLayout,
   STACK_PORTRAIT_PROFILE,
+  RAIL_MIN_PX,
+  withoutRegion,
   type LayoutProfile,
   type LayoutConfig,
   type ProfileGridConfig,
@@ -573,6 +575,8 @@ export class AnyVacCard extends LitElement {
    *  field (not @state) — read post-render in `updated()`, never drives a
    *  render itself. */
   private _lastPortraitFitW = 0;
+  /** Grid gap as last measured (portrait), for the rail's width budget. */
+  private _gridGapPx = 6;
   /** docs/25 §4: last computed map-rotation decision, kept as the answer while
    *  the map region hasn't been measured yet (`shouldRotateMap` returns
    *  `undefined`) so the map doesn't flicker between orientations on first
@@ -1030,10 +1034,15 @@ export class AnyVacCard extends LitElement {
     // topology is currently rendered, so it stays correct across the switch.
     if (this._profile === "portrait") {
       const startEl = this.renderRoot?.querySelector<HTMLElement>(".avc-region--start");
+      const heroEl = this.renderRoot?.querySelector<HTMLElement>(".avc-region--hero");
       const gapPx = parseFloat(getComputedStyle(root).rowGap || getComputedStyle(root).gap || "0") || 0;
       const startH = startEl ? Math.round(startEl.getBoundingClientRect().height) : 0;
+      // docs/44 F3: the hero row sits above map+dock in both topologies, so it
+      // comes off the box the same way the START row does.
+      const heroH = heroEl ? Math.round(heroEl.getBoundingClientRect().height) : 0;
+      this._gridGapPx = gapPx;
       const aw = Math.round(root.clientWidth);
-      const ah = Math.round(root.clientHeight - startH - (startH ? gapPx : 0));
+      const ah = Math.round(root.clientHeight - startH - (startH ? gapPx : 0) - heroH - (heroH ? gapPx : 0));
       if (aw && Math.abs(aw - this._mapAvailW) >= 2) this._mapAvailW = aw;
       if (ah > 0 && Math.abs(ah - this._mapAvailH) >= 2) this._mapAvailH = ah;
     }
@@ -1199,6 +1208,10 @@ export class AnyVacCard extends LitElement {
     const avail = total - gapPx;
     let mapW = Math.round(this._lastPortraitFitW);
     if (avail > 0) mapW = Math.min(mapW, avail);
+    // docs/44 F3: never squeeze the rail below its usable minimum. The map
+    // region then simply measures narrower and `_renderResponsive` fits the
+    // floorplan into that (contain), so the two settle on the same width.
+    if (this._isRail() && avail > RAIL_MIN_PX * 2) mapW = Math.min(mapW, avail - RAIL_MIN_PX);
     const want = Math.round(mapW) + "px 1fr";
     if (root.style.gridTemplateColumns !== want) root.style.gridTemplateColumns = want;
   }
@@ -2861,6 +2874,179 @@ export class AnyVacCard extends LitElement {
     `;
   }
 
+  /** docs/44 F3: is the portrait split column rendered as the rail? */
+  private _isRail(): boolean {
+    return this._profile === "portrait" && !!this._config.layout && this._themed()
+      && !this._config.debug_dense_dock && !this._stackTopology;
+  }
+
+  /** docs/44 F3 ("rail"): the portrait split column, top to bottom — one
+   *  compact tile per robot, the selection / running-plan card, and a small
+   *  tools grid pinned to the bottom. Replaces the icon strip + `dock-layers`
+   *  row, which left most of the column empty (the reason `stackBias` had to
+   *  be 1.5, docs/25 §7c). The START bar's mode / dock sheets take over the
+   *  rail while open instead of being squeezed in below the tiles — still
+   *  in-flow in the dock region, never a floating layer (docs/21 §5b). */
+  private _renderRail(vacs: VacuumConfig[]) {
+    if (this._modeSheetOpen || this._dockSheetOpen) {
+      return html`<div class="dock rail rail--sheet">${this._renderModeSheet()}${this._renderDockSheet()}</div>`;
+    }
+    return html`
+      <div class="dock rail">
+        <div class="rail-tiles">${vacs.map((v, i) => this._renderRailTile(v, i))}</div>
+        ${this._renderRailPlan(vacs)}
+        ${this._renderRailTools(vacs)}
+      </div>`;
+  }
+
+  /** One robot in the rail. Same gestures as the icon strip it replaces: tap
+   *  opens the robot sheet (F2), hold hides/shows the robot's layers on the
+   *  shared map (`_toggleShownMulti`, deliberately not `_toggleShown`). */
+  private _renderRailTile(v: VacuumConfig, i: number) {
+    const shown = this._shownSet.has(i);
+    const holdId = "vacicon-" + i;
+    const holding = this._holdId === holdId;
+    const name = this._vacName(v);
+    const color = this._color(v);
+    const cleaning = this._isCleaning(v);
+    const [label, labelColor, statusIcon] = this._statusInfo(v);
+    const errState = this._hasError(v) ? this.hass.states[this._ent(v, "error")!]?.state : null;
+    const jv = (this._jobProgress()?.vacuums ?? {})[v.entity] as Record<string, any> | undefined;
+    const crid = this._ent(v, "current_room");
+    const crState = crid ? this.hass.states[crid]?.state : undefined;
+    const room = (jv?.room as string | undefined)
+      ?? (cleaning && crState && crState !== "unknown" && crState !== "unavailable" ? crState : undefined);
+    const pct = typeof jv?.pct === "number" ? jv.pct : cleaning ? this._progress(v) : null;
+    const bat = this._battery(v);
+    const sub = errState ? errState : room ? room : bat !== null ? bat + "\u2009%" : "";
+    return html`
+      <button class="rail-tile ${holding ? "rail-tile--holding" : ""} ${shown ? "" : "rail-tile--hidden"} ${cleaning ? "rail-tile--live" : ""}"
+        style=${styleMap({ "--vac": color })}
+        @pointerdown=${(e: PointerEvent) => {
+          e.preventDefault();
+          this._cancelHold();
+          this._holdId = holdId;
+          this._holdTimer = setTimeout(() => {
+            this._holdTimer = null;
+            this._holdId = null;
+            this._toggleShownMulti(i);
+          }, HOLD_DURATION_MS);
+        }}
+        @pointerup=${() => {
+          if (this._holdTimer !== null) { this._cancelHold(); this._robotSheet = i; }
+          else this._holdId = null;
+        }}
+        @keydown=${(e: KeyboardEvent) => { if (e.key === "Enter" || e.key === " ") { e.preventDefault(); this._robotSheet = i; } }}
+        @pointerleave=${this._holdEnd}
+        @pointercancel=${this._holdEnd}
+        title="${name} \u2014 tap for controls, hold to ${shown ? "hide it on" : "show it on"} the map"
+        aria-label="${name} \u2014 open controls" aria-pressed=${shown ? "true" : "false"}>
+        <div class="hold-ring"></div>
+        ${this._renderBattRing(v, 36)}
+        <span class="rail-tile-text">
+          <span class="rail-tile-name">${name}${shown ? nothing : html`<ha-icon icon="mdi:eye-off-outline"></ha-icon>`}</span>
+          <span class="tile-status" style=${styleMap({ color: errState ? "rgb(var(--avc-err-rgb))" : labelColor })}>
+            <ha-icon icon=${errState ? "mdi:alert-circle-outline" : statusIcon}></ha-icon>${label}
+          </span>
+          ${sub ? html`<span class="tile-sub">${sub}</span>` : nothing}
+        </span>
+        ${cleaning && pct !== null ? html`<span class="rail-tile-bar"><span style=${styleMap({ width: Math.min(100, pct) + "%" })}></span></span>` : nothing}
+      </button>`;
+  }
+
+  /** Middle card of the rail. While an orchestrated job runs it lists the
+   *  job's passes exactly as the integration publishes them (`job_progress`,
+   *  docs/14 — no local re-planning); otherwise it states what START will
+   *  clean: the picked rooms (with Clear) or the whole home. */
+  private _renderRailPlan(vacs: VacuumConfig[]) {
+    const hasInt = vacs.some((v) => this._intAttrs(v));
+    const jp = this._jobProgress();
+    const byEnt = new Map(this._config.vacuums.map((v) => [v.entity, v] as const));
+    if (jp && Array.isArray(jp.rooms)) {
+      const rows = jp.rooms as Array<Record<string, any>>;
+      return html`
+        <div class="rail-card rail-plan">
+          <div class="rail-card-head"><ha-icon icon="mdi:format-list-checks"></ha-icon><span>Plan</span>
+            <small>${jp.passes_done ?? 0}/${jp.passes_total ?? rows.length}</small></div>
+          ${rows.map((r) => {
+            const vc = byEnt.get(r.vacuum);
+            const st = r.state === "done" ? "done" : r.state === "active" ? "active" : "queued";
+            return html`
+              <div class="rail-plan-row rail-plan-row--${st}">
+                <ha-icon icon=${r.kind === "wet" ? "mdi:water" : "mdi:broom"} style=${styleMap({ color: vc ? this._color(vc) : "inherit" })}></ha-icon>
+                <span class="rail-plan-name">${r.room}</span>
+                ${st === "done" ? html`<ha-icon class="rail-plan-state" icon="mdi:check"></ha-icon>`
+                  : st === "active" ? html`<b>${Math.round(Number(r.pct ?? 0))}\u2009%</b>` : nothing}
+              </div>`;
+          })}
+        </div>`;
+    }
+    const keys = this._allRoomKeys();
+    if (!keys.length) return nothing;
+    const names = new Map(this._mergedRoomDefs(vacs).map(({ r }) => [r.key, r.name ?? r.key] as const));
+    const selKeys = keys.filter((k) => this._isRoomSelectedAny(k, vacs));
+    const runKeys = selKeys.length ? selKeys : keys;
+    if (hasInt) this._fetchPlan(runKeys, this._planMode);
+    const est = this._etaFor(runKeys, this._planMode, hasInt);
+    const unassigned = this._unassignedRooms(runKeys, this._planMode, hasInt);
+    return html`
+      <div class="rail-card rail-sel">
+        <div class="rail-card-head">
+          <ha-icon icon=${selKeys.length ? "mdi:checkbox-multiple-marked-outline" : "mdi:home-outline"}></ha-icon>
+          <span>${selKeys.length ? `${selKeys.length} ${selKeys.length === 1 ? "room" : "rooms"}` : "Whole home"}</span>
+          ${est ? html`<small>~${est} min</small>` : nothing}
+        </div>
+        ${selKeys.length
+          ? html`<div class="rail-chips">${selKeys.map((k) => html`<span class="rail-chip">${names.get(k) ?? k}</span>`)}</div>
+              <button class="mtbtn rail-clear" @click=${() => this._clearRoomSelection()}>
+                <ha-icon icon="mdi:close"></ha-icon><span>Clear</span></button>`
+          : html`<span class="rail-hint">Tap rooms on the map to pick them</span>`}
+        ${unassigned.length ? html`<span class="rail-warn"><ha-icon icon="mdi:robot-off"></ha-icon>${unassigned.length} without a robot for this mode</span>` : nothing}
+      </div>`;
+  }
+
+  /** Bottom of the rail: map-view tools that portrait has no meta bar for —
+   *  dry/wet trail visibility, refresh, flip and Align. Icon-only, labelled. */
+  private _renderRailTools(vacs: VacuumConfig[]) {
+    const withMap = vacs.filter((v) => this._mapEntityFor(v));
+    const alignCand = this._alignCandidates(vacs);
+    const refreshTap = (e: Event) => {
+      const btn = e.currentTarget as HTMLElement;
+      btn.classList.remove("mtbtn--spin");
+      void btn.offsetWidth;
+      btn.classList.add("mtbtn--spin");
+      for (const v of withMap) this._refreshMap(v);
+    };
+    return html`
+      <div class="rail-tools">
+        ${this._renderLayerToggleCompact(vacs)}
+        ${withMap.length ? html`<button class="mtbtn mtbtn--icon" title="Refresh map" aria-label="Refresh map" @click=${refreshTap}>
+            <ha-icon icon="mdi:refresh"></ha-icon></button>` : nothing}
+        ${this._config.layout ? html`<button class="mtbtn mtbtn--icon ${this._flipEff ? "on" : ""}"
+            title="Flip map 180° for this screen (this session only)" aria-label="Flip map"
+            aria-pressed=${this._flipEff ? "true" : "false"} @click=${() => this._toggleFlipLive()}>
+            <ha-icon icon="mdi:flip-vertical"></ha-icon></button>` : nothing}
+        ${alignCand.length ? html`<button class="mtbtn mtbtn--icon" title="Align — full-screen manual floorplan seating" aria-label="Align"
+            @click=${() => this._openAlign(alignCand[0])}>
+            <ha-icon icon="mdi:vector-square-edit"></ha-icon></button>` : nothing}
+      </div>`;
+  }
+
+  /** Clear every explicit room pick (the rail's Clear button). Mirrors what
+   *  deselecting each room by hand does, including dropping manual pins
+   *  (`_toggleRoomAcross`), but as one backend call when selection is shared. */
+  private _clearRoomSelection(): void {
+    const vacs = this._config.vacuums;
+    const sel = this._allRoomKeys().filter((k) => this._isRoomSelectedAny(k, vacs));
+    if (!sel.length) return;
+    if (this._backendSel()) {
+      if (vacs.some((v) => this._intAttrs(v))) for (const k of sel) void this._call("anyvac", "pin_room", { room: k });
+      this._setBackendSel([], "clear");
+      return;
+    }
+    for (const k of sel) this._toggleRoomAcross(k, vacs);
+  }
+
   /** `withPicker` (v1.1.0 follow-up, docs/33): the landscape vacuum picker
    *  used to be its own grid region, sitting in a SEPARATE row above dock —
    *  `status` spanned both rows so its column height matched theirs
@@ -2874,6 +3060,10 @@ export class AnyVacCard extends LitElement {
    *  getting that (unchanged), and doesn't also get a duplicate here. */
   private _renderDock(withRun: boolean, withPicker = false) {
     const vacs = this._config.vacuums;
+    // docs/44 F3: portrait split column = the rail in every non-legacy theme.
+    // Stack keeps its full-width row, landscape its picker + room list, and
+    // `debug_dense_dock` (§7e) its dense view.
+    if (this._isRail()) return this._renderRail(vacs);
     const rooms = this._mergedRoomDefs(vacs);
     // Room-less configs (e.g. a fresh install before any rooms exist, docs/30)
     // used to make the WHOLE picker region disappear too, back when picker
@@ -8796,7 +8986,7 @@ export class AnyVacCard extends LitElement {
   private get _stackTopology(): boolean {
     if (this._profile !== "portrait" || !this._config.layout) return false;
     const p = this._config.layout.portrait;
-    if (p?.topology === "split") return false;
+    if (p?.topology === "split" || p?.topology === "rail") return false;
     if (p?.topology === "stack") return true;
     if (p?.columns?.length || p?.rows?.length || (p?.place && Object.keys(p.place).length)) return false;
     const ar = this._mapAR > 0.1 ? this._mapAR : 3.636;
@@ -8807,7 +8997,11 @@ export class AnyVacCard extends LitElement {
     // this one's, and converges within a render or two, same as elsewhere in
     // this settle-based system.
     const effAr = this._narrow ? 1 / ar : ar;
-    const computed = shouldStackLayout(effAr, this._mapAvailW, this._mapAvailH);
+    // docs/44 F3: themed cards fill the split column with the rail, so the
+    // decision uses the new defaults; legacy keeps the old mostly-empty
+    // column and with it the old bias (see shouldStackLayout, point 4).
+    const computed = shouldStackLayout(effAr, this._mapAvailW, this._mapAvailH,
+      this._themed() ? {} : { stackBias: 1.5, dockMinPx: 0 });
     if (computed !== undefined) { this._lastStack = computed; return computed; }
     return this._lastStack;
   }
@@ -8874,7 +9068,16 @@ export class AnyVacCard extends LitElement {
     // (uniform scaling can't do otherwise without distorting the image).
     const crop = this._config.layout[this._profile]?.crop;
     const cover = crop?.fit === "cover";
-    const boxW = this._mapRegW, boxH = this._mapRegH;
+    let boxW = this._mapRegW;
+    const boxH = this._mapRegH;
+    // docs/44 F3: in the rail topology the map may never take the width the
+    // rail needs. The region is always MEASURED at the declarative column
+    // split (Lit's styleMap re-applies `gridTemplateColumns` on every render,
+    // docs/21 §5b, and `_refineGridColumns` only narrows it afterwards), so
+    // the budget is applied here, to the fit, instead of trusting the box.
+    if (this._isRail() && this._mapAvailW > RAIL_MIN_PX * 2) {
+      boxW = Math.min(boxW, this._mapAvailW - this._gridGapPx - RAIL_MIN_PX);
+    }
     let rW: number, rH: number;
     if (cover) { rW = Math.max(boxW, boxH * arEff); rH = Math.max(boxH, rW / arEff); }
     else { rW = Math.min(boxW, boxH * arEff); rH = Math.min(boxH, rW / arEff); }
@@ -8892,6 +9095,15 @@ export class AnyVacCard extends LitElement {
     // is upside down for me") are independent and compose into one of the
     // four right angles. `.avc-rot`'s counter-rotation CSS reads the total
     // back off `--map-rot` (single computed source, not per-angle classes).
+    // Shared with the rotated branch below — see the docs/44 F3 note there.
+    const tight = !cover && this._profile === "portrait";
+    const outer = tight
+      ? `width:${rW}px;height:${rH}px;margin:${Math.max(0, Math.floor((boxH - rH) / 2))}px auto 0`
+      : `width:${boxW}px;height:${boxH}px;margin:0 auto`;
+    const pan = tight ? "0px,0px" : `${panX}px,${panY}px`;
+    // docs/44 F3: the rail takes whatever width the fitted map leaves, in
+    // every orientation (not just the quarter turns the legacy split refined).
+    if (this._isRail()) this._lastPortraitFitW = rW;
     if (totalRotationDeg !== 0) {
       if (rotate) {
         // Stashed for `_refineGridColumns` (portrait's map/dock column
@@ -8922,9 +9134,16 @@ export class AnyVacCard extends LitElement {
       // chips, room icons) so their text stays upright while the map itself
       // is rotated — `--map-rot` feeds the same counter-rotation to all
       // four angles from one place (anyvac-card.ts CSS block).
+      // docs/44 F3 (found with the rail preview): in portrait "contain" the
+      // clip box is the fitted content itself, not the measured region. The
+      // region is measured at the declarative column split and then narrowed
+      // to the fitted width by `_refineGridColumns`; a region-sized clip box
+      // with the content centred inside it (pan) therefore ended up wider than
+      // its own column and cut the map off on the right. A content-sized box
+      // centred by margins lands in the same place whatever the column does.
       return html`
-        <div class="avc-rot" style="position:relative;width:${boxW}px;height:${boxH}px;margin:0 auto;overflow:hidden;--map-rot:${totalRotationDeg}deg">
-          <div style="position:absolute;top:0;left:0;width:100%;height:100%;transform:translate(${panX}px,${panY}px)">
+        <div class="avc-rot" style="position:relative;${outer};overflow:hidden;--map-rot:${totalRotationDeg}deg">
+          <div style="position:absolute;top:0;left:0;width:100%;height:100%;transform:translate(${pan})">
             <div style="position:absolute;top:0;left:0;width:${innerW}px;height:${innerH}px;${rotTransform}">
               ${mapHtml}
             </div>
@@ -8933,8 +9152,8 @@ export class AnyVacCard extends LitElement {
       `;
     }
     return html`
-      <div style="position:relative;width:${boxW}px;height:${boxH}px;margin:0 auto;overflow:hidden">
-        <div style="position:absolute;top:0;left:0;width:${rW}px;height:${rH}px;transform:translate(${panX}px,${panY}px)">
+      <div style="position:relative;${outer};overflow:hidden">
+        <div style="position:absolute;top:0;left:0;width:${rW}px;height:${rH}px;transform:translate(${pan})">
           ${mapHtml}
         </div>
       </div>
@@ -10045,6 +10264,13 @@ export class AnyVacCard extends LitElement {
       }
       case "tools":
         return this._renderMetaBar(vacsOf(shown));
+      case "hero": {
+        // docs/44 F3: portrait's own full-width hero bar (landscape carries the
+        // hero inside the `tools` meta bar instead). No integration → nothing,
+        // and `_renderGrid` then drops the row entirely (`withoutRegion`).
+        const hero = this._renderHero(this._config.vacuums);
+        return hero === nothing ? nothing : html`<div class="meta-bar meta-bar--hero">${hero}</div>`;
+      }
       case "dock":
         // The dock carries the orchestrated run footer when no `start` region is
         // placed in this profile (landscape, docs/18 §7d). `withPicker`:
@@ -10137,7 +10363,10 @@ export class AnyVacCard extends LitElement {
     // `_stackTopology` already refuses to fire when the user has hand-set
     // columns/rows/place, so this never overrides a manual layout.
     const stack = this._profile === "portrait" && this._stackTopology;
-    const prof = stack ? STACK_PORTRAIT_PROFILE : resolveProfile(lay, this._profile);
+    let prof = stack ? STACK_PORTRAIT_PROFILE : resolveProfile(lay, this._profile);
+    // docs/44 F3: an empty hero must not leave an empty track (+ its gap).
+    const heroTpl = "hero" in prof.place ? this._regionTemplate("hero", prof) : nothing;
+    if (heroTpl == null || heroTpl === nothing) prof = withoutRegion(prof, "hero");
     const schemaWarn = this._schemaWarning();
     // The split/stack line that used to sit in this chip was TEMP diagnostics
     // for the 0.73.1–0.73.7 topology work (screenshots weren't precise enough
@@ -10149,14 +10378,14 @@ export class AnyVacCard extends LitElement {
       <ha-card class=${this._rootClasses()} style=${styleMap({ padding: "0", display: "block", ...this._rootVars() })}>
         ${this.editMode ? html`<div class="version-chip">
           <div>v${CARD_VERSION} · ${Math.round(this._cardW)}w · ${this._profile}</div>
-          ${this._config.debug ? html`<div>${stack ? "stack" : "split"} · box:${Math.round(this._mapAvailW)}x${Math.round(this._mapAvailH)}</div>` : nothing}
+          ${this._config.debug ? html`<div>${stack ? "stack" : this._themed() ? "rail" : "split"} · box:${Math.round(this._mapAvailW)}x${Math.round(this._mapAvailH)}</div>` : nothing}
         </div>` : nothing}
         <div class="avc-grid avc-grid--${this._profile}" style=${styleMap(gridRootStyles(lay, prof))}>
           ${schemaWarn ? html`<div class="avc-schemawarn">
             <ha-icon icon="mdi:alert" style="--mdc-icon-size:18px"></ha-icon><span>${schemaWarn}</span>
           </div>` : nothing}
           ${Object.entries(prof.place).map(([name, pl]) => {
-            const tpl = this._regionTemplate(name, prof);
+            const tpl = name === "hero" ? heroTpl : this._regionTemplate(name, prof);
             if (tpl == null || tpl === nothing) return nothing;
             return html`<div class="avc-region avc-region--${name}" style=${styleMap(regionStyles(pl))}>${tpl}</div>`;
           })}
@@ -10880,6 +11109,7 @@ export class AnyVacCard extends LitElement {
     .action-btn--holding .hold-ring,
     .badge--holding .hold-ring,
     .vac-icon-btn--holding .hold-ring,
+    .rail-tile--holding .hold-ring,
     .room-overlay--holding .hold-ring {
       animation: hold-fill var(--hold-ms) linear forwards;
     }
@@ -11593,6 +11823,70 @@ export class AnyVacCard extends LitElement {
       .avc-theme--auto .tile-status { filter: brightness(0.6) saturate(1.2); }
     }
 
+    /* ── docs/44 F3: portrait hero bar + rail ─────────────────────────── */
+    .meta-bar--hero { flex-wrap: nowrap; min-height: 52px; box-sizing: border-box; }
+    .meta-bar--hero .meta-hero { flex: 1; margin-right: 0; }
+    .meta-bar--hero .hero-title { overflow: hidden; text-overflow: ellipsis; }
+    .avc-grid--portrait .rail { padding: 6px; gap: 8px; overflow: hidden; }
+    .rail-tiles { display: flex; flex-direction: column; gap: 6px; }
+    .rail-tile {
+      position: relative; overflow: hidden;
+      display: flex; align-items: center; gap: 8px;
+      width: 100%; min-height: 52px; padding: 6px 8px; box-sizing: border-box;
+      border-radius: var(--avc-r-m); border: 1px solid var(--avc-panel-line);
+      background: rgba(var(--avc-ink-rgb), 0.04); color: inherit; font: inherit;
+      text-align: left; cursor: pointer; transition: opacity 0.15s ease, border-color 0.2s ease;
+      touch-action: manipulation; -webkit-touch-callout: none; user-select: none;
+    }
+    .rail-tile > :not(.hold-ring) { position: relative; z-index: 1; }
+    .rail-tile--live { border-color: var(--vac); }
+    .rail-tile--hidden { opacity: 0.4; }
+    .rail-tile-text { display: flex; flex-direction: column; gap: 1px; min-width: 0; flex: 1; }
+    .rail-tile-name {
+      display: flex; align-items: center; gap: 4px; min-width: 0;
+      font-size: var(--avc-fs-m); font-weight: 600; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+    }
+    .rail-tile-name ha-icon { --mdc-icon-size: 14px; opacity: 0.7; flex-shrink: 0; }
+    .rail-tile .tile-status, .rail-tile .tile-sub { font-size: var(--avc-fs-xs); }
+    .rail-tile .tile-status ha-icon { --mdc-icon-size: 12px; }
+    .rail-tile-bar {
+      position: absolute !important; left: 8px; right: 8px; bottom: 3px; height: 3px;
+      border-radius: var(--avc-r-pill); background: rgba(var(--avc-ink-rgb), 0.1); overflow: hidden;
+    }
+    .rail-tile-bar > span { display: block; height: 100%; background: var(--vac); border-radius: inherit; transition: width 0.6s var(--avc-ease, ease); }
+    .rail-card {
+      display: flex; flex-direction: column; gap: 6px; min-height: 0; overflow: auto;
+      padding: 8px; border-radius: var(--avc-r-m);
+      background: var(--avc-sunken); border: 1px solid var(--avc-panel-line);
+      font-size: var(--avc-fs-s); scrollbar-width: none;
+    }
+    .rail-card::-webkit-scrollbar { display: none; }
+    .rail-card-head { display: flex; align-items: center; gap: 6px; font-size: var(--avc-fs-m); font-weight: 600; }
+    .rail-card-head ha-icon { --mdc-icon-size: 16px; color: rgb(var(--avc-accent-rgb)); flex-shrink: 0; }
+    .rail-card-head small { margin-left: auto; font-weight: 500; color: rgba(var(--avc-ink-rgb), 0.6); font-variant-numeric: tabular-nums; white-space: nowrap; }
+    .rail-chips { display: flex; flex-wrap: wrap; gap: 4px; }
+    .rail-chip {
+      max-width: 100%; box-sizing: border-box; padding: 2px 8px; border-radius: var(--avc-r-pill);
+      background: rgba(var(--avc-accent-rgb), 0.16); font-size: var(--avc-fs-xs);
+      white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+    }
+    .rail-hint { color: rgba(var(--avc-ink-rgb), 0.55); font-size: var(--avc-fs-xs); }
+    .rail-clear { align-self: flex-start; padding: 4px 8px; }
+    .rail-warn { display: flex; align-items: center; gap: 4px; color: rgb(var(--avc-err-rgb)); font-size: var(--avc-fs-xs); }
+    .rail-warn ha-icon { --mdc-icon-size: 14px; flex-shrink: 0; }
+    .rail-plan-row { display: flex; align-items: center; gap: 6px; min-width: 0; }
+    .rail-plan-row ha-icon { --mdc-icon-size: 14px; flex-shrink: 0; }
+    .rail-plan-name { flex: 1; min-width: 0; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+    .rail-plan-row b { font-size: var(--avc-fs-xs); font-variant-numeric: tabular-nums; }
+    .rail-plan-row--done { opacity: 0.5; }
+    .rail-plan-row--done .rail-plan-state { color: rgb(var(--avc-ok-rgb)); }
+    .rail-plan-row--active .rail-plan-name { font-weight: 600; }
+    .rail-tools { display: grid; grid-template-columns: repeat(auto-fit, minmax(38px, 1fr)); gap: 4px; margin-top: auto; flex-shrink: 0; }
+    .rail-tools .mtbtn { justify-content: center; padding: 8px 0; min-width: 0; }
+    .rail--sheet { overflow: auto; }
+    .rail--sheet .dock-mode span { display: inline; }
+    .rail--sheet .dock-head { flex-direction: column; }
+
     /* Dock rows without a box per row (K6): hairline separators, selection is
      * a soft accent wash, and the list fades out instead of showing a
      * platform scrollbar (wheel/touch scrolling unchanged). */
@@ -11741,6 +12035,7 @@ export class AnyVacCard extends LitElement {
      * browser default — unstyled, but accessible on its own. */
     .avc-theme .action-btn:focus-visible,
     .avc-theme .tile-main:focus-visible,
+    .avc-theme .rail-tile:focus-visible,
     .avc-theme .tile-pause:focus-visible,
     .avc-theme .robot-sheet-icon:focus-visible,
     .avc-theme .start-bar:focus-visible,

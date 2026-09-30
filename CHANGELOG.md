@@ -6,6 +6,46 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [1.40.0] - 2026-09-30
+
+Third phase of the "living home" redesign (docs/44 F3): the portrait **rail**.
+Card-only; works with integration 1.39.0 (the rail's running plan reads
+`job_progress`; with an older integration it shows the selection card).
+
+### Changed
+
+- **Portrait split column is now the rail** (every theme except `legacy`):
+  one compact tile per robot (battery ring, status, current room, live %
+  bar), the selection card (picked rooms + ETA + Clear, or "Whole home"), or
+  — while an orchestrated job runs — the job's passes exactly as the
+  integration publishes them (done / active % / queued), and a small tools
+  grid at the bottom (dry/wet trails, refresh, flip, Align). Replaces the
+  icon strip and the `dock-layers` row. Rail tile gestures are the icon
+  strip's: tap opens the robot sheet, hold hides/shows the robot on the map.
+- **Portrait hero bar** above the map (all themes, like the landscape meta
+  bar since 1.39.0). With no integration the hero row is dropped entirely, not
+  left as an empty track.
+- **Split vs stack decision** (`shouldStackLayout`): the split column is no
+  longer mostly empty, so the stack preference drops from 1.5 to 1.1 and the
+  map is only offered the width that leaves the rail ≥ 160 px
+  (`RAIL_MIN_PX`). The reference boxes that used to flip to stack (360×514,
+  360×580 with a narrow floorplan, docs/25 §7c) now pick the rail. `theme:
+  legacy` keeps the old column and the old decision.
+- The START bar's mode and dock sheets take over the rail while open (still
+  in-flow in the dock region — no floating layer, docs/21 §5b). The robot
+  sheet is a bottom sheet in portrait too.
+- `layout.portrait.topology` also accepts `"rail"` (synonym of `"split"`).
+
+### Fixed
+
+- **Portrait map clipped on the right in split topology.** The map region is
+  measured at the declarative column split (Lit's `styleMap` re-applies it on
+  every render, docs/21 §5b) and only afterwards narrowed to the fitted map
+  width by `_refineGridColumns`; the rotated map's clip box kept the measured
+  (wider) size with the content centred inside it, so part of the floorplan
+  fell outside its own column. In portrait "contain" the clip box is now the
+  fitted content itself, centred by margins.
+
 ## [1.39.0] - 2026-09-30
 
 Second phase of the "living home" redesign (docs/44 F2): hierarchy. Pairs with

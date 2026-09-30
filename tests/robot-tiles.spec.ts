@@ -157,11 +157,13 @@ test("themed status colours are the calmer palette; legacy keeps the old one", a
   expect(await colorOf()).toBe("rgb(82, 196, 26)");
 });
 
+// Stack topology here (square test floorplan); the rail tile has the same
+// gesture and is covered in rail.spec.ts.
 test("portrait: tapping a robot in the icon strip opens its sheet", async ({ page }) => {
   await mount(page, { width: 390, height: 780 });
   await page.evaluate(async () => {
     const card = (window as any).__card;
-    const btn = card.shadowRoot.querySelectorAll(".vac-icon-btn")[1] as HTMLElement;
+    const btn = card.shadowRoot.querySelectorAll(".vac-icon-btn, .rail-tile")[1] as HTMLElement;
     btn.dispatchEvent(new PointerEvent("pointerdown", { bubbles: true }));
     btn.dispatchEvent(new PointerEvent("pointerup", { bubbles: true }));
     await card.updateComplete;
