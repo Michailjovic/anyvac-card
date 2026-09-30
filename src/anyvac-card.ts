@@ -25,6 +25,7 @@ import {
   HOLD_DURATION_MS,
   HOLD_MOVE_CANCEL_PX,
   STATUS_MAP,
+  STATUS_MUTED,
   COLOR_HEX,
   COLOR_BG,
   COLOR_BG_ACTIVE,
@@ -185,6 +186,8 @@ export class AnyVacCard extends LitElement {
    *  not backend-shared (same reasoning as `_inspectKey`: navigation, not
    *  orchestration input). */
   @state() private _dockSheetOpen = false;
+  /** docs/44 F2: index of the vacuum whose robot sheet is open (null = closed). */
+  @state() private _robotSheet: number | null = null;
   @state() private _dockSheetIdx = 0;
   /** docs/25 §10 follow-up (2026-07-25): the START bar's left segment mirrors
    *  the manufacturer app's 3-section bottom bar (mode / START / Dock, see
@@ -1515,7 +1518,13 @@ export class AnyVacCard extends LitElement {
 
   private _statusInfo(vac: VacuumConfig): readonly [string, string, string] {
     const raw = this.hass.states[this._ent(vac, "status") ?? vac.entity]?.state ?? "unknown";
-    return STATUS_MAP[raw] ?? [raw, "rgba(var(--avc-ink-rgb),0.5)", "mdi:robot-vacuum"];
+    const info = STATUS_MAP[raw] ?? [raw, "rgba(var(--avc-ink-rgb),0.5)", "mdi:robot-vacuum"];
+    // docs/44 F2 (K4, second half): themed cards use a calmer, equally
+    // distinguishable status palette. Contrast was checked for text on the
+    // tile surface (dark) and, through the light-theme brightness filter on
+    // `.status-label`/`.tile-status`, on light surfaces. Legacy unchanged.
+    const muted = this._themed() ? STATUS_MUTED[info[1]] : undefined;
+    return muted ? [info[0], muted, info[2]] : info;
   }
 
   /** docs/25 §10 follow-up (2026-07-24): consumable/"care" rows auto-discovered from
@@ -2829,7 +2838,9 @@ export class AnyVacCard extends LitElement {
                 @pointerup=${() => {
                   if (this._holdTimer !== null) {
                     this._cancelHold();
-                    this._fireMoreInfo(v.entity);
+                    // docs/44 F2: tap opens the robot sheet (which carries the
+                    // HA more-info escape hatch as its (i) button).
+                    this._robotSheet = i;
                   } else {
                     this._holdId = null;
                   }
@@ -4172,7 +4183,11 @@ export class AnyVacCard extends LitElement {
    *  never called any of the three, so they had been dead since docs/19 A4. */
   private _renderMetaBar(vacs: VacuumConfig[]) {
     const withMap = vacs.filter((v) => this._mapEntityFor(v));
-    if (!withMap.length) return nothing;
+    if (!withMap.length) {
+      // No map entity: no map tools, but the hero (docs/44 F2) still belongs here.
+      const hero = this._renderHero(vacs);
+      return hero === nothing ? nothing : html`<div class="meta-bar">${hero}</div>`;
+    }
     // Pin & Go / Zone here is armed for ALL candidates at once ("*", `_armMode`) —
     // in merged mode the capture (click/drag) happens once on the shared map and
     // the choice of WHICH vacuum executes it is made afterwards on that vacuum's
@@ -4222,6 +4237,7 @@ export class AnyVacCard extends LitElement {
     };
     return html`
       <div class="meta-bar">
+        ${this._renderHero(vacs)}
         <div class="meta-bar-cluster">
           <button class="mtbtn ${mode === "pin" ? "on" : ""}" ?disabled=${!canCmd}
             @click=${() => this._armMode("pin")} title=${cmdTitle || "Pin & Go"}>
@@ -9676,6 +9692,162 @@ export class AnyVacCard extends LitElement {
     `;
   }
 
+  /** docs/44 F2: the running orchestrated job's progress, as published by the
+   *  integration (coordinator-wide, so any vacuum's sensor carries it). */
+  private _jobProgress(): Record<string, any> | null {
+    for (const v of this._config.vacuums) {
+      const jp = this._intAttrs(v)?.job_progress as Record<string, any> | undefined;
+      if (jp?.active) return jp;
+    }
+    return null;
+  }
+
+  private _clockStr(iso: string | undefined): string {
+    if (!iso) return "";
+    const d = new Date(iso);
+    if (isNaN(d.getTime())) return "";
+    return d.toLocaleTimeString((this.hass as any)?.language || [], { hour: "2-digit", minute: "2-digit" });
+  }
+
+  private _vacName(vac: VacuumConfig): string {
+    return vac.name ?? vac.entity.split(".")[1] ?? vac.entity;
+  }
+
+  /** docs/44 F2 (W6): avatar inside a battery ring; the ring pulses while charging. */
+  private _renderBattRing(vac: VacuumConfig, size: number) {
+    const bat = this._battery(vac);
+    const status = this.hass.states[this._ent(vac, "status") ?? vac.entity]?.state ?? "";
+    const charging = status === "charging";
+    const r = size / 2 - 2.5;
+    const c = 2 * Math.PI * r;
+    const pct = bat ?? 0;
+    const ringCol = bat === null ? "rgba(var(--avc-ink-rgb),0.2)" : pct <= 20 ? "rgb(var(--avc-err-rgb))" : pct <= 40 ? "rgb(var(--avc-warn-rgb))" : "rgb(var(--avc-ok-rgb))";
+    const inner = size - 10;
+    return html`
+      <span class="batt-ring" style=${styleMap({ width: size + "px", height: size + "px" })}
+        title=${bat !== null ? `Battery ${bat} %` : ""}>
+        <svg width=${size} height=${size} viewBox="0 0 ${size} ${size}" aria-hidden="true">
+          <circle cx=${size / 2} cy=${size / 2} r=${r} fill="none" style="stroke: rgba(var(--avc-ink-rgb),0.1)" stroke-width="3"></circle>
+          ${bat !== null ? svg`<circle class=${charging ? "batt-ring-arc batt-ring-arc--charging" : "batt-ring-arc"} cx=${size / 2} cy=${size / 2} r=${r} fill="none"
+            style=${"stroke: " + ringCol} stroke-width="3" stroke-linecap="round"
+            stroke-dasharray="${((c * pct) / 100).toFixed(1)} ${c.toFixed(1)}"></circle>` : nothing}
+        </svg>
+        ${vac.image
+          ? html`<img src=${vac.image} alt="" style=${styleMap({ width: inner + "px", height: inner + "px" })}>`
+          : html`<ha-icon icon="mdi:robot-vacuum" style=${styleMap({ color: this._color(vac), "--mdc-icon-size": inner * 0.6 + "px" })}></ha-icon>`}
+        ${charging ? html`<span class="batt-ring-bolt"><ha-icon icon="mdi:lightning-bolt"></ha-icon></span>` : nothing}
+      </span>`;
+  }
+
+  /** docs/44 F2 (W4): left half of the landscape meta bar — what the home is
+   *  doing right now, in one glance. All numbers come from the integration
+   *  (`job_progress`, room ages); the card only formats them. */
+  private _renderHero(vacs: VacuumConfig[]) {
+    const withInt = vacs.filter((v) => this._intAttrs(v));
+    if (!withInt.length) return nothing;
+    const jp = this._jobProgress();
+    if (jp) {
+      const done = Number(jp.rooms_done ?? 0);
+      const total = Math.max(1, Number(jp.rooms_total ?? 0));
+      const pct = Math.round((100 * done) / total);
+      const r = 17, c = 2 * Math.PI * r;
+      const who = Object.entries((jp.vacuums ?? {}) as Record<string, any>)
+        .filter(([, v]) => v?.room)
+        .map(([ent, v]) => {
+          const vc = this._config.vacuums.find((x) => x.entity === ent);
+          const nm = vc ? this._vacName(vc) : ent.split(".")[1];
+          return `${nm} ${v.kind === "wet" ? "mopping" : "in"} ${v.room}`;
+        });
+      const left = Math.round(Number(jp.eta_min_left ?? 0));
+      return html`
+        <div class="meta-hero">
+          <span class="hero-ring" aria-hidden="true">
+            <svg width="40" height="40" viewBox="0 0 40 40">
+              <circle cx="20" cy="20" r=${r} fill="none" style="stroke: rgba(var(--avc-ink-rgb),0.1)" stroke-width="3.5"></circle>
+              <circle cx="20" cy="20" r=${r} fill="none" style="stroke: rgb(var(--avc-accent-rgb))" stroke-width="3.5" stroke-linecap="round"
+                stroke-dasharray="${((c * pct) / 100).toFixed(1)} ${c.toFixed(1)}" transform="rotate(-90 20 20)"></circle>
+            </svg>
+            <b>${done}/${jp.rooms_total ?? 0}</b>
+          </span>
+          <span class="hero-text">
+            <span class="hero-title">Cleaning · done around ${this._clockStr(jp.finish_at)}</span>
+            <span class="hero-sub">${left} min left${who.length ? " · " + who.join(" · ") : ""}</span>
+          </span>
+        </div>`;
+    }
+    const busy = vacs.filter((v) => this._isCleaning(v));
+    const age = (t: "dry" | "wet") => {
+      const d = this._oldestAgeDays(withInt, t);
+      return d === null ? null : d < 1 ? "today" : Math.round(d) + " d ago";
+    };
+    const dry = age("dry"), wet = age("wet");
+    const sub = [dry ? "vacuumed " + dry : "", wet ? "mopped " + wet : ""].filter(Boolean).join(" · ");
+    return html`
+      <div class="meta-hero">
+        <span class="hero-badge"><ha-icon icon=${busy.length ? "mdi:broom" : "mdi:home-outline"}></ha-icon></span>
+        <span class="hero-text">
+          <span class="hero-title">${busy.length ? busy.map((v) => this._vacName(v)).join(", ") + (busy.length > 1 ? " are" : " is") + " cleaning" : "Home is calm"}</span>
+          ${sub ? html`<span class="hero-sub">Oldest room: ${sub}</span>` : nothing}
+        </span>
+      </div>`;
+  }
+
+  /** docs/44 F2 (K2): per-robot controls moved out of the always-visible tiles
+   *  into one sheet per robot — presets, "start just this robot", send home,
+   *  care, and the HA more-info escape hatch. The whole-home START stays the
+   *  single primary action on the card. */
+  private _renderRobotSheet() {
+    const idx = this._robotSheet;
+    if (idx === null) return nothing;
+    const vac = this._config.vacuums[idx];
+    if (!vac) return nothing;
+    const name = this._vacName(vac);
+    const [label, labelColor, statusIcon] = this._statusInfo(vac);
+    const bat = this._battery(vac);
+    const close = () => { this._robotSheet = null; };
+    const rooms = this._roomsFor(vac).filter((r) => this._isRoomSelected(r, vac));
+    const mins = this._totalCleanMins(vac);
+    const hasDockStuff = this._dockCaps(vac).hasDock || this._careItems(vac).length > 0;
+    return html`
+      <div class="robot-sheet-scrim" @click=${close}></div>
+      <div class="robot-sheet" role="dialog" aria-modal="true" aria-label="${name} controls"
+        @keydown=${(e: KeyboardEvent) => { if (e.key === "Escape") close(); }}>
+        <span class="robot-sheet-grip" aria-hidden="true"></span>
+        <div class="robot-sheet-head">
+          ${this._renderBattRing(vac, 60)}
+          <span class="robot-sheet-id">
+            <span class="robot-sheet-name">${name}</span>
+            <span class="tile-status" style=${styleMap({ color: labelColor })}>
+              <ha-icon icon=${statusIcon}></ha-icon>${label}${bat !== null ? html` · ${bat}&thinsp;%` : nothing}
+            </span>
+            <span class="tile-sub">Last clean ${this._lastCleanStr(vac)}</span>
+          </span>
+          <button class="robot-sheet-icon" aria-label="Open ${name} in Home Assistant" title="Home Assistant details"
+            @click=${() => this._fireMoreInfo(vac.entity)}><ha-icon icon="mdi:information-outline"></ha-icon></button>
+          <button class="robot-sheet-icon" aria-label="Close" @click=${close}><ha-icon icon="mdi:close"></ha-icon></button>
+        </div>
+        <div class="robot-sheet-rooms">
+          <span class="robot-sheet-label">Rooms</span>
+          <span>${rooms.length
+            ? html`${rooms.map((r) => r.name ?? r.key).join(", ")}${mins ? html` <small>· ${this._timeStr(mins)}</small>` : nothing}`
+            : html`<small>Pick rooms on the map first</small>`}</span>
+        </div>
+        ${this._renderActions(vac, idx)}
+        <div class="robot-sheet-foot">
+          <button class="mtbtn" @click=${() => this._dock(vac)}><ha-icon icon="mdi:home-import-outline"></ha-icon><span>Send to dock</span></button>
+          ${hasDockStuff ? html`<button class="mtbtn" @click=${() => {
+              // Dock sheet tabs index its OWN filtered list (vacuums with dock
+              // actions or care rows), not the config array.
+              const tabs = this._config.vacuums.filter((v) => this._dockCaps(v).hasDock || this._careItems(v).length > 0);
+              this._dockSheetIdx = Math.max(0, tabs.indexOf(vac));
+              this._dockSheetOpen = true;
+              close();
+            }}>
+            <ha-icon icon="mdi:toolbox-outline"></ha-icon><span>Care &amp; dock</span></button>` : nothing}
+        </div>
+      </div>`;
+  }
+
   /** v1.1.0 (2026-08-03): compact header replaces the old 150px-image /
    *  1fr-info grid split — a small circular avatar (mirrors `.vac-icon-btn`'s
    *  established look, docs/25 §7) beside the condensed two-line info block
@@ -9685,43 +9857,68 @@ export class AnyVacCard extends LitElement {
    *  a small `.avatar-info-badge` now marks it visually so shrinking the
    *  avatar doesn't also make that escape hatch less discoverable. */
   private _renderStatusCard(vac: VacuumConfig, vacIdx: number) {
+    // docs/44 F2 (K1/K2): a compact robot tile. Tapping it opens the robot
+    // sheet (`_renderRobotSheet`) where the per-robot START, presets and the
+    // HA more-info escape hatch now live. Only states that need an immediate
+    // answer keep their button on the tile itself: a pending Pin & Go / Zone
+    // confirmation (docs/19 — the pick happens here), Pause while cleaning and
+    // Resume/Dock while paused.
     const cleaning = this._isCleaning(vac);
+    const paused = this._isPaused(vac);
     const color = this._color(vac);
-    const name = vac.name ?? vac.entity.split(".")[1] ?? vac.entity;
-
-    // v1.2.0: the resting border goes through the panel-line token so a theme
-    // can drop the hairline entirely and let elevation do the separating
-    // (docs/35 §2). `legacy` resolves it back to the old literal. The active
-    // border stays the vacuum's identity colour — that one carries meaning.
-    const cardBorder = cleaning ? "2px solid " + color : "1px solid var(--avc-panel-line)";
-    const cardShadow = cleaning ? "0 0 22px " + color + "40" : "var(--avc-elev-1)";
-    const imgFilter = cleaning
-      ? "drop-shadow(0 0 8px " + color + "D8)"
-      : "drop-shadow(0 2px 5px " + color + "33)";
-
+    const name = this._vacName(vac);
+    const [label, labelColor, statusIcon] = this._statusInfo(vac);
+    const bat = this._battery(vac);
+    const jp = this._jobProgress();
+    const jv = (jp?.vacuums ?? {})[vac.entity] as Record<string, any> | undefined;
+    const crid = this._ent(vac, "current_room");
+    const crState = crid ? this.hass.states[crid]?.state : undefined;
+    const room = (jv?.room as string | undefined)
+      ?? (crState && crState !== "unknown" && crState !== "unavailable" ? crState : undefined)
+      ?? (this._intAttrs(vac)?.vacuum_room_name as string | undefined);
+    const pct = typeof jv?.pct === "number" ? jv.pct : this._progress(vac);
+    const erid = this._ent(vac, "error");
+    const errState = this._hasError(vac) ? this.hass.states[erid!]?.state : null;
+    const sub = errState ? errState
+      : cleaning && jv?.next_room ? "Next: " + jv.next_room
+      : "Last clean " + this._lastCleanStr(vac);
+    const urgent = !!(this._pinPending?.[vac.entity] || this._zonePending?.[vac.entity] || paused);
+    // Cleaning: Pause is a compact hold button beside the tile instead of a
+    // full-width bar — three robots cleaning used to mean three big Pause bars.
+    const pauseId = "pause-" + vacIdx;
+    const showPause = cleaning && !urgent;
+    const cardBorder = cleaning ? "1.5px solid " + color : "1px solid var(--avc-panel-line)";
     return html`
-      <div class="status-card" style=${styleMap({ border: cardBorder, boxShadow: cardShadow })}>
-        <div class="status-header">
-          <div class="status-avatar" style=${styleMap({ borderColor: color })}
-            @click=${() => this._fireMoreInfo(vac.entity)}
-            title="Open ${name} info — native controls, in case this card can't do something">
-            ${vac.image ? html`
-              <img src=${vac.image} alt=${name}
-                style=${styleMap({ opacity: cleaning ? "0.9" : "0.6", filter: imgFilter })}
-              />
-            ` : html`
-              <ha-icon icon="mdi:robot-vacuum"
-                style=${styleMap({ color, fontSize: "22px", opacity: cleaning ? "0.9" : "0.5" })}
-              ></ha-icon>
-            `}
-            <span class="avatar-info-badge"><ha-icon icon="mdi:information-outline"></ha-icon></span>
-          </div>
-          <div class="status-info">
-            ${this._renderStatusRow(vac)}
-          </div>
+      <div class="status-card status-tile ${cleaning ? "status-tile--live" : ""}" style=${styleMap({ border: cardBorder })}>
+        <div class="tile-row">
+        <button class="tile-main" aria-label="${name} — open controls" @click=${() => { this._robotSheet = vacIdx; }}>
+          ${this._renderBattRing(vac, 50)}
+          <span class="tile-text">
+            <span class="tile-name"><span class="tile-dot" style=${styleMap({ background: color })}></span>${name}</span>
+            <span class="tile-status" style=${styleMap({ color: errState ? "rgb(var(--avc-err-rgb))" : labelColor })}>
+              <ha-icon icon=${errState ? "mdi:alert-circle-outline" : statusIcon}></ha-icon>${label}${room ? html`<span class="tile-room"> · ${room}</span>` : nothing}
+            </span>
+            <span class="tile-sub">${sub}</span>
+          </span>
+          <span class="tile-right">
+            ${cleaning && pct !== null ? html`
+              <b>${pct}&thinsp;%</b>
+              <span class="tile-bar"><span style=${styleMap({ width: Math.min(100, pct) + "%", background: color })}></span></span>`
+            : bat !== null ? html`<small>${bat}&thinsp;%</small>` : nothing}
+          </span>
+          <ha-icon class="tile-chev" icon="mdi:chevron-right"></ha-icon>
+        </button>
+        ${showPause ? html`<button class="tile-pause ${this._holdId === pauseId ? "action-btn--holding" : ""}"
+            aria-label="Pause ${name} (hold)" title="Hold to pause"
+            @pointerdown=${this._holdStart(pauseId, () => this._pause(vac))}
+            @pointermove=${this._holdMove}
+            @pointerup=${this._holdEnd}
+            @pointerleave=${this._holdEnd}
+            @pointercancel=${this._holdEnd}>
+            <div class="hold-ring"></div><ha-icon icon="mdi:pause"></ha-icon>
+          </button>` : nothing}
         </div>
-        ${this._renderProgress(vac)}
-        ${this._renderActions(vac, vacIdx)}
+        ${urgent ? this._renderActions(vac, vacIdx) : nothing}
         ${this._renderDebugProgress(vac)}
       </div>
     `;
@@ -9964,6 +10161,7 @@ export class AnyVacCard extends LitElement {
             return html`<div class="avc-region avc-region--${name}" style=${styleMap(regionStyles(pl))}>${tpl}</div>`;
           })}
         </div>
+        ${this._renderRobotSheet()}
       </ha-card>
     `;
   }
@@ -9999,6 +10197,7 @@ export class AnyVacCard extends LitElement {
                 ${this._renderMapTools(this._config.vacuums[i])}
                 ${this._renderStatusCard(this._config.vacuums[i], i)}
               `)}
+        ${this._renderRobotSheet()}
       </ha-card>
     `;
   }
@@ -11292,6 +11491,108 @@ export class AnyVacCard extends LitElement {
     /* Icon-only trail toggles (K5). */
     .mtbtn--icon { padding: 5px 9px; }
 
+    /* ── docs/44 F2: hero, robot tiles, robot sheet ──────────────────── */
+    .meta-hero { display: flex; align-items: center; gap: 10px; min-width: 0; margin-right: 10px; }
+    .hero-badge {
+      width: 36px; height: 36px; border-radius: var(--avc-r-m); flex-shrink: 0;
+      display: flex; align-items: center; justify-content: center;
+      background: rgba(var(--avc-accent-rgb), 0.14); color: rgb(var(--avc-accent-rgb));
+    }
+    .hero-badge ha-icon { --mdc-icon-size: 20px; }
+    .hero-ring { position: relative; width: 40px; height: 40px; flex-shrink: 0; display: flex; align-items: center; justify-content: center; }
+    .hero-ring svg { position: absolute; inset: 0; }
+    .hero-ring b { position: relative; font-size: var(--avc-fs-xs); font-variant-numeric: tabular-nums; }
+    .hero-text { display: flex; flex-direction: column; gap: 1px; min-width: 0; }
+    .hero-title { font-size: var(--avc-fs-l); font-weight: 600; white-space: nowrap; }
+    .hero-sub {
+      font-size: var(--avc-fs-s); color: rgba(var(--avc-ink-rgb), 0.62);
+      white-space: nowrap; overflow: hidden; text-overflow: ellipsis; font-variant-numeric: tabular-nums;
+    }
+
+    .status-tile { padding: 8px 10px; gap: 8px; }
+    .tile-main {
+      display: flex; align-items: center; gap: 12px; width: 100%;
+      padding: 0; border: none; background: none; color: inherit; font: inherit;
+      text-align: left; cursor: pointer;
+    }
+    .tile-text { display: flex; flex-direction: column; gap: 2px; min-width: 0; flex: 1; }
+    .tile-name { display: flex; align-items: center; gap: 7px; font-size: var(--avc-fs-l); font-weight: 600; }
+    .tile-dot { width: 8px; height: 8px; border-radius: 50%; flex-shrink: 0; }
+    .tile-status {
+      display: flex; align-items: center; gap: 4px; min-width: 0;
+      font-size: var(--avc-fs-s); font-weight: 600; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+    }
+    .tile-status ha-icon { --mdc-icon-size: 14px; flex-shrink: 0; }
+    .tile-room { color: rgba(var(--avc-ink-rgb), 0.6); font-weight: 500; }
+    .tile-sub { font-size: var(--avc-fs-s); color: rgba(var(--avc-ink-rgb), 0.55); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+    .tile-right { display: flex; flex-direction: column; align-items: flex-end; gap: 6px; width: 96px; flex-shrink: 0; font-variant-numeric: tabular-nums; }
+    .tile-right b { font-size: var(--avc-fs-m); }
+    .tile-right small { font-size: var(--avc-fs-s); color: rgba(var(--avc-ink-rgb), 0.6); }
+    .tile-bar { display: block; width: 100%; height: 4px; border-radius: var(--avc-r-pill); background: rgba(var(--avc-ink-rgb), 0.1); overflow: hidden; }
+    .tile-bar > span { display: block; height: 100%; border-radius: inherit; transition: width 0.6s var(--avc-ease, ease); }
+    .tile-chev { --mdc-icon-size: 18px; color: rgba(var(--avc-ink-rgb), 0.4); flex-shrink: 0; }
+    .status-tile .actions { margin-top: 0; }
+    .tile-row { display: flex; align-items: center; gap: 10px; }
+    .tile-row .tile-main { flex: 1; min-width: 0; }
+    .tile-pause {
+      position: relative; overflow: hidden; flex-shrink: 0;
+      width: 44px; height: 44px; border-radius: var(--avc-r-m); cursor: pointer;
+      display: flex; align-items: center; justify-content: center;
+      border: 1px solid rgba(var(--avc-warn-rgb), 0.45);
+      background: rgba(var(--avc-warn-rgb), 0.12); color: rgb(var(--avc-warn-rgb));
+      touch-action: manipulation; -webkit-touch-callout: none; user-select: none;
+    }
+
+    .batt-ring { position: relative; display: inline-flex; align-items: center; justify-content: center; flex-shrink: 0; }
+    .batt-ring svg { position: absolute; inset: 0; transform: rotate(-90deg); }
+    .batt-ring img { border-radius: 50%; object-fit: cover; }
+    .batt-ring-bolt {
+      position: absolute; right: -2px; bottom: -2px; width: 18px; height: 18px; border-radius: 50%;
+      display: flex; align-items: center; justify-content: center;
+      background: var(--avc-surface); color: rgb(var(--avc-warn-rgb));
+    }
+    .batt-ring-bolt ha-icon { --mdc-icon-size: 12px; }
+    .batt-ring-arc--charging { animation: avc-charge 2.2s ease-in-out infinite; }
+    @keyframes avc-charge { 0%, 100% { opacity: 1; } 50% { opacity: 0.45; } }
+
+    .robot-sheet-scrim { position: absolute; inset: 0; z-index: 40; background: rgba(0, 0, 0, 0.5); }
+    .robot-sheet {
+      position: absolute; left: 50%; bottom: 0; z-index: 41;
+      width: min(480px, 100%); box-sizing: border-box; transform: translateX(-50%);
+      display: flex; flex-direction: column; gap: 14px; padding: 10px 16px 16px;
+      border-radius: 22px 22px 0 0;
+      background: rgb(var(--avc-scrim-2-rgb)); color: rgb(var(--avc-ink-rgb));
+      box-shadow: 0 -12px 40px rgba(0, 0, 0, 0.45);
+      animation: avc-sheet-in 0.22s var(--avc-ease, ease-out);
+    }
+    @keyframes avc-sheet-in { from { transform: translate(-50%, 24px); opacity: 0; } to { transform: translate(-50%, 0); opacity: 1; } }
+    .robot-sheet-grip { align-self: center; width: 38px; height: 4px; border-radius: var(--avc-r-pill); background: rgba(var(--avc-ink-rgb), 0.18); }
+    .robot-sheet-head { display: flex; align-items: center; gap: 14px; }
+    .robot-sheet-id { display: flex; flex-direction: column; gap: 3px; flex: 1; min-width: 0; }
+    .robot-sheet-name { font-size: var(--avc-fs-xl); font-weight: 600; }
+    .robot-sheet-icon {
+      width: 40px; height: 40px; flex-shrink: 0; border: none; border-radius: var(--avc-r-m); cursor: pointer;
+      display: flex; align-items: center; justify-content: center;
+      background: rgba(var(--avc-ink-rgb), 0.06); color: rgba(var(--avc-ink-rgb), 0.7);
+    }
+    .robot-sheet-rooms { display: flex; flex-direction: column; gap: 4px; font-size: var(--avc-fs-m); }
+    .robot-sheet-rooms small { color: rgba(var(--avc-ink-rgb), 0.6); font-size: var(--avc-fs-s); }
+    .robot-sheet-label { font-size: var(--avc-fs-s); color: rgba(var(--avc-ink-rgb), 0.6); }
+    .robot-sheet-foot { display: flex; gap: 8px; flex-wrap: wrap; padding-top: 10px; border-top: 1px solid rgba(var(--avc-ink-rgb), 0.08); }
+    .robot-sheet .actions { margin: 0; }
+    .avc-still .robot-sheet, .avc-still .batt-ring-arc--charging { animation: none; }
+    @media (prefers-reduced-motion: reduce) {
+      .robot-sheet, .batt-ring-arc--charging { animation: none; }
+    }
+    /* Status colours are tuned for dark surfaces; on light themes darken them
+     * as text (the same approach docs/35 §9b took for the age colours). */
+    .avc-theme--light .status-label,
+    .avc-theme--light .tile-status { filter: brightness(0.6) saturate(1.2); }
+    @media (prefers-color-scheme: light) {
+      .avc-theme--auto .status-label,
+      .avc-theme--auto .tile-status { filter: brightness(0.6) saturate(1.2); }
+    }
+
     /* Dock rows without a box per row (K6): hairline separators, selection is
      * a soft accent wash, and the list fades out instead of showing a
      * platform scrollbar (wheel/touch scrolling unchanged). */
@@ -11439,6 +11740,9 @@ export class AnyVacCard extends LitElement {
      * Scoped to .avc-theme like every other 1.2.0 rule, so legacy keeps the
      * browser default — unstyled, but accessible on its own. */
     .avc-theme .action-btn:focus-visible,
+    .avc-theme .tile-main:focus-visible,
+    .avc-theme .tile-pause:focus-visible,
+    .avc-theme .robot-sheet-icon:focus-visible,
     .avc-theme .start-bar:focus-visible,
     .avc-theme .start-seg:focus-visible,
     .avc-theme .dock-mode:focus-visible,

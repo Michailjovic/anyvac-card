@@ -1,6 +1,6 @@
 export const CARD_NAME = "anyvac-card";
 export const EDITOR_NAME = "anyvac-card-editor";
-export const CARD_VERSION = "1.38.0";
+export const CARD_VERSION = "1.39.0";
 
 /** Hold duration in ms required to trigger START / PAUSE actions */
 export const HOLD_DURATION_MS = 600;
@@ -78,6 +78,21 @@ export const STATUS_MAP: Readonly<Record<string, readonly [string, string, strin
   charging_problem:                 ["Charging problem",        "#ff4d4f", "mdi:alert-outline"],
   locked:                           ["Locked",                  "#ff4d4f", "mdi:lock-outline"],
   device_offline:                   ["Offline",                 "#ff4d4f", "mdi:wifi-off"],
+};
+
+/**
+ * docs/44 F2: calmer status palette for themed (non-legacy) cards — same five
+ * meanings, less saturation, each still clearly apart in lightness. Keyed by the
+ * STATUS_MAP colour it replaces; the neutral ink-channel states are untouched.
+ * Contrast: every value is >= 4.5:1 as text on the dark tile surface; on light
+ * themes `.status-label`/`.tile-status` darken it through a brightness filter.
+ */
+export const STATUS_MUTED: Readonly<Record<string, string>> = {
+  "#52c41a": "#5DBB6A",
+  "#40a9ff": "#4DA3E8",
+  "#9254de": "#A48BE0",
+  "#faad14": "#E0A84A",
+  "#ff4d4f": "#E5675F",
 };
 
 /** Colour hex values for VacuumColor variants */

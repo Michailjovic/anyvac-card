@@ -6,6 +6,44 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [1.39.0] - 2026-09-30
+
+Second phase of the "living home" redesign (docs/44 F2): hierarchy. Pairs with
+integration **1.39.0** (`job_progress`); with an older integration the hero
+simply shows the idle summary and tiles fall back to the firmware progress %.
+
+### Changed
+
+- **Robot tiles replace the status cards.** Battery ring around the avatar
+  (pulses while charging), status with icon, current room, last clean or the
+  next room of the running job, and the live room % with a bar while
+  cleaning. The per-robot START is **gone from the tile** — one primary START
+  (dock footer / START bar) is the card's main action now. States that need an
+  immediate answer keep their button on the tile: a pending Pin & Go / Zone
+  pick (docs/19), Pause while cleaning, Resume/Dock while paused.
+- **Robot sheet.** Tapping a tile (landscape) or a robot in the portrait icon
+  strip opens a sheet with that robot's presets, "start just this robot"
+  (hold), Send to dock, Care & dock (jumps to the Dock sheet on the right tab)
+  and the Home Assistant more-info button — the "rescue control" that used to
+  sit on the tile's avatar (docs/33). In portrait the icon-strip tap used to
+  open more-info directly; hold-to-hide is unchanged.
+- **Hero on the meta bar** (landscape). Idle: "Home is calm" + the oldest
+  room's dry/wet age (moved here from the trail toggles in 1.38.0). Running
+  job: a rooms-done ring, "Cleaning · done around HH:MM", minutes left and who
+  is where — all taken verbatim from the integration's `job_progress`; the
+  card computes no time itself (docs/14).
+- **Calmer status palette** in themed cards (`STATUS_MUTED`): the five
+  meanings keep their hues with less saturation. As text on light themes the
+  status colour is darkened with the same brightness-filter approach docs/35
+  §9b used for the age colours. Legacy unchanged.
+
+### Added
+
+- `tests/robot-tiles.spec.ts` (7 tests): idle tile without START and the sheet
+  with it, more-info + scrim close, Pin & Go pick staying on the tile, hero
+  formatting `job_progress`, idle hero ages, themed vs legacy status colour,
+  portrait icon-strip tap opening the sheet.
+
 ## [1.38.0] - 2026-09-30
 
 First phase of the "living home" redesign (docs/43 analysis, docs/44 plan,

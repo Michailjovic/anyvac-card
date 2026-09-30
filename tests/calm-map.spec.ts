@@ -117,7 +117,7 @@ test("status labels carry no emoji and trail toggles carry no age text", async (
   const out = await page.evaluate(() => {
     const root = (window as any).__card.shadowRoot as ShadowRoot;
     return {
-      status: Array.from(root.querySelectorAll(".status-label")).map((e) => e.textContent ?? ""),
+      status: Array.from(root.querySelectorAll(".status-label, .tile-status")).map((e) => e.textContent ?? ""),
       toggles: Array.from(root.querySelectorAll(".mtbtn--icon")).map((e) => (e.textContent ?? "").trim()),
     };
   });
