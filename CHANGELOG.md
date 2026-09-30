@@ -6,6 +6,59 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [1.48.0] - 2026-10-01
+
+Card-only (integration unchanged). docs/46 G1: care and dock belong to the
+robot.
+
+### Changed
+
+- **Robot sheet tabs: Clean / Dock / Care.** Tapping a robot opens its sheet
+  as before; the sheet now has three tabs. **Clean** is what the sheet held
+  until now (presets, rooms, start this robot only, send to dock). **Dock** is
+  this robot's dock: one line saying whether it's ready, running a cycle,
+  reporting an error or wants a tank checked; the tank flags; and only the
+  actions the dock can do (an auto-empty-only dock gets Empty alone; a robot
+  without a dock has no Dock tab). **Care** lists the robot's consumables worst
+  first, with a bar for % left and the reset button.
+- **"Needs attention" per robot.** A red dot on the robot's avatar (tile, rail,
+  icon strip, sheet header) and on the tab that needs a look — Dock for a dock
+  error or tank flag, Care for a consumable at or below the new threshold. The
+  sheet always opens on Clean. Before, one dot on the shared Dock button said
+  that *some* dock had an error.
+- **The shared dock sheet is gone,** with the START bar's Dock segment
+  (portrait: the bar is now mode + START), the landscape Dock button and the
+  sheet's "Care & dock" button.
+- Hour-only consumables read "212 h left" instead of "212 h".
+
+### Added
+
+- **`care_warn_pct`** (Global → Appearance → "Care warning at", default 10 %).
+
+### Internal
+
+- `_renderDockSheet` → `_renderDockTab(vac)` / `_renderCareTab(vac)`; new
+  `_vacAttention`, `_carePct`, `_openRobotSheet(idx, tab)`. `dock.spec.ts`
+  opens the Dock tab instead of the old sheet (its 11 tests unchanged
+  otherwise). New `tests/robot-sheet-tabs.spec.ts` (6).
+
+## [1.47.1] - 2026-10-01
+
+Card-only (integration unchanged).
+
+### Changed
+
+- **Visual editor on a phone.** It is precise mouse work (sub-percent nudges,
+  corner handles, exact values) and its layout doesn't fit a phone. The entry
+  button now opens it only on a screen at least 760 px wide with a mouse,
+  trackpad or pen somewhere; elsewhere it shows a short "Made for a bigger
+  screen" notice with **OK** and **Open anyway** (for a large touch-only
+  tablet). Field report 2026-10-01.
+
+### Internal
+
+- New `tests/ve-small-screen.spec.ts` (3).
+
 ## [1.47.0] - 2026-10-01
 
 Card-only (integration unchanged).

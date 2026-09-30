@@ -471,6 +471,10 @@ export interface AnyVacCardConfig {
    *  legacy`, with `reduce_motion` and with the OS "reduce motion" setting
    *  (docs/44, card 1.47.0). */
   marker_glide_s?: number;
+  /** A body consumable (main/side brush, filter, sensors) at or below this %
+   *  of its life marks its robot as needing care: a dot on the robot's avatar
+   *  and on the robot sheet's Care tab. Default 10 (docs/46, card 1.48.0). */
+  care_warn_pct?: number;
   /** Show the Visual editor's entry button (full-screen Seat & Appearance /
    *  Rooms / Floorplan & Calibrate tools, docs/42) when a floorplan +
    *  integration are otherwise available. Default on; `false` hides it —

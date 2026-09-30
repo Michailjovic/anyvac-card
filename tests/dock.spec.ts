@@ -1,7 +1,8 @@
 import { test, expect, type Page } from "@playwright/test";
 
 /**
- * Dock sheet — capability gating and the start/stop toggle (card 1.3.0).
+ * Dock actions — capability gating and the start/stop toggle (card 1.3.0;
+ * since 1.48.0 in the robot sheet's Dock tab, docs/46).
  *
  * Two things worth pinning down here, both of which fail silently rather than
  * loudly if they regress:
@@ -104,11 +105,11 @@ async function mountCard(page: Page, opts: MountOpts = {}): Promise<void> {
     },
     { dockStatus, debug, PIXEL }
   );
-  // The sheet is opened by a button whose placement differs per layout profile;
-  // this test is about the sheet's contents, not about finding that button.
+  // docs/46 G1: the dock lives in the robot's own sheet, Dock tab. This test
+  // is about the tab's contents, not about finding the robot tile.
   await page.evaluate(async () => {
     const card = (window as any).__card;
-    card._dockSheetOpen = true;
+    card._openRobotSheet(0, "dock");
     await card.updateComplete;
   });
 }

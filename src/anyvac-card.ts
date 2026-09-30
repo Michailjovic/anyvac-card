@@ -175,6 +175,10 @@ const TRAIL_HEAD_RR = 3.2;
  *  finishes before the next position lands (an early one still continues
  *  smoothly — see `_runMarkerGlides`). */
 const MARKER_GLIDE_DEFAULT_S = 1.5;
+/** docs/46 G1: a body consumable at or below this % marks its robot as
+ *  needing care (config `care_warn_pct`, Global editor). */
+const CARE_WARN_DEFAULT_PCT = 10;
+type RobotSheetTab = "clean" | "dock" | "care";
 const MARKER_GLIDE_MAX_S = 25;
 
 /** docs/44 F5 start sequence timing: rooms light up one step apart (at most
@@ -211,21 +215,18 @@ export class AnyVacCard extends LitElement {
    *  the room overlay; a tap while open dismisses it instead of toggling
    *  selection (see `_renderRoomOverlay`'s pointer handlers). */
   @state() private _inspectKey: string | null = null;
-  /** docs/25 §7 field follow-up (2026-07-24): dock sheet (Empty/Wash/Dry +
-   *  per-vacuum status), opened from a new "Dock" button in the dock-head
-   *  row. `_dockSheetIdx` is which vacuum's tab is active — local UI state,
-   *  not backend-shared (same reasoning as `_inspectKey`: navigation, not
-   *  orchestration input). */
-  @state() private _dockSheetOpen = false;
   /** docs/44 F2: index of the vacuum whose robot sheet is open (null = closed). */
   @state() private _robotSheet: number | null = null;
-  @state() private _dockSheetIdx = 0;
+  /** docs/46 G1: which tab of the robot sheet is showing, for which robot.
+   *  Any other robot (or none recorded) opens on Clean. */
+  @state() private _robotSheetTab: { idx: number; tab: RobotSheetTab } | null = null;
+  /** 1.47.1: vacuum whose Visual editor was requested on a screen it doesn't
+   *  fit (`_veFitsScreen`) — the notice sheet is showing instead. */
+  @state() private _veNotice: VacuumConfig | null = null;
   /** docs/25 §10 follow-up (2026-07-25): the START bar's left segment mirrors
    *  the manufacturer app's 3-section bottom bar (mode / START / Dock, see
-   *  docs/25 §10) — mode picker sheet, same in-flow pattern as `_dockSheetOpen`
-   *  right next to it. Mutually exclusive with the dock sheet (toggling one
-   *  closes the other) purely to keep the narrow dock column from showing two
-   *  panels stacked at once. */
+   *  docs/25 §10) — mode picker sheet, in-flow in the dock region. (The dock
+   *  sheet it used to alternate with moved into the robot sheet, docs/46.) */
   @state() private _modeSheetOpen = false;
   /** docs/25 §10 field-caught (2026-07-25): reset-button visual feedback.
    *  Live diagnosis on the field-reporting user's real HA found the reset
@@ -1698,15 +1699,65 @@ export class AnyVacCard extends LitElement {
     if (!row.entity) return "—";
     const st = this.hass.states[row.entity];
     if (!st || st.state === "unavailable" || st.state === "unknown") return "—";
+    const hours = this._careHours(row);
+    if (hours === null) return st.state;
+    const pct = this._carePct(row);
+    if (pct !== null) return `${pct} %`;
+    return `${Math.round(hours)} h left`;
+  }
+
+  /** Remaining life of a consumable row in hours (unit-normalized, see
+   *  `_careValue`), null when unknown. */
+  private _careHours(row: CareRow): number | null {
+    if (!row.entity) return null;
+    const st = this.hass.states[row.entity];
+    if (!st || st.state === "unavailable" || st.state === "unknown") return null;
     const raw = Number(st.state);
-    if (Number.isNaN(raw)) return st.state;
+    if (Number.isNaN(raw)) return null;
     const unit = st.attributes?.unit_of_measurement;
-    const hours = unit === "s" ? raw / 3600 : unit === "min" ? raw / 60 : raw;
-    if (row.totalHours) {
-      const pct = Math.max(0, Math.min(100, Math.round((hours / row.totalHours) * 100)));
-      return `${pct} %`;
-    }
-    return `${Math.round(hours)} h`;
+    return unit === "s" ? raw / 3600 : unit === "min" ? raw / 60 : raw;
+  }
+
+  /** % of nominal lifespan left, only for rows with a known total. */
+  private _carePct(row: CareRow): number | null {
+    const hours = this._careHours(row);
+    if (hours === null || !row.totalHours) return null;
+    return Math.max(0, Math.min(100, Math.round((hours / row.totalHours) * 100)));
+  }
+
+  private _careWarnPct(): number {
+    const v = Number(this._config.care_warn_pct ?? CARE_WARN_DEFAULT_PCT);
+    return Number.isFinite(v) ? Math.max(0, Math.min(100, v)) : CARE_WARN_DEFAULT_PCT;
+  }
+
+  /** docs/46 G1: what about THIS robot needs a look. dock = the dock reports
+   *  an error or a tank flag is up; care = a body consumable is at or below
+   *  `care_warn_pct`. Read from the integration / official entities only. */
+  private _vacAttention(vac: VacuumConfig): { dock: boolean; care: boolean } {
+    const ds = this._intAttrs(vac)?.dock_status as Record<string, unknown> | undefined;
+    const err = ds?.dock_error_status;
+    const rows = this._careItems(vac);
+    const tank = rows.some((r) => r.binary && this.hass.states[r.binary]?.state === "on");
+    const warn = this._careWarnPct();
+    const care = rows.some((r) => {
+      if (r.binary) return false;
+      const p = this._carePct(r);
+      return p !== null && p <= warn;
+    });
+    return { dock: (err !== null && err !== undefined && err !== 0 && err !== "0") || tank, care };
+  }
+
+  /** Small "needs attention" dot on a robot's avatar (docs/46 G1). */
+  private _attnDot(vac: VacuumConfig) {
+    const a = this._vacAttention(vac);
+    if (!a.dock && !a.care) return nothing;
+    const what = a.dock && a.care ? "dock and care" : a.dock ? "dock" : "care";
+    return html`<span class="vac-attn-dot" role="img" aria-label="Needs attention: ${what}" title="Needs attention: ${what}"></span>`;
+  }
+
+  private _openRobotSheet(idx: number, tab: RobotSheetTab = "clean"): void {
+    this._robotSheet = idx;
+    this._robotSheetTab = { idx, tab };
   }
 
   private _isCleaning(vac: VacuumConfig): boolean {
@@ -3077,6 +3128,7 @@ export class AnyVacCard extends LitElement {
                 ${v.image
                   ? html`<img src=${v.image} alt="" />`
                   : html`<ha-icon icon="mdi:robot-vacuum" style=${styleMap({ color: this._color(v) })}></ha-icon>`}
+                ${this._attnDot(v)}
               </button>
             </div>
           `;
@@ -3099,8 +3151,8 @@ export class AnyVacCard extends LitElement {
    *  rail while open instead of being squeezed in below the tiles — still
    *  in-flow in the dock region, never a floating layer (docs/21 §5b). */
   private _renderRail(vacs: VacuumConfig[]) {
-    if (this._modeSheetOpen || this._dockSheetOpen) {
-      return html`<div class="dock rail rail--sheet">${this._renderModeSheet()}${this._renderDockSheet()}</div>`;
+    if (this._modeSheetOpen) {
+      return html`<div class="dock rail rail--sheet">${this._renderModeSheet()}</div>`;
     }
     return html`
       <div class="dock rail">
@@ -3238,7 +3290,7 @@ export class AnyVacCard extends LitElement {
             aria-pressed=${this._flipEff ? "true" : "false"} @click=${() => this._toggleFlipLive()}>
             <ha-icon icon="mdi:flip-vertical"></ha-icon></button>` : nothing}
         ${alignCand.length ? html`<button class="mtbtn mtbtn--icon" title="Align — full-screen manual floorplan seating" aria-label="Align"
-            @click=${() => this._openAlign(alignCand[0])}>
+            @click=${() => this._requestVisualEditor(alignCand[0])}>
             <ha-icon icon="mdi:vector-square-edit"></ha-icon></button>` : nothing}
       </div>`;
   }
@@ -3283,12 +3335,8 @@ export class AnyVacCard extends LitElement {
     // content, not on the picker/icon-strip above it, so it doesn't regress
     // that case. Mirrors the main return's `withPicker` + icon-strip pair
     // below (each self-gates to its own profile, so exactly one renders).
-    // The dock sheet is about the dock, not the rooms, so it comes along too —
-    // caught by its own test (2026-09-02): the Dock button is gated on dock
-    // capability alone, so on a room-less config it rendered and then opened
-    // onto nothing, because this early return happened first.
     if (!rooms.length)
-      return html`${withPicker ? this._renderVacuumPicker() : nothing}${this._renderVacuumIconStrip()}${this._renderDockSheet()}`;
+      return html`${withPicker ? this._renderVacuumPicker() : nothing}${this._renderVacuumIconStrip()}`;
     const hasInt = vacs.some((v) => this._intAttrs(v));
     const mode = this._planMode;
     const selKeys = this._allRoomKeys().filter((k) => this._isRoomSelectedAny(k, vacs));
@@ -3345,7 +3393,7 @@ export class AnyVacCard extends LitElement {
               ${(() => {
                 const alignCand = this._alignCandidates(vacs);
                 return alignCand.length ? html`<button class="mtbtn" title="Align — full-screen manual floorplan seating"
-                    @click=${() => this._openAlign(alignCand[0])}>
+                    @click=${() => this._requestVisualEditor(alignCand[0])}>
                   <ha-icon icon="mdi:vector-square-edit"></ha-icon>
                 </button>` : nothing;
               })()}
@@ -3354,15 +3402,8 @@ export class AnyVacCard extends LitElement {
         ${withRun ? html`
           <div class="dock-head">
             ${modeBtn("dry", "mdi:broom", "Dry")}${modeBtn("wet", "mdi:water", "Wet")}${modeBtn("both", "mdi:water-plus", "Both")}
-            ${vacs.some((v) => this._dockCaps(v).hasDock || this._careItems(v).length > 0) ? html`
-              <button class="dock-mode dock-mode--dock ${this._dockSheetOpen ? "on" : ""}"
-                @click=${(e: Event) => { e.stopPropagation(); this._dockSheetOpen = !this._dockSheetOpen; }}>
-                <ha-icon icon="mdi:home-outline"></ha-icon><span>Dock</span>
-                ${this._dockNeedsAttention() ? html`<span class="dock-mode-dot"></span>` : nothing}
-              </button>` : nothing}
           </div>` : nothing}
         ${this._renderModeSheet()}
-        ${this._renderDockSheet()}
         ${!showRoomList ? nothing : html`<div class="dock-rows">
           ${rooms.map(({ r, v }) => {
             const rec = this._intRoomRec(v, r);
@@ -3434,20 +3475,7 @@ export class AnyVacCard extends LitElement {
     `;
   }
 
-  /** docs/25 §7 field follow-up: true when ANY vacuum's dock reports a real
-   *  error (`dock_error_status`, docs/26 §1 vrstva A). Deliberately narrow —
-   *  `water_shortage_status`/`dust_collection_status`'s exact value meanings
-   *  aren't documented anywhere upstream (verified against python-roborock's
-   *  source and docs), so guessing thresholds for THOSE risks a false badge.
-   *  `dock_error_status` is the one field where "present, nonzero" is an
-   *  unambiguous problem regardless of the exact code. */
-  private _dockNeedsAttention(): boolean {
-    return this._config.vacuums.some((v) => {
-      const dock = this._intAttrs(v)?.dock_status as Record<string, unknown> | undefined;
-      const err = dock?.dock_error_status;
-      return err !== null && err !== undefined && err !== 0 && err !== "0";
-    });
-  }
+
 
   /** docs/25 §10 third follow-up (2026-07-24): dock hardware tier, read from
    *  `dock_status.dock_type` (already flowing through the integration sensor,
@@ -3525,33 +3553,14 @@ export class AnyVacCard extends LitElement {
     return v === null || v === undefined ? null : !!v;
   }
 
-  /** docs/25 §7 field follow-up (2026-07-24): dock sheet — per-vacuum tabs +
-   *  Empty/Wash/Dry actions (`anyvac.dock_*`, confirmed commands per docs/26
-   *  §3, live-verified against the field-reporting user's real HW). Toggled
-   *  from `.dock-head`'s Dock button when it's rendered (landscape), or from
-   *  the START bar's right segment when it isn't (portrait, docs/25 §10
-   *  follow-up 2026-07-25) — either way `_dockSheetOpen` renders it here,
-   *  in-flow inside the `dock` region (which already has its own
-   *  `overflow:auto`, docs/18 `regionStyles()`) rather than as a floating
-   *  overlay — deliberately avoids `position:fixed`/absolute layering in a
-   *  region that's had real mobile-crash history (docs/21 §5b) tied to grid
-   *  ownership; an in-flow panel can't touch that class of bug. Raw
-   *  `dock_status` fields shown only behind `debug` (§7c precedent) — their
-   *  value encodings aren't documented upstream, so surfacing them as
-   *  polished UI would overclaim confidence we don't have. */
-  private _renderDockSheet() {
-    if (!this._dockSheetOpen) return nothing;
-    // A vacuum with no dock at all (tier "none", e.g. S6) still belongs in
-    // this sheet's tab list if it has its own body consumables to show
-    // (main/side brush, filter, sensor — these live on the vacuum's OWN
-    // device and have nothing to do with dock hardware). Dropped from the
-    // list entirely only when it has neither dock actions nor care rows.
-    const vacs = this._config.vacuums.filter(
-      (v) => this._dockCaps(v).hasDock || this._careItems(v).length > 0
-    );
-    if (!vacs.length) return nothing;
-    const idx = Math.min(this._dockSheetIdx, vacs.length - 1);
-    const vac = vacs[idx];
+  /** docs/46 G1: the robot sheet's Dock tab — this robot's dock only (was
+   *  the global Dock sheet with a tab per robot, docs/25 §10). A one-line
+   *  state first (error / a tank flag / a running cycle / ready), then the
+   *  tank flags, then the actions the dock can do (`_dockCaps`: an
+   *  empty-only dock gets Empty alone). Everything in-flow inside the sheet
+   *  — no floating layer (docs/21 §5b). Raw `dock_status` only behind
+   *  `debug`: its encodings aren't documented upstream. */
+  private _renderDockTab(vac: VacuumConfig) {
     const caps = this._dockCaps(vac);
     const dock = this._intAttrs(vac)?.dock_status as Record<string, unknown> | undefined;
     const act = (service: string, action?: "start" | "stop") => () =>
@@ -3581,38 +3590,34 @@ export class AnyVacCard extends LitElement {
           <span>${running ? "Stop" : label}</span>
         </button>`;
     };
-    const care = this._careItems(vac);
-    // docs/25 §10 field-caught: `pendingKey` is the entity we actually WATCH
-    // for the reset to land (the sensor, when we have one — falls back to
-    // the button's own id for binary-only rows with no time-left sensor).
-    const reset = (row: CareRow) => (e: Event) => {
-      e.stopPropagation();
-      const pendingKey = row.entity ?? row.reset!;
-      const next = new Map(this._careResetPending);
-      next.set(pendingKey, Date.now());
-      this._careResetPending = next;
-      // Hard fallback: clear the spinner even if the poll never lands
-      // (offline vacuum, entity removed, ...) — see `_careResetPending` doc.
-      setTimeout(() => {
-        if (this._careResetPending.get(pendingKey) === next.get(pendingKey)) {
-          const cleared = new Map(this._careResetPending);
-          cleared.delete(pendingKey);
-          this._careResetPending = cleared;
-        }
-      }, 40000);
-      void this._call("button", "press", { entity_id: row.reset! });
-    };
+    const tanks = this._careItems(vac).filter((r) => r.binary);
+    const badTanks = tanks.filter((r) => this.hass.states[r.binary!]?.state === "on");
+    const err = dock?.dock_error_status;
+    const hasErr = err !== null && err !== undefined && err !== 0 && err !== "0";
+    const runningLabel = (["empty", "wash", "dry"] as const)
+      .filter((k) => this._dockRunning(vac, k))
+      .map((k) => ({ empty: "Emptying the bin", wash: "Washing the mop", dry: "Drying the mop" })[k]);
+    const bad = hasErr || badTanks.length > 0;
+    const stateText = hasErr ? "The dock reports an error"
+      : badTanks.length ? badTanks.map((r) => r.label).join(", ") + " — check"
+      : runningLabel.length ? runningLabel.join(" · ")
+      : "Dock ready";
     return html`
-      <div class="dock-sheet">
-        ${vacs.length > 1 ? html`
-          <div class="dock-sheet-tabs">
-            ${vacs.map((v, i) => html`
-              <button class="dock-sheet-tab ${i === idx ? "on" : ""}"
-                style=${styleMap({ borderColor: this._color(v) })}
-                title=${v.name ?? v.entity}
-                @click=${(e: Event) => { e.stopPropagation(); this._dockSheetIdx = i; }}>
-                ${v.image ? html`<img src=${v.image} alt="" />` : html`<ha-icon icon="mdi:robot-vacuum" style=${styleMap({ color: this._color(v) })}></ha-icon>`}
-              </button>`)}
+      <div class="rs-pane">
+        <div class="rs-dock-state ${bad ? "bad" : ""}">
+          <ha-icon icon=${bad ? "mdi:alert-circle-outline" : runningLabel.length ? "mdi:progress-clock" : "mdi:check-circle-outline"}></ha-icon>
+          <span>${stateText}</span>
+        </div>
+        ${tanks.length ? html`
+          <div class="dock-sheet-care">
+            ${tanks.map((row) => {
+              const on = this.hass.states[row.binary!]?.state === "on";
+              return html`
+                <div class="dock-sheet-care-row">
+                  <span class="dock-sheet-care-label">${row.label}</span>
+                  <span class="dock-sheet-care-badge ${on ? "warn" : ""}">${on ? "Check" : "OK"}</span>
+                </div>`;
+            })}
           </div>` : nothing}
         ${this._config.debug && dock ? html`
           <div class="dock-sheet-debug">
@@ -3648,37 +3653,73 @@ export class AnyVacCard extends LitElement {
                 <ha-icon icon="mdi:autorenew"></ha-icon><span>Self-clean</span>
               </button>` : nothing}
           </div>` : nothing}
-        ${care.length ? html`
-          <div class="dock-sheet-care">
-            ${care.map((row) => html`
-              <div class="dock-sheet-care-row">
-                <span class="dock-sheet-care-label">${row.label}</span>
-                ${row.binary
-                  ? html`<span class="dock-sheet-care-badge ${this.hass.states[row.binary]?.state === "on" ? "warn" : ""}">
-                      ${this.hass.states[row.binary]?.state === "on" ? "⚠" : "OK"}
-                    </span>`
-                  : html`<span class="dock-sheet-care-value">${this._careValue(row)}</span>`}
-                ${row.reset ? (() => {
-                  const pending = this._careResetPending.has(row.entity ?? row.reset!);
-                  return html`
-                    <button class="dock-sheet-care-reset ${pending ? "pending" : ""}"
-                      title="Reset" ?disabled=${pending} @click=${reset(row)}>
-                      <ha-icon icon=${pending ? "mdi:loading" : "mdi:refresh"}></ha-icon>
-                    </button>`;
-                })() : nothing}
-              </div>`)}
-          </div>` : nothing}
+      </div>
+    `;
+  }
+
+  /** docs/46 G1: the robot sheet's Care tab — this robot's consumables (body
+   *  parts from its own device, brush/strainer from its dock), worst first:
+   *  % rows ascending, then hour-only rows in their usual order. A bar shows
+   *  % left; a row at or below `care_warn_pct` is marked. Reset keeps the
+   *  docs/25 §10 spinner until the watched sensor actually moves. */
+  private _renderCareTab(vac: VacuumConfig) {
+    const warn = this._careWarnPct();
+    const rows = this._careItems(vac).filter((r) => !r.binary)
+      .map((r, i) => ({ r, i, pct: this._carePct(r) }))
+      .sort((a, b) => (a.pct ?? 1e9) - (b.pct ?? 1e9) || a.i - b.i);
+    // docs/25 §10 field-caught: `pendingKey` is the entity we actually WATCH
+    // for the reset to land (the sensor, when we have one — falls back to
+    // the button's own id for rows with no time-left sensor).
+    const reset = (row: CareRow) => (e: Event) => {
+      e.stopPropagation();
+      const pendingKey = row.entity ?? row.reset!;
+      const next = new Map(this._careResetPending);
+      next.set(pendingKey, Date.now());
+      this._careResetPending = next;
+      // Hard fallback: clear the spinner even if the poll never lands
+      // (offline vacuum, entity removed, ...) — see `_careResetPending` doc.
+      setTimeout(() => {
+        if (this._careResetPending.get(pendingKey) === next.get(pendingKey)) {
+          const cleared = new Map(this._careResetPending);
+          cleared.delete(pendingKey);
+          this._careResetPending = cleared;
+        }
+      }, 40000);
+      void this._call("button", "press", { entity_id: row.reset! });
+    };
+    return html`
+      <div class="rs-pane">
+        <div class="dock-sheet-care rs-care">
+          ${rows.map(({ r: row, pct }) => {
+            const low = pct !== null && pct <= warn;
+            const pending = !!row.reset && this._careResetPending.has(row.entity ?? row.reset);
+            return html`
+              <div class="dock-sheet-care-row ${low ? "low" : ""}">
+                <span class="rs-care-main">
+                  <span class="rs-care-line">
+                    ${low ? html`<ha-icon class="rs-care-warn" icon="mdi:alert-outline"></ha-icon>` : nothing}
+                    <span class="dock-sheet-care-label">${row.label}</span>
+                    <span class="dock-sheet-care-value">${this._careValue(row)}</span>
+                  </span>
+                  ${pct !== null ? html`<span class="rs-care-bar"><span style=${styleMap({ width: pct + "%" })}></span></span>` : nothing}
+                </span>
+                ${row.reset ? html`
+                  <button class="dock-sheet-care-reset ${pending ? "pending" : ""}"
+                    title="Reset ${row.label}" aria-label="Reset ${row.label}" ?disabled=${pending} @click=${reset(row)}>
+                    <ha-icon icon=${pending ? "mdi:loading" : "mdi:refresh"}></ha-icon>
+                  </button>` : nothing}
+              </div>`;
+          })}
+        </div>
+        <span class="rs-note">Worst first · marked at ${warn} % or less</span>
       </div>
     `;
   }
 
   /** docs/25 §10 follow-up (2026-07-25): mode picker sheet — the START bar's
-   *  left segment opens this (see `_renderStartBar`), same in-flow panel
-   *  pattern as `_renderDockSheet` and reusing the identical `.dock-mode`
-   *  button look (dry/wet/both), just three buttons instead of the dock
-   *  sheet's actions. Picking a mode closes the sheet immediately — there's
-   *  nothing else to configure here, unlike the dock sheet which stays open
-   *  for repeated care/action taps. */
+   *  left segment opens this (see `_renderStartBar`) as an in-flow panel,
+   *  reusing the `.dock-mode` button look (dry/wet/both). Picking a mode
+   *  closes the sheet immediately — there's nothing else to configure here. */
   private _renderModeSheet() {
     if (!this._modeSheetOpen) return nothing;
     const mode = this._planMode;
@@ -3706,14 +3747,12 @@ export class AnyVacCard extends LitElement {
    *  end — it means "whole home", and START stays immediately pressable from
    *  the moment the card opens. Room selection / Dry-Wet-Both stay on screen
    *  as refinement, not as a gate the user has to clear first.
-   *  docs/25 §10 follow-up (2026-07-25): three-segment bar, mirroring the
-   *  manufacturer app's bottom bar (mode / START / Dock, docs/25 §10) — the
-   *  mode buttons and Dock button that used to live in `.dock-head` above
-   *  the bar move down into the bar itself (`_renderDock` only still renders
-   *  `.dock-head` when there's no separate `start` region to host them,
-   *  i.e. landscape). Both side segments just toggle a sheet rendered back
-   *  in the `dock` region (`_renderModeSheet`/`_renderDockSheet`) — the
-   *  bar itself stays a fixed-height strip, not an expandable panel. */
+   *  docs/25 §10 follow-up (2026-07-25): the mode buttons that used to live
+   *  in `.dock-head` above the bar sit in the bar itself (`_renderDock` only
+   *  still renders `.dock-head` when there's no separate `start` region,
+   *  i.e. landscape); the mode segment toggles `_renderModeSheet` in the
+   *  `dock` region. docs/46 G1: the bar's Dock segment is gone — the dock is
+   *  per robot now, in the robot sheet's Dock tab. */
   private _renderStartBar() {
     const vacs = this._config.vacuums;
     const hasInt = vacs.some((v) => this._intAttrs(v));
@@ -3726,18 +3765,10 @@ export class AnyVacCard extends LitElement {
     const modeSeg = html`
       <button class="start-seg start-seg--mode ${this._modeSheetOpen ? "on" : ""}"
         title="Clean type — tap to change"
-        @click=${(e: Event) => { e.stopPropagation(); this._dockSheetOpen = false; this._modeSheetOpen = !this._modeSheetOpen; }}>
+        @click=${(e: Event) => { e.stopPropagation(); this._modeSheetOpen = !this._modeSheetOpen; }}>
         <ha-icon icon=${modeIcon}></ha-icon>
         <span>${modeLabel}</span>
       </button>`;
-    const showDock = vacs.some((v) => this._dockCaps(v).hasDock || this._careItems(v).length > 0);
-    const dockSeg = showDock ? html`
-      <button class="start-seg start-seg--dock ${this._dockSheetOpen ? "on" : ""}"
-        title="Dock control"
-        @click=${(e: Event) => { e.stopPropagation(); this._modeSheetOpen = false; this._dockSheetOpen = !this._dockSheetOpen; }}>
-        <ha-icon icon="mdi:home-outline"></ha-icon>
-        ${this._dockNeedsAttention() ? html`<span class="dock-mode-dot"></span>` : nothing}
-      </button>` : nothing;
     if (anyCleaning) {
       return html`
         <div class="start-row">
@@ -3753,7 +3784,6 @@ export class AnyVacCard extends LitElement {
             <ha-icon icon="mdi:stop"></ha-icon>
             <span>CANCEL · hold</span>
           </button>
-          ${dockSeg}
         </div>`;
     }
     const canStart = hasInt && runKeys.length > 0;
@@ -3772,7 +3802,6 @@ export class AnyVacCard extends LitElement {
           <ha-icon icon="mdi:play"></ha-icon>
           <span>START · ${scopeLabel}${est ? " · ~" + est + " min" : ""}</span>
         </button>
-        ${dockSeg}
       </div>`;
   }
 
@@ -4668,7 +4697,7 @@ export class AnyVacCard extends LitElement {
           ${(() => {
             const alignCand = this._alignCandidates(vacs);
             return alignCand.length ? html`<button class="mtbtn" title="Align — full-screen manual floorplan seating"
-                @click=${() => this._openAlign(alignCand[0])}>
+                @click=${() => this._requestVisualEditor(alignCand[0])}>
               <ha-icon icon="mdi:vector-square-edit"></ha-icon>
             </button>` : nothing;
           })()}
@@ -4792,6 +4821,48 @@ export class AnyVacCard extends LitElement {
   private _alignVac(): VacuumConfig | undefined {
     const s = this._alignSession;
     return s ? this._config.vacuums.find((v) => v.entity === s.vacuum) : undefined;
+  }
+
+  /** 1.47.1 (field report 2026-10-01): the Visual editor is precision work
+   *  — sub-percent nudges, corner handles, side-panel fields — and does not
+   *  fit a phone. It's opened only where it fits: wide enough and with a
+   *  fine pointer somewhere (mouse / trackpad / pen). Elsewhere the entry
+   *  button explains that instead, with a way through for a big touch-only
+   *  tablet. */
+  private _veFitsScreen(): boolean {
+    try {
+      if (window.innerWidth < 760) return false;
+      const mm = window.matchMedia?.bind(window);
+      return !mm || mm("(any-pointer: fine)").matches;
+    } catch { return true; }
+  }
+
+  private _requestVisualEditor(vac: VacuumConfig): void {
+    if (this._veFitsScreen()) this._openAlign(vac);
+    else this._veNotice = vac;
+  }
+
+  private _renderVeNotice() {
+    const vac = this._veNotice;
+    if (!vac) return nothing;
+    const close = () => { this._veNotice = null; };
+    return html`
+      <div class="robot-sheet-scrim" @click=${close}></div>
+      <div class="robot-sheet ve-notice" role="dialog" aria-modal="true" aria-label="Visual editor"
+        @keydown=${(e: KeyboardEvent) => { if (e.key === "Escape") close(); }}>
+        <span class="robot-sheet-grip" aria-hidden="true"></span>
+        <div class="ve-notice-head">
+          <ha-icon icon="mdi:monitor-screenshot"></ha-icon>
+          <span class="robot-sheet-name">Made for a bigger screen</span>
+        </div>
+        <p class="ve-notice-text">The Visual editor is precise mouse work — aligning maps, dragging room
+          corners, typing exact values. Open this dashboard on a computer to use it.</p>
+        <div class="robot-sheet-foot">
+          <button class="mtbtn ve-notice-anyway" @click=${() => { close(); this._openAlign(vac); }}>
+            <ha-icon icon="mdi:open-in-new"></ha-icon><span>Open anyway</span></button>
+          <button class="mtbtn on ve-notice-ok" @click=${close}><span>OK</span></button>
+        </div>
+      </div>`;
   }
 
   private _openAlign(vac: VacuumConfig): void {
@@ -10316,6 +10387,7 @@ export class AnyVacCard extends LitElement {
           ? html`<img src=${vac.image} alt="" style=${styleMap({ width: inner + "px", height: inner + "px" })}>`
           : html`<ha-icon icon="mdi:robot-vacuum" style=${styleMap({ color: this._color(vac), "--mdc-icon-size": inner * 0.6 + "px" })}></ha-icon>`}
         ${charging ? html`<span class="batt-ring-bolt"><ha-icon icon="mdi:lightning-bolt"></ha-icon></span>` : nothing}
+        ${this._attnDot(vac)}
       </span>`;
   }
 
@@ -10384,10 +10456,34 @@ export class AnyVacCard extends LitElement {
     const name = this._vacName(vac);
     const [label, labelColor, statusIcon] = this._statusInfo(vac);
     const bat = this._battery(vac);
-    const close = () => { this._robotSheet = null; };
+    const close = () => { this._robotSheet = null; this._robotSheetTab = null; };
     const rooms = this._roomsFor(vac).filter((r) => this._isRoomSelected(r, vac));
     const mins = this._totalCleanMins(vac);
-    const hasDockStuff = this._dockCaps(vac).hasDock || this._careItems(vac).length > 0;
+    // docs/46 G1: Clean / Dock / Care, per robot. A tab exists only when it
+    // has something to show (no dock → no Dock tab, e.g. S6); the sheet always
+    // opens on Clean and a dot marks the tab that needs a look.
+    const hasDockTab = this._dockCaps(vac).hasDock;
+    const hasCareTab = this._careItems(vac).some((r) => !r.binary);
+    const attn = this._vacAttention(vac);
+    let tab: RobotSheetTab = this._robotSheetTab?.idx === idx ? this._robotSheetTab.tab : "clean";
+    if ((tab === "dock" && !hasDockTab) || (tab === "care" && !hasCareTab)) tab = "clean";
+    const tabBtn = (t: RobotSheetTab, text: string, icon: string, dot: boolean) => html`
+      <button class="rs-tab ${tab === t ? "on" : ""}" role="tab" aria-selected=${tab === t ? "true" : "false"}
+        @click=${(e: Event) => { e.stopPropagation(); this._robotSheetTab = { idx, tab: t }; }}>
+        <ha-icon icon=${icon}></ha-icon><span>${text}</span>
+        ${dot ? html`<span class="rs-tab-dot" role="img" aria-label="needs attention"></span>` : nothing}
+      </button>`;
+    const clean = html`
+      <div class="robot-sheet-rooms">
+        <span class="robot-sheet-label">Rooms</span>
+        <span>${rooms.length
+          ? html`${rooms.map((r) => r.name ?? r.key).join(", ")}${mins ? html` <small>· ${this._timeStr(mins)}</small>` : nothing}`
+          : html`<small>Pick rooms on the map first</small>`}</span>
+      </div>
+      ${this._renderActions(vac, idx)}
+      <div class="robot-sheet-foot">
+        <button class="mtbtn" @click=${() => this._dock(vac)}><ha-icon icon="mdi:home-import-outline"></ha-icon><span>Send to dock</span></button>
+      </div>`;
     return html`
       <div class="robot-sheet-scrim" @click=${close}></div>
       <div class="robot-sheet" role="dialog" aria-modal="true" aria-label="${name} controls"
@@ -10406,25 +10502,13 @@ export class AnyVacCard extends LitElement {
             @click=${() => this._fireMoreInfo(vac.entity)}><ha-icon icon="mdi:information-outline"></ha-icon></button>
           <button class="robot-sheet-icon" aria-label="Close" @click=${close}><ha-icon icon="mdi:close"></ha-icon></button>
         </div>
-        <div class="robot-sheet-rooms">
-          <span class="robot-sheet-label">Rooms</span>
-          <span>${rooms.length
-            ? html`${rooms.map((r) => r.name ?? r.key).join(", ")}${mins ? html` <small>· ${this._timeStr(mins)}</small>` : nothing}`
-            : html`<small>Pick rooms on the map first</small>`}</span>
-        </div>
-        ${this._renderActions(vac, idx)}
-        <div class="robot-sheet-foot">
-          <button class="mtbtn" @click=${() => this._dock(vac)}><ha-icon icon="mdi:home-import-outline"></ha-icon><span>Send to dock</span></button>
-          ${hasDockStuff ? html`<button class="mtbtn" @click=${() => {
-              // Dock sheet tabs index its OWN filtered list (vacuums with dock
-              // actions or care rows), not the config array.
-              const tabs = this._config.vacuums.filter((v) => this._dockCaps(v).hasDock || this._careItems(v).length > 0);
-              this._dockSheetIdx = Math.max(0, tabs.indexOf(vac));
-              this._dockSheetOpen = true;
-              close();
-            }}>
-            <ha-icon icon="mdi:toolbox-outline"></ha-icon><span>Care &amp; dock</span></button>` : nothing}
-        </div>
+        ${hasDockTab || hasCareTab ? html`
+          <div class="rs-tabs" role="tablist" aria-label="${name} sections">
+            ${tabBtn("clean", "Clean", "mdi:broom", false)}
+            ${hasDockTab ? tabBtn("dock", "Dock", "mdi:home-outline", attn.dock) : nothing}
+            ${hasCareTab ? tabBtn("care", "Care", "mdi:toolbox-outline", attn.care) : nothing}
+          </div>` : nothing}
+        ${tab === "dock" ? this._renderDockTab(vac) : tab === "care" ? this._renderCareTab(vac) : clean}
       </div>`;
   }
 
@@ -10717,7 +10801,7 @@ export class AnyVacCard extends LitElement {
   private _isCalm(): boolean {
     if (this._config.calm_state === false) return false;
     if (this._mapMode !== "normal") return false;
-    if (this._dockSheetOpen || this._modeSheetOpen) return false;
+    if (this._modeSheetOpen) return false;
     const vacs = this._config.vacuums;
     if (vacs.some((v) => this._isCleaning(v) || this._hasError(v))) return false;
     return !this._allRoomKeys().some((k) => this._isRoomSelectedAny(k, vacs));
@@ -10756,7 +10840,7 @@ export class AnyVacCard extends LitElement {
             return html`<div class="avc-region avc-region--${name}" style=${styleMap(regionStyles(pl))}>${tpl}</div>`;
           })}
         </div>
-        ${this._renderRobotSheet()}
+        ${this._renderRobotSheet()}${this._renderVeNotice()}
       </ha-card>
     `;
   }
@@ -10792,7 +10876,7 @@ export class AnyVacCard extends LitElement {
                 ${this._renderMapTools(this._config.vacuums[i])}
                 ${this._renderStatusCard(this._config.vacuums[i], i)}
               `)}
-        ${this._renderRobotSheet()}
+        ${this._renderRobotSheet()}${this._renderVeNotice()}
       </ha-card>
     `;
   }
@@ -11054,19 +11138,6 @@ export class AnyVacCard extends LitElement {
       background: rgba(var(--avc-ink-rgb), 0.12);
       border-color: rgba(var(--avc-ink-rgb), 0.5);
     }
-    /* docs/25 §7 field follow-up: Dock button — same base as the mode
-     * buttons (visually one row), but a flex-0 fixed width since it's an
-     * icon + short label, not a mode choice competing for equal space. */
-    .dock-mode--dock { flex: 0 0 auto; padding: 7px 10px; position: relative; }
-    .dock-mode-dot {
-      position: absolute;
-      top: 4px;
-      right: 4px;
-      width: 7px;
-      height: 7px;
-      border-radius: 50%;
-      background: rgb(var(--avc-warn-rgb));
-    }
     .dock-sheet {
       display: flex;
       flex-direction: column;
@@ -11076,21 +11147,48 @@ export class AnyVacCard extends LitElement {
       border: 1px solid var(--avc-panel-line);
       border-radius: var(--avc-th-r-l, 10px);
     }
-    .dock-sheet-tabs { display: flex; gap: 6px; }
-    .dock-sheet-tab {
-      width: 30px;
-      height: 30px;
-      border-radius: 50%;
-      overflow: hidden;
-      padding: 0;
-      cursor: pointer;
-      background: rgba(var(--avc-ink-rgb), 0.05);
-      border: 1.5px solid rgba(var(--avc-ink-rgb), 0.2);
-      opacity: 0.55;
+    /* ── docs/46 G1: robot sheet tabs (Clean / Dock / Care) ─────────────── */
+    .rs-tabs {
+      display: flex; gap: 2px; padding: 3px; border-radius: var(--avc-r-m);
+      background: rgba(var(--avc-ink-rgb), 0.06);
     }
-    .dock-sheet-tab.on { opacity: 1; }
-    .dock-sheet-tab img { width: 100%; height: 100%; object-fit: cover; display: block; }
-    .dock-sheet-tab ha-icon { --mdc-icon-size: 16px; }
+    .rs-tab {
+      flex: 1; display: flex; align-items: center; justify-content: center; gap: 6px;
+      min-height: 38px; border: none; border-radius: var(--avc-r-m); cursor: pointer;
+      background: transparent; color: rgba(var(--avc-ink-rgb), 0.6);
+      font-family: inherit; font-size: var(--avc-fs-m); font-weight: 500; --mdc-icon-size: 16px;
+    }
+    .rs-tab.on {
+      background: rgba(var(--avc-ink-rgb), 0.12); color: rgb(var(--avc-ink-rgb)); font-weight: 600;
+      box-shadow: 0 1px 3px rgba(0, 0, 0, 0.3);
+    }
+    .rs-tab-dot, .vac-attn-dot {
+      width: 8px; height: 8px; border-radius: 50%; flex-shrink: 0;
+      background: rgb(var(--avc-err-rgb));
+    }
+    .vac-attn-dot {
+      position: absolute; top: 0; right: 0; width: 11px; height: 11px;
+      box-shadow: 0 0 0 2px var(--avc-surface, rgb(var(--avc-scrim-2-rgb)));
+    }
+    .vac-icon-btn .vac-attn-dot { top: 12%; right: 12%; }
+    .rs-pane { display: flex; flex-direction: column; gap: 10px; }
+    .rs-dock-state {
+      display: flex; align-items: center; gap: 10px; padding: 10px 12px; border-radius: var(--avc-r-m);
+      background: rgba(var(--avc-ink-rgb), 0.05); font-size: var(--avc-fs-m); --mdc-icon-size: 18px;
+    }
+    .rs-dock-state ha-icon { color: rgb(var(--avc-ok-rgb)); }
+    .rs-dock-state.bad ha-icon { color: rgb(var(--avc-err-rgb)); }
+    .rs-care { gap: 0; }
+    .rs-care .dock-sheet-care-row { padding: 8px 2px; border-bottom: 1px solid rgba(var(--avc-ink-rgb), 0.06); }
+    .rs-care-main { display: flex; flex-direction: column; gap: 5px; flex: 1; min-width: 0; }
+    .rs-care-line { display: flex; align-items: center; gap: 6px; }
+    .rs-care-line .dock-sheet-care-label { flex: 1; }
+    .rs-care-warn { color: rgb(var(--avc-err-rgb)); --mdc-icon-size: 14px; }
+    .rs-care .low .dock-sheet-care-value { color: rgb(var(--avc-err-rgb)); font-weight: 600; }
+    .rs-care-bar { display: block; height: 4px; border-radius: var(--avc-r-pill); background: rgba(var(--avc-ink-rgb), 0.08); overflow: hidden; }
+    .rs-care-bar > span { display: block; height: 100%; border-radius: inherit; background: rgb(var(--avc-ok-rgb)); }
+    .rs-care .low .rs-care-bar > span { background: rgb(var(--avc-err-rgb)); }
+    .rs-note { font-size: var(--avc-fs-s); color: rgba(var(--avc-ink-rgb), 0.55); }
     .dock-sheet-debug {
       display: flex;
       flex-direction: column;
@@ -11360,7 +11458,6 @@ export class AnyVacCard extends LitElement {
       background: rgba(var(--avc-ink-rgb), 0.14);
       border-color: rgba(var(--avc-ink-rgb), 0.5);
     }
-    .start-seg--dock { position: relative; }
 
     .map-tools-label {
       font-size: var(--avc-th-fs-xs, 11px);
@@ -12176,6 +12273,10 @@ export class AnyVacCard extends LitElement {
     @keyframes avc-charge { 0%, 100% { opacity: 1; } 50% { opacity: 0.45; } }
 
     .robot-sheet-scrim { position: absolute; inset: 0; z-index: 40; background: rgba(0, 0, 0, 0.5); }
+    .ve-notice-head { display: flex; align-items: center; gap: 10px; --mdc-icon-size: 24px; }
+    .ve-notice-head ha-icon { color: rgb(var(--avc-accent-rgb)); }
+    .ve-notice-text { margin: 0; font-size: var(--avc-fs-m); line-height: 1.45; color: rgba(var(--avc-ink-rgb), 0.75); }
+    .ve-notice .robot-sheet-foot { justify-content: flex-end; }
     .robot-sheet {
       position: absolute; left: 50%; bottom: 0; z-index: 41;
       width: min(480px, 100%); box-sizing: border-box; transform: translateX(-50%);
@@ -12184,6 +12285,7 @@ export class AnyVacCard extends LitElement {
       background: rgb(var(--avc-scrim-2-rgb)); color: rgb(var(--avc-ink-rgb));
       box-shadow: 0 -12px 40px rgba(0, 0, 0, 0.45);
       animation: avc-sheet-in 0.22s var(--avc-ease, ease-out);
+      max-height: 100%; overflow-y: auto; overscroll-behavior: contain;
     }
     @keyframes avc-sheet-in { from { transform: translate(-50%, 24px); opacity: 0; } to { transform: translate(-50%, 0); opacity: 1; } }
     .robot-sheet-grip { align-self: center; width: 38px; height: 4px; border-radius: var(--avc-r-pill); background: rgba(var(--avc-ink-rgb), 0.18); }
@@ -12428,7 +12530,7 @@ export class AnyVacCard extends LitElement {
     .avc-theme .dock-mode,
     .avc-theme .dock-row,
     .avc-theme .dock-sheet-action,
-    .avc-theme .dock-sheet-tab,
+    .avc-theme .rs-tab,
     .avc-theme .dock-sheet-care-reset,
     .avc-theme .mtbtn,
     .avc-theme .badge,
@@ -12446,7 +12548,7 @@ export class AnyVacCard extends LitElement {
     .avc-theme .dock-mode:active,
     .avc-theme .dock-row:active:not(:disabled),
     .avc-theme .dock-sheet-action:active,
-    .avc-theme .dock-sheet-tab:active,
+    .avc-theme .rs-tab:active,
     .avc-theme .dock-sheet-care-reset:active:not(.pending),
     .avc-theme .mtbtn:active:not(:disabled),
     .avc-theme .badge:active,
@@ -12480,7 +12582,7 @@ export class AnyVacCard extends LitElement {
     .avc-theme .dock-row:focus-visible,
     .avc-theme .dock-chip:focus-visible,
     .avc-theme .dock-sheet-action:focus-visible,
-    .avc-theme .dock-sheet-tab:focus-visible,
+    .avc-theme .rs-tab:focus-visible,
     .avc-theme .dock-sheet-care-reset:focus-visible,
     .avc-theme .mtbtn:focus-visible,
     .avc-theme .badge:focus-visible,

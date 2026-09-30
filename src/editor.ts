@@ -1733,6 +1733,10 @@ export class AnyVacCardEditor extends LitElement {
           (v) => this._setConfig({ marker_glide_s: v === 1.5 ? undefined : v }), " s")}
         ${this._hint("How long the robot takes to drive its new trail after each update. 0 = jump.",
           "Positions arrive about every 30 s. Short (1–2 s) replays the new stretch quickly; long (up to 25 s) keeps the robot moving almost all the time, but it then trails reality by that long.")}
+        ${this._numberSlider("Care warning at", this._config.care_warn_pct ?? 10, 0, 50, 1,
+          (v) => this._setConfig({ care_warn_pct: v === 10 ? undefined : v }), " %")}
+        ${this._hint("A brush, filter or sensor at or below this marks its robot with a dot.",
+          "The dot sits on the robot's avatar and on the Care tab of its sheet. Dock errors and tank warnings mark the Dock tab regardless of this value.")}
 
         <div class="section-title">Layout</div>
         ${this._toggle("Fit card to available screen space", !!this._config.layout,
