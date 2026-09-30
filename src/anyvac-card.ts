@@ -111,6 +111,7 @@ import {
   type ProfileGridConfig,
   type ResolvedProfileGrid,
 } from "./layout";
+import { fmtPts, trailTail, type Pt } from "./trail";
 
 /** docs/25 §10 follow-up: one auto-discovered "care" row (consumable time-left +
  *  reset button, or a dock tank binary status). See `_careItems()` for how these
@@ -160,6 +161,13 @@ console.info(
   "background:#2196F3;color:#fff;font-weight:700;padding:2px 4px;border-radius:3px 0 0 3px",
   "background:#1a1a1a;color:#fff;font-weight:400;padding:2px 4px;border-radius:0 3px 3px 0"
 );
+
+/** docs/44 F4 (trail C): length of the highlighted trail head, along the
+ *  line, in marker radii (`rr` = 1/55 of the map's longer side). 3.2 rr is
+ *  the marker itself plus ~2.2 rr of visible head beyond it — about 26–30
+ *  screen px on a typical phone/tablet map, the length the approved mockup
+ *  used, while still scaling with the map the way the marker does. */
+const TRAIL_HEAD_RR = 3.2;
 
 @customElement(CARD_NAME)
 export class AnyVacCard extends LitElement {
@@ -575,6 +583,13 @@ export class AnyVacCard extends LitElement {
    *  field (not @state) — read post-render in `updated()`, never drives a
    *  render itself. */
   private _lastPortraitFitW = 0;
+  /** docs/44 F4 W1 memo + sheen bookkeeping (see `_roomFill`). */
+  private _fillJp: Record<string, any> | null = null;
+  private _fillMap: Map<string, { frac: number; done: boolean; color: string; sheen: boolean }> | null = null;
+  private _doneSeen: Set<string> | null = null;
+  private _sheenRooms = new Set<string>();
+  /** docs/44 F4 W2: last rendered marker per overlay (see `_renderVectorLayers`). */
+  private _markerPrev = new Map<string, { pose: string; x: number; y: number }>();
   /** Grid gap as last measured (portrait), for the rail's width budget. */
   private _gridGapPx = 6;
   /** docs/25 §4: last computed map-rotation decision, kept as the answer while
@@ -8449,34 +8464,10 @@ export class AnyVacCard extends LitElement {
     const rot = dims.rotation ?? 0;
     if (rot === 90 || rot === 270) { const tmp = NW; NW = NH; NH = tmp; }
     if (!NW || !NH) return nothing;
-    const color = this._color(vac);
     const rr = Math.max(NW, NH) / 55;
-    const toPts = (arr: any) => (Array.isArray(arr) ? arr : []).map((p: any) => p.x.toFixed(1) + "," + p.y.toFixed(1)).join(" ");
-    const ct = this._vacCleanType(vac);
-    // Dry layer draws the SEGMENTED dry trace (path_dry_px — cleaning-only points,
-    // no transit / mop-wash driving). Wet layer draws the mop trace as a wider
-    // translucent "wet sheen" band under the line.
-    const layersOn = this._layersEff();
-    const showDry = layersOn.dry && ct.dry;
-    const showWet = layersOn.wet && ct.wet;
-    // path_dry_px / path_wet_px are both lists of contiguous segments (docs/14 §3.9
-    // for dry; docs/27 extends the same shape to wet) — the backend never bridges an
-    // excluded gap (transit/mop-wash for dry, a dock trip between two dispatches of
-    // the same orchestrated job for wet) with a straight line, so the card must not
-    // either. One <polyline> per segment; a single flat polyline across all segments
-    // used to draw a spurious diagonal line at every gap, which is why a finished
-    // multi-room dry trace used to look like a scribble while the live in-progress
-    // trace (still one segment) looked clean (fixed 2026-07-15) — same class of bug
-    // docs/27 avoids for a multi-sortie wet trace by segmenting it the same way.
-    const drySegs: string[] = showDry && Array.isArray(at.path_dry_px)
-      ? at.path_dry_px.map((seg: any) => toPts(seg)).filter((s: string) => s.length > 0)
-      : [];
-    const wetSegs: string[] = showWet && Array.isArray(at.path_wet_px)
-      ? at.path_wet_px.map((seg: any) => toPts(seg)).filter((s: string) => s.length > 0)
-      : [];
     const vp = at.vacuum_position_px;
     const rob = vp ? { x: vp.x as number, y: vp.y as number } : null;
-    let head: { x: number; y: number } | null = null;
+    let head: Pt | null = null;
     if (rob && vp.a != null) {
       // Heading: the angle is reported in vacuum space; the mm→px transform flips
       // the y axis, so the px-space direction is (cos a, −sin a).
@@ -8490,71 +8481,175 @@ export class AnyVacCard extends LitElement {
       aspectRatio: NW + " / " + NH,
       transform: "translate(-50%,-50%) " + seatRotateScaleCss(m?.rotation ?? 0, m?.scale ?? 100, m?.scaleY),
     };
+    // 2026-09-17 field report: the extra Y-only `scale(1,r)` `scaleY` adds to
+    // the SVG's OWN CSS transform (`seatRotateScaleCss`, in `seat` above)
+    // stretches EVERYTHING drawn in its `viewBox` space uniformly — paths
+    // and rooms are meant to stretch (that's the whole point of `scaleY`),
+    // but the robot marker/icon is not: a plain circle would render as an
+    // ellipse, and `robot_image_on_map` would visibly squash. The marker is
+    // counter-scaled by the reciprocal ratio (`_renderVectorLayers`),
+    // anchored at the robot's own position. `seatScaleYRatio` is 1 (a no-op)
+    // for every config written before `scale_y` existed.
+    const inner = this._renderVectorLayers(vac, {
+      dry: this._vecSegs(at.path_dry_px),
+      wet: this._vecSegs(at.path_wet_px),
+      rob, head, rr, digits: 1, pose: vp ? vp.x + "," + vp.y : "",
+      imageRot: (vp && vp.a != null ? vp.a : 0) + (vac.robot_image_rotation ?? 0),
+      filterId: "avc-err-blur-" + vac.entity.replace(/[^a-zA-Z0-9]/g, "-"),
+      scaleYRatio: seatScaleYRatio(m?.scale ?? 100, m?.scaleY),
+    }, part);
+    return html`<svg class="map-vector" viewBox="0 0 ${NW} ${NH}" preserveAspectRatio="none" style=${styleMap(seat)}>${inner}</svg>`;
+  }
+
+  /** Backend segment list (`path_*_px` / `path_*_home_px`: a list of
+   *  contiguous segments, docs/14 §3.9 / docs/27) → projected points. The
+   *  backend never bridges an excluded gap (transit, mop wash, a dock trip)
+   *  with a straight line, so neither may the card: one polyline per
+   *  segment, never one flat polyline across all of them (the 2026-07-15
+   *  "scribble" bug). */
+  private _vecSegs(raw: unknown, proj?: (p: { x: number; y: number }) => Pt): Pt[][] {
+    if (!Array.isArray(raw)) return [];
+    // No projection (legacy px contract: already in this SVG's space) → the
+    // backend's own point objects, uncopied — thousands of points per poll.
+    return raw.map((seg: any) => (Array.isArray(seg) ? (proj ? seg.map(proj) : seg) : []));
+  }
+
+  /**
+   * docs/44 F4 — the ONE renderer for everything drawn on the map from a
+   * vacuum's projected points: the dry trace (+ soft underglow on themed
+   * cards, docs/35 §6), the wet mop band + centre line, the robot marker
+   * (circle + heading tick, or `robot_image_on_map`) and the error halo.
+   * The three overlay renderers (legacy seat, home-frame crop, home-anchor
+   * fit) only project points into their own SVG user space and hand them
+   * here, so a visual change to the trail or marker happens in one place
+   * instead of three copies that had already started to drift.
+   *
+   * Layer visibility (dry/wet toggles × the vacuum's clean type) is applied
+   * here too. `digits` keeps each caller's historical output precision.
+   * `part` lets merged mode z-order all vacuums' paths below all markers
+   * (field report 2026-07-26, see `_renderIntegrationOverlay`).
+   */
+  private _renderVectorLayers(
+    vac: VacuumConfig,
+    g: {
+      dry: Pt[][]; wet: Pt[][];
+      rob: Pt | null; head: Pt | null; imageRot: number;
+      rr: number; digits: number; filterId: string; scaleYRatio?: number;
+      /** Raw backend pose, only to tell robot movement from re-projection. */
+      pose?: string;
+    },
+    part: "both" | "paths" | "marker",
+  ) {
+    const { rob, head, rr, digits: dg } = g;
+    const color = this._color(vac);
+    const ct = this._vacCleanType(vac);
+    const layersOn = this._layersEff();
+    const drySegs = layersOn.dry && ct.dry ? g.dry.map((sg) => fmtPts(sg, dg)).filter((x) => x.length > 0) : [];
+    const wetSegs = layersOn.wet && ct.wet ? g.wet.map((sg) => fmtPts(sg, dg)).filter((x) => x.length > 0) : [];
     const pw = rr * 0.35 * ((vac.path_width ?? 100) / 100);
     const sw = pw.toFixed(2);
     const bw = (pw * 2.6 * ((vac.mop_band_width ?? 100) / 100)).toFixed(2);
     const bandOp = ((vac.mop_band_opacity ?? 28) / 100).toFixed(2);
     const wetColor = vac.mop_path_color || "#40a9ff";
     const mopBand = wetSegs.length
-      ? svg`${wetSegs.map((s) => svg`<polyline points=${s} fill="none" stroke=${wetColor} stroke-width=${bw} stroke-linejoin="round" stroke-linecap="round" opacity=${bandOp}></polyline>`)}`
+      ? svg`${wetSegs.map((x) => svg`<polyline points=${x} fill="none" stroke=${wetColor} stroke-width=${bw} stroke-linejoin="round" stroke-linecap="round" opacity=${bandOp}></polyline>`)}`
       : nothing;
     // Thin centre line down the mop band, so the wet trace reads as a path inside the sheen.
     const mopLine = wetSegs.length
-      ? svg`${wetSegs.map((s) => svg`<polyline points=${s} fill="none" stroke=${wetColor} stroke-width=${sw} stroke-linejoin="round" stroke-linecap="round" opacity="0.9"></polyline>`)}`
+      ? svg`${wetSegs.map((x) => svg`<polyline points=${x} fill="none" stroke=${wetColor} stroke-width=${sw} stroke-linejoin="round" stroke-linecap="round" opacity="0.9"></polyline>`)}`
       : nothing;
     // v1.2.0 (docs/35 §6): the dry trace was a single hairline, which reads as
     // a scribble once a whole flat has been covered. A much wider, very faint
     // pass underneath turns it into a lit trail instead — same geometry drawn
-    // twice, so the cost is one extra <polyline> per segment (the points are
-    // already RDP-simplified server-side, integration 0.67.0) and nothing else.
-    // Skipped on `legacy` so that theme stays exactly as it was, and so there
-    // is a way back if the doubled node count ever bites on weak hardware.
+    // twice. Skipped on `legacy` so that theme stays exactly as it was.
     const dryColor = vac.path_color || color;
     const softMap = (this._config.theme ?? DEFAULT_THEME) !== "legacy";
     const glowW = (pw * 3).toFixed(2);
     const traceT = drySegs.length
-      ? svg`${softMap ? drySegs.map((s) => svg`<polyline points=${s} fill="none" stroke=${dryColor} stroke-width=${glowW} stroke-linejoin="round" stroke-linecap="round" opacity="0.12"></polyline>`) : nothing}${drySegs.map((s) => svg`<polyline points=${s} fill="none" stroke=${dryColor} stroke-width=${sw} stroke-linejoin="round" stroke-linecap="round" opacity="0.85"></polyline>`)}`
+      ? svg`${softMap ? drySegs.map((x) => svg`<polyline points=${x} fill="none" stroke=${dryColor} stroke-width=${glowW} stroke-linejoin="round" stroke-linecap="round" opacity="0.12"></polyline>`) : nothing}${drySegs.map((x) => svg`<polyline points=${x} fill="none" stroke=${dryColor} stroke-width=${sw} stroke-linejoin="round" stroke-linecap="round" opacity="0.85"></polyline>`)}`
       : nothing;
     const useImg = !!(vac.robot_image_on_map && vac.image);
     const robSize = rr * 2.6 * ((vac.robot_size ?? 100) / 100);
-    const robA = (vp && vp.a != null ? vp.a : 0) + (vac.robot_image_rotation ?? 0);
-    const robotT = rob
-      ? (useImg
-          ? svg`<image href=${vac.image!} x=${(rob.x - robSize / 2).toFixed(1)} y=${(rob.y - robSize / 2).toFixed(1)} width=${robSize.toFixed(1)} height=${robSize.toFixed(1)} preserveAspectRatio="xMidYMid meet" transform=${"rotate(" + robA + " " + rob.x.toFixed(1) + " " + rob.y.toFixed(1) + ")"}></image>`
-          : svg`${head ? svg`<line x1=${rob.x.toFixed(1)} y1=${rob.y.toFixed(1)} x2=${head.x.toFixed(1)} y2=${head.y.toFixed(1)} stroke="#ffffff" stroke-width=${(rr * 0.3).toFixed(2)} stroke-linecap="round"></line>` : nothing}<circle cx=${rob.x.toFixed(1)} cy=${rob.y.toFixed(1)} r=${rr.toFixed(1)} fill=${color} stroke="#ffffff" stroke-width=${(rr * 0.18).toFixed(2)}></circle>`)
-      : nothing;
-    // Robot-error halo: a soft pulsing red glow behind the robot marker, so an
-    // active error is visible directly on the map, not just in the status card.
-    // Filter id is per-vacuum-entity to avoid collisions between multiple <svg>
-    // overlays (merged mode renders one per vacuum, all in the same shadow root).
-    const hasErr = rob && this._hasError(vac);
-    const errFilterId = "avc-err-blur-" + vac.entity.replace(/[^a-zA-Z0-9]/g, "-");
-    const errHalo = hasErr
-      ? svg`<defs><filter id=${errFilterId} x="-150%" y="-150%" width="400%" height="400%">
+    const ry = g.scaleYRatio ?? 1;
+    // docs/44 F4 — the "living" map, every non-legacy theme. Legacy keeps the
+    // previous marker markup byte for byte (verified by the F4 refactor
+    // snapshot: the legacy cases stay identical).
+    if (!this._themed()) {
+      const robotT = rob
+        ? (useImg
+            ? svg`<image href=${vac.image!} x=${(rob.x - robSize / 2).toFixed(dg)} y=${(rob.y - robSize / 2).toFixed(dg)} width=${robSize.toFixed(dg)} height=${robSize.toFixed(dg)} preserveAspectRatio="xMidYMid meet" transform=${"rotate(" + g.imageRot + " " + rob.x.toFixed(dg) + " " + rob.y.toFixed(dg) + ")"}></image>`
+            : svg`${head ? svg`<line x1=${rob.x.toFixed(dg)} y1=${rob.y.toFixed(dg)} x2=${head.x.toFixed(dg)} y2=${head.y.toFixed(dg)} stroke="#ffffff" stroke-width=${(rr * 0.3).toFixed(2)} stroke-linecap="round"></line>` : nothing}<circle cx=${rob.x.toFixed(dg)} cy=${rob.y.toFixed(dg)} r=${rr.toFixed(dg)} fill=${color} stroke="#ffffff" stroke-width=${(rr * 0.18).toFixed(2)}></circle>`)
+        : nothing;
+      // Robot-error halo: a soft pulsing red glow behind the robot marker, so an
+      // active error is visible directly on the map, not just in the status card.
+      // Filter id is per-vacuum-entity (and per renderer) to avoid collisions
+      // between the several <svg> overlays in one shadow root.
+      const errHalo = rob && this._hasError(vac)
+        // (template whitespace kept exactly as before the F4 refactor)
+        ? svg`<defs><filter id=${g.filterId} x="-150%" y="-150%" width="400%" height="400%">
               <feGaussianBlur stdDeviation=${(rr * 0.5).toFixed(2)}></feGaussianBlur>
             </filter></defs>
-            <circle class="avc-err-halo" cx=${rob!.x.toFixed(1)} cy=${rob!.y.toFixed(1)} r=${(rr * 2.2).toFixed(1)}
-              fill="#ff3b30" filter=${"url(#" + errFilterId + ")"}></circle>`
+            <circle class="avc-err-halo" cx=${rob.x.toFixed(dg)} cy=${rob.y.toFixed(dg)} r=${(rr * 2.2).toFixed(dg)}
+              fill="#ff3b30" filter=${"url(#" + g.filterId + ")"}></circle>`
+        : nothing;
+      const markerContent = svg`${errHalo}${robotT}`;
+      const markerInner = (ry !== 1 && rob)
+        ? svg`<g transform=${"translate(" + rob.x.toFixed(1) + "," + rob.y.toFixed(1) + ") scale(1," + (1 / ry).toFixed(4) + ") translate(" + (-rob.x).toFixed(1) + "," + (-rob.y).toFixed(1) + ")"}>${markerContent}</g>`
+        : markerContent;
+      const pathsInner = svg`${mopBand}${mopLine}${traceT}`;
+      return part === "paths" ? pathsInner : part === "marker" ? markerInner : svg`${pathsInner}${markerInner}`;
+    }
+    const cleaning = this._isCleaning(vac);
+    // Trail C (docs/43 §5, chosen over the fading comet): the whole history
+    // stays as it is; only the newest stretch of the robot that is cleaning
+    // RIGHT NOW is lifted out — measured along the line (`trailTail`), and
+    // in marker radii so it scales with the map like the marker does.
+    const headLen = rr * TRAIL_HEAD_RR;
+    const lastTail = (segs: Pt[][]): Pt[] => {
+      for (let i = segs.length - 1; i >= 0; i--) if (segs[i].length >= 2) return trailTail(segs[i], headLen);
+      return [];
+    };
+    const headOf = (tail: Pt[], col: string) => {
+      if (tail.length < 2) return nothing;
+      const pts = fmtPts(tail, dg);
+      return svg`<polyline class="avc-trail-head-glow" points=${pts} fill="none" stroke=${col} stroke-width=${(pw * 4).toFixed(2)} stroke-linejoin="round" stroke-linecap="round" opacity="0.3"></polyline><polyline class="avc-trail-head" points=${pts} fill="none" stroke=${col} stroke-width=${(pw * 1.7).toFixed(2)} stroke-linejoin="round" stroke-linecap="round"></polyline>`;
+    };
+    const heads = cleaning
+      ? svg`${wetSegs.length ? headOf(lastTail(g.wet), wetColor) : nothing}${drySegs.length ? headOf(lastTail(g.dry), dryColor) : nothing}`
       : nothing;
-    // 2026-09-17 field report: the extra Y-only `scale(1,r)` `scaleY` adds to
-    // the SVG's OWN CSS transform (`seatRotateScaleCss`, in `seat` below)
-    // stretches EVERYTHING drawn in its `viewBox` space uniformly — paths
-    // and rooms are meant to stretch (that's the whole point of `scaleY`),
-    // but the robot marker/icon is not: a plain circle would render as an
-    // ellipse, and `robot_image_on_map` would visibly squash. Counter-scale
-    // just the marker group by the reciprocal ratio, anchored at the robot's
-    // own position so it neither shifts nor distorts, while the path stretch
-    // (`pathsInner`, left alone) still does its job. `seatScaleYRatio` is 1
-    // (a no-op) for every non-`_renderIntegrationOverlay` caller and every
-    // config written before `scale_y` existed, so this is additive only.
-    const scaleYRatio = seatScaleYRatio(m?.scale ?? 100, m?.scaleY);
-    const markerContent = svg`${errHalo}${robotT}`;
-    const markerInner = (scaleYRatio !== 1 && rob)
-      ? svg`<g transform=${"translate(" + rob.x.toFixed(1) + "," + rob.y.toFixed(1) + ") scale(1," + (1 / scaleYRatio).toFixed(4) + ") translate(" + (-rob.x).toFixed(1) + "," + (-rob.y).toFixed(1) + ")"}>${markerContent}</g>`
-      : markerContent;
-    const pathsInner = svg`${mopBand}${mopLine}${traceT}`;
-    const inner = part === "paths" ? pathsInner : part === "marker" ? markerInner : svg`${pathsInner}${markerInner}`;
-    return html`<svg class="map-vector" viewBox="0 0 ${NW} ${NH}" preserveAspectRatio="none" style=${styleMap(seat)}>${inner}</svg>`;
+    // W2: the marker is drawn around the origin and MOVED by a CSS transform,
+    // so a new position eases over (`.avc-marker` transition) instead of
+    // jumping. No extrapolation between polls — the animation never shows
+    // the robot anywhere the backend hasn't reported it. A sonar ring pulses
+    // while the robot is cleaning.
+    let liveMarker: unknown = nothing;
+    if (rob && part !== "paths") {
+      const hx = head ? head.x - rob.x : 0, hy = head ? head.y - rob.y : 0;
+      const dot = useImg
+        ? svg`<image href=${vac.image!} x=${(-robSize / 2).toFixed(dg)} y=${(-robSize / 2).toFixed(dg)} width=${robSize.toFixed(dg)} height=${robSize.toFixed(dg)} preserveAspectRatio="xMidYMid meet" transform=${"rotate(" + g.imageRot + ")"}></image>`
+        : svg`${head ? svg`<line x1="0" y1="0" x2=${hx.toFixed(dg)} y2=${hy.toFixed(dg)} stroke="#ffffff" stroke-width=${(rr * 0.3).toFixed(2)} stroke-linecap="round"></line>` : nothing}<circle class="avc-marker-dot" cx="0" cy="0" r=${rr.toFixed(dg)} fill=${color} stroke="#ffffff" stroke-width=${(rr * 0.18).toFixed(2)}></circle>`;
+      const halo = this._hasError(vac)
+        ? svg`<defs><filter id=${g.filterId} x="-150%" y="-150%" width="400%" height="400%">
+                <feGaussianBlur stdDeviation=${(rr * 0.5).toFixed(2)}></feGaussianBlur>
+              </filter></defs>
+              <circle class="avc-err-halo" cx="0" cy="0" r=${(rr * 2.2).toFixed(dg)} fill="#ff3b30" filter=${"url(#" + g.filterId + ")"}></circle>`
+        : nothing;
+      const sonar = cleaning
+        ? svg`<circle class="avc-sonar" cx="0" cy="0" r=${rr.toFixed(dg)} fill="none" stroke=${color} stroke-width=${(rr * 0.22).toFixed(2)}></circle>`
+        : nothing;
+      const body = svg`${halo}${sonar}${dot}`;
+      // Ease only real robot movement. When the SAME backend pose lands
+      // somewhere else (floorplan aspect learned on load, re-seat, rotation,
+      // flip) the marker jumps: gliding across the map there would show a
+      // move the robot never made. Class is set for exactly that render.
+      const prev = this._markerPrev.get(g.filterId);
+      const jump = !!prev && prev.pose === (g.pose ?? "") && (Math.abs(prev.x - rob.x) > 1e-6 || Math.abs(prev.y - rob.y) > 1e-6);
+      this._markerPrev.set(g.filterId, { pose: g.pose ?? "", x: rob.x, y: rob.y });
+      liveMarker = svg`<g class="avc-marker ${jump ? "avc-marker--jump" : ""}" style=${"transform: translate(" + rob.x.toFixed(dg) + "px, " + rob.y.toFixed(dg) + "px)"}>${
+        ry !== 1 ? svg`<g transform=${"scale(1," + (1 / ry).toFixed(4) + ")"}>${body}</g>` : body}</g>`;
+    }
+    const livePaths = svg`${mopBand}${mopLine}${traceT}${heads}`;
+    return part === "paths" ? livePaths : part === "marker" ? liveMarker : svg`${livePaths}${liveMarker}`;
   }
 
   /** docs/40 §4.4 (Fáje 3) home-frame twin of `_renderIntegrationOverlay` —
@@ -8583,68 +8678,23 @@ export class AnyVacCard extends LitElement {
     const cropW = crop.x1 - crop.x0;
     const cropH = crop.y1 - crop.y0;
     if (!(cropW > 0) || !(cropH > 0)) return nothing;
-    const color = this._color(vac);
     const rr = Math.max(cropW, cropH) / 55;
-    const local = (p: { x: number; y: number }) => ({ x: p.x - crop.x0, y: p.y - crop.y0 });
-    const toPts = (seg: any) =>
-      (Array.isArray(seg) ? seg : [])
-        .map((p: any) => { const q = local(p); return q.x.toFixed(1) + "," + q.y.toFixed(1); })
-        .join(" ");
-    const ct = this._vacCleanType(vac);
-    const layersOn = this._layersEff();
-    const showDry = layersOn.dry && ct.dry;
-    const showWet = layersOn.wet && ct.wet;
-    const drySegs: string[] = showDry && Array.isArray(at.path_dry_home_px)
-      ? at.path_dry_home_px.map((seg: any) => toPts(seg)).filter((s: string) => s.length > 0)
-      : [];
-    const wetSegs: string[] = showWet && Array.isArray(at.path_wet_home_px)
-      ? at.path_wet_home_px.map((seg: any) => toPts(seg)).filter((s: string) => s.length > 0)
-      : [];
+    const local = (p: { x: number; y: number }): Pt => ({ x: p.x - crop.x0, y: p.y - crop.y0 });
     const vp = at.vacuum_position_home_px;
     const rob = vp ? local(vp) : null;
-    let head: { x: number; y: number } | null = null;
+    let head: Pt | null = null;
     if (rob && vp.a != null) {
       const arad = (vp.a * Math.PI) / 180;
       head = { x: rob.x + rr * 1.3 * Math.cos(arad), y: rob.y + rr * 1.3 * Math.sin(arad) };
     }
     const style = { left: "0", top: "0", width: "100%", height: "100%" };
-    const pw = rr * 0.35 * ((vac.path_width ?? 100) / 100);
-    const sw = pw.toFixed(2);
-    const bw = (pw * 2.6 * ((vac.mop_band_width ?? 100) / 100)).toFixed(2);
-    const bandOp = ((vac.mop_band_opacity ?? 28) / 100).toFixed(2);
-    const wetColor = vac.mop_path_color || "#40a9ff";
-    const mopBand = wetSegs.length
-      ? svg`${wetSegs.map((s) => svg`<polyline points=${s} fill="none" stroke=${wetColor} stroke-width=${bw} stroke-linejoin="round" stroke-linecap="round" opacity=${bandOp}></polyline>`)}`
-      : nothing;
-    const mopLine = wetSegs.length
-      ? svg`${wetSegs.map((s) => svg`<polyline points=${s} fill="none" stroke=${wetColor} stroke-width=${sw} stroke-linejoin="round" stroke-linecap="round" opacity="0.9"></polyline>`)}`
-      : nothing;
-    const dryColor = vac.path_color || color;
-    const softMap = (this._config.theme ?? DEFAULT_THEME) !== "legacy";
-    const glowW = (pw * 3).toFixed(2);
-    const traceT = drySegs.length
-      ? svg`${softMap ? drySegs.map((s) => svg`<polyline points=${s} fill="none" stroke=${dryColor} stroke-width=${glowW} stroke-linejoin="round" stroke-linecap="round" opacity="0.12"></polyline>`) : nothing}${drySegs.map((s) => svg`<polyline points=${s} fill="none" stroke=${dryColor} stroke-width=${sw} stroke-linejoin="round" stroke-linecap="round" opacity="0.85"></polyline>`)}`
-      : nothing;
-    const useImg = !!(vac.robot_image_on_map && vac.image);
-    const robSize = rr * 2.6 * ((vac.robot_size ?? 100) / 100);
-    const robA = (vp && vp.a != null ? vp.a : 0) + (vac.robot_image_rotation ?? 0);
-    const robotT = rob
-      ? (useImg
-          ? svg`<image href=${vac.image!} x=${(rob.x - robSize / 2).toFixed(1)} y=${(rob.y - robSize / 2).toFixed(1)} width=${robSize.toFixed(1)} height=${robSize.toFixed(1)} preserveAspectRatio="xMidYMid meet" transform=${"rotate(" + robA + " " + rob.x.toFixed(1) + " " + rob.y.toFixed(1) + ")"}></image>`
-          : svg`${head ? svg`<line x1=${rob.x.toFixed(1)} y1=${rob.y.toFixed(1)} x2=${head.x.toFixed(1)} y2=${head.y.toFixed(1)} stroke="#ffffff" stroke-width=${(rr * 0.3).toFixed(2)} stroke-linecap="round"></line>` : nothing}<circle cx=${rob.x.toFixed(1)} cy=${rob.y.toFixed(1)} r=${rr.toFixed(1)} fill=${color} stroke="#ffffff" stroke-width=${(rr * 0.18).toFixed(2)}></circle>`)
-      : nothing;
-    const hasErr = rob && this._hasError(vac);
-    const errFilterId = "avc-hf-err-blur-" + vac.entity.replace(/[^a-zA-Z0-9]/g, "-");
-    const errHalo = hasErr
-      ? svg`<defs><filter id=${errFilterId} x="-150%" y="-150%" width="400%" height="400%">
-              <feGaussianBlur stdDeviation=${(rr * 0.5).toFixed(2)}></feGaussianBlur>
-            </filter></defs>
-            <circle class="avc-err-halo" cx=${rob!.x.toFixed(1)} cy=${rob!.y.toFixed(1)} r=${(rr * 2.2).toFixed(1)}
-              fill="#ff3b30" filter=${"url(#" + errFilterId + ")"}></circle>`
-      : nothing;
-    const pathsInner = svg`${mopBand}${mopLine}${traceT}`;
-    const markerInner = svg`${errHalo}${robotT}`;
-    const inner = part === "paths" ? pathsInner : part === "marker" ? markerInner : svg`${pathsInner}${markerInner}`;
+    const inner = this._renderVectorLayers(vac, {
+      dry: this._vecSegs(at.path_dry_home_px, local),
+      wet: this._vecSegs(at.path_wet_home_px, local),
+      rob, head, rr, digits: 1, pose: vp ? vp.x + "," + vp.y : "",
+      imageRot: (vp && vp.a != null ? vp.a : 0) + (vac.robot_image_rotation ?? 0),
+      filterId: "avc-hf-err-blur-" + vac.entity.replace(/[^a-zA-Z0-9]/g, "-"),
+    }, part);
     return html`<svg class="map-vector" viewBox="0 0 ${cropW} ${cropH}" preserveAspectRatio="none" style=${styleMap(style)}>${inner}</svg>`;
   }
 
@@ -8688,71 +8738,26 @@ export class AnyVacCard extends LitElement {
   ) {
     const at = this._intAttrs(vac);
     if (!at || !(ar > 0)) return nothing;
-    const color = this._color(vac);
-    const proj = (p: { x: number; y: number }) => {
+    const proj = (p: { x: number; y: number }): Pt => {
       const pct = projectHomePxThroughFit(p, dims, fit, ar);
       return { x: pct.x, y: pct.y / ar };
     };
     const rr = Math.max(100, 100 / ar) / 55;
-    const toPts = (seg: any) =>
-      (Array.isArray(seg) ? seg : [])
-        .map((p: any) => { const q = proj(p); return q.x.toFixed(2) + "," + q.y.toFixed(2); })
-        .join(" ");
-    const ct = this._vacCleanType(vac);
-    const layersOn = this._layersEff();
-    const showDry = layersOn.dry && ct.dry;
-    const showWet = layersOn.wet && ct.wet;
-    const drySegs: string[] = showDry && Array.isArray(at.path_dry_home_px)
-      ? at.path_dry_home_px.map((seg: any) => toPts(seg)).filter((s: string) => s.length > 0)
-      : [];
-    const wetSegs: string[] = showWet && Array.isArray(at.path_wet_home_px)
-      ? at.path_wet_home_px.map((seg: any) => toPts(seg)).filter((s: string) => s.length > 0)
-      : [];
     const vp = at.vacuum_position_home_px;
     const rob = vp ? proj(vp) : null;
-    let head: { x: number; y: number } | null = null;
+    let head: Pt | null = null;
     if (rob && vp.a != null) {
       const arad = ((vp.a + fit.rotation) * Math.PI) / 180;
       head = { x: rob.x + rr * 1.3 * Math.cos(arad), y: rob.y + rr * 1.3 * Math.sin(arad) };
     }
     const style = { left: "0", top: "0", width: "100%", height: "100%" };
-    const pw = rr * 0.35 * ((vac.path_width ?? 100) / 100);
-    const sw = pw.toFixed(2);
-    const bw = (pw * 2.6 * ((vac.mop_band_width ?? 100) / 100)).toFixed(2);
-    const bandOp = ((vac.mop_band_opacity ?? 28) / 100).toFixed(2);
-    const wetColor = vac.mop_path_color || "#40a9ff";
-    const mopBand = wetSegs.length
-      ? svg`${wetSegs.map((s) => svg`<polyline points=${s} fill="none" stroke=${wetColor} stroke-width=${bw} stroke-linejoin="round" stroke-linecap="round" opacity=${bandOp}></polyline>`)}`
-      : nothing;
-    const mopLine = wetSegs.length
-      ? svg`${wetSegs.map((s) => svg`<polyline points=${s} fill="none" stroke=${wetColor} stroke-width=${sw} stroke-linejoin="round" stroke-linecap="round" opacity="0.9"></polyline>`)}`
-      : nothing;
-    const dryColor = vac.path_color || color;
-    const softMap = (this._config.theme ?? DEFAULT_THEME) !== "legacy";
-    const glowW = (pw * 3).toFixed(2);
-    const traceT = drySegs.length
-      ? svg`${softMap ? drySegs.map((s) => svg`<polyline points=${s} fill="none" stroke=${dryColor} stroke-width=${glowW} stroke-linejoin="round" stroke-linecap="round" opacity="0.12"></polyline>`) : nothing}${drySegs.map((s) => svg`<polyline points=${s} fill="none" stroke=${dryColor} stroke-width=${sw} stroke-linejoin="round" stroke-linecap="round" opacity="0.85"></polyline>`)}`
-      : nothing;
-    const useImg = !!(vac.robot_image_on_map && vac.image);
-    const robSize = rr * 2.6 * ((vac.robot_size ?? 100) / 100);
-    const robA = (vp && vp.a != null ? vp.a + fit.rotation : 0) + (vac.robot_image_rotation ?? 0);
-    const robotT = rob
-      ? (useImg
-          ? svg`<image href=${vac.image!} x=${(rob.x - robSize / 2).toFixed(2)} y=${(rob.y - robSize / 2).toFixed(2)} width=${robSize.toFixed(2)} height=${robSize.toFixed(2)} preserveAspectRatio="xMidYMid meet" transform=${"rotate(" + robA + " " + rob.x.toFixed(2) + " " + rob.y.toFixed(2) + ")"}></image>`
-          : svg`${head ? svg`<line x1=${rob.x.toFixed(2)} y1=${rob.y.toFixed(2)} x2=${head.x.toFixed(2)} y2=${head.y.toFixed(2)} stroke="#ffffff" stroke-width=${(rr * 0.3).toFixed(2)} stroke-linecap="round"></line>` : nothing}<circle cx=${rob.x.toFixed(2)} cy=${rob.y.toFixed(2)} r=${rr.toFixed(2)} fill=${color} stroke="#ffffff" stroke-width=${(rr * 0.18).toFixed(2)}></circle>`)
-      : nothing;
-    const hasErr = rob && this._hasError(vac);
-    const errFilterId = "avc-ha-err-blur-" + vac.entity.replace(/[^a-zA-Z0-9]/g, "-");
-    const errHalo = hasErr
-      ? svg`<defs><filter id=${errFilterId} x="-150%" y="-150%" width="400%" height="400%">
-              <feGaussianBlur stdDeviation=${(rr * 0.5).toFixed(2)}></feGaussianBlur>
-            </filter></defs>
-            <circle class="avc-err-halo" cx=${rob!.x.toFixed(2)} cy=${rob!.y.toFixed(2)} r=${(rr * 2.2).toFixed(2)}
-              fill="#ff3b30" filter=${"url(#" + errFilterId + ")"}></circle>`
-      : nothing;
-    const pathsInner = svg`${mopBand}${mopLine}${traceT}`;
-    const markerInner = svg`${errHalo}${robotT}`;
-    const inner = part === "paths" ? pathsInner : part === "marker" ? markerInner : svg`${pathsInner}${markerInner}`;
+    const inner = this._renderVectorLayers(vac, {
+      dry: this._vecSegs(at.path_dry_home_px, proj),
+      wet: this._vecSegs(at.path_wet_home_px, proj),
+      rob, head, rr, digits: 2, pose: vp ? vp.x + "," + vp.y : "",
+      imageRot: (vp && vp.a != null ? vp.a + fit.rotation : 0) + (vac.robot_image_rotation ?? 0),
+      filterId: "avc-ha-err-blur-" + vac.entity.replace(/[^a-zA-Z0-9]/g, "-"),
+    }, part);
     return html`<svg class="map-vector" viewBox=${"0 0 100 " + (100 / ar).toFixed(3)} preserveAspectRatio="none" style=${styleMap(style)}>${inner}</svg>`;
   }
 
@@ -9495,6 +9500,61 @@ export class AnyVacCard extends LitElement {
     `;
   }
 
+  /** docs/44 F4 (W1): per-room fill state of the running orchestrated job,
+   *  straight from `job_progress.rooms` (docs/14 — the card derives nothing
+   *  but a mean of the published pass percentages). Recomputed only when the
+   *  published object changes. Also tracks which rooms turned `done` while
+   *  this card was watching — only those get the one-shot sheen, so opening
+   *  the dashboard mid-job doesn't flash every finished room at once. */
+  private _roomFill(): Map<string, { frac: number; done: boolean; color: string; sheen: boolean }> {
+    const jp = this._jobProgress();
+    if (jp === this._fillJp && this._fillMap) return this._fillMap;
+    this._fillJp = jp;
+    const out = new Map<string, { frac: number; done: boolean; color: string; sheen: boolean }>();
+    if (!jp || !Array.isArray(jp.rooms)) {
+      this._doneSeen = null;
+      this._sheenRooms.clear();
+      this._fillMap = out;
+      return out;
+    }
+    const byRoom = new Map<string, Array<Record<string, any>>>();
+    for (const r of jp.rooms as Array<Record<string, any>>) {
+      if (typeof r?.room !== "string") continue;
+      const list = byRoom.get(r.room) ?? [];
+      list.push(r);
+      byRoom.set(r.room, list);
+    }
+    const colorOf = (ent: unknown) => {
+      const v = this._config.vacuums.find((x) => x.entity === ent);
+      return v ? this._color(v) : "#8a8f98";
+    };
+    const firstSight = this._doneSeen === null;
+    const seen = this._doneSeen ?? new Set<string>();
+    for (const [name, rows] of byRoom) {
+      const done = rows.every((r) => r.state === "done");
+      const sum = rows.reduce((a, r) => a + (r.state === "done" ? 100 : Math.max(0, Math.min(100, Number(r.pct) || 0))), 0);
+      const pick = rows.find((r) => r.state === "active") ?? [...rows].reverse().find((r) => r.state === "done") ?? rows[0];
+      if (done && !seen.has(name)) {
+        seen.add(name);
+        if (!firstSight) this._sheenRooms.add(name);
+      }
+      out.set(name, { frac: sum / (100 * rows.length), done, color: colorOf(pick?.vacuum), sheen: this._sheenRooms.has(name) });
+    }
+    this._doneSeen = seen;
+    this._fillMap = out;
+    return out;
+  }
+
+  private _renderRoomFill(room: RoomConfig) {
+    const f = this._roomFill().get(room.key) ?? (room.name ? this._roomFill().get(room.name) : undefined);
+    if (!f || (!f.done && f.frac <= 0)) return nothing;
+    // Tone rises with coverage (max 0.22); a finished room keeps the full,
+    // calm tone after its one-shot sheen.
+    const op = f.done ? 0.22 : 0.04 + 0.18 * f.frac;
+    return html`<span class="room-fill ${f.done ? "room-fill--done" : ""}" style=${styleMap({ background: f.color, opacity: op.toFixed(3) })}></span>${
+      f.sheen ? html`<span class="room-sheen"></span>` : nothing}`;
+  }
+
   private _renderRoomOverlay(room: RoomConfig, vac: VacuumConfig, opts?: { vacs?: VacuumConfig[]; wholeHome?: boolean }) {
     const selected = opts?.vacs ? this._isRoomSelectedAny(room.key, opts.vacs) : this._isRoomSelected(room, vac);
     // docs/25 §5: nothing explicitly selected = whole home is the implicit
@@ -9589,6 +9649,7 @@ export class AnyVacCard extends LitElement {
           title=${locked ? "Room selection is off while placing a pin/zone" : room.name} aria-label=${room.name}
           aria-pressed=${selected ? "true" : "false"}
         >
+          ${themed ? this._renderRoomFill(room) : nothing}
           <div class="hold-ring"></div>
           ${themed ? this._renderRoomLabel(room, vac, anchor, opts?.vacs) : html`
             ${!this._config.room_icon_hidden && anchor !== "none" && room.icon ? html`
@@ -11821,6 +11882,41 @@ export class AnyVacCard extends LitElement {
     @media (prefers-color-scheme: light) {
       .avc-theme--auto .status-label,
       .avc-theme--auto .tile-status { filter: brightness(0.6) saturate(1.2); }
+    }
+
+    /* ── docs/44 F4: living map ───────────────────────────────────────── */
+    .avc-marker { transition: transform 1.5s linear; }
+    .avc-marker--jump { transition: none; }
+    .avc-sonar {
+      transform-box: fill-box; transform-origin: center;
+      animation: avc-sonar 2.4s ease-out infinite;
+    }
+    @keyframes avc-sonar {
+      0% { transform: scale(1); opacity: 0.75; }
+      100% { transform: scale(3.4); opacity: 0; }
+    }
+    .room-fill {
+      position: absolute; inset: 0; border-radius: inherit; pointer-events: none;
+      transition: opacity 1.2s ease, background-color 0.6s ease;
+    }
+    .room-sheen { position: absolute; inset: 0; border-radius: inherit; overflow: hidden; pointer-events: none; }
+    .room-sheen::after {
+      content: ""; position: absolute; inset: 0;
+      background: linear-gradient(105deg, transparent 25%, rgba(255, 255, 255, 0.5) 50%, transparent 75%);
+      transform: translateX(-110%); opacity: 0;
+      animation: avc-sheen 1.3s ease-out 1 forwards;
+    }
+    @keyframes avc-sheen {
+      0% { transform: translateX(-110%); opacity: 1; }
+      85% { opacity: 1; }
+      100% { transform: translateX(110%); opacity: 0; }
+    }
+    .avc-theme .room-overlay > .room-label { position: relative; z-index: 1; }
+    .avc-still .avc-marker { transition: none; }
+    .avc-still .avc-sonar, .avc-still .room-sheen { display: none; }
+    @media (prefers-reduced-motion: reduce) {
+      .avc-marker { transition: none; }
+      .avc-sonar, .room-sheen { display: none; }
     }
 
     /* ── docs/44 F3: portrait hero bar + rail ─────────────────────────── */

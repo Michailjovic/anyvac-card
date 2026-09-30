@@ -217,8 +217,12 @@ test.describe("home frame identity rendering + click geometry (docs/40 §4.4, F�
       const svgs = Array.from((window as any).__card.shadowRoot.querySelectorAll("svg.map-vector")) as SVGElement[];
       for (const svg of svgs) {
         if (svg.getAttribute("viewBox")?.startsWith("0 0 1000 500")) {
-          const c = svg.querySelector("circle");
-          if (c) return { cx: c.getAttribute("cx"), cy: c.getAttribute("cy") };
+          // docs/44 F4: themed markers are drawn around the origin and moved by
+          // a CSS translate on `.avc-marker` — read the rendered position.
+          const c = (svg.querySelector("circle.avc-marker-dot") ?? svg.querySelector("circle")) as SVGCircleElement | null;
+          const g = c?.closest(".avc-marker") as SVGGElement | null;
+          const m = g ? new DOMMatrix(getComputedStyle(g).transform) : null;
+          if (c) return { cx: String(parseFloat(c.getAttribute("cx")!) + (m ? m.e : 0)), cy: String(parseFloat(c.getAttribute("cy")!) + (m ? m.f : 0)) };
         }
       }
       return null;

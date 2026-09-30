@@ -6,6 +6,40 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [1.41.0] - 2026-09-30
+
+Fourth phase of the "living home" redesign (docs/44 F4): the living map.
+Card-only; the room fill reads `job_progress` (integration ≥ 1.39.0). Every
+change is gated on a non-`legacy` theme and switched off by reduced motion
+(OS setting or `reduce_motion: true`).
+
+### Added
+
+- **Trail head (variant C).** The whole trace stays as it was; the newest
+  stretch of a robot that is cleaning right now is drawn brighter and wider,
+  ending under the marker. Its length is measured along the line (3.2 marker
+  radii ≈ 26–30 px on a typical map), so it doesn't jump with the backend's
+  point simplification.
+- **Room fill (W1).** While an orchestrated job runs, each room of the plan
+  takes on a tone of the robot working it, rising with the published pass
+  percentages; a finished room keeps a calm tone after a one-shot sheen. The
+  sheen only plays for rooms that finish while the card is open.
+- **Live marker (W2).** A sonar ring pulses around a cleaning robot, and a new
+  position eases over 1.5 s instead of jumping. No extrapolation between
+  polls; a re-projection of the same position (floorplan loaded, re-seat,
+  rotation, flip) still jumps.
+
+### Changed
+
+- **One renderer for trail + marker.** The three overlay renderers (per-vacuum
+  seat, home-frame crop, home-anchor fit) now only project points and share
+  `_renderVectorLayers` (geometry in `src/trail.ts`). Verified byte-identical
+  output against 1.40.0 for all three before any visual change; `theme:
+  legacy` output is still identical.
+- Themed markers are drawn around the origin and positioned by a CSS
+  `translate` on `.avc-marker` (the moving part); legacy keeps absolute
+  `cx`/`cy`.
+
 ## [1.40.0] - 2026-09-30
 
 Third phase of the "living home" redesign (docs/44 F3): the portrait **rail**.
