@@ -464,6 +464,13 @@ export interface AnyVacCardConfig {
    *  the theme. `prefers-reduced-motion` already disables them at the OS
    *  level — this is for people who want them off regardless (docs/35 §5). */
   reduce_motion?: boolean;
+  /** Seconds the robot marker takes to drive the stretch of trail since the
+   *  previous position update (the integration polls every ~30 s), following
+   *  the drawn line instead of cutting straight across the room. 0 = jump
+   *  straight to the new position. Default 1.5, max 25. Off in `theme:
+   *  legacy`, with `reduce_motion` and with the OS "reduce motion" setting
+   *  (docs/44, card 1.47.0). */
+  marker_glide_s?: number;
   /** Show the Visual editor's entry button (full-screen Seat & Appearance /
    *  Rooms / Floorplan & Calibrate tools, docs/42) when a floorplan +
    *  integration are otherwise available. Default on; `false` hides it —

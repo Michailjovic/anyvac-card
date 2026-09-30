@@ -1729,6 +1729,10 @@ export class AnyVacCardEditor extends LitElement {
           (v) => this._setConfig({ reduce_motion: v ? true : undefined }))}
         ${this._hint("Turns off animations on the map and the start sequence.",
           "The operating system's own \"reduce motion\" setting already does this — this is for switching them off without changing that.")}
+        ${this._numberSlider("Robot marker glide", this._config.marker_glide_s ?? 1.5, 0, 25, 0.5,
+          (v) => this._setConfig({ marker_glide_s: v === 1.5 ? undefined : v }), " s")}
+        ${this._hint("How long the robot takes to drive its new trail after each update. 0 = jump.",
+          "Positions arrive about every 30 s. Short (1–2 s) replays the new stretch quickly; long (up to 25 s) keeps the robot moving almost all the time, but it then trails reality by that long.")}
 
         <div class="section-title">Layout</div>
         ${this._toggle("Fit card to available screen space", !!this._config.layout,

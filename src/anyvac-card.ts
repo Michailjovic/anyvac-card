@@ -111,7 +111,7 @@ import {
   type ProfileGridConfig,
   type ResolvedProfileGrid,
 } from "./layout";
-import { fmtPts, trailTail, type Pt } from "./trail";
+import { fmtPts, trailTail, traceSince, pointAtFraction, glideKeyframes, arcLength, type Pt } from "./trail";
 import { planOrder } from "./startseq";
 import { hexToRgb, tintMapImage } from "./maptint";
 
@@ -170,6 +170,12 @@ console.info(
  *  screen px on a typical phone/tablet map, the length the approved mockup
  *  used, while still scaling with the map the way the marker does. */
 const TRAIL_HEAD_RR = 3.2;
+/** docs/44 marker-on-trail (1.47.0): default and ceiling of `marker_glide_s`.
+ *  The ceiling stays under the integration's 30 s poll so a glide normally
+ *  finishes before the next position lands (an early one still continues
+ *  smoothly — see `_runMarkerGlides`). */
+const MARKER_GLIDE_DEFAULT_S = 1.5;
+const MARKER_GLIDE_MAX_S = 25;
 
 /** docs/44 F5 start sequence timing: rooms light up one step apart (at most
  *  0.3 s; long plans compress so the last one starts by 1.6 s), each light is
@@ -614,7 +620,18 @@ export class AnyVacCard extends LitElement {
     id: number; delay: Map<string, number>; first: Array<{ entity: string; room: string }>;
   } | null = null;
   /** docs/44 F4 W2: last rendered marker per overlay (see `_renderVectorLayers`). */
-  private _markerPrev = new Map<string, { pose: string; x: number; y: number }>();
+  private _markerPrev = new Map<string, {
+    pose: string; x: number; y: number;
+    /** Trail the marker sat at the end of: layer, its segment count and the
+     *  arc length of its last segment — bounds the next `traceSince` search. */
+    trail: { layer: "dry" | "wet"; n: number; len: number } | null;
+  }>();
+  /** Glides queued by the last render, started in `updated()` (1.47.0). */
+  private _markerMoves = new Map<string, { route: Pt[]; digits: number }>();
+  /** Marker re-projected (not moved) this render — stop any running glide. */
+  private _markerStops = new Set<string>();
+  /** Running glide per marker, to continue it if the next position lands early. */
+  private _markerAnims = new Map<string, { anim: Animation; route: Pt[] }>();
   /** Grid gap as last measured (portrait), for the rail's width budget. */
   private _gridGapPx = 6;
   /** docs/25 §4: last computed map-rotation decision, kept as the answer while
@@ -1136,6 +1153,7 @@ export class AnyVacCard extends LitElement {
    *  OWN `static styles` (docs/14 rule 1: one stylesheet, not a forked copy
    *  for the portal). */
   protected updated(): void {
+    this._runMarkerGlides();
     if (this._alignSession && !this._alignHost) {
       const raw = (this.constructor as typeof AnyVacCard).elementStyles;
       const sheets: CSSStyleSheet[] = [];
@@ -2694,6 +2712,48 @@ export class AnyVacCard extends LitElement {
     if (this._config.reduce_motion) return true;
     try { return window.matchMedia?.("(prefers-reduced-motion: reduce)").matches ?? false; } catch { return false; }
   }
+  /** 1.47.0: how long the marker takes to drive the trail since the last
+   *  position update (`marker_glide_s`), 0 when it should just jump. */
+  private _glideS(): number {
+    if (this._reducedMotion()) return 0;
+    const v = Number(this._config.marker_glide_s ?? MARKER_GLIDE_DEFAULT_S);
+    return Number.isFinite(v) ? Math.min(MARKER_GLIDE_MAX_S, Math.max(0, v)) : MARKER_GLIDE_DEFAULT_S;
+  }
+
+  /** 1.47.0: start the glides `_renderVectorLayers` queued. Compositor-driven
+   *  transform keyframes (one per trail vertex, offset by arc length → even
+   *  speed); no per-frame JS. The element's own inline transform already
+   *  holds the final position, so the animation (fill: none) simply ends
+   *  there. A position landing mid-glide continues from where the marker IS
+   *  (rest of the old route + the new one) instead of snapping. */
+  private _runMarkerGlides(): void {
+    for (const id of this._markerStops) {
+      this._markerAnims.get(id)?.anim.cancel();
+      this._markerAnims.delete(id);
+    }
+    this._markerStops.clear();
+    if (!this._markerMoves.size) return;
+    const dur = this._glideS() * 1000;
+    for (const [id, mv] of this._markerMoves) {
+      const el = this.renderRoot.querySelector(`.avc-marker[data-mk="${CSS.escape(id)}"]`) as (SVGGElement & { animate?: unknown }) | null;
+      if (!el || typeof el.animate !== "function" || !(dur > 0)) continue;
+      let route = mv.route;
+      const run = this._markerAnims.get(id);
+      if (run) {
+        const st = run.anim.playState;
+        if (st === "running" || st === "paused") {
+          const total = Number((run.anim.effect as KeyframeEffect | null)?.getTiming().duration) || dur;
+          const at = pointAtFraction(run.route, Number(run.anim.currentTime ?? 0) / total);
+          route = [at.pt, ...run.route.slice(at.next), ...route];
+        }
+        run.anim.cancel();
+      }
+      const anim = el.animate(glideKeyframes(route, mv.digits), { duration: dur, easing: "linear", fill: "none" });
+      this._markerAnims.set(id, { anim, route });
+    }
+    this._markerMoves.clear();
+  }
+
 
   /** The avatars' flight (merged map): from just outside the map's bottom edge
    *  AS SEEN ON SCREEN — un-rotated into the wrap's own frame, so a rotated
@@ -2776,20 +2836,20 @@ export class AnyVacCard extends LitElement {
     };
     const cell = (entity?: string) => {
       const v = this._config.vacuums.find((x) => x.entity === entity);
-      if (!v) return html`<span style="font-size:11px;opacity:.25">—</span>`;
+      if (!v) return html`<span style="font-size:var(--avc-th-fs-xs,11px);opacity:.25">—</span>`;
       const c = this._color(v);
-      return html`<span style="display:inline-flex;align-items:center;justify-content:center;min-width:24px;height:17px;padding:0 5px;border-radius:9px;font-size:10px;font-weight:700;color:rgb(var(--avc-ink-rgb));background:${c}30;border:1px solid ${c}">${this._vacAbbrev(v)}</span>`;
+      return html`<span style="display:inline-flex;align-items:center;justify-content:center;min-width:24px;height:17px;padding:0 5px;border-radius:var(--avc-th-r-pill,9px);font-size:var(--avc-th-fs-xs,10px);font-weight:700;color:rgb(var(--avc-ink-rgb));background:${c}30;border:1px solid ${c}">${this._vacAbbrev(v)}</span>`;
     };
     const modeBtn = (m: "dry" | "wet" | "both", label: string) => {
       const on = mode === m;
       return html`<button @click=${(e: Event) => { e.stopPropagation(); this._planMode = m; }}
-        style="padding:2px 8px;border-radius:8px;font-size:10px;font-weight:700;cursor:pointer;font-family:inherit;border:1px solid ${on ? "rgba(var(--avc-ink-rgb),0.5)" : "rgba(var(--avc-ink-rgb),0.15)"};background:${on ? "rgba(var(--avc-ink-rgb),0.12)" : "transparent"};color:${on ? "#fff" : "rgba(var(--avc-ink-rgb),0.5)"}">${label}</button>`;
+        style="padding:2px 8px;border-radius:var(--avc-th-r-m,8px);font-size:var(--avc-th-fs-xs,10px);font-weight:700;cursor:pointer;font-family:inherit;border:1px solid ${on ? "rgba(var(--avc-ink-rgb),0.5)" : "rgba(var(--avc-ink-rgb),0.15)"};background:${on ? "rgba(var(--avc-ink-rgb),0.12)" : "transparent"};color:${on ? "#fff" : "rgba(var(--avc-ink-rgb),0.5)"}">${label}</button>`;
     };
     const runHid = "plan-run";
     return html`
-      <div style="margin:0 4px 6px;padding:6px 8px;background:rgba(var(--avc-ink-rgb),0.03);border:1px solid rgba(var(--avc-ink-rgb),0.08);border-radius:12px;display:flex;flex-direction:column;gap:6px">
+      <div style="margin:0 4px 6px;padding:6px 8px;background:rgba(var(--avc-ink-rgb),0.03);border:1px solid rgba(var(--avc-ink-rgb),0.08);border-radius:var(--avc-th-r-l,12px);display:flex;flex-direction:column;gap:6px">
         <div style="display:flex;align-items:center;justify-content:space-between">
-          <span style="font-size:9px;font-weight:600;letter-spacing:.6px;color:rgba(var(--avc-ink-rgb),.35)">CLEAN PLAN${apLabel ? " · " + apLabel.toUpperCase() : ""}</span>
+          <span style="font-size:var(--avc-th-fs-xs,9px);font-weight:600;letter-spacing:.6px;color:rgba(var(--avc-ink-rgb),.35)">CLEAN PLAN${apLabel ? " · " + apLabel.toUpperCase() : ""}</span>
           <div style="display:flex;gap:4px">${modeBtn("dry", "Dry")}${modeBtn("wet", "Wet")}${modeBtn("both", "Both")}</div>
         </div>
         <div style="display:flex;gap:6px;overflow-x:auto;align-items:center">
@@ -2816,7 +2876,7 @@ export class AnyVacCard extends LitElement {
           @pointercancel=${this._holdEnd}>
           <div class="hold-ring"></div>
           <ha-icon icon="mdi:play" style="--mdc-icon-size:18px"></ha-icon>
-          <span style="font-size:12px">Start · hold</span>
+          <span style="font-size:var(--avc-th-fs-s,12px)">Start · hold</span>
         </button>
       </div>
     `;
@@ -2831,11 +2891,11 @@ export class AnyVacCard extends LitElement {
           const active = this._activeGlobalPreset === gp.id;
           return html`<button
             @click=${() => this._selectGlobalPreset(gp)}
-            style="flex:0 1 auto;min-width:128px;display:flex;flex-direction:row;align-items:center;justify-content:flex-start;gap:10px;padding:9px 14px;border-radius:14px;cursor:pointer;font-family:inherit;color:white;background:${active ? "rgba(var(--avc-ok-rgb),0.14)" : "rgba(var(--avc-ink-rgb),0.05)"};border:1px solid ${active ? "rgba(var(--avc-ok-rgb),0.6)" : "rgba(var(--avc-ink-rgb),0.12)"}">
+            style="flex:0 1 auto;min-width:128px;display:flex;flex-direction:row;align-items:center;justify-content:flex-start;gap:10px;padding:9px 14px;border-radius:var(--avc-th-r-m,14px);cursor:pointer;font-family:inherit;color:white;background:${active ? "rgba(var(--avc-ok-rgb),0.14)" : "rgba(var(--avc-ink-rgb),0.05)"};border:1px solid ${active ? "rgba(var(--avc-ok-rgb),0.6)" : "rgba(var(--avc-ink-rgb),0.12)"}">
             <ha-icon icon=${gp.icon || "mdi:robot-vacuum-variant"} style="--mdc-icon-size:24px"></ha-icon>
             <div style="display:flex;flex-direction:column;align-items:flex-start;line-height:1.15">
-              <span style="font-size:13px;font-weight:700">${gp.label}</span>
-              <small style="font-size:9px;font-weight:600;letter-spacing:.4px;color:rgba(var(--avc-ink-rgb),0.4)">${
+              <span style="font-size:var(--avc-th-fs-m,13px);font-weight:700">${gp.label}</span>
+              <small style="font-size:var(--avc-th-fs-xs,9px);font-weight:600;letter-spacing:.4px;color:rgba(var(--avc-ink-rgb),0.4)">${
                 gp.scope === "all" ? "WHOLE HOME" : gp.scope === "select" ? "SELECTED" : "ROOMS"
               }${gp.mode ? " · " + (gp.mode === "dry" ? "DRY" : gp.mode === "wet" ? "WET" : "BOTH") : ""}</small>
             </div>
@@ -3367,7 +3427,7 @@ export class AnyVacCard extends LitElement {
               @pointercancel=${this._holdEnd}>
               <div class="hold-ring"></div>
               <ha-icon icon="mdi:play" style="--mdc-icon-size:16px"></ha-icon>
-              <span style="font-size:12px">Start · hold</span>
+              <span style="font-size:var(--avc-th-fs-s,12px)">Start · hold</span>
             </button>
           </div>` : nothing}
       </div>
@@ -3768,8 +3828,8 @@ export class AnyVacCard extends LitElement {
             @click=${(e: Event) => { e.stopPropagation(); this._setActivePreset(vac, p.id); }}
             style=${styleMap({
               display: "inline-flex", alignItems: "center", gap: "4px", flexShrink: "0",
-              padding: "4px 10px", borderRadius: "14px", cursor: "pointer",
-              fontSize: "12px", lineHeight: "1",
+              padding: "4px 10px", borderRadius: "var(--avc-th-r-pill, 14px)", cursor: "pointer",
+              fontSize: "var(--avc-th-fs-s, 12px)", lineHeight: "1",
               border: "1px solid " + (active ? color : "rgba(var(--avc-ink-rgb),0.15)"),
               background: active ? this._colorBg(vac) : "rgba(var(--avc-ink-rgb),0.04)",
               color: active ? "rgb(var(--avc-ink-rgb))" : "rgba(var(--avc-ink-rgb),0.55)",
@@ -4656,7 +4716,7 @@ export class AnyVacCard extends LitElement {
           @click=${() => this._toggleMode(vac.entity, "zone")} title=${cmdTitle || "Zone clean"}>
           <ha-icon icon="mdi:select-drag"></ha-icon><span>Zone</span>
         </button>
-        ${this._dbg && (this._config.debug || !this._config.layout) ? html`<span style="font-size:11px;opacity:0.65;align-self:center;font-family:monospace">${this._dbg}</span>` : nothing}
+        ${this._dbg && (this._config.debug || !this._config.layout) ? html`<span style="font-size:var(--avc-th-fs-xs,11px);opacity:0.65;align-self:center;font-family:monospace">${this._dbg}</span>` : nothing}
       </div>
       ${mode === "pin" ? html`<div class="calib-panel">Tap the map to send the robot there.</div>` : nothing}
       ${mode === "zone" ? html`<div class="calib-panel">
@@ -8825,11 +8885,11 @@ export class AnyVacCard extends LitElement {
     const heads = cleaning
       ? svg`${wetSegs.length ? headOf(lastTail(g.wet), wetColor) : nothing}${drySegs.length ? headOf(lastTail(g.dry), dryColor) : nothing}`
       : nothing;
-    // W2: the marker is drawn around the origin and MOVED by a CSS transform,
-    // so a new position eases over (`.avc-marker` transition) instead of
-    // jumping. No extrapolation between polls — the animation never shows
-    // the robot anywhere the backend hasn't reported it. A sonar ring pulses
-    // while the robot is cleaning.
+    // W2: the marker is drawn around the origin and MOVED by a transform, so
+    // a new position can glide there (1.47.0: along the trail, driven by the
+    // Web Animations API in `_runMarkerGlides`) instead of jumping. No
+    // extrapolation between polls — the glide never shows the robot anywhere
+    // the backend hasn't reported it. A sonar ring pulses while cleaning.
     let liveMarker: unknown = nothing;
     if (rob && part !== "paths") {
       const hx = head ? head.x - rob.x : 0, hy = head ? head.y - rob.y : 0;
@@ -8851,9 +8911,38 @@ export class AnyVacCard extends LitElement {
       // flip) the marker jumps: gliding across the map there would show a
       // move the robot never made. Class is set for exactly that render.
       const prev = this._markerPrev.get(g.filterId);
-      const jump = !!prev && prev.pose === (g.pose ?? "") && (Math.abs(prev.x - rob.x) > 1e-6 || Math.abs(prev.y - rob.y) > 1e-6);
-      this._markerPrev.set(g.filterId, { pose: g.pose ?? "", x: rob.x, y: rob.y });
-      liveMarker = svg`<g class="avc-marker ${jump ? "avc-marker--jump" : ""}" style=${"transform: translate(" + rob.x.toFixed(dg) + "px, " + rob.y.toFixed(dg) + "px)"}>${
+      const pose = g.pose ?? "";
+      const jump = !!prev && prev.pose === pose && (Math.abs(prev.x - rob.x) > 1e-6 || Math.abs(prev.y - rob.y) > 1e-6);
+      // The trail the robot is drawing right now: the layer whose last
+      // segment ends nearest the marker (dry and wet can both exist).
+      let trail: { layer: "dry" | "wet"; n: number; len: number; seg: Pt[] } | null = null;
+      let trailEnd = Infinity;
+      for (const [layer, segs] of [["dry", g.dry], ["wet", g.wet]] as const) {
+        let k = segs.length - 1;
+        while (k >= 0 && segs[k].length < 2) k--;
+        if (k < 0) continue;
+        const seg = segs[k];
+        const e = seg[seg.length - 1];
+        const d = Math.hypot(e.x - rob.x, e.y - rob.y);
+        if (d < trailEnd) { trailEnd = d; trail = { layer, n: k + 1, len: arcLength(seg), seg }; }
+      }
+      // 1.47.0: a real move glides ALONG the drawn trail (`traceSince`), not
+      // straight across the room; no trail near the old position → straight.
+      // Never extrapolated — the route ends exactly at the reported position.
+      if (jump) this._markerStops.add(g.filterId);
+      else if (prev && prev.pose !== pose && this._glideS() > 0) {
+        const from = { x: prev.x, y: prev.y };
+        let route: Pt[] | null = null;
+        if (trail) {
+          const pt = prev.trail;
+          const grown = pt && pt.layer === trail.layer && pt.n === trail.n ? trail.len - pt.len : trail.len;
+          route = traceSince(trail.seg, from, rob, Math.max(grown, 0) + rr * 2, rr * 0.6);
+        }
+        this._markerMoves.set(g.filterId, { route: route ?? [from, { x: rob.x, y: rob.y }], digits: dg });
+      }
+      this._markerPrev.set(g.filterId, { pose, x: rob.x, y: rob.y,
+        trail: trail ? { layer: trail.layer, n: trail.n, len: trail.len } : null });
+      liveMarker = svg`<g class="avc-marker ${jump ? "avc-marker--jump" : ""}" data-mk=${g.filterId} style=${"transform: translate(" + rob.x.toFixed(dg) + "px, " + rob.y.toFixed(dg) + "px)"}>${
         ry !== 1 ? svg`<g transform=${"scale(1," + (1 / ry).toFixed(4) + ")"}>${body}</g>` : body}</g>`;
     }
     const livePaths = svg`${mopBand}${mopLine}${traceT}${heads}`;
@@ -10008,7 +10097,7 @@ export class AnyVacCard extends LitElement {
       ${hasError ? html`
         <div class="error-row">
           <ha-icon icon="mdi:alert-circle" style="color:rgb(var(--avc-err-rgb))"></ha-icon>
-          <span style="color:rgb(var(--avc-err-rgb));font-size:11px;font-weight:600">${errState}</span>
+          <span style="color:rgb(var(--avc-err-rgb));font-size:var(--avc-th-fs-xs,11px);font-weight:600">${errState}</span>
         </div>
       ` : nothing}
       <div class="status-line1">
@@ -10680,7 +10769,7 @@ export class AnyVacCard extends LitElement {
     return html`
       <ha-card class=${this._rootClasses()} style=${styleMap(this._rootVars())}>
         ${this.editMode ? html`<div class="version-chip">v${CARD_VERSION} · ${Math.round(this._cardW)}w</div>` : nothing}
-        ${schemaWarn ? html`<div style="margin:0 4px;padding:8px 12px;border-radius:12px;border:1px solid rgba(var(--avc-warn-rgb),0.55);background:rgba(var(--avc-warn-rgb),0.12);color:rgb(var(--avc-warn-rgb));font-size:12px;display:flex;align-items:center;gap:8px">
+        ${schemaWarn ? html`<div style="margin:0 4px;padding:8px 12px;border-radius:var(--avc-th-r-l,12px);border:1px solid rgba(var(--avc-warn-rgb),0.55);background:rgba(var(--avc-warn-rgb),0.12);color:rgb(var(--avc-warn-rgb));font-size:var(--avc-th-fs-s,12px);display:flex;align-items:center;gap:8px">
           <ha-icon icon="mdi:alert" style="--mdc-icon-size:18px"></ha-icon><span>${schemaWarn}</span>
         </div>` : nothing}
         <div class="badges-row">
@@ -10733,8 +10822,23 @@ export class AnyVacCard extends LitElement {
       display: block;
       width: 100%;
 
-      /* docs/44 F1 (K8): one type and one radius scale for everything new;
-       * older rules migrate to these as later phases touch them. */
+      /* docs/44 K8 (card 1.46.0): ONE type and ONE radius scale.
+       *
+       * --avc-fs-* / --avc-r-* are the scale itself, live in every theme
+       * (hero, tiles, rail and sheets are structural, not a theme choice).
+       *
+       * Every older rule states BOTH values in one place:
+       *   font-size: var(--avc-th-fs-xs, 10px);
+       * --avc-th-* is defined ONLY under .avc-theme (right below :host), so
+       * theme: legacy falls through to the literal — the exact 1.1.0 value —
+       * and every other theme lands on a scale step. That keeps legacy
+       * pixel-identical without a second set of override selectors, and
+       * tests/type-scale.spec.ts walks the rendered card to prove no themed
+       * element sits off the scale.
+       *
+       * micro (10px) is for numerals and chips painted ON the map or inside
+       * a gauge ring, where 11px does not fit a small room; nothing else. */
+      --avc-fs-micro: 10px;
       --avc-fs-xs: 11px;
       --avc-fs-s: 12px;
       --avc-fs-m: 13px;
@@ -10794,6 +10898,23 @@ export class AnyVacCard extends LitElement {
       --avc-live: none;
     }
 
+    /* K8 scale switch (see the --avc-fs-* comment in :host). Only themed
+     * roots define these, so legacy rules fall back to their literal. */
+    .avc-theme {
+      --avc-th-fs-micro: var(--avc-fs-micro);
+      --avc-th-fs-xs: var(--avc-fs-xs);
+      --avc-th-fs-s: var(--avc-fs-s);
+      --avc-th-fs-m: var(--avc-fs-m);
+      --avc-th-fs-l: var(--avc-fs-l);
+      --avc-th-fs-xl: var(--avc-fs-xl);
+      --avc-th-r-s: var(--avc-r-s);
+      --avc-th-r-m: var(--avc-r-m);
+      --avc-th-r-l: var(--avc-r-l);
+      --avc-th-r-pill: var(--avc-r-pill);
+    }
+    /* micro numerals need a slightly larger disc than legacy's 8px did. */
+    .avc-theme .mini-gauge span { width: 18px; height: 18px; }
+
     ha-card {
       position: relative;
       background: transparent;
@@ -10811,12 +10932,12 @@ export class AnyVacCard extends LitElement {
       right: 8px;
       max-width: calc(100% - 16px);
       text-align: right;
-      font-size: 10px;
+      font-size: var(--avc-th-fs-xs, 10px);
       line-height: 1.5;
       font-weight: 600;
       color: rgba(var(--avc-ink-rgb), 0.85);
       background: rgba(var(--avc-shade-rgb), 0.75);
-      border-radius: 6px;
+      border-radius: var(--avc-th-r-s, 6px);
       padding: 3px 6px;
       pointer-events: none;
       z-index: 20;
@@ -10872,7 +10993,7 @@ export class AnyVacCard extends LitElement {
       box-sizing: border-box;
       background: var(--avc-panel);
       border: 1px solid var(--avc-panel-line);
-      border-radius: 12px;
+      border-radius: var(--avc-th-r-l, 12px);
     }
     /* v1.1.0 follow-up (2026-08-03): field feedback that the picker column's
      * full-size badges (same .badge used by the legacy/portrait horizontal
@@ -10882,7 +11003,7 @@ export class AnyVacCard extends LitElement {
      * established size unchanged. */
     .vac-picker .badge { width: 100%; box-sizing: border-box; padding: 4px 12px 4px 4px; gap: 8px; }
     .vac-picker .badge-img, .vac-picker .badge-icon { width: 26px; height: 26px; --mdc-icon-size: 18px; }
-    .vac-picker .badge-name { font-size: 12px; }
+    .vac-picker .badge-name { font-size: var(--avc-th-fs-s, 12px); }
 
     /* Dock (docs/12 §3): selection + plan + pinning in one column */
     .dock {
@@ -10898,7 +11019,7 @@ export class AnyVacCard extends LitElement {
       box-sizing: border-box;
       background: var(--avc-panel);
       border: 1px solid var(--avc-panel-line);
-      border-radius: 12px;
+      border-radius: var(--avc-th-r-l, 12px);
     }
     /* Portrait-only dry/wet path visibility row (see _renderDock) — reuses
        .mtbtn from the meta bar, wrapped to full width like .dock-head below. */
@@ -10912,10 +11033,10 @@ export class AnyVacCard extends LitElement {
       justify-content: center;
       gap: 4px;
       padding: 7px 4px;
-      border-radius: 10px;
+      border-radius: var(--avc-th-r-m, 10px);
       cursor: pointer;
       font-family: inherit;
-      font-size: 11px;
+      font-size: var(--avc-th-fs-xs, 11px);
       /* docs/25 §6: 700 read as one more hard-edged/technical accent among
        * several — the mode row is a secondary control next to START, not a
        * second primary action, so its resting weight steps down a notch.
@@ -10953,7 +11074,7 @@ export class AnyVacCard extends LitElement {
       padding: 8px;
       background: var(--avc-sunken);
       border: 1px solid var(--avc-panel-line);
-      border-radius: 10px;
+      border-radius: var(--avc-th-r-l, 10px);
     }
     .dock-sheet-tabs { display: flex; gap: 6px; }
     .dock-sheet-tab {
@@ -10974,7 +11095,7 @@ export class AnyVacCard extends LitElement {
       display: flex;
       flex-direction: column;
       gap: 2px;
-      font-size: 10px;
+      font-size: var(--avc-th-fs-xs, 10px);
       color: rgba(var(--avc-ink-rgb), 0.4);
     }
     .dock-sheet-actions { display: flex; flex-wrap: wrap; gap: 8px; }
@@ -10985,10 +11106,10 @@ export class AnyVacCard extends LitElement {
       align-items: center;
       gap: 4px;
       padding: 10px 0;
-      border-radius: 9px;
+      border-radius: var(--avc-th-r-m, 9px);
       cursor: pointer;
       font-family: inherit;
-      font-size: 11px;
+      font-size: var(--avc-th-fs-xs, 11px);
       color: rgba(var(--avc-ink-rgb), 0.8);
       background: rgba(var(--avc-ink-rgb), 0.05);
       border: 1px solid rgba(var(--avc-ink-rgb), 0.12);
@@ -11013,7 +11134,7 @@ export class AnyVacCard extends LitElement {
       display: flex;
       align-items: center;
       gap: 8px;
-      font-size: 12px;
+      font-size: var(--avc-th-fs-s, 12px);
     }
     .dock-sheet-care-label {
       flex: 1;
@@ -11024,10 +11145,10 @@ export class AnyVacCard extends LitElement {
       font-variant-numeric: tabular-nums;
     }
     .dock-sheet-care-badge {
-      font-size: 10px;
+      font-size: var(--avc-th-fs-xs, 10px);
       font-weight: 600;
       padding: 2px 7px;
-      border-radius: 20px;
+      border-radius: var(--avc-th-r-pill, 20px);
       background: rgba(var(--avc-ok-rgb), 0.18);
       color: rgb(var(--avc-ok-rgb));
     }
@@ -11067,7 +11188,7 @@ export class AnyVacCard extends LitElement {
       align-items: center;
       gap: 6px;
       padding: 6px 7px;
-      border-radius: 9px;
+      border-radius: var(--avc-th-r-m, 9px);
       cursor: pointer;
       font-family: inherit;
       text-align: left;
@@ -11094,7 +11215,7 @@ export class AnyVacCard extends LitElement {
       min-width: 0;
       overflow-wrap: break-word;
       white-space: normal;
-      font-size: 12px;
+      font-size: var(--avc-th-fs-s, 12px);
       font-weight: 600;
       line-height: 1.25;
     }
@@ -11117,12 +11238,12 @@ export class AnyVacCard extends LitElement {
      * optional icons are present or how long the name is. */
     .dock-info { display: inline-flex; align-items: center; gap: 6px; margin-left: auto; flex-shrink: 0; }
     .dock-ages { display: inline-flex; gap: 6px; flex-shrink: 0; }
-    .dock-age { display: inline-flex; align-items: center; gap: 2px; font-size: 10px; }
+    .dock-age { display: inline-flex; align-items: center; gap: 2px; font-size: var(--avc-th-fs-xs, 10px); }
     .dock-age ha-icon { --mdc-icon-size: 12px; color: rgba(var(--avc-ink-rgb), 0.3); }
     /* Persistent last-clean coverage % (docs/29) — deliberately dimmer/smaller than the
        age badge next to it: age is the primary "should I clean this?" signal, coverage
        is supporting detail. */
-    .dock-cov { font-size: 9px; opacity: 0.45; margin-left: 1px; }
+    .dock-cov { font-size: var(--avc-th-fs-micro, 9px); opacity: 0.45; margin-left: 1px; }
     /* docs/45: finished, but part of the reachable floor was never reached. */
     .dock-age ha-icon.dock-cov-warn { --mdc-icon-size: 11px; color: rgb(var(--avc-warn-rgb)); }
     .dock-avatars { display: inline-flex; gap: 3px; flex-shrink: 0; }
@@ -11134,8 +11255,8 @@ export class AnyVacCard extends LitElement {
       min-width: 24px;
       height: 17px;
       padding: 0 5px;
-      border-radius: 9px;
-      font-size: 10px;
+      border-radius: var(--avc-th-r-pill, 9px);
+      font-size: var(--avc-th-fs-xs, 10px);
       font-weight: 700;
       border: 1px solid transparent;
       cursor: pointer;
@@ -11149,7 +11270,7 @@ export class AnyVacCard extends LitElement {
       border-top: 1px solid rgba(var(--avc-ink-rgb), 0.08);
       padding-top: 6px;
     }
-    .dock-est { font-size: 11px; color: rgba(var(--avc-ink-rgb), 0.45); }
+    .dock-est { font-size: var(--avc-th-fs-xs, 11px); color: rgba(var(--avc-ink-rgb), 0.45); }
     .dock-run {
       flex: 0 0 auto;
       padding: 7px 14px;
@@ -11192,10 +11313,10 @@ export class AnyVacCard extends LitElement {
       align-items: center;
       justify-content: center;
       gap: 10px;
-      border-radius: 18px;
+      border-radius: var(--avc-th-r-l, 18px);
       cursor: pointer;
       font-family: inherit;
-      font-size: 16px;
+      font-size: var(--avc-th-fs-l, 16px);
       font-weight: 700;
       color: rgb(var(--avc-ink-rgb));
       background: rgba(var(--avc-accent-rgb), 0.24);
@@ -11223,10 +11344,10 @@ export class AnyVacCard extends LitElement {
       align-items: center;
       justify-content: center;
       gap: 2px;
-      border-radius: 16px;
+      border-radius: var(--avc-th-r-l, 16px);
       cursor: pointer;
       font-family: inherit;
-      font-size: 10px;
+      font-size: var(--avc-th-fs-xs, 10px);
       font-weight: 600;
       color: rgba(var(--avc-ink-rgb), 0.65);
       background: rgba(var(--avc-ink-rgb), 0.05);
@@ -11242,7 +11363,7 @@ export class AnyVacCard extends LitElement {
     .start-seg--dock { position: relative; }
 
     .map-tools-label {
-      font-size: 11px;
+      font-size: var(--avc-th-fs-xs, 11px);
       font-weight: 700;
       color: rgba(var(--avc-ink-rgb), 0.45);
       align-self: center;
@@ -11279,7 +11400,7 @@ export class AnyVacCard extends LitElement {
     .avc-grid--portrait .badge { padding: 4px 10px 4px 4px; gap: 6px; flex-shrink: 0; }
     .avc-grid--portrait .badge-img { width: 30px; height: 30px; }
     .avc-grid--portrait .badge-icon { --mdc-icon-size: 26px; }
-    .avc-grid--portrait .badge-name { font-size: 11px; }
+    .avc-grid--portrait .badge-name { font-size: var(--avc-th-fs-s, 11px); }
     .avc-grid--portrait .dock { padding: 4px; gap: 4px; }
     .avc-grid--portrait .dock-mode { padding: 6px 2px; }
     .avc-grid--portrait .dock-mode span { display: none; }
@@ -11292,9 +11413,9 @@ export class AnyVacCard extends LitElement {
      * Neutralised here; portrait's own centered-wrap look is unaffected. */
     .avc-grid--portrait .dock-info { margin-left: 0; }
     .avc-grid--portrait .dock-ages { gap: 3px; }
-    .avc-grid--portrait .dock-age { font-size: 9px; }
+    .avc-grid--portrait .dock-age { font-size: var(--avc-th-fs-micro, 9px); }
     .avc-grid--portrait .dock-age ha-icon { --mdc-icon-size: 10px; }
-    .avc-grid--portrait .dock-cov { font-size: 8px; }
+    .avc-grid--portrait .dock-cov { font-size: var(--avc-th-fs-micro, 8px); }
 
     .avc-schemawarn {
       position: absolute;
@@ -11303,11 +11424,11 @@ export class AnyVacCard extends LitElement {
       transform: translateX(-50%);
       z-index: 5;
       padding: 8px 12px;
-      border-radius: 12px;
+      border-radius: var(--avc-th-r-l, 12px);
       border: 1px solid rgba(var(--avc-warn-rgb), 0.55);
       background: rgba(var(--avc-warn-rgb), 0.12);
       color: rgb(var(--avc-warn-rgb));
-      font-size: 12px;
+      font-size: var(--avc-th-fs-s, 12px);
       display: flex;
       align-items: center;
       gap: 8px;
@@ -11328,7 +11449,7 @@ export class AnyVacCard extends LitElement {
       align-items: center;
       gap: 10px;
       padding: 6px 18px 6px 6px;
-      border-radius: 99px;
+      border-radius: var(--avc-th-r-pill, 99px);
       cursor: pointer;
       backdrop-filter: blur(10px);
       -webkit-backdrop-filter: blur(10px);
@@ -11365,7 +11486,7 @@ export class AnyVacCard extends LitElement {
     }
 
     .badge-name {
-      font-size: 15px;
+      font-size: var(--avc-th-fs-l, 15px);
       font-weight: 700;
       white-space: nowrap;
       transition: color 0.3s;
@@ -11404,7 +11525,7 @@ export class AnyVacCard extends LitElement {
       width: 100%;
       padding-top: 27.5%;
       overflow: hidden;
-      border-radius: 12px;
+      border-radius: var(--avc-th-r-l, 12px);
     }
 
     .map-img {
@@ -11419,7 +11540,7 @@ export class AnyVacCard extends LitElement {
     .map-vector { position: absolute; transform-origin: center center; pointer-events: none; overflow: visible; }
     .avc-err-halo { animation: avc-err-pulse 1.3s ease-in-out infinite; }
     @keyframes avc-err-pulse { 0%,100% { opacity: 0.18; } 50% { opacity: 0.6; } }
-    .zone-rect { position: absolute; border: 2px solid rgb(var(--avc-ink-rgb)); background: rgba(var(--avc-ink-rgb), 0.15); border-radius: 4px; pointer-events: none; box-shadow: 0 0 0 1px rgba(var(--avc-shade-rgb), 0.45); }
+    .zone-rect { position: absolute; border: 2px solid rgb(var(--avc-ink-rgb)); background: rgba(var(--avc-ink-rgb), 0.15); border-radius: var(--avc-th-r-s, 4px); pointer-events: none; box-shadow: 0 0 0 1px rgba(var(--avc-shade-rgb), 0.45); }
     /* Move/resize handles (docs/19 follow-up) — decoration only, no pointer
        handlers: the overlaying .map-clickcatch does the actual hit-testing
        (_zoneHit) so a drag anywhere near a corner resizes, and inside the box
@@ -11430,19 +11551,19 @@ export class AnyVacCard extends LitElement {
     .zone-handle--sw { left: 0; top: 100%; }
     .zone-handle--se { left: 100%; top: 100%; }
     .layer-toggles { position: absolute; top: 8px; right: 8px; display: flex; gap: 6px; z-index: 3; }
-    .layer-btn { display: flex; align-items: center; gap: 3px; padding: 3px 8px; border-radius: 999px; border: 1px solid rgba(var(--avc-ink-rgb), 0.2); background: rgba(var(--avc-shade-rgb), 0.45); color: rgba(var(--avc-ink-rgb), 0.55); font-size: 11px; font-weight: 600; cursor: pointer; --mdc-icon-size: 16px; user-select: none; -webkit-touch-callout: none; touch-action: manipulation; }
+    .layer-btn { display: flex; align-items: center; gap: 3px; padding: 3px 8px; border-radius: var(--avc-th-r-pill, 999px); border: 1px solid rgba(var(--avc-ink-rgb), 0.2); background: rgba(var(--avc-shade-rgb), 0.45); color: rgba(var(--avc-ink-rgb), 0.55); font-size: var(--avc-th-fs-xs, 11px); font-weight: 600; cursor: pointer; --mdc-icon-size: 16px; user-select: none; -webkit-touch-callout: none; touch-action: manipulation; }
     .layer-btn.on { color: rgb(var(--avc-ink-rgb)); border-color: rgba(var(--avc-ink-rgb), 0.55); background: rgba(var(--avc-shade-rgb), 0.7); }
-    .layer-menu { position: absolute; top: 38px; right: 0; min-width: 200px; max-width: 86vw; max-height: 60vh; overflow-y: auto; display: flex; flex-direction: column; gap: 2px; padding: 6px; border-radius: 12px; background: rgba(var(--avc-scrim-rgb), 0.96); border: 1px solid rgba(var(--avc-ink-rgb), 0.15); box-shadow: 0 8px 24px rgba(var(--avc-shade-rgb), 0.5); }
-    .layer-menu-head { display: flex; align-items: center; gap: 6px; font-size: 11px; color: rgba(var(--avc-ink-rgb), 0.5); padding: 2px 6px 5px; --mdc-icon-size: 14px; }
-    .layer-menu-row { display: flex; align-items: center; gap: 8px; padding: 6px 8px; border-radius: 8px; border: 1px solid transparent; background: transparent; color: rgba(var(--avc-ink-rgb), 0.88); cursor: pointer; font-size: 13px; --mdc-icon-size: 16px; }
+    .layer-menu { position: absolute; top: 38px; right: 0; min-width: 200px; max-width: 86vw; max-height: 60vh; overflow-y: auto; display: flex; flex-direction: column; gap: 2px; padding: 6px; border-radius: var(--avc-th-r-l, 12px); background: rgba(var(--avc-scrim-rgb), 0.96); border: 1px solid rgba(var(--avc-ink-rgb), 0.15); box-shadow: 0 8px 24px rgba(var(--avc-shade-rgb), 0.5); }
+    .layer-menu-head { display: flex; align-items: center; gap: 6px; font-size: var(--avc-th-fs-xs, 11px); color: rgba(var(--avc-ink-rgb), 0.5); padding: 2px 6px 5px; --mdc-icon-size: 14px; }
+    .layer-menu-row { display: flex; align-items: center; gap: 8px; padding: 6px 8px; border-radius: var(--avc-th-r-m, 8px); border: 1px solid transparent; background: transparent; color: rgba(var(--avc-ink-rgb), 0.88); cursor: pointer; font-size: var(--avc-th-fs-m, 13px); --mdc-icon-size: 16px; }
     .layer-menu-row.on { background: rgba(var(--avc-ink-rgb), 0.12); border-color: rgba(var(--avc-ink-rgb), 0.4); }
     .lm-name { flex: 1; text-align: left; }
     .layer-menu-row b { font-weight: 700; }
     /* .rl-prog is the live coverage chip (_renderProgChip) and is still used —
        the rest of the old .room-list/.rl-* set went with _renderRoomList
        (dead since docs/19 A4, deleted 2026-08-08). */
-    .rl-prog { font-size: 12px; font-weight: 700; display: flex; align-items: baseline; gap: 1px; }
-    .rl-prog small { font-size: 8px; opacity: 0.55; }
+    .rl-prog { font-size: var(--avc-th-fs-s, 12px); font-weight: 700; display: flex; align-items: baseline; gap: 1px; }
+    .rl-prog small { font-size: var(--avc-th-fs-micro, 8px); opacity: 0.55; }
     .map-wrap--fixed { padding-top: 0; }
     .image-base-img--fit { position: absolute; inset: 0; width: 100%; height: 100%; object-fit: contain; }
 
@@ -11451,7 +11572,7 @@ export class AnyVacCard extends LitElement {
       position: absolute;
       width: 46px;
       height: 46px;
-      border-radius: 12px;
+      border-radius: var(--avc-th-r-m, 12px);
       cursor: pointer;
       display: flex;
       align-items: center;
@@ -11479,7 +11600,7 @@ export class AnyVacCard extends LitElement {
     .room-overlay {
       position: absolute;
       transform: translate(-50%, -50%);
-      border-radius: 6px;
+      border-radius: var(--avc-th-r-m, 6px);
       cursor: pointer;
       display: flex;
       padding: 3px;
@@ -11579,9 +11700,9 @@ export class AnyVacCard extends LitElement {
        * ancestor glow/blend can show through at all. */
       background: rgba(var(--avc-scrim-rgb), 0.99);
       border: 1px solid rgba(var(--avc-ink-rgb), 0.25);
-      border-radius: 8px;
+      border-radius: var(--avc-th-r-m, 8px);
       padding: 6px 8px;
-      font-size: 11px;
+      font-size: var(--avc-th-fs-xs, 11px);
       white-space: nowrap;
       box-shadow: 0 4px 14px rgba(var(--avc-shade-rgb), 0.45);
       isolation: isolate;
@@ -11621,7 +11742,7 @@ export class AnyVacCard extends LitElement {
       border-radius: 50%;
       background: rgba(var(--avc-shade-rgb), 0.82);
       color: rgb(var(--avc-ink-rgb));
-      font-size: 9px;
+      font-size: var(--avc-th-fs-micro, 9px);
       font-weight: 700;
       display: flex;
       align-items: center;
@@ -11637,7 +11758,7 @@ export class AnyVacCard extends LitElement {
       background: var(--avc-surface);
       backdrop-filter: blur(12px);
       -webkit-backdrop-filter: blur(12px);
-      border-radius: 16px;
+      border-radius: var(--avc-th-r-l, 16px);
       overflow: hidden;
       transition: border 0.4s, box-shadow 0.4s;
     }
@@ -11682,37 +11803,37 @@ export class AnyVacCard extends LitElement {
     @keyframes pulse-error { 0%,100% { opacity:1; } 50% { opacity:0.6; } }
 
     .status-line1 { display: flex; align-items: baseline; justify-content: space-between; gap: 8px; }
-    .model-label { font-size: 13px; font-weight: 500; color: rgba(var(--avc-ink-rgb), 0.85); }
-    .status-label { font-size: 12px; font-weight: 600; text-align: right; }
+    .model-label { font-size: var(--avc-th-fs-m, 13px); font-weight: 500; color: rgba(var(--avc-ink-rgb), 0.85); }
+    .status-label { font-size: var(--avc-th-fs-s, 12px); font-weight: 600; text-align: right; }
 
     .status-line2 { display: flex; align-items: center; justify-content: space-between; gap: 8px; }
-    .current-room { display: flex; align-items: center; gap: 3px; font-size: 11px; color: rgba(var(--avc-ink-rgb), 0.45); }
+    .current-room { display: flex; align-items: center; gap: 3px; font-size: var(--avc-th-fs-xs, 11px); color: rgba(var(--avc-ink-rgb), 0.45); }
 
     .status-meta { display: flex; align-items: center; gap: 8px; flex-shrink: 0; }
-    .battery { display: flex; align-items: center; gap: 3px; font-size: 11px; font-weight: 600; }
+    .battery { display: flex; align-items: center; gap: 3px; font-size: var(--avc-th-fs-xs, 11px); font-weight: 600; }
     .battery ha-icon { --mdc-icon-size: 13px; }
-    .last-clean { display: flex; align-items: center; gap: 3px; font-size: 11px; color: rgba(var(--avc-ink-rgb), 0.45); }
+    .last-clean { display: flex; align-items: center; gap: 3px; font-size: var(--avc-th-fs-xs, 11px); color: rgba(var(--avc-ink-rgb), 0.45); }
     .last-clean ha-icon { --mdc-icon-size: 11px; color: rgba(var(--avc-ink-rgb), 0.25); }
 
     /* ── Progress bar ────────────────────────────────────────────────── */
     .progress { display: flex; align-items: center; gap: 8px; }
     .progress-track {
       flex: 1; height: 3px;
-      background: rgba(var(--avc-ink-rgb), 0.08); border-radius: 2px; overflow: hidden;
+      background: rgba(var(--avc-ink-rgb), 0.08); border-radius: var(--avc-th-r-pill, 2px); overflow: hidden;
     }
-    .progress-fill { height: 100%; border-radius: 2px; transition: width 0.5s ease; }
-    .progress-label { font-size: 11px; font-weight: 600; flex-shrink: 0; }
+    .progress-fill { height: 100%; border-radius: var(--avc-th-r-pill, 2px); transition: width 0.5s ease; }
+    .progress-label { font-size: var(--avc-th-fs-xs, 11px); font-weight: 600; flex-shrink: 0; }
 
     /* ── Debug per-room progress strip ───────────────────────────────── */
     .dbg-prog { display: flex; flex-wrap: wrap; gap: 6px 12px; padding-top: 2px; }
-    .dbg-prog-item { display: flex; align-items: center; gap: 3px; font-size: 11px; color: rgba(var(--avc-ink-rgb), 0.55); --mdc-icon-size: 14px; }
+    .dbg-prog-item { display: flex; align-items: center; gap: 3px; font-size: var(--avc-th-fs-xs, 11px); color: rgba(var(--avc-ink-rgb), 0.55); --mdc-icon-size: 14px; }
     .dbg-prog-name { color: rgba(var(--avc-ink-rgb), 0.45); }
     .dbg-prog-item b { font-weight: 700; }
-    .dbg-prog-item small { color: rgba(var(--avc-ink-rgb), 0.4); font-size: 10px; }
+    .dbg-prog-item small { color: rgba(var(--avc-ink-rgb), 0.4); font-size: var(--avc-th-fs-xs, 10px); }
     .mini-gauge-wrap { display: inline-flex; align-items: center; gap: 2px; }
     .mini-gauge-ico { --mdc-icon-size: 12px; opacity: 0.8; }
     .mini-gauge { width: 22px; height: 22px; border-radius: 50%; display: inline-flex; align-items: center; justify-content: center; }
-    .mini-gauge span { width: 16px; height: 16px; border-radius: 50%; background: rgba(var(--avc-shade-rgb), 0.82); color: rgb(var(--avc-ink-rgb)); font-size: 8px; font-weight: 700; display: flex; align-items: center; justify-content: center; }
+    .mini-gauge span { width: 16px; height: 16px; border-radius: 50%; background: rgba(var(--avc-shade-rgb), 0.82); color: rgb(var(--avc-ink-rgb)); font-size: var(--avc-th-fs-micro, 8px); font-weight: 700; display: flex; align-items: center; justify-content: center; }
 
     /* ── Action buttons ──────────────────────────────────────────────── */
     .actions { display: flex; gap: 8px; }
@@ -11738,7 +11859,7 @@ export class AnyVacCard extends LitElement {
       justify-content: center;
       gap: 8px;
       padding: 8px 12px;
-      border-radius: 12px;
+      border-radius: var(--avc-th-r-l, 12px);
       cursor: pointer;
       transition: opacity 0.2s;
       font-family: inherit;
@@ -11747,7 +11868,7 @@ export class AnyVacCard extends LitElement {
     .action-btn:disabled { cursor: default; opacity: 0.7; }
 
     .action-btn ha-icon { --mdc-icon-size: 18px; flex-shrink: 0; position: relative; z-index: 1; }
-    .action-btn span { font-size: 13px; font-weight: 700; color: rgb(var(--avc-ink-rgb)); position: relative; z-index: 1; }
+    .action-btn span { font-size: var(--avc-th-fs-m, 13px); font-weight: 700; color: rgb(var(--avc-ink-rgb)); position: relative; z-index: 1; }
 
     .action-btn--secondary {
       background: rgba(var(--avc-info-rgb), 0.08);
@@ -11769,11 +11890,11 @@ export class AnyVacCard extends LitElement {
       z-index: 1;
     }
 
-    .start-body small { font-size: 10px; }
+    .start-body small { font-size: var(--avc-th-fs-xs, 10px); }
 
     .map-clickcatch { position: absolute; inset: 0; cursor: crosshair; z-index: 5; }
     .map-tools { display: flex; gap: 6px; margin: 6px 0 0; }
-    .mtbtn { display: inline-flex; align-items: center; gap: 4px; padding: 5px 10px; border-radius: 8px; border: 1px solid rgba(var(--avc-ink-rgb), 0.18); background: rgba(var(--avc-ink-rgb), 0.06); color: inherit; cursor: pointer; font-size: 12px; font-weight: 600; }
+    .mtbtn { display: inline-flex; align-items: center; gap: 4px; padding: 5px 10px; border-radius: var(--avc-th-r-m, 8px); border: 1px solid rgba(var(--avc-ink-rgb), 0.18); background: rgba(var(--avc-ink-rgb), 0.06); color: inherit; cursor: pointer; font-size: var(--avc-th-fs-s, 12px); font-weight: 600; }
     .mtbtn.on { background: rgba(var(--avc-tool-rgb), 0.25); border-color: rgb(var(--avc-tool-rgb)); }
     .mtbtn:disabled { opacity: 0.4; cursor: default; }
     .mtbtn ha-icon { --mdc-icon-size: 16px; }
@@ -11797,7 +11918,7 @@ export class AnyVacCard extends LitElement {
      * distinct panel at all — the specific goal this section was built for.
      * Bumped just for .meta-bar/.meta-bar-divider, not the other panels,
      * which weren't reported as a problem. */
-    .meta-bar { display: flex; align-items: center; gap: 4px; flex-wrap: wrap; padding: 6px 8px; background: var(--avc-panel-strong); border: 1px solid var(--avc-panel-strong-line); border-radius: 12px; }
+    .meta-bar { display: flex; align-items: center; gap: 4px; flex-wrap: wrap; padding: 6px 8px; background: var(--avc-panel-strong); border: 1px solid var(--avc-panel-strong-line); border-radius: var(--avc-th-r-l, 12px); }
     .meta-bar-cluster { display: flex; align-items: center; gap: 4px; }
     .meta-bar-spacer { flex: 1 1 auto; }
     .meta-bar-divider { width: 0.5px; align-self: stretch; background: rgba(var(--avc-ink-rgb), 0.22); margin: 0 4px; }
@@ -11810,7 +11931,7 @@ export class AnyVacCard extends LitElement {
     .mode-action { display: flex; flex-wrap: wrap; gap: 6px; margin-bottom: 6px; }
     .mode-action .mtbtn { width: 100%; justify-content: center; box-sizing: border-box; animation: avc-mode-action-pulse 1.6s ease-in-out infinite; }
     @keyframes avc-mode-action-pulse { 0%,100% { box-shadow: 0 0 0 rgba(var(--avc-tool-rgb), 0); } 50% { box-shadow: 0 0 12px rgba(var(--avc-tool-rgb), 0.55); } }
-    .calib-panel { margin-top: 4px; font-size: 12px; opacity: 0.9; padding: 6px 8px; background: rgba(var(--avc-tool-rgb), 0.12); border-radius: 8px; }
+    .calib-panel { margin-top: 4px; font-size: var(--avc-th-fs-s, 12px); opacity: 0.9; padding: 6px 8px; background: rgba(var(--avc-tool-rgb), 0.12); border-radius: var(--avc-th-r-m, 8px); }
     .calib-panel > div { margin-bottom: 4px; }
     .calib-actions { display: flex; gap: 6px; flex-wrap: wrap; }
 
@@ -11931,27 +12052,17 @@ export class AnyVacCard extends LitElement {
 
     /* ══ Structural pass — every theme except legacy ═════════════════════
      * The token flip above only changes colour. This is the part that changes
-     * the card's genre: panels carry elevation instead of a hairline outline,
-     * and corners step up one notch. legacy simply never gets the
-     * .avc-theme class, so none of this applies to it. */
-    .avc-theme .status-card { border-radius: 20px; box-shadow: var(--avc-elev-1); }
+     * the card's genre: panels carry elevation instead of a hairline outline.
+     * Corners and type sizes are NOT set here any more — they come from the
+     * one K8 scale (--avc-th-*, see the token block at the top). legacy
+     * simply never gets the .avc-theme class, so none of this applies to it. */
+    .avc-theme .status-card { box-shadow: var(--avc-elev-1); }
     .avc-theme .dock,
-    .avc-theme .vac-picker { border-radius: 18px; box-shadow: var(--avc-elev-1); }
-    .avc-theme .meta-bar { border-radius: 16px; box-shadow: var(--avc-elev-1); }
-    .avc-theme .map-wrap { border-radius: 18px; box-shadow: var(--avc-elev-1); }
-    .avc-theme .dock-sheet { border-radius: 14px; }
-    .avc-theme .dock-row,
-    .avc-theme .dock-mode,
-    .avc-theme .dock-sheet-action { border-radius: 12px; }
-    .avc-theme .action-btn { border-radius: 14px; }
-    .avc-theme .mtbtn { border-radius: 10px; }
-    .avc-theme .start-bar { border-radius: 22px; }
-    .avc-theme .start-seg { border-radius: 18px; }
-    .avc-theme .room-inspect-inner { border-radius: 12px; box-shadow: var(--avc-elev-2); }
-    .avc-theme .layer-menu { border-radius: 16px; box-shadow: var(--avc-elev-2); }
-    /* Rounder rooms read softer without touching the field-tuned selection
-     * ring itself (0.52/0.53 spent real effort landing that gradient). */
-    .avc-theme .room-overlay { border-radius: 10px; }
+    .avc-theme .vac-picker { box-shadow: var(--avc-elev-1); }
+    .avc-theme .meta-bar { box-shadow: var(--avc-elev-1); }
+    .avc-theme .map-wrap { box-shadow: var(--avc-elev-1); }
+    .avc-theme .room-inspect-inner { box-shadow: var(--avc-elev-2); }
+    .avc-theme .layer-menu { box-shadow: var(--avc-elev-2); }
 
     /* ── docs/44 F1: calm map ─────────────────────────────────────────
      * Room label pill (name + dry/wet freshness dots) replaces the bare icon
@@ -12069,7 +12180,7 @@ export class AnyVacCard extends LitElement {
       position: absolute; left: 50%; bottom: 0; z-index: 41;
       width: min(480px, 100%); box-sizing: border-box; transform: translateX(-50%);
       display: flex; flex-direction: column; gap: 14px; padding: 10px 16px 16px;
-      border-radius: 22px 22px 0 0;
+      border-radius: var(--avc-th-r-l, 22px) var(--avc-th-r-l, 22px) 0 0;
       background: rgb(var(--avc-scrim-2-rgb)); color: rgb(var(--avc-ink-rgb));
       box-shadow: 0 -12px 40px rgba(0, 0, 0, 0.45);
       animation: avc-sheet-in 0.22s var(--avc-ease, ease-out);
@@ -12103,8 +12214,9 @@ export class AnyVacCard extends LitElement {
     }
 
     /* ── docs/44 F4: living map ───────────────────────────────────────── */
-    .avc-marker { transition: transform 1.5s linear; }
-    .avc-marker--jump { transition: none; }
+    /* The marker's glide is a Web Animation along the trail (1.47.0,
+     * _runMarkerGlides), not a CSS transition — a transition could only
+     * cut straight across the room. */
     .avc-sonar {
       transform-box: fill-box; transform-origin: center;
       animation: avc-sonar 2.4s ease-out infinite;
@@ -12130,10 +12242,8 @@ export class AnyVacCard extends LitElement {
       100% { transform: translateX(110%); opacity: 0; }
     }
     .avc-theme .room-overlay > .room-label { position: relative; z-index: 1; }
-    .avc-still .avc-marker { transition: none; }
     .avc-still .avc-sonar, .avc-still .room-sheen { display: none; }
     @media (prefers-reduced-motion: reduce) {
-      .avc-marker { transition: none; }
       .avc-sonar, .room-sheen { display: none; }
     }
 
@@ -12210,7 +12320,7 @@ export class AnyVacCard extends LitElement {
     .rail-card::-webkit-scrollbar { display: none; }
     .rail-card-head { display: flex; align-items: center; gap: 6px; font-size: var(--avc-fs-m); font-weight: 600; }
     .rail-card-head ha-icon { --mdc-icon-size: 16px; color: rgb(var(--avc-accent-rgb)); flex-shrink: 0; }
-    .rail-card-head small { margin-left: auto; font-weight: 500; color: rgba(var(--avc-ink-rgb), 0.6); font-variant-numeric: tabular-nums; white-space: nowrap; }
+    .rail-card-head small { margin-left: auto; font-size: var(--avc-fs-xs); font-weight: 500; color: rgba(var(--avc-ink-rgb), 0.6); font-variant-numeric: tabular-nums; white-space: nowrap; }
     .rail-chips { display: flex; flex-wrap: wrap; gap: 4px; }
     .rail-chip {
       max-width: 100%; box-sizing: border-box; padding: 2px 8px; border-radius: var(--avc-r-pill);
@@ -12248,9 +12358,7 @@ export class AnyVacCard extends LitElement {
       background: transparent;
       border: none;
       border-bottom: 1px solid rgba(var(--avc-ink-rgb), 0.06);
-      border-radius: var(--avc-r-m);
     }
-    .avc-theme .room-btn { border-radius: 14px; }
     /* The age dots were the most instrument-like detail on the map: two 7px
      * discs with a hard 1px black stroke. Same information, softer edge. */
     .avc-theme .room-age-dot {
@@ -12292,28 +12400,9 @@ export class AnyVacCard extends LitElement {
       border-bottom-color: transparent;
     }
 
-    /* Type floor (docs/35 §4). 8–10px is instrument sizing; nothing sits
-     * below 10px any more, and everything whose value ticks gets tabular
-     * figures so a live ETA or battery reading stops shoving its neighbours
-     * sideways on every poll. */
-    .avc-theme .dock-age,
-    .avc-theme .dock-chip,
-    .avc-theme .start-seg,
-    .avc-theme .dock-sheet-debug,
-    .avc-theme .dock-sheet-care-badge,
-    .avc-theme .start-body small,
-    .avc-theme .dbg-prog-item small,
-    .avc-theme .version-chip { font-size: 11px; }
-    .avc-theme .dock-cov { font-size: 10px; }
-    .avc-theme .rl-prog small { font-size: 9px; }
-    .avc-theme .room-gauge span { font-size: 10px; }
-    .avc-theme .mini-gauge span { font-size: 9px; }
-    /* Portrait keeps its own tighter scale, just lifted off the floor too —
-     * these need one more class than the .avc-grid--portrait rules above to
-     * win, hence the doubled prefix rather than a plain override. */
-    .avc-theme .avc-grid--portrait .dock-age { font-size: 10px; }
-    .avc-theme .avc-grid--portrait .dock-cov { font-size: 9px; }
-    .avc-theme .avc-grid--portrait .badge-name { font-size: 12px; }
+    /* Everything whose value ticks gets tabular figures, so a live ETA or
+     * battery reading stops shoving its neighbours sideways on every poll.
+     * (The type floor that used to live here is now the K8 scale.) */
     .avc-theme .dock-age,
     .avc-theme .dock-est,
     .avc-theme .dock-cov,
@@ -12424,7 +12513,7 @@ export class AnyVacCard extends LitElement {
      * between "a bar that happens to be partly filled" and "something is
      * happening right now". White on purpose: it is a specular highlight on
      * a coloured bar, not ink, so it does not follow the theme. */
-    .avc-theme .progress-track { height: 4px; border-radius: 3px; }
+    .avc-theme .progress-track { height: 4px; }
     .avc-theme .progress-fill { position: relative; overflow: hidden; }
     .avc-theme .progress-fill::after {
       content: "";
@@ -12555,19 +12644,19 @@ export class AnyVacCard extends LitElement {
       flex-wrap: wrap;
     }
     .align-toolbar-title {
-      display: flex; align-items: center; gap: 8px; font-weight: 700; font-size: 13px;
+      display: flex; align-items: center; gap: 8px; font-weight: 700; font-size: var(--avc-th-fs-m, 13px);
     }
     .align-toolbar-spacer { flex: 1 1 auto; }
     .align-vac-picker { display: flex; gap: 6px; flex-wrap: wrap; }
     .align-vac-chip {
-      font: inherit; font-size: 11px; font-weight: 600; cursor: pointer;
-      padding: 5px 10px; border-radius: 999px; color: rgb(var(--avc-ink-rgb));
+      font: inherit; font-size: var(--avc-th-fs-xs, 11px); font-weight: 600; cursor: pointer;
+      padding: 5px 10px; border-radius: var(--avc-th-r-pill, 999px); color: rgb(var(--avc-ink-rgb));
       background: var(--avc-panel); border: 1px solid var(--avc-panel-line);
     }
     .align-vac-chip.on { background: rgba(var(--avc-tool-rgb), 0.22); border-color: rgba(var(--avc-tool-rgb), 0.6); }
     .align-btn {
       display: inline-flex; align-items: center; justify-content: center;
-      width: 34px; height: 34px; border-radius: 10px; cursor: pointer;
+      width: 34px; height: 34px; border-radius: var(--avc-th-r-m, 10px); cursor: pointer;
       color: rgb(var(--avc-ink-rgb)); background: var(--avc-panel);
       border: 1px solid var(--avc-panel-line);
     }
@@ -12620,15 +12709,15 @@ export class AnyVacCard extends LitElement {
     .align-btn[disabled] { opacity: 0.35; cursor: default; pointer-events: none; }
     .align-btn--flash { background: rgba(var(--avc-ok-rgb), 0.22); border-color: rgba(var(--avc-ok-rgb), 0.6); }
     .align-save-btn {
-      width: auto; padding: 0 12px; gap: 6px; font-weight: 700; font-size: 12px;
+      width: auto; padding: 0 12px; gap: 6px; font-weight: 700; font-size: var(--avc-th-fs-s, 12px);
       background: rgba(var(--avc-tool-rgb), 0.22); border-color: rgba(var(--avc-tool-rgb), 0.6);
     }
     .align-tier-group {
-      display: flex; border-radius: 10px; overflow: hidden;
+      display: flex; border-radius: var(--avc-th-r-m, 10px); overflow: hidden;
       border: 1px solid var(--avc-panel-line);
     }
     .align-tier-btn {
-      font: inherit; font-size: 11px; font-weight: 600; cursor: pointer;
+      font: inherit; font-size: var(--avc-th-fs-xs, 11px); font-weight: 600; cursor: pointer;
       padding: 0 10px; height: 34px; color: rgba(var(--avc-ink-rgb), 0.6);
       background: var(--avc-panel); border: none; border-right: 1px solid var(--avc-panel-line);
     }
@@ -12646,18 +12735,18 @@ export class AnyVacCard extends LitElement {
     }
     .align-field-row { display: flex; align-items: center; justify-content: space-between; gap: 8px; }
     .align-field-row label {
-      font-size: 12px; font-weight: 600; color: rgba(var(--avc-ink-rgb), 0.75);
+      font-size: var(--avc-th-fs-s, 12px); font-weight: 600; color: rgba(var(--avc-ink-rgb), 0.75);
       display: flex; align-items: center; gap: 3px;
     }
-    .align-field-row label span { font-size: 10.5px; font-weight: 500; color: rgba(var(--avc-ink-rgb), 0.5); }
+    .align-field-row label span { font-size: var(--avc-th-fs-xs, 10.5px); font-weight: 500; color: rgba(var(--avc-ink-rgb), 0.5); }
     .align-field-arrow {
       --mdc-icon-size: 13px; color: rgb(var(--avc-tool-rgb));
       flex-shrink: 0;
     }
     .align-field-row input[type="number"] {
-      width: 84px; font: inherit; font-size: 12px; text-align: right;
+      width: 84px; font: inherit; font-size: var(--avc-th-fs-s, 12px); text-align: right;
       color: rgb(var(--avc-ink-rgb)); background: var(--avc-panel);
-      border: 1px solid var(--avc-panel-line); border-radius: 8px; padding: 5px 7px;
+      border: 1px solid var(--avc-panel-line); border-radius: var(--avc-th-r-m, 8px); padding: 5px 7px;
     }
     .align-field-row input[disabled] { opacity: 0.4; }
     .align-field-row--opacity { flex-direction: column; align-items: stretch; gap: 2px; }
@@ -12682,8 +12771,8 @@ export class AnyVacCard extends LitElement {
       flex-wrap: wrap;
     }
     .ve-tool-tab {
-      font: inherit; font-size: 12px; font-weight: 600; cursor: pointer;
-      padding: 7px 14px; border-radius: 999px; color: rgba(var(--avc-ink-rgb), 0.7);
+      font: inherit; font-size: var(--avc-th-fs-s, 12px); font-weight: 600; cursor: pointer;
+      padding: 7px 14px; border-radius: var(--avc-th-r-pill, 999px); color: rgba(var(--avc-ink-rgb), 0.7);
       background: var(--avc-panel); border: 1px solid var(--avc-panel-line);
     }
     .ve-tool-tab.on {
@@ -12696,15 +12785,15 @@ export class AnyVacCard extends LitElement {
       color: rgba(var(--avc-ink-rgb), 0.6); text-align: center; padding: 24px;
       --mdc-icon-size: 40px;
     }
-    .ve-placeholder-title { font-size: 15px; font-weight: 700; color: rgb(var(--avc-ink-rgb)); }
-    .ve-placeholder-sub { font-size: 12px; }
+    .ve-placeholder-title { font-size: var(--avc-th-fs-l, 15px); font-weight: 700; color: rgb(var(--avc-ink-rgb)); }
+    .ve-placeholder-sub { font-size: var(--avc-th-fs-s, 12px); }
     /* == Visual editor: Floorplan & Calibrate tool's sub-tabs (fáze J2) ==== */
     .ve-subtab-row {
       display: flex; gap: 6px; padding: 8px 12px 0;
     }
     .ve-subtab {
-      font: inherit; font-size: 11.5px; font-weight: 600; cursor: pointer;
-      padding: 5px 12px; border-radius: 999px; color: rgba(var(--avc-ink-rgb), 0.65);
+      font: inherit; font-size: var(--avc-th-fs-s, 11.5px); font-weight: 600; cursor: pointer;
+      padding: 5px 12px; border-radius: var(--avc-th-r-pill, 999px); color: rgba(var(--avc-ink-rgb), 0.65);
       background: transparent; border: 1px solid var(--avc-panel-line);
     }
     .ve-subtab.on {
@@ -12718,43 +12807,43 @@ export class AnyVacCard extends LitElement {
       width: 24px; height: 24px; border-radius: 50%;
       background: rgba(var(--avc-warn-rgb), 0.9); border: 2px solid white;
       display: flex; align-items: center; justify-content: center;
-      color: #000; font-size: 12px; font-weight: 700;
+      color: #000; font-size: var(--avc-th-fs-s, 12px); font-weight: 700;
       pointer-events: none; z-index: 2;
     }
     .floor-calib-banner {
-      font-size: 12px; line-height: 1.4; padding: 8px 10px; border-radius: 8px;
+      font-size: var(--avc-th-fs-s, 12px); line-height: 1.4; padding: 8px 10px; border-radius: var(--avc-th-r-m, 8px);
       background: rgba(var(--avc-warn-rgb), 0.14); border: 1px solid rgba(var(--avc-warn-rgb), 0.4);
       display: flex; flex-direction: column; gap: 4px;
     }
     .floor-calib-inset {
-      position: relative; border-radius: 8px; overflow: hidden; cursor: crosshair;
+      position: relative; border-radius: var(--avc-th-r-m, 8px); overflow: hidden; cursor: crosshair;
       background: rgba(var(--avc-ink-rgb), 0.06); border: 1px solid var(--avc-panel-line);
     }
     .floor-calib-inset:not(.floor-calib-inset--active) { cursor: default; opacity: 0.55; }
     .floor-calib-inset img { display: block; width: 100%; height: auto; pointer-events: none; }
-    .floor-calib-error { font-size: 12px; color: rgb(var(--avc-err-rgb)); }
+    .floor-calib-error { font-size: var(--avc-th-fs-s, 12px); color: rgb(var(--avc-err-rgb)); }
     /* == Visual editor: Seat & Appearance tool's Appearance section ======= */
     .align-side-panel-divider {
       height: 1px; background: var(--avc-panel-line); margin: 4px 0;
     }
     .align-side-panel .section-title {
-      font-size: 11px; font-weight: 700; letter-spacing: 0.03em; text-transform: uppercase;
+      font-size: var(--avc-th-fs-xs, 11px); font-weight: 700; letter-spacing: 0.03em; text-transform: uppercase;
       color: rgba(var(--avc-ink-rgb), 0.5);
     }
     .align-field-row--color { flex-direction: column; align-items: stretch; gap: 4px; }
     .align-color-row { display: flex; gap: 6px; align-items: center; }
     .align-color-swatch {
-      width: 30px; height: 30px; padding: 0; border-radius: 8px; cursor: pointer;
+      width: 30px; height: 30px; padding: 0; border-radius: var(--avc-th-r-m, 8px); cursor: pointer;
       border: 1px solid var(--avc-panel-line); background: none;
     }
     .align-color-text {
-      flex: 1 1 auto; font: inherit; font-size: 12px; color: rgb(var(--avc-ink-rgb));
+      flex: 1 1 auto; font: inherit; font-size: var(--avc-th-fs-s, 12px); color: rgb(var(--avc-ink-rgb));
       background: var(--avc-panel); border: 1px solid var(--avc-panel-line);
-      border-radius: 8px; padding: 5px 7px;
+      border-radius: var(--avc-th-r-m, 8px); padding: 5px 7px;
     }
     .align-field-row select {
-      font: inherit; font-size: 12px; color: rgb(var(--avc-ink-rgb)); background: var(--avc-panel);
-      border: 1px solid var(--avc-panel-line); border-radius: 8px; padding: 5px 7px;
+      font: inherit; font-size: var(--avc-th-fs-s, 12px); color: rgb(var(--avc-ink-rgb)); background: var(--avc-panel);
+      border: 1px solid var(--avc-panel-line); border-radius: var(--avc-th-r-m, 8px); padding: 5px 7px;
     }
     /* == Rooms tool (docs/42 §9 fáze I) ==================================== */
     .align-btn--armed { background: rgba(var(--avc-tool-rgb), 0.28); border-color: rgba(var(--avc-tool-rgb), 0.7); }
@@ -12771,15 +12860,15 @@ export class AnyVacCard extends LitElement {
     }
     .rooms-rect-label {
       position: absolute; top: 2px; left: 4px; max-width: calc(100% - 8px);
-      font-size: 11px; font-weight: 700; color: rgb(var(--avc-ink-rgb)); background: var(--avc-surface);
-      padding: 1px 5px; border-radius: 6px; pointer-events: none; white-space: nowrap; overflow: hidden;
+      font-size: var(--avc-th-fs-xs, 11px); font-weight: 700; color: rgb(var(--avc-ink-rgb)); background: var(--avc-surface);
+      padding: 1px 5px; border-radius: var(--avc-th-r-s, 6px); pointer-events: none; white-space: nowrap; overflow: hidden;
       text-overflow: ellipsis;
     }
     .rooms-handle--nw { left: 0; top: 0; }
     .rooms-handle--ne { left: 100%; top: 0; }
     .rooms-handle--sw { left: 0; top: 100%; }
     .rooms-handle--se { left: 100%; top: 100%; }
-    .rooms-side-note { font-size: 12px; color: rgba(var(--avc-ink-rgb), 0.6); line-height: 1.4; }
+    .rooms-side-note { font-size: var(--avc-th-fs-s, 12px); color: rgba(var(--avc-ink-rgb), 0.6); line-height: 1.4; }
     /* == docs/44 F7: Visual editor — canvas, top bar, room labels ========= */
     /* V1: an opaque canvas with a fine dot grid — the dashboard no longer
      * shows through behind the editor. Themed only; legacy keeps its scrim. */
@@ -12800,14 +12889,14 @@ export class AnyVacCard extends LitElement {
     .ve-topbar-actions { justify-self: end; display: flex; align-items: center; gap: 6px; flex-wrap: nowrap; }
     .align-vac-chip {
       display: inline-flex; align-items: center; gap: 6px; flex-shrink: 0;
-      padding: 3px 12px 3px 3px; font-size: 12px;
+      padding: 3px 12px 3px 3px; font-size: var(--avc-th-fs-s, 12px);
     }
     .align-vac-chip--static { cursor: default; }
     .ve-chip-avatar { width: 24px; height: 24px; border-radius: 50%; object-fit: cover; flex-shrink: 0; }
     .ve-chip-avatar--dot { display: inline-block; width: 12px; height: 12px; margin: 0 2px 0 6px; }
     .ve-topbar .ve-tool-row {
       padding: 3px; gap: 2px; border: 1px solid var(--avc-panel-line); border-top: 1px solid var(--avc-panel-line);
-      border-radius: 999px; background: var(--avc-panel); flex-wrap: nowrap;
+      border-radius: var(--avc-th-r-pill, 999px); background: var(--avc-panel); flex-wrap: nowrap;
     }
     .ve-topbar .ve-tool-tab {
       display: inline-flex; align-items: center; gap: 6px; border: none; background: transparent;
@@ -12841,8 +12930,8 @@ export class AnyVacCard extends LitElement {
     .align-seat-layer--readonly .align-seat-img { cursor: default; }
     .align-readonly-note {
       position: absolute; left: 50%; bottom: 6%; transform: translateX(-50%);
-      display: flex; align-items: center; gap: 6px; font-size: 12px; font-weight: 600;
-      padding: 7px 12px; border-radius: 999px; white-space: nowrap;
+      display: flex; align-items: center; gap: 6px; font-size: var(--avc-th-fs-s, 12px); font-weight: 600;
+      padding: 7px 12px; border-radius: var(--avc-th-r-pill, 999px); white-space: nowrap;
       color: rgb(var(--avc-ink-rgb)); background: var(--avc-surface); box-shadow: var(--avc-elev-1);
     }
     /* == Align mode: Cancel confirmation (docs/41 §4.4, Esc/X row) ======== */
@@ -12851,15 +12940,15 @@ export class AnyVacCard extends LitElement {
       background: rgba(var(--avc-shade-rgb), 0.55); z-index: 1;
     }
     .align-confirm-panel {
-      width: min(320px, 86vw); padding: 18px; border-radius: 14px;
+      width: min(320px, 86vw); padding: 18px; border-radius: var(--avc-th-r-l, 14px);
       background: var(--avc-surface); box-shadow: var(--avc-elev-1);
       color: rgb(var(--avc-ink-rgb));
     }
-    .align-confirm-title { font-size: 14px; font-weight: 700; margin-bottom: 6px; }
-    .align-confirm-body { font-size: 12.5px; color: rgba(var(--avc-ink-rgb), 0.7); margin-bottom: 14px; }
+    .align-confirm-title { font-size: var(--avc-th-fs-l, 14px); font-weight: 700; margin-bottom: 6px; }
+    .align-confirm-body { font-size: var(--avc-th-fs-m, 12.5px); color: rgba(var(--avc-ink-rgb), 0.7); margin-bottom: 14px; }
     .align-confirm-actions { display: flex; justify-content: flex-end; gap: 8px; }
     .align-confirm-keep, .align-confirm-discard {
-      width: auto; height: 32px; padding: 0 12px; font-size: 12px; font-weight: 700;
+      width: auto; height: 32px; padding: 0 12px; font-size: var(--avc-th-fs-s, 12px); font-weight: 700;
     }
     .align-confirm-discard { background: rgba(var(--avc-err-rgb), 0.18); border-color: rgba(var(--avc-err-rgb), 0.5); }
   `;

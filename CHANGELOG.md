@@ -6,6 +6,71 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [1.47.0] - 2026-10-01
+
+Card-only (integration unchanged).
+
+### Changed
+
+- **The robot marker drives along its trail.** The integration reports a new
+  position about every 30 s; since 1.41.0 the marker then slid there in a
+  straight line, across walls and furniture. It now follows the stretch of
+  trail drawn since the previous position — lanes, turns and all — at an even
+  speed, and ends exactly at the reported position (still never ahead of the
+  data). When the old position isn't on the trail (driving without drawing,
+  a new trail segment) it moves straight, as before.
+- A position arriving while the marker is still gliding continues from where
+  the marker is instead of snapping.
+
+### Added
+
+- **`marker_glide_s`** (Global → Appearance → "Robot marker glide", default
+  1.5 s, 0 = jump, max 25 s): how long the marker takes for that stretch.
+  Long values keep the robot moving almost continuously, at the cost of
+  showing where it was up to that long ago. Off in `theme: legacy`, with
+  `reduce_motion` and with the OS reduce-motion setting.
+
+### Internal
+
+- The glide is a Web Animation (transform keyframes, one per trail vertex,
+  offset by arc length) started after render; the CSS `transition` on
+  `.avc-marker` is gone. New pure helpers in `src/trail.ts`: `traceSince`
+  (search bounded by how much the trail grew, so a neighbouring lane can't
+  win), `pointAtFraction`, `glideKeyframes`.
+- New `tests/marker-glide.spec.ts` (7).
+
+## [1.46.0] - 2026-10-01
+
+Card-only (integration unchanged). docs/44 K8: one type scale and one corner
+scale across the whole card and the Visual editor.
+
+### Changed
+
+- **Type scale.** Every text size in a themed card is now one of six steps:
+  10 (numerals and chips on the map or inside a gauge ring only), 11, 12, 13,
+  15 and 20 px. Before, the themed card still carried 17 different sizes from
+  8 to 16 px, including 10.5 / 11.5 / 12.5 px. The START label goes from 16 to
+  15 px, the Visual editor's small field labels from 10.5 to 11 px, the
+  portrait "last clean" badges from 9 to 10 px.
+- **Corner scale.** Every corner is one of 6 / 10 / 16 px or fully round.
+  Panels (map, meta bar, dock, robot tiles, sheets, START bar and its
+  segments, the primary buttons) are 16 px, controls (dock rows, mode
+  buttons, map tools, editor inputs) 10 px, small labels 6 px, chips and
+  progress bars round. Before, 18 / 20 / 22 / 14 / 12 / 9 px were mixed.
+- `theme: legacy` is unchanged, verified element by element: every rendered
+  element's computed size and corners match 1.45.0 (landscape, portrait,
+  robot sheet, all three Visual editor tools).
+
+### Internal
+
+- Each older rule now states its legacy literal and its scale step in one
+  place (`font-size: var(--avc-th-fs-xs, 10px)`); the `--avc-th-*` tokens exist
+  only under `.avc-theme`, so legacy falls through to the literal. The
+  separate themed size/corner overrides from docs/35 are gone.
+- New `tests/type-scale.spec.ts` walks everything the themed card renders
+  (running job, portrait rail, robot sheet, Visual editor) and fails on any
+  text size or corner off the scale; 3 of its 4 tests fail against 1.45.0.
+
 ## [1.45.0] - 2026-09-30
 
 Pairs with integration **1.45.0** (docs/45 — room completion).

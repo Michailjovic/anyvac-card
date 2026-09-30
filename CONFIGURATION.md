@@ -56,6 +56,7 @@ Everything is optional unless stated otherwise — the whole card boots from
 | `accent` | hex string | `"#6FBF73"` | Always | Accent colour for START, room selection and focus rings. Status colours are unaffected. See [Appearance](#appearance-theme-accent-calm-state). |
 | `calm_state` | boolean | `true` | Always | Step the leftover map trace and secondary numbers back when nothing is running and nothing is selected. Purely de-emphasis — nothing is hidden or disabled. |
 | `reduce_motion` | boolean | `false` | Always | Turn off press feedback and live pulses. The OS `prefers-reduced-motion` setting already does this on its own; this is for switching them off without it. |
+| `marker_glide_s` | number | `1.5` | Themed (not `legacy`) | Seconds the robot marker takes to drive the stretch of trail since the previous position update, along the drawn line. `0` = jump. Max `25`. |
 | `debug` | boolean | `false` | Always | Shows raw debug readouts (geometry, plan response, etc.) in the production grid UI. |
 | `visual_editor_mode` | boolean | `true` | Always | Shows/hides the card's own entry point into the **Visual editor** (seat fitting + Appearance, and — as they land — Rooms and Floorplan & Calibrate) whenever the `anyvac` integration is otherwise available. `false` hides it, e.g. on a locked-down kiosk tablet where a full-screen editing overlay would be an accidental-tap hazard. Renamed from `align_mode` in card 1.14.0 (**breaking**, not migrated — a config still using `align_mode` is silently ignored and the button defaults back on). |
 
@@ -413,6 +414,7 @@ theme: dark          # dark (default) | light | auto | legacy
 accent: "#6FBF73"    # any hex
 calm_state: true     # default
 reduce_motion: false # default
+marker_glide_s: 1.5  # default, 0 = jump
 vacuums: [...]
 ```
 
@@ -455,6 +457,22 @@ at all times.
 Turns off the press feedback and the live pulses added in 1.2.0. The operating
 system's own reduce-motion preference already disables them regardless of this
 setting — this key is for switching them off without changing that.
+
+### `marker_glide_s`
+
+Added in card 1.47.0. The integration reports the robot's position about every
+30 s. After each update the marker drives the stretch of trail the robot drew
+since the previous one — along the line, so it follows the lanes and turns
+instead of cutting straight across walls and furniture. When the old position
+isn't on the trail (the robot drove without drawing, e.g. between rooms), it
+moves straight.
+
+The value is how long that takes. Short (1–2 s, default 1.5) replays the new
+stretch quickly. Long (up to 25 s) keeps the robot moving almost all the time,
+but it then shows where the robot was up to that long ago — the trail itself
+is drawn in full as soon as each update lands. A position arriving mid-glide
+continues from where the marker is. `0` turns the glide off; `reduce_motion`,
+the OS reduce-motion setting and `theme: legacy` do too.
 
 ---
 
