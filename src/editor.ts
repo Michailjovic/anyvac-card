@@ -102,7 +102,8 @@ export class AnyVacCardEditor extends LitElement {
   @state() private _dragSeq: number | null = null;
 
   // Accordion open state — always create new instances to trigger Lit reactivity
-  @state() private _openVac     = new Set<number>();
+  /** docs/44 F6: at most one vacuum expanded (null = all collapsed). */
+  @state() private _openVac: number | null = null;
   @state() private _openSensors = new Set<number>();
   @state() private _openMap     = new Set<number>();
   @state() private _openPresets = new Set<number>();
@@ -175,16 +176,31 @@ export class AnyVacCardEditor extends LitElement {
 
   private _initialized = false;
 
+  /** docs/44 F6: HA's form elements — null while loading, false when they
+   *  aren't available (plain inputs then), true once `ha-selector` exists. */
+  @state() private _ha: boolean | null = null;
+  /** Open ⋮ row menu and the row whose delete is being confirmed. */
+  @state() private _menu: string | null = null;
+  @state() private _confirm: string | null = null;
+  /** Hints whose long text is expanded (keyed by their short text). */
+  @state() private _hintsOpen = new Set<string>();
+  private _hintSeq = 0;
+
+  connectedCallback(): void {
+    super.connectedCallback();
+    void this._ensureHaElements();
+  }
+
   setConfig(config: AnyVacCardConfig): void {
     this._config = config;
     if (!this._initialized) {
       this._initialized = true;
-      this._openVac = new Set((config.vacuums ?? []).map((_, i) => i));
+      this._openVac = (config.vacuums ?? []).length === 1 ? 0 : null;
     }
   }
 
   protected updated(changed: PropertyValues): void {
-    if (changed.has("hass") && this.hass) {
+    if ((changed.has("hass") || changed.has("_ha")) && this.hass && this._ha === false) {
       const dl = this.shadowRoot?.getElementById("ha-entities") as HTMLDataListElement | null;
       if (dl && !dl.options.length) {
         dl.innerHTML = Object.keys(this.hass.states).sort()
@@ -571,11 +587,6 @@ export class AnyVacCardEditor extends LitElement {
     this._setVacuum(vacIdx, { clean_action: { ...existing, ...updates } as CleanAction });
   }
 
-  private _togglePresets(vacIdx: number): void {
-    const s = new Set(this._openPresets);
-    if (s.has(vacIdx)) s.delete(vacIdx); else s.add(vacIdx);
-    this._openPresets = s;
-  }
   private _setPreset(vacIdx: number, presetIdx: number, updates: Partial<SettingPreset>): void {
     const presets = [...(this._config.vacuums[vacIdx].presets ?? [])];
     presets[presetIdx] = { ...presets[presetIdx], ...updates };
@@ -613,22 +624,23 @@ export class AnyVacCardEditor extends LitElement {
     [vacuums[idx], vacuums[target]] = [vacuums[target], vacuums[idx]];
     const next = { ...this._config, vacuums };
     this._config = next; this._fire(next);
+    if (this._openVac === idx) this._openVac = target;
+    else if (this._openVac === target) this._openVac = idx;
   }
 
   private _addVacuum(): void {
     const vacuums = [...this._config.vacuums, { ...DEFAULT_VACUUM }];
     const next = { ...this._config, vacuums };
     this._config = next; this._fire(next);
-    const newIdx = vacuums.length - 1;
-    this._openVac = new Set([...this._openVac, newIdx]);
+    this._openVac = vacuums.length - 1;
   }
 
   private _deleteVacuum(idx: number): void {
     const vacuums = this._config.vacuums.filter((_, i) => i !== idx);
     const next = { ...this._config, vacuums };
     this._config = next; this._fire(next);
-    const s = new Set(this._openVac); s.delete(idx);
-    this._openVac = s;
+    if (this._openVac === idx) this._openVac = null;
+    else if (this._openVac !== null && this._openVac > idx) this._openVac--;
   }
 
   private _addRoom(vacIdx: number): void {
@@ -692,10 +704,11 @@ export class AnyVacCardEditor extends LitElement {
 
   // ── Accordion toggle helpers ──────────────────────────────────────────────
 
+  /** docs/44 F6: one vacuum expanded at a time — three fully expanded
+   *  vacuums used to be a wall of fields (docs/43 E3). */
   private _toggleVac(idx: number): void {
-    const s = new Set(this._openVac);
-    if (s.has(idx)) s.delete(idx); else s.add(idx);
-    this._openVac = s;
+    this._openVac = this._openVac === idx ? null : idx;
+    this._menu = null;
   }
 
   private _toggleRoom(vacIdx: number, roomIdx: number): void {
@@ -705,34 +718,79 @@ export class AnyVacCardEditor extends LitElement {
     this._openRoom = m;
   }
 
-  private _toggleSensors(vacIdx: number): void {
-    const s = new Set(this._openSensors);
-    if (s.has(vacIdx)) s.delete(vacIdx); else s.add(vacIdx);
-    this._openSensors = s;
+  private _toggleIn(set: Set<number>, idx: number, open?: boolean): Set<number> {
+    const s = new Set(set);
+    const want = open ?? !s.has(idx);
+    if (want) s.add(idx); else s.delete(idx);
+    return s;
+  }
+  private _toggleSensors(vacIdx: number, open?: boolean): void { this._openSensors = this._toggleIn(this._openSensors, vacIdx, open); }
+  private _toggleMap(vacIdx: number, open?: boolean): void { this._openMap = this._toggleIn(this._openMap, vacIdx, open); }
+  private _toggleAction(vacIdx: number, open?: boolean): void { this._openAction = this._toggleIn(this._openAction, vacIdx, open); }
+  private _togglePresets(vacIdx: number, open?: boolean): void { this._openPresets = this._toggleIn(this._openPresets, vacIdx, open); }
+  private _toggleGlobal(idx: number): void { this._openGlobal = this._toggleIn(this._openGlobal, idx); }
+
+  // ── HA form elements (docs/44 F6) ─────────────────────────────────────────
+
+  /**
+   * `ha-selector` / `ha-expansion-panel` are lazy-loaded by Home Assistant —
+   * they only exist once some built-in editor has been opened. The usual
+   * trick: ask the card helpers for a stock card and load ITS config
+   * element, which pulls the form elements in. Outside Home Assistant (no
+   * `loadCardHelpers`, e.g. the test harness) or if they never show up, the
+   * editor keeps its own plain inputs — every field works either way, the
+   * HA path just looks and behaves like the rest of HA.
+   */
+  private async _ensureHaElements(): Promise<void> {
+    if (this._ha !== null) return;
+    // `ha-selector` is what matters; `ha-expansion-panel` is optional (the
+    // editor's own collapsible stands in for it, see `_panel`).
+    const ready = () => !!customElements.get("ha-selector");
+    if (ready()) { this._ha = true; return; }
+    const w = window as any;
+    if (typeof w.loadCardHelpers !== "function") { this._ha = false; return; }
+    try {
+      const helpers = await w.loadCardHelpers();
+      for (const type of ["entities", "tile"]) {
+        const card = await helpers.createCardElement({ type, entities: [], entity: "sun.sun" });
+        await (card?.constructor as any)?.getConfigElement?.();
+        if (ready()) break;
+      }
+      await Promise.race([
+        customElements.whenDefined("ha-selector"),
+        new Promise((r) => setTimeout(r, 4000)),
+      ]);
+    } catch (err) {
+      // eslint-disable-next-line no-console
+      console.warn("[anyvac-card] couldn't load HA form elements, using plain inputs:", err);
+    }
+    this._ha = ready();
   }
 
-  private _toggleMap(vacIdx: number): void {
-    const s = new Set(this._openMap);
-    if (s.has(vacIdx)) s.delete(vacIdx); else s.add(vacIdx);
-    this._openMap = s;
-  }
-
-  private _toggleAction(vacIdx: number): void {
-    const s = new Set(this._openAction);
-    if (s.has(vacIdx)) s.delete(vacIdx); else s.add(vacIdx);
-    this._openAction = s;
-  }
-
-  private _toggleGlobal(idx: number): void {
-    const s = new Set(this._openGlobal);
-    if (s.has(idx)) s.delete(idx); else s.add(idx);
-    this._openGlobal = s;
+  /** One HA selector field. `label` is an attribute on purpose (Lit maps it
+   *  to the property) so labels stay visible in the rendered markup.
+   *  `required` MUST be a property binding: `ha-selector` defaults it to
+   *  true, so a merely absent boolean attribute would leave every optional
+   *  field required (not clearable, marked with *). The
+   *  selector's `value-changed` is stopped here — only `config-changed`
+   *  should leave this editor. */
+  private _sel(
+    label: string, selector: Record<string, unknown>, value: unknown,
+    onChange: (v: any) => void, opts: { required?: boolean; placeholder?: string } = {},
+  ) {
+    return html`<ha-selector class="sel" .hass=${this.hass} .selector=${selector} .value=${value}
+      label=${label} .required=${!!opts.required} .placeholder=${opts.placeholder}
+      @value-changed=${(e: CustomEvent) => { e.stopPropagation(); onChange(e.detail?.value); }}></ha-selector>`;
   }
 
   // ── Shared field helpers ──────────────────────────────────────────────────
 
   private _entityPicker(label: string, value: string | undefined, domains: string[],
     onChange: (v: string) => void, required = false) {
+    if (this._ha) {
+      return this._sel(label, { entity: { domain: domains.length === 1 ? domains[0] : domains } },
+        value || undefined, (v) => onChange(v ?? ""), { required });
+    }
     const ph = domains.length ? domains.join(" / ") : "entity_id";
     const isSingle = domains.length === 1;
     const listId = isSingle ? "ha-ents-" + domains[0] : "ha-entities";
@@ -752,6 +810,7 @@ export class AnyVacCardEditor extends LitElement {
   }
 
   private _textField(label: string, value: string | undefined, onChange: (v: string) => void, placeholder = "") {
+    if (this._ha) return this._sel(label, { text: {} }, value ?? "", (v) => onChange(v ?? ""), { placeholder });
     return html`
       <div class="field">
         <label>${label}</label>
@@ -761,59 +820,60 @@ export class AnyVacCardEditor extends LitElement {
   }
 
   /** Resolves a VacuumColor (legacy preset name or custom hex) to a CSS colour
-   *  string — mirrors `_resolveColor` in anyvac-card.ts. Used for accordion
-   *  accent borders and to seed the hex swatch with the right colour even
-   *  when the stored value is still one of the three legacy names. */
+   *  string — mirrors `_resolveColor` in anyvac-card.ts. */
   private _resolveColor(raw: string | undefined, fallback: string): string {
     const c = raw ?? fallback;
     return COLOR_HEX[c] ?? c;
   }
 
-  /** Hex colour field with a native colour-picker swatch alongside the text input —
-   *  the swatch writes back as a hex string, so both stay interchangeable. Falls
-   *  back to the placeholder colour for the swatch when the current value isn't a
-   *  valid #rrggbb (empty, or a CSS variable/name some configs still use). */
-  private _hexColorField(label: string, value: string | undefined, onChange: (v: string) => void, placeholder: string) {
-    const swatch = /^#[0-9a-fA-F]{6}$/.test(value ?? "") ? (value as string) : placeholder;
+  /** docs/44 F6: colour = a palette of swatches plus a custom one (native
+   *  colour picker). HA has no hex-string selector (`color_rgb` stores an
+   *  [r,g,b] list, which would change the config format), so this stays a
+   *  small control of the editor's own. Writes `#rrggbb`, like before. */
+  private _colorField(label: string, value: string | undefined, palette: ReadonlyArray<{ hex: string; label?: string }>,
+    onChange: (v: string | undefined) => void, fallback: string) {
+    const cur = (value ?? "").toLowerCase();
+    const custom = /^#[0-9a-f]{6}$/.test(cur) && !palette.some((p) => p.hex.toLowerCase() === cur);
     return html`
       <div class="field">
-        <label>${label} (hex)</label>
-        <div class="hex-color-row">
-          <input type="color" class="threshold-color" .value=${swatch}
-            @input=${(e: Event) => onChange((e.target as HTMLInputElement).value)} />
-          <input class="text-input" type="text" .value=${value ?? ""} placeholder=${placeholder}
-            @change=${(e: Event) => onChange((e.target as HTMLInputElement).value)} />
+        <span class="field-label">${label}</span>
+        <div class="swatches" role="radiogroup" aria-label=${label}>
+          ${palette.map((p) => html`<button type="button" class="swatch ${p.hex.toLowerCase() === cur ? "swatch--on" : ""}"
+              role="radio" aria-checked=${p.hex.toLowerCase() === cur ? "true" : "false"}
+              title=${p.label ?? p.hex} aria-label=${p.label ?? p.hex}
+              style=${styleMap({ background: p.hex })} @click=${() => onChange(p.hex)}></button>`)}
+          <label class="swatch swatch--custom ${custom ? "swatch--on" : ""}" title="Custom colour"
+            style=${styleMap({ background: custom ? cur : "transparent" })}>
+            ${custom ? nothing : html`<ha-icon icon="mdi:palette-outline"></ha-icon>`}
+            <input type="color" .value=${/^#[0-9a-f]{6}$/.test(cur) ? cur : fallback}
+              @input=${(e: Event) => onChange((e.target as HTMLInputElement).value)} />
+          </label>
+          ${value ? html`<button type="button" class="link-btn" @click=${() => onChange(undefined)}>Default</button>` : nothing}
         </div>
       </div>`;
   }
 
   private _numberSlider(label: string, value: number | undefined, min: number, max: number, step: number,
-    onChange: (v: number) => void, suffix = "", onCommit?: (v: number) => void) {
+    onChange: (v: number) => void, suffix = "") {
     const cur = value ?? 0;
-    // Typed entry alongside the slider (2026-09-15 field report): dragging a slider whose
-    // range spans hundreds of % over a ~150px track can't reach a precise value, so the
-    // shown number is now an editable field, not just a label — clamped to [min,max] but
-    // NOT snapped to `step` (typing an exact value is the whole point).
+    if (this._ha) {
+      return this._sel(label,
+        { number: { min, max, step, mode: "slider", ...(suffix.trim() ? { unit_of_measurement: suffix.trim() } : {}) } },
+        cur, (v) => { const n = Number(v); if (!Number.isNaN(n)) onChange(Math.min(max, Math.max(min, n))); });
+    }
+    // Typed entry alongside the slider (2026-09-15 field report): clamped to
+    // [min,max] but NOT snapped to `step` (typing an exact value is the point).
     const commit = (raw: string) => {
       const n = Number(raw);
       if (Number.isNaN(n)) return;
-      (onCommit ?? onChange)(Math.min(max, Math.max(min, n)));
+      onChange(Math.min(max, Math.max(min, n)));
     };
-    // `onCommit` (1.13.0), when given, fires once per interaction instead of
-    // once per drag tick — on the range's `change` (fires on mouse-up/drag
-    // release, same event browsers already use for exactly this) and on the
-    // number field's existing blur/Enter commit. `onChange` still drives
-    // `input` alone for live visual feedback while dragging. Seat-geometry
-    // sliders use this split to send a backend service call once per
-    // gesture rather than once per pixel; every other caller leaves
-    // `onCommit` unset and keeps today's per-tick behavior unchanged.
     return html`
       <div class="field field--row">
         <label>${label}</label>
         <div class="slider-wrap">
           <input type="range" class="slider" min=${min} max=${max} step=${step} .value=${String(cur)}
-            @input=${(e: Event) => onChange(Number((e.target as HTMLInputElement).value))}
-            @change=${(e: Event) => (onCommit ?? onChange)(Number((e.target as HTMLInputElement).value))} />
+            @input=${(e: Event) => onChange(Number((e.target as HTMLInputElement).value))} />
           <span class="slider-val-wrap">
             <input type="number" class="slider-val-input" min=${min} max=${max} step=${step}
               .value=${String(cur)}
@@ -825,8 +885,31 @@ export class AnyVacCardEditor extends LitElement {
       </div>`;
   }
 
+  /** Plain number box (segment ID, threshold days). Empty → undefined. */
+  private _numberBox(label: string, value: number | undefined, onChange: (v: number | undefined) => void,
+    opts: { min?: number; max?: number; placeholder?: string } = {}) {
+    if (this._ha) {
+      return this._sel(label, { number: { mode: "box", step: 1, ...(opts.min !== undefined ? { min: opts.min } : {}), ...(opts.max !== undefined ? { max: opts.max } : {}) } },
+        value, (v) => { const n = typeof v === "number" ? v : parseInt(String(v ?? "")); onChange(Number.isNaN(n) ? undefined : n); },
+        { placeholder: opts.placeholder });
+    }
+    return html`
+      <div class="field field--row">
+        <label>${label}</label>
+        <input class="text-input text-input--sm" type="number" min=${opts.min ?? ""} max=${opts.max ?? ""}
+          .value=${String(value ?? "")} placeholder=${opts.placeholder ?? ""}
+          @change=${(e: Event) => {
+            const v = parseInt((e.target as HTMLInputElement).value);
+            onChange(isNaN(v) ? undefined : v);
+          }} />
+      </div>`;
+  }
+
   private _selectField<T extends string>(label: string, value: T,
     options: Array<{ value: T; label: string }>, onChange: (v: T) => void) {
+    if (this._ha) {
+      return this._sel(label, { select: { mode: "dropdown", options } }, value, (v) => { if (v != null) onChange(v as T); }, { required: true });
+    }
     return html`
       <div class="field field--row">
         <label>${label}</label>
@@ -836,8 +919,29 @@ export class AnyVacCardEditor extends LitElement {
       </div>`;
   }
 
+  /** docs/44 F6: a short choice among a few values as a segmented control
+   *  (Role, Scope, Mode) instead of a dropdown. Same control in both paths —
+   *  it is plain buttons styled with HA's own variables. */
+  private _segmented<T extends string>(label: string, value: T,
+    options: Array<{ value: T; label: string; icon?: string }>, onChange: (v: T) => void) {
+    return html`
+      <div class="field">
+        <span class="field-label">${label}</span>
+        <div class="segmented" role="radiogroup" aria-label=${label}>
+          ${options.map((o) => html`<button type="button" role="radio" aria-checked=${o.value === value ? "true" : "false"}
+              class="seg ${o.value === value ? "seg--on" : ""}" @click=${() => { if (o.value !== value) onChange(o.value); }}>
+              ${o.icon ? html`<ha-icon icon=${o.icon}></ha-icon>` : nothing}<span>${o.label}</span></button>`)}
+        </div>
+      </div>`;
+  }
+
   private _optionSelectFromList(label: string, opts: string[], value: string | undefined,
     onChange: (v: string) => void) {
+    if (this._ha) {
+      return this._sel(label,
+        { select: { mode: "dropdown", options: [{ value: "", label: "— none —" }, ...opts.map((o) => ({ value: o, label: o }))] } },
+        value ?? "", (v) => onChange(v ?? ""));
+    }
     return html`
       <div class="field field--row">
         <label>${label}</label>
@@ -855,29 +959,22 @@ export class AnyVacCardEditor extends LitElement {
       ? ((this.hass.states[entity]?.attributes["options"] as string[]) ?? [])
       : [];
     if (!opts.length) return this._textField(label, value, onChange, "e.g. balanced");
-    return html`
-      <div class="field field--row">
-        <label>${label}</label>
-        <select class="select-input"
-          @change=${(e: Event) => onChange((e.target as HTMLSelectElement).value)}>
-          <option value="">— none —</option>
-          ${opts.map(o => html`<option value=${o} ?selected=${o === value}>${o}</option>`)}
-        </select>
-      </div>`;
+    return this._optionSelectFromList(label, opts, value, onChange);
   }
 
-  private _iconPickerField(value: string | undefined, onChange: (v: string) => void) {
+  private _iconPickerField(value: string | undefined, onChange: (v: string) => void, label = "Icon") {
+    if (this._ha) return this._sel(label, { icon: {} }, value ?? "", (v) => onChange(v ?? ""));
     return html`
       <div class="field">
-        <label>Icon</label>
+        <label>${label}</label>
         <ha-icon-picker .value=${value ?? "mdi:square"}
           @value-changed=${(e: CustomEvent) => onChange(e.detail.value)}
         ></ha-icon-picker>
       </div>`;
   }
 
-
   private _areaPicker(label: string, value: string | undefined, onChange: (v: string) => void) {
+    if (this._ha) return this._sel(label, { area: {} }, value ?? "", (v) => onChange(v ?? ""));
     const areas = Object.values((this.hass as any)?.areas ?? {}) as Array<{area_id: string; name: string}>;
     if (!areas.length) return this._textField(label, value, onChange, "e.g. living_room");
     return html`
@@ -892,13 +989,96 @@ export class AnyVacCardEditor extends LitElement {
       </div>`;
   }
 
+  private _toggle(label: string, checked: boolean, onChange: (v: boolean) => void) {
+    if (this._ha) return this._sel(label, { boolean: {} }, checked, (v) => onChange(!!v));
+    return html`
+      <div class="field field--row">
+        <label>${label}</label>
+        <label class="toggle-wrap">
+          <input type="checkbox" class="toggle-input" .checked=${checked}
+            @change=${(e: Event) => onChange((e.target as HTMLInputElement).checked)} />
+          <span class="toggle-track"></span>
+        </label>
+      </div>`;
+  }
+
+  /** docs/44 F6 (E3): hints are one line; the longer explanation sits behind
+   *  an (i) that expands it in place — a tooltip alone doesn't exist on a
+   *  phone. */
+  private _hint(short: unknown, more?: unknown) {
+    if (!more) return html`<p class="hint">${short}</p>`;
+    const key = typeof short === "string" ? short : String(this._hintSeq++);
+    const open = this._hintsOpen.has(key);
+    return html`<p class="hint">${short}
+      <button type="button" class="hint-more" aria-expanded=${open ? "true" : "false"} aria-label="More"
+        @click=${() => { const s = new Set(this._hintsOpen); if (open) s.delete(key); else s.add(key); this._hintsOpen = s; }}>
+        <ha-icon icon=${open ? "mdi:chevron-up" : "mdi:information-outline"}></ha-icon></button>
+      ${open ? html`<span class="hint-long">${more}</span>` : nothing}</p>`;
+  }
+
+  /** A collapsible sub-panel: `ha-expansion-panel` (outlined, with a one-line
+   *  summary) when HA's elements are available, the editor's own otherwise.
+   *  The body is only built while open. */
+  private _panel(title: string, secondary: string | undefined, open: boolean,
+    onToggle: (open: boolean) => void, body: () => unknown) {
+    if (this._ha && customElements.get("ha-expansion-panel")) {
+      return html`<ha-expansion-panel outlined class="panel" header=${title} secondary=${secondary ?? ""}
+          .expanded=${open}
+          @expanded-will-change=${(e: CustomEvent) => { if (e.target === e.currentTarget) onToggle(!!e.detail?.expanded); }}
+          @expanded-changed=${(e: CustomEvent) => { if (e.target === e.currentTarget && !!e.detail?.expanded !== open) onToggle(!!e.detail?.expanded); }}>
+        ${open ? html`<div class="panel-body">${body()}</div>` : nothing}
+      </ha-expansion-panel>`;
+    }
+    return html`
+      <div class="collapsible">
+        <div class="collapsible-header" @click=${() => onToggle(!open)}>
+          <span class="collapsible-title">${title}</span>
+          ${secondary ? html`<span class="badge">${secondary}</span>` : nothing}
+          <ha-icon icon=${open ? "mdi:chevron-up" : "mdi:chevron-down"} class="acc-chevron"></ha-icon>
+        </div>
+        ${open ? html`<div class="collapsible-body">${body()}</div>` : nothing}
+      </div>`;
+  }
+
+  /** docs/44 F6: ⋮ row menu (move / delete) instead of a permanent red bin
+   *  per row. Delete asks for confirmation inside the menu. */
+  private _rowMenu(id: string, name: string, items: Array<{ label: string; icon: string; action: () => void; disabled?: boolean }>,
+    onDelete?: () => void) {
+    const open = this._menu === id;
+    const confirming = this._confirm === id;
+    return html`
+      <span class="menu-wrap" @click=${(e: Event) => e.stopPropagation()}>
+        <button type="button" class="icon-btn" aria-label="More actions" aria-haspopup="menu" aria-expanded=${open ? "true" : "false"}
+          @click=${() => { this._menu = open ? null : id; this._confirm = null; }}>
+          <ha-icon icon="mdi:dots-vertical"></ha-icon>
+        </button>
+        ${open ? html`
+          <div class="menu" role="menu">
+            ${confirming ? html`
+              <div class="menu-confirm">Delete ${name}?</div>
+              <div class="menu-confirm-row">
+                <button type="button" class="menu-btn" @click=${() => { this._menu = null; this._confirm = null; }}>Cancel</button>
+                <button type="button" class="menu-btn menu-btn--danger"
+                  @click=${() => { this._menu = null; this._confirm = null; onDelete?.(); }}>Delete</button>
+              </div>`
+            : html`
+              ${items.map((it) => html`<button type="button" role="menuitem" class="menu-item" ?disabled=${!!it.disabled}
+                  @click=${() => { this._menu = null; it.action(); }}>
+                  <ha-icon icon=${it.icon}></ha-icon><span>${it.label}</span></button>`)}
+              ${onDelete ? html`<button type="button" role="menuitem" class="menu-item menu-item--danger"
+                  @click=${() => { this._confirm = id; }}>
+                  <ha-icon icon="mdi:delete-outline"></ha-icon><span>Delete</span></button>` : nothing}`}
+          </div>` : nothing}
+      </span>`;
+  }
+
   // ── Tab: Vacuums ──────────────────────────────────────────────────────────
 
   private _renderVacuumsTab() {
     return html`
       <div class="tab-body">
         ${this._config.vacuums.length === 0
-          ? html`<p class="hint">No vacuums yet. Add one below.</p>`
+          ? this._hint("No vacuums yet. Add one below.")
           : this._config.vacuums.map((vac, i) => this._renderVacuumAccordion(vac, i))}
         <button class="btn btn--add" @click=${() => this._addVacuum()}>
           <ha-icon icon="mdi:plus"></ha-icon> Add vacuum
@@ -906,53 +1086,57 @@ export class AnyVacCardEditor extends LitElement {
       </div>`;
   }
 
+  private _roleLabel(ct: VacuumConfig["clean_type"]): string {
+    return ct === "dry" ? "Dry" : ct === "wet" ? "Wet" : ct === "both" ? "Dry + wet" : "Auto role";
+  }
+
   private _renderVacuumAccordion(vac: VacuumConfig, idx: number) {
-    const color = this._resolveColor(vac.color, "green");
-    const isOpen = this._openVac.has(idx);
+    const color = this._resolveColor(vac.color, DEFAULT_VACUUM_PALETTE[idx % DEFAULT_VACUUM_PALETTE.length]);
+    const isOpen = this._openVac === idx;
+    const last = this._config.vacuums.length - 1;
+    const name = vac.name || vac.entity || "Unnamed vacuum";
     return html`
-      <div class="acc-row" style=${styleMap({ borderLeft: "3px solid " + color })}>
-        <div class="acc-header" @click=${() => this._toggleVac(idx)}>
-          ${vac.image
-            ? html`<img class="acc-img" src=${vac.image} alt=${vac.name ?? ""} />`
-            : html`<ha-icon icon="mdi:robot-vacuum" style=${styleMap({ color, width: "36px", height: "36px" })}></ha-icon>`}
+      <div class="acc-row ${isOpen ? "acc-row--open" : ""}">
+        <div class="acc-header" role="button" tabindex="0" aria-expanded=${isOpen ? "true" : "false"}
+          @click=${() => this._toggleVac(idx)}
+          @keydown=${(e: KeyboardEvent) => { if (e.key === "Enter" || e.key === " ") { e.preventDefault(); this._toggleVac(idx); } }}>
+          <span class="acc-avatar" style=${styleMap({ borderColor: color })}>
+            ${vac.image
+              ? html`<img src=${vac.image} alt="" />`
+              : html`<ha-icon icon="mdi:robot-vacuum" style=${styleMap({ color })}></ha-icon>`}
+          </span>
           <div class="acc-info">
-            <span class="acc-name">${vac.name || vac.entity || "Unnamed vacuum"}</span>
-            <span class="acc-sub">${vac.entity}</span>
+            <span class="acc-name"><span class="acc-dot" style=${styleMap({ background: color })}></span>${name}</span>
+            <span class="acc-sub">${this._roleLabel(vac.clean_type)} · ${vac.entity || "no entity"}</span>
           </div>
-          <button class="icon-btn" ?disabled=${idx === 0}
-            @click=${(e: Event) => { e.stopPropagation(); this._moveVacuum(idx, -1); }}>
-            <ha-icon icon="mdi:arrow-up"></ha-icon>
-          </button>
-          <button class="icon-btn" ?disabled=${idx === this._config.vacuums.length - 1}
-            @click=${(e: Event) => { e.stopPropagation(); this._moveVacuum(idx, 1); }}>
-            <ha-icon icon="mdi:arrow-down"></ha-icon>
-          </button>
-          <button class="icon-btn icon-btn--danger"
-            @click=${(e: Event) => { e.stopPropagation(); this._deleteVacuum(idx); }}>
-            <ha-icon icon="mdi:delete"></ha-icon>
-          </button>
+          ${this._rowMenu("vac-" + idx, name, [
+            { label: "Move up", icon: "mdi:arrow-up", action: () => this._moveVacuum(idx, -1), disabled: idx === 0 },
+            { label: "Move down", icon: "mdi:arrow-down", action: () => this._moveVacuum(idx, 1), disabled: idx === last },
+          ], () => this._deleteVacuum(idx))}
           <ha-icon icon=${isOpen ? "mdi:chevron-up" : "mdi:chevron-down"} class="acc-chevron"></ha-icon>
         </div>
 
         ${isOpen ? html`
           <div class="acc-body">
-
-            <div class="section-title">Basic</div>
             ${this._entityPicker("Vacuum entity", vac.entity, ["vacuum"],
               v => this._setVacuum(idx, { entity: v }), true)}
             ${this._textField("Display name", vac.name,
               v => this._setVacuum(idx, { name: v }), "e.g. S8")}
             ${this._textField("Image path", vac.image,
               v => this._setVacuum(idx, { image: v }), "/local/...")}
-            ${this._hexColorField("Accent colour", vac.color ? this._resolveColor(vac.color, "green") : undefined,
+            ${this._colorField("Colour", vac.color ? this._resolveColor(vac.color, "green") : undefined,
+              DEFAULT_VACUUM_PALETTE.map((hex) => ({ hex })),
               v => this._setVacuum(idx, { color: v || undefined }), DEFAULT_VACUUM_PALETTE[idx % DEFAULT_VACUUM_PALETTE.length])}
-            ${this._selectField<"auto" | "dry" | "wet" | "both">("Role", vac.clean_type ?? "auto",
-              [{ value: "auto", label: "Auto-detect from clean action" },
-               { value: "dry", label: "Dry only" },
-               { value: "wet", label: "Wet only" },
-               { value: "both", label: "Both — follow live mode" }],
+            ${this._segmented<"auto" | "dry" | "wet" | "both">("Role", vac.clean_type ?? "auto",
+              [{ value: "auto", label: "Auto" },
+               { value: "dry", label: "Dry", icon: "mdi:broom" },
+               { value: "wet", label: "Wet", icon: "mdi:water" },
+               { value: "both", label: "Both", icon: "mdi:water-plus" }],
               v => this._setVacuum(idx, { clean_type: v === "auto" ? undefined : v }))}
-            <p class="hint">This vacuum's capability — controls which time estimate and which dry/wet layer it uses. Not the run-time Dry/Wet/Both choice (that's made on the controller). "Both" follows the live water mode (needs the integration sensor).</p>
+            ${this._hint("What this robot can do — not the Dry/Wet choice for a run.",
+              html`Controls which time estimate and which dry/wet layer it uses. "Auto" detects it
+                from the clean action; "Both" follows the live water mode (needs the integration
+                sensor). The run-time Dry/Wet/Both choice is made on the card.`)}
 
             ${this._renderSensorsSection(idx, vac)}
             ${this._renderMapSection(idx, vac)}
@@ -960,58 +1144,49 @@ export class AnyVacCardEditor extends LitElement {
             ${this._renderPresetsSection(idx, vac)}
 
             ${this._mergedEdit ? html`
-              <div class="section-title">Rooms</div>
-              <p class="hint map-hint" @click=${() => { this._tab = "global"; }}>
-                Merged mode shares one room list across every vacuum — edit it in
-                <strong>Global tab → Rooms (shared)</strong> →
+              <p class="hint link" @click=${() => { this._tab = "global"; }}>
+                Rooms (shared) are edited once for all vacuums on the Global tab →
               </p>
-            ` : html`
-              <div class="section-title">Rooms (${(vac.rooms ?? []).length})</div>
-              ${this._intEntityFor(vac)
-                ? html`<p class="hint">With the AnyVac integration, rooms appear automatically from
-                    this vacuum's own map — you don't need to add them here. Add a room below only to
-                    override its icon/display name, or to position it on a custom floorplan.</p>`
-                : html`<p class="hint">Add one entry per room this vacuum can clean.</p>`}
-              ${(vac.rooms ?? []).map((r, ri) => this._renderRoomAccordion(r, idx, ri))}
-              <button class="btn btn--add" @click=${() => this._addRoom(idx)}>
-                <ha-icon icon="mdi:plus"></ha-icon> Add room
-              </button>
-            `}
-
+            ` : this._renderSplitRooms(idx, vac)}
           </div>
         ` : nothing}
       </div>`;
   }
 
+  private _renderSplitRooms(idx: number, vac: VacuumConfig) {
+    const rooms = vac.rooms ?? [];
+    const withInt = !!this._intEntityFor(vac);
+    return html`
+      <div class="section-title">Rooms (${rooms.length})</div>
+      ${withInt
+        ? this._hint("Rooms come from this vacuum's map automatically.",
+            html`Add a room here only to override its icon/display name, or to position it on a custom floorplan.`)
+        : this._hint("Add one entry per room this vacuum can clean.")}
+      ${rooms.map((r, ri) => this._renderRoomAccordion(r, idx, ri))}
+      <button class="btn btn--add" @click=${() => this._addRoom(idx)}>
+        <ha-icon icon="mdi:plus"></ha-icon> Add room
+      </button>`;
+  }
+
   private _renderSensorsSection(vacIdx: number, vac: VacuumConfig) {
-    const isOpen = this._openSensors.has(vacIdx);
     const configured = [vac.status_entity, vac.battery_entity, vac.last_clean_entity,
       vac.progress_entity, vac.current_room_entity, vac.error_entity].filter(Boolean).length;
-    return html`
-      <div class="collapsible">
-        <div class="collapsible-header" @click=${() => this._toggleSensors(vacIdx)}>
-          <span class="collapsible-title">Sensors</span>
-          ${configured ? html`<span class="badge">${configured} configured</span>` : nothing}
-          <ha-icon icon=${isOpen ? "mdi:chevron-up" : "mdi:chevron-down"} class="acc-chevron"></ha-icon>
-        </div>
-        ${isOpen ? html`
-          <div class="collapsible-body">
-            <p class="hint">Leave the sensors below blank to auto-fill them from the vacuum's device (battery, status, last clean, progress, current room, error).</p>
-            ${this._entityPicker("Status", vac.status_entity, ["sensor"],
-              v => this._setVacuum(vacIdx, { status_entity: v || undefined }))}
-            ${this._entityPicker("Battery", vac.battery_entity, ["sensor"],
-              v => this._setVacuum(vacIdx, { battery_entity: v || undefined }))}
-            ${this._entityPicker("Last clean end", vac.last_clean_entity, ["sensor"],
-              v => this._setVacuum(vacIdx, { last_clean_entity: v || undefined }))}
-            ${this._entityPicker("Progress", vac.progress_entity, ["sensor"],
-              v => this._setVacuum(vacIdx, { progress_entity: v || undefined }))}
-            ${this._entityPicker("Current room", vac.current_room_entity, ["sensor"],
-              v => this._setVacuum(vacIdx, { current_room_entity: v || undefined }))}
-            ${this._entityPicker("Error", vac.error_entity, ["sensor"],
-              v => this._setVacuum(vacIdx, { error_entity: v || undefined }))}
-          </div>
-        ` : nothing}
-      </div>`;
+    return this._panel("Sensors",
+      configured ? `${configured} set manually, the rest found automatically` : "Found automatically on the vacuum's device",
+      this._openSensors.has(vacIdx), (o) => this._toggleSensors(vacIdx, o), () => html`
+        ${this._hint("Leave blank to use the vacuum's own sensors.")}
+        ${this._entityPicker("Status", vac.status_entity, ["sensor"],
+          v => this._setVacuum(vacIdx, { status_entity: v || undefined }))}
+        ${this._entityPicker("Battery", vac.battery_entity, ["sensor"],
+          v => this._setVacuum(vacIdx, { battery_entity: v || undefined }))}
+        ${this._entityPicker("Last clean end", vac.last_clean_entity, ["sensor"],
+          v => this._setVacuum(vacIdx, { last_clean_entity: v || undefined }))}
+        ${this._entityPicker("Progress", vac.progress_entity, ["sensor"],
+          v => this._setVacuum(vacIdx, { progress_entity: v || undefined }))}
+        ${this._entityPicker("Current room", vac.current_room_entity, ["sensor"],
+          v => this._setVacuum(vacIdx, { current_room_entity: v || undefined }))}
+        ${this._entityPicker("Error", vac.error_entity, ["sensor"],
+          v => this._setVacuum(vacIdx, { error_entity: v || undefined }))}`);
   }
 
   /** Per-vacuum map & floorplan settings (fáze L relocation, docs/42): the
@@ -1019,56 +1194,38 @@ export class AnyVacCardEditor extends LitElement {
    *  layer" and the fixed stage height are split-mode-only concepts — in
    *  merged mode there's one shared card-level floorplan/height instead
    *  (Global tab), so those two + the floorplan-tools block below are
-   *  hidden here (mirrors the old Maps tab's own `_mergedEdit` gate). */
+   *  hidden here. */
   private _renderMapSection(vacIdx: number, vac: VacuumConfig) {
-    const isOpen = this._openMap.has(vacIdx);
-    return html`
-      <div class="collapsible">
-        <div class="collapsible-header" @click=${() => this._toggleMap(vacIdx)}>
-          <span class="collapsible-title">Map &amp; floorplan</span>
-          <ha-icon icon=${isOpen ? "mdi:chevron-up" : "mdi:chevron-down"} class="acc-chevron"></ha-icon>
-        </div>
-        ${isOpen ? html`
-          <div class="collapsible-body">
-            ${this._entityPicker("Map image entity (override)", vac.map?.entity, ["image"],
-              v => this._setMap(vacIdx, { entity: v }))}
-            <p class="hint">Leave blank to auto-resolve the AnyVac map image entity from this vacuum's device.</p>
-            ${this._entityPicker("AnyVac sensor (override)", vac.integration_entity, ["sensor"],
-              v => this._setVacuum(vacIdx, { integration_entity: v || undefined }))}
-            <p class="hint">Leave blank to auto-resolve the AnyVac companion sensor from this vacuum's device.</p>
-            ${this._mergedEdit ? html`
-              <p class="hint">Base layer and stage height are set once for the whole card — see
-                <strong>Global tab → Floorplan</strong> in merged mode.</p>
-            ` : html`
-              ${this._selectField<"image" | "map" | "combined">("Base layer", vac.base ?? "map",
-                [{ value: "map", label: "Live map only" },
-                 { value: "image", label: "Custom floorplan image" },
-                 { value: "combined", label: "Floorplan + map overlay" }],
-                v => this._setVacuum(vacIdx, { base: v }))}
-              ${this._numberSlider("Stage height (0 = auto)", vac.base_height ?? 0, 0, 1200, 10,
-                v => this._setVacuum(vacIdx, { base_height: v > 0 ? v : undefined }), " px")}
-              ${(vac.base === "image" || vac.base === "combined")
-                ? this._renderFloorplanTools(vacIdx, vac)
-                : nothing}
-            `}
-          </div>
-        ` : nothing}
-      </div>`;
+    const auto = this._mapEntityFor(vac);
+    const summary = vac.map?.entity ? vac.map.entity : auto ? `Found automatically: ${auto}` : "No map image found";
+    return this._panel("Map & floorplan", summary,
+      this._openMap.has(vacIdx), (o) => this._toggleMap(vacIdx, o), () => html`
+        ${this._entityPicker("Map image entity (override)", vac.map?.entity, ["image"],
+          v => this._setMap(vacIdx, { entity: v }))}
+        ${this._entityPicker("AnyVac sensor (override)", vac.integration_entity, ["sensor"],
+          v => this._setVacuum(vacIdx, { integration_entity: v || undefined }))}
+        ${this._hint("Leave both blank to find them on the vacuum's device.")}
+        ${this._mergedEdit ? this._hint(html`Base layer and stage height are set once for the whole card —
+            <strong>Global tab → Floorplan</strong>.`) : html`
+          ${this._selectField<"image" | "map" | "combined">("Base layer", vac.base ?? "map",
+            [{ value: "map", label: "Live map only" },
+             { value: "image", label: "Custom floorplan image" },
+             { value: "combined", label: "Floorplan + map overlay" }],
+            v => this._setVacuum(vacIdx, { base: v }))}
+          ${this._numberSlider("Stage height (0 = auto)", vac.base_height ?? 0, 0, 1200, 10,
+            v => this._setVacuum(vacIdx, { base_height: v > 0 ? v : undefined }), " px")}
+          ${(vac.base === "image" || vac.base === "combined")
+            ? this._renderFloorplanTools(vacIdx, vac)
+            : nothing}
+        `}`);
   }
 
   /** THIS vacuum's own floorplan image tooling (docs/38, docs/37) — snapshot
    *  from its live map, export tracing guide layers, record/clear the crop
    *  the saved file was cut from, place its rooms from that crop, and the
-   *  image_base rotation/scale/offset fields. Split-mode-only: it edits
-   *  `vac.image_base`, which has no Visual-editor equivalent at all (the
-   *  backend's `set_floorplan_seat` override has no per-vacuum `image_base`
-   *  slot — docs/42 fáze L). Note: the busy/error/result state fields this
-   *  reads (`_floorplanSnapshotBusy` etc.) are shared across every vacuum's
-   *  accordion rather than keyed per-vacuum — a carry-over from when only one
-   *  vacuum's tools could ever be on screen at once (the old Maps tab's
-   *  picker pills). Harmless in practice (the busy state is transient and
-   *  each write still targets the right `vacIdx`), but two of these sections
-   *  open at once will visually share one busy/error/result line. */
+   *  image_base rotation/scale/offset fields. Split-mode-only (see docs/42
+   *  fáze L). The busy/error/result state is shared across vacuums — harmless,
+   *  only one vacuum is expanded at a time now (docs/44 F6). */
   private _renderFloorplanTools(vacIdx: number, vac: VacuumConfig) {
     const ib = this._currentImageBase(vacIdx);
     const cropBox = ib?.crop_box;
@@ -1087,14 +1244,13 @@ export class AnyVacCardEditor extends LitElement {
             ${this._floorplanSnapshotBusy ? "Snapshotting…" : "Use this vacuum's current map as floorplan"}
           </button>
           ${this._floorplanSnapshotError
-            ? html`<p class="hint" style="color:#ff4d4f">${this._floorplanSnapshotError}</p>` : nothing}
-        ` : html`<p class="hint">No map image entity found for this vacuum — set one above, or make
-            sure its device exposes one.</p>`}
+            ? html`<p class="hint hint--error">${this._floorplanSnapshotError}</p>` : nothing}
+        ` : this._hint("No map image entity found for this vacuum — set one above.")}
 
         ${this._textField("Image src (URL)", ib?.src,
           v => this._setEditedImageBase({ src: v }, vacIdx), "/local/anyvac/flat.svg")}
         ${ib?.src ? html`
-          <img src=${ib.src} alt="Floorplan preview" style="max-width:100%;border-radius:8px;margin:4px 0;display:block"
+          <img class="fp-preview" src=${ib.src} alt="Floorplan preview"
             @load=${(e: Event) => {
               const im = e.target as HTMLImageElement;
               if (im.naturalWidth && im.naturalHeight
@@ -1104,14 +1260,7 @@ export class AnyVacCardEditor extends LitElement {
               }
             }} />
         ` : nothing}
-        <div class="field field--row">
-          <label>Swap ↔/↕ slider labels</label>
-          <label class="toggle-wrap">
-            <input type="checkbox" class="toggle-input" .checked=${swap}
-              @change=${(e: Event) => { this._hvSwap = (e.target as HTMLInputElement).checked; }} />
-            <span class="toggle-track"></span>
-          </label>
-        </div>
+        ${this._toggle("Swap ↔/↕ slider labels", swap, (v) => { this._hvSwap = v; })}
         ${this._numberSlider("Rotation", ib?.rotation ?? 0, -180, 180, 1,
           v => this._setEditedImageBase({ rotation: v }, vacIdx), "°")}
         ${this._numberSlider("Scale", ib?.scale ?? 100, 10, 400, 1,
@@ -1123,116 +1272,101 @@ export class AnyVacCardEditor extends LitElement {
 
         ${mapEntity ? html`
           <div class="sub-title">Guide layers</div>
-          <p class="hint">Draws room-boundary/dry/wet-path guides in the same pixel canvas as the
-            floorplan snapshot above, for tracing furniture in an external image editor.</p>
+          ${this._hint("Room/path guides for tracing furniture in an image editor.",
+            html`Drawn in the same pixel canvas as the floorplan snapshot above, as transparent PNGs.`)}
           <button class="btn btn--sm" ?disabled=${this._guideExportBusy}
             @click=${() => this._exportMapGuide(vac, vacIdx)}>
             <ha-icon icon="mdi:layers-outline"></ha-icon>
             ${this._guideExportBusy ? "Exporting…" : "Export guide layers"}
           </button>
           ${this._guideExportError
-            ? html`<p class="hint" style="color:#ff4d4f">${this._guideExportError}</p>` : nothing}
+            ? html`<p class="hint hint--error">${this._guideExportError}</p>` : nothing}
           ${guideResult ? html`
             <p class="hint">Exported (${guideResult.size.w}×${guideResult.size.h}px):
               ${Object.keys(guideResult.paths).map(k => html`<code>${k}</code> `)}
               — trace furniture over them, then set the traced file as the Image src above.</p>
             ${guideResult.crop ? html`
-              <span class="footer-link"
+              <button type="button" class="link-btn"
                 @click=${() => this._setEditedImageBase(
                   { crop_box: { entity: vac.entity, ...guideResult.crop! } }, vacIdx)}>
                 Use this crop for the floorplan
-              </span>
+              </button>
             ` : nothing}
           ` : nothing}
         ` : nothing}
 
         ${vacCrop ? html`
           <div class="sub-title">Crop box</div>
-          <p class="hint">This floorplan was cut from (${vacCrop.x0}, ${vacCrop.y0}) – (${vacCrop.x1}, ${vacCrop.y1})px
-            of this vacuum's own map.
-            <span class="footer-link" @click=${() => this._setEditedImageBase({ crop_box: undefined }, vacIdx)}>Clear</span>
+          <p class="hint">Cut from (${vacCrop.x0}, ${vacCrop.y0}) – (${vacCrop.x1}, ${vacCrop.y1})px of this vacuum's map.
+            <button type="button" class="link-btn" @click=${() => this._setEditedImageBase({ crop_box: undefined }, vacIdx)}>Clear</button>
           </p>
           ${this._pvNat && (Math.round(this._pvNat.w) !== Math.round(vacCrop.x1 - vacCrop.x0)
             || Math.round(this._pvNat.h) !== Math.round(vacCrop.y1 - vacCrop.y0))
-            ? html`<p class="hint" style="color:#ff4d4f">The saved image (${this._pvNat.w}×${this._pvNat.h}px) doesn't
+            ? html`<p class="hint hint--error">The saved image (${this._pvNat.w}×${this._pvNat.h}px) doesn't
                 match this crop box (${Math.round(vacCrop.x1 - vacCrop.x0)}×${Math.round(vacCrop.y1 - vacCrop.y0)}px) —
-                it may have been trimmed/re-exported since. Re-snapshot or re-export the guide layers above.</p>`
+                re-snapshot or re-export the guide layers above.</p>`
             : nothing}
           <button class="btn btn--sm" @click=${() => this._placeRoomsFromCropBox()}>
             Place rooms from crop box
           </button>
           ${this._placeRoomsResult
-            ? html`<p class="hint">Placed ${this._placeRoomsResult.placed}, added ${this._placeRoomsResult.added} room(s).</p>`
+            ? this._hint(`Placed ${this._placeRoomsResult.placed}, added ${this._placeRoomsResult.added} room(s).`)
             : nothing}
         ` : nothing}
       </div>`;
   }
 
   private _renderPresetsSection(vacIdx: number, vac: VacuumConfig) {
-    const isOpen = this._openPresets.has(vacIdx);
     const presets = vac.presets ?? [];
     const speeds: string[] = (this.hass.states[vac.entity]?.attributes["fan_speed_list"] as string[]) ?? [];
     const ca = vac.clean_action as Partial<NativeAutoCleanAction> | undefined;
     const mopModeEnt = ca?.mop_mode_entity;
     const mopIntEnt = ca?.mop_intensity_entity;
-    return html`
-      <div class="collapsible">
-        <div class="collapsible-header" @click=${() => this._togglePresets(vacIdx)}>
-          <span class="collapsible-title">Setting presets</span>
-          ${presets.length ? html`<span class="badge">${presets.length}</span>` : nothing}
-          <ha-icon icon=${isOpen ? "mdi:chevron-up" : "mdi:chevron-down"} class="acc-chevron"></ha-icon>
-        </div>
-        ${isOpen ? html`
-          <div class="collapsible-body">
-            <p class="hint">Named "how" bundles for Manual mode — the user picks one on the controller, then picks rooms. Mop entities come from Clean action above; presets only set the values. With fewer than 2 presets the controller shows no chips (a default from Clean action is used).</p>
-            ${presets.map((p, pi) => html`
-              <div class="sub-section">
-                <div class="sub-title" style="display:flex;align-items:center;justify-content:space-between">
-                  <span>${p.label || p.id}</span>
-                  <button class="icon-btn icon-btn--danger" title="Delete preset"
-                    @click=${() => this._deletePreset(vacIdx, pi)}>
-                    <ha-icon icon="mdi:delete"></ha-icon>
-                  </button>
-                </div>
-                ${this._textField("Label", p.label, v => this._setPreset(vacIdx, pi, { label: v }), "e.g. Dry")}
-                ${this._textField("Icon", p.icon, v => this._setPreset(vacIdx, pi, { icon: v || undefined }), "mdi:broom")}
-                ${speeds.length
-                  ? this._optionSelectFromList("Suction", speeds, p.suction_level,
-                      v => this._setPreset(vacIdx, pi, { suction_level: v || undefined }))
-                  : this._textField("Suction", p.suction_level,
-                      v => this._setPreset(vacIdx, pi, { suction_level: v || undefined }), "e.g. max")}
-                ${mopModeEnt ? this._optionSelect("Mop mode", mopModeEnt, p.mop_mode,
-                  v => this._setPreset(vacIdx, pi, { mop_mode: v || undefined })) : nothing}
-                ${mopIntEnt ? this._optionSelect("Mop intensity", mopIntEnt, p.mop_intensity,
-                  v => this._setPreset(vacIdx, pi, { mop_intensity: v || undefined })) : nothing}
-                ${this._numberSlider("Repeat passes", p.repeat ?? 1, 1, 3, 1,
-                  v => this._setPreset(vacIdx, pi, { repeat: v }))}
-              </div>
-            `)}
-            <button class="btn btn--add" @click=${() => this._addPreset(vacIdx)}>
-              <ha-icon icon="mdi:plus"></ha-icon> Add preset
-            </button>
+    return this._panel("Setting presets",
+      presets.length ? `${presets.length} preset${presets.length > 1 ? "s" : ""}` : "None — the clean action's defaults are used",
+      this._openPresets.has(vacIdx), (o) => this._togglePresets(vacIdx, o), () => html`
+        ${this._hint("Named “how” bundles picked on the robot sheet.",
+          html`Mop entities come from Clean action above; presets only set the values. With fewer
+            than 2 presets no chips are shown and the Clean action's defaults are used.`)}
+        ${presets.map((p, pi) => html`
+          <div class="sub-section">
+            <div class="sub-title sub-title--row">
+              <span>${p.label || p.id}</span>
+              ${this._rowMenu(`preset-${vacIdx}-${pi}`, p.label || p.id, [], () => this._deletePreset(vacIdx, pi))}
+            </div>
+            ${this._textField("Label", p.label, v => this._setPreset(vacIdx, pi, { label: v }), "e.g. Dry")}
+            ${this._iconPickerField(p.icon, v => this._setPreset(vacIdx, pi, { icon: v || undefined }))}
+            ${speeds.length
+              ? this._optionSelectFromList("Suction", speeds, p.suction_level,
+                  v => this._setPreset(vacIdx, pi, { suction_level: v || undefined }))
+              : this._textField("Suction", p.suction_level,
+                  v => this._setPreset(vacIdx, pi, { suction_level: v || undefined }), "e.g. max")}
+            ${mopModeEnt ? this._optionSelect("Mop mode", mopModeEnt, p.mop_mode,
+              v => this._setPreset(vacIdx, pi, { mop_mode: v || undefined })) : nothing}
+            ${mopIntEnt ? this._optionSelect("Mop intensity", mopIntEnt, p.mop_intensity,
+              v => this._setPreset(vacIdx, pi, { mop_intensity: v || undefined })) : nothing}
+            ${this._numberSlider("Repeat passes", p.repeat ?? 1, 1, 3, 1,
+              v => this._setPreset(vacIdx, pi, { repeat: v }))}
           </div>
-        ` : nothing}
-      </div>`;
+        `)}
+        <button class="btn btn--add" @click=${() => this._addPreset(vacIdx)}>
+          <ha-icon icon="mdi:plus"></ha-icon> Add preset
+        </button>`);
+  }
+
+  /** docs/44 F6 (E4): the removed `native-auto` value shows as plain
+   *  "native" — it behaves identically and is no longer offered. */
+  private _actionSummary(action: CleanAction): string {
+    if (action.type === "script") return "Script" + ((action as ScriptCleanAction).entity_id ? ": " + (action as ScriptCleanAction).entity_id : "");
+    if (action.type === "native-area") return "Native area (vacuum.clean_area)";
+    return "Native (segments)";
   }
 
   private _renderCleanActionSection(vacIdx: number, vac: VacuumConfig) {
-    const isOpen = this._openAction.has(vacIdx);
     const action = vac.clean_action ?? { type: "native" as const };
-    return html`
-      <div class="collapsible">
-        <div class="collapsible-header" @click=${() => this._toggleAction(vacIdx)}>
-          <span class="collapsible-title">Clean action</span>
-          <span class="badge">${action.type}</span>
-          <ha-icon icon=${isOpen ? "mdi:chevron-up" : "mdi:chevron-down"} class="acc-chevron"></ha-icon>
-        </div>
-        ${isOpen ? html`
-          <div class="collapsible-body">
-            ${this._renderCleanActionEditor(vacIdx, vac)}
-          </div>
-        ` : nothing}
-      </div>`;
+    return this._panel("Clean action", this._actionSummary(action),
+      this._openAction.has(vacIdx), (o) => this._toggleAction(vacIdx, o),
+      () => this._renderCleanActionEditor(vacIdx, vac));
   }
 
   private _renderCleanActionEditor(vacIdx: number, vac: VacuumConfig) {
@@ -1266,41 +1400,37 @@ export class AnyVacCardEditor extends LitElement {
             action as NativeCleanAction | NativeAutoCleanAction | NativeAreaCleanAction)}`;
   }
 
-  /** Shared editor for all three native strategies — only the hint differs */
+  /** Shared editor for all native strategies — only the hint differs */
   private _renderNativeOptions(
     vacIdx: number,
     action: NativeCleanAction | NativeAutoCleanAction | NativeAreaCleanAction
   ) {
-    const hint =
-      action.type === "native-area"
-        ? html`<p class="hint">Calls <code>vacuum.clean_area</code> (degraded mode only — with the AnyVac integration the START button sends <code>anyvac.clean</code> instead). No repeat; repeat lives server-side in <code>anyvac.clean</code>.</p>`
-        : action.type === "native-auto"
-          ? html`<p class="hint">Legacy value, no longer offered above — behaves identically to <strong>Native</strong> (segment-based) both with and without the integration. Safe to leave as-is; re-selecting "Native" above rewrites it.</p>`
-          : html`<p class="hint">Degraded mode only — with the AnyVac integration the START button always sends <code>anyvac.clean</code> instead, which resolves segments server-side.</p>`;
+    const hint = action.type === "native-area"
+      ? this._hint(html`Used without the integration only — with it, START sends <code>anyvac.clean</code>.`,
+          html`Calls <code>vacuum.clean_area</code>. No repeat; repeat lives server-side in <code>anyvac.clean</code>.`)
+      : this._hint(html`Used without the integration only — with it, START sends <code>anyvac.clean</code>.`,
+          html`<code>anyvac.clean</code> resolves segments server-side.${action.type === "native-auto"
+            ? html` This vacuum still carries the retired value <code>native-auto</code>; it behaves exactly
+                like Native and is rewritten the next time you pick a strategy.` : nothing}`);
+    const speeds: string[] = (this.hass.states[this._config.vacuums[vacIdx]?.entity]
+      ?.attributes["fan_speed_list"] as string[]) ?? [];
     return html`
       <div class="sub-section">
         ${hint}
         ${this._numberSlider("Repeat passes", action.repeat ?? 1, 1, 3, 1,
           v => this._setCleanAction(vacIdx, { repeat: v }))}
-        <div class="sub-title">Suction level (optional)</div>
-        ${(() => {
-          const speeds: string[] = (this.hass.states[this._config.vacuums[vacIdx]?.entity]
-            ?.attributes["fan_speed_list"] as string[]) ?? [];
-          return speeds.length
-            ? this._optionSelectFromList("Suction option", speeds, action.suction_level,
-                v => this._setCleanAction(vacIdx, { suction_level: v || undefined }))
-            : this._textField("Suction option", action.suction_level,
-                v => this._setCleanAction(vacIdx, { suction_level: v || undefined }), "e.g. balanced");
-        })()}
-        <div class="sub-title">Mop mode (optional)</div>
-        ${this._entityPicker("Mop mode entity", action.mop_mode_entity, ["select"],
+        ${speeds.length
+          ? this._optionSelectFromList("Suction (optional)", speeds, action.suction_level,
+              v => this._setCleanAction(vacIdx, { suction_level: v || undefined }))
+          : this._textField("Suction (optional)", action.suction_level,
+              v => this._setCleanAction(vacIdx, { suction_level: v || undefined }), "e.g. balanced")}
+        ${this._entityPicker("Mop mode entity (optional)", action.mop_mode_entity, ["select"],
           v => this._setCleanAction(vacIdx, { mop_mode_entity: v || undefined }))}
-        ${action.mop_mode_entity ? this._optionSelect("Mop mode option", action.mop_mode_entity, action.mop_mode,
+        ${action.mop_mode_entity ? this._optionSelect("Mop mode", action.mop_mode_entity, action.mop_mode,
           v => this._setCleanAction(vacIdx, { mop_mode: v || undefined })) : nothing}
-        <div class="sub-title">Mop intensity (optional)</div>
-        ${this._entityPicker("Mop intensity entity", action.mop_intensity_entity, ["select"],
+        ${this._entityPicker("Mop intensity entity (optional)", action.mop_intensity_entity, ["select"],
           v => this._setCleanAction(vacIdx, { mop_intensity_entity: v || undefined }))}
-        ${action.mop_intensity_entity ? this._optionSelect("Mop intensity option", action.mop_intensity_entity, action.mop_intensity,
+        ${action.mop_intensity_entity ? this._optionSelect("Mop intensity", action.mop_intensity_entity, action.mop_intensity,
           v => this._setCleanAction(vacIdx, { mop_intensity: v || undefined })) : nothing}
       </div>`;
   }
@@ -1312,22 +1442,19 @@ export class AnyVacCardEditor extends LitElement {
       <div class="sub-section">
         ${this._entityPicker("Script entity", action.entity_id, ["script"],
           v => this._setCleanAction(vacIdx, { entity_id: v }))}
-        <p class="hint">Tokens: {{ entity }}, {{ selected_segments }}, {{ selected_room_keys }}, {{ selected_area_ids }}</p>
+        ${this._hint("Variables passed to the script.",
+          html`Tokens: {{ entity }}, {{ selected_segments }}, {{ selected_room_keys }}, {{ selected_area_ids }}`)}
         ${entries.map(([key, val], vi) => html`
           <div class="var-row">
-            <input class="text-input text-input--half" .value=${key} placeholder="name"
-              @change=${(e: Event) => {
-                const newKey = (e.target as HTMLInputElement).value;
-                const newVars = Object.fromEntries(entries.map(([k, v], i) => [i === vi ? newKey : k, v]));
-                this._setCleanAction(vacIdx, { variables: newVars });
-              }} />
+            ${this._textField("Name", key, (newKey) => {
+              const newVars = Object.fromEntries(entries.map(([k, v], i) => [i === vi ? newKey : k, v]));
+              this._setCleanAction(vacIdx, { variables: newVars });
+            }, "name")}
             <span class="var-sep">&#8594;</span>
-            <input class="text-input text-input--half" .value=${val} placeholder="{{ entity }}"
-              @change=${(e: Event) => {
-                const newVars = { ...vars, [key]: (e.target as HTMLInputElement).value };
-                this._setCleanAction(vacIdx, { variables: newVars });
-              }} />
-            <button class="icon-btn icon-btn--danger icon-btn--sm"
+            ${this._textField("Value", val, (nv) => {
+              this._setCleanAction(vacIdx, { variables: { ...vars, [key]: nv } });
+            }, "{{ entity }}")}
+            <button class="icon-btn icon-btn--sm" aria-label="Remove variable"
               @click=${() => {
                 const newVars = Object.fromEntries(entries.filter((_, i) => i !== vi));
                 this._setCleanAction(vacIdx, { variables: newVars });
@@ -1344,13 +1471,8 @@ export class AnyVacCardEditor extends LitElement {
 
   /** Icon, icon-anchor and dry/wet clean-time estimate fields — shared between
    *  the per-vacuum room accordion (split mode, `vac.rooms`) and the shared
-   *  room accordion (merged mode, `_config.rooms`, Global tab). These three
-   *  fields used to be editable only from the now-removed Maps tab (fáze L,
-   *  docs/42) — there is no Visual-editor equivalent (`RoomsEditSession`'s
-   *  `styleDraft` only carries the global border widths, never a per-room
-   *  icon), so they need a home here regardless of which room list is being
-   *  edited. `onChange` merges into whichever list (`vac.rooms` or
-   *  `_config.rooms`) the caller is actually editing. */
+   *  room accordion (merged mode, `_config.rooms`, Global tab). `onChange`
+   *  merges into whichever list the caller is actually editing. */
   private _renderRoomMetaFields(room: RoomConfig, onChange: (u: Partial<RoomConfig>) => void) {
     return html`
       ${this._iconPickerField(room.icon, v => onChange({ icon: v || undefined }))}
@@ -1367,176 +1489,112 @@ export class AnyVacCardEditor extends LitElement {
         v => onChange({ clean_time_dry: v > 0 ? v : undefined }), " min")}
       ${this._numberSlider("Est. wet clean time", room.clean_time_wet ?? 0, 0, 120, 1,
         v => onChange({ clean_time_wet: v > 0 ? v : undefined }), " min")}
-      <p class="hint">Dry/wet estimates feed the controller's remaining-time readout for this
-        room when the AnyVac integration hasn't learned its own yet — leave at 0 to use the
-        integration's learned estimate (or the legacy fallback below, for setups without it).</p>`;
+      ${this._hint("Leave at 0 to use the integration's learned estimate.",
+        html`Used for this room's remaining time until the AnyVac integration has learned its own
+          (or the legacy fallback below, for setups without it).`)}`;
+  }
+
+  /** The fallback block shared by both room accordions: segment ID +
+   *  legacy helpers without the integration, the effective area for the
+   *  native-area strategy, nothing at all with the integration. */
+  private _renderRoomBackendFields(room: RoomConfig, rep: VacuumConfig | undefined,
+    onChange: (u: Partial<RoomConfig>) => void, areaHint: unknown) {
+    if (rep && this._intEntityFor(rep)) {
+      return this._hint("Segments, timing and history are handled by the AnyVac integration.");
+    }
+    if (rep?.clean_action?.type === "native-area") {
+      return html`
+        <div class="field field--row">
+          <label>Effective area</label>
+          <strong class="value">${
+            /* must mirror the card's resolution order */
+            room.area_id ?? this._config.area_mappings?.[room.key] ?? room.key
+          }</strong>
+        </div>
+        ${areaHint}`;
+    }
+    return html`
+      ${this._numberBox("Segment ID", room.segment_id, (v) => onChange({ segment_id: v }), { min: 0, placeholder: "e.g. 16" })}
+      ${this._hint(html`Find IDs: Developer Tools → Actions → <code>roborock.get_maps</code>`)}
+      ${this._numberSlider("Est. clean time (fallback)", room.clean_time_mins ?? 0, 0, 120, 1,
+        v => onChange({ clean_time_mins: v > 0 ? v : undefined }), " min")}
+      ${this._entityPicker("Clean time fallback (input_number, legacy)", room.clean_time_entity, ["input_number"],
+        v => onChange({ clean_time_entity: v || undefined }))}
+      ${this._entityPicker("Last clean fallback (input_datetime, legacy)", room.last_clean_entity, ["input_datetime"],
+        v => onChange({ last_clean_entity: v || undefined }))}
+      ${this._hint("Legacy read-only fallbacks for setups without the integration.")}`;
+  }
+
+  private _roomRow(room: RoomConfig, key: number, roomIdx: number, isOpen: boolean,
+    onToggle: () => void, onDelete: () => void, onDrop: (from: number) => void, meta: unknown, body: () => unknown) {
+    const dragOver = this._dragRoom && this._dragRoom.vac === key && this._dragRoom.idx !== roomIdx;
+    return html`
+      <div class="room-acc ${dragOver ? "room-acc--drop" : ""}"
+        @dragover=${(e: DragEvent) => { if (this._dragRoom && this._dragRoom.vac === key) e.preventDefault(); }}
+        @drop=${(e: DragEvent) => { e.preventDefault(); if (this._dragRoom && this._dragRoom.vac === key) onDrop(this._dragRoom.idx); this._dragRoom = null; }}>
+        <div class="room-acc-header" @click=${onToggle}>
+          <ha-icon class="drag" icon="mdi:drag-horizontal-variant" title="Drag to reorder"
+            draggable="true"
+            @click=${(e: Event) => e.stopPropagation()}
+            @dragstart=${(e: DragEvent) => { this._dragRoom = { vac: key, idx: roomIdx }; if (e.dataTransfer) e.dataTransfer.effectAllowed = "move"; }}
+            @dragend=${() => { this._dragRoom = null; }}></ha-icon>
+          <ha-icon class="room-acc-icon" icon=${room.icon || "mdi:square"}></ha-icon>
+          <div class="room-acc-info">
+            <span class="room-acc-name">${room.name || room.key || "Unnamed room"}</span>
+            ${meta}
+          </div>
+          ${this._rowMenu(`room-${key}-${roomIdx}`, room.name || room.key || "this room", [], onDelete)}
+          <ha-icon icon=${isOpen ? "mdi:chevron-up" : "mdi:chevron-down"} class="acc-chevron"></ha-icon>
+        </div>
+        ${isOpen ? html`<div class="room-acc-body">${body()}</div>` : nothing}
+      </div>`;
   }
 
   private _renderRoomAccordion(room: RoomConfig, vacIdx: number, roomIdx: number) {
     const isOpen = (this._openRoom.get(vacIdx) ?? null) === roomIdx;
-    return html`
-      <div class="room-acc"
-        style=${this._dragRoom && this._dragRoom.vac === vacIdx && this._dragRoom.idx !== roomIdx
-          ? styleMap({ outline: "2px dashed var(--primary-color,#3b82f6)", outlineOffset: "-2px" }) : nothing}
-        @dragover=${(e: DragEvent) => { if (this._dragRoom && this._dragRoom.vac === vacIdx) e.preventDefault(); }}
-        @drop=${(e: DragEvent) => { e.preventDefault(); if (this._dragRoom && this._dragRoom.vac === vacIdx) this._moveRoom(vacIdx, this._dragRoom.idx, roomIdx); this._dragRoom = null; }}>
-        <div class="room-acc-header" @click=${() => this._toggleRoom(vacIdx, roomIdx)}>
-          <ha-icon icon="mdi:drag-horizontal-variant" title="Drag to reorder"
-            draggable="true" style="cursor:grab;opacity:0.5;--mdc-icon-size:18px;flex-shrink:0"
-            @click=${(e: Event) => e.stopPropagation()}
-            @dragstart=${(e: DragEvent) => { this._dragRoom = { vac: vacIdx, idx: roomIdx }; if (e.dataTransfer) e.dataTransfer.effectAllowed = "move"; }}
-            @dragend=${() => { this._dragRoom = null; }}></ha-icon>
-          <ha-icon class="room-acc-icon" icon=${room.icon || "mdi:square"}></ha-icon>
-          <div class="room-acc-info">
-            <span class="room-acc-name">${room.name || room.key || "Unnamed room"}</span>
-            ${room.segment_id !== undefined && !this._intEntityFor(this._config.vacuums[vacIdx])
-              ? html`<span class="room-acc-meta">seg ${room.segment_id}</span>` : nothing}
-          </div>
-          <button class="icon-btn icon-btn--danger icon-btn--sm"
-            @click=${(e: Event) => { e.stopPropagation(); this._deleteRoom(vacIdx, roomIdx); }}>
-            <ha-icon icon="mdi:delete"></ha-icon>
-          </button>
-          <ha-icon icon=${isOpen ? "mdi:chevron-up" : "mdi:chevron-down"} class="acc-chevron"></ha-icon>
-        </div>
-        ${isOpen ? html`
-          <div class="room-acc-body">
-            ${this._textField("Key (unique ID)", room.key,
-              v => this._setRoom(vacIdx, roomIdx, { key: v }), "e.g. bedroom")}
-            <p class="hint">Tip: keep this identical to the room's name in the Roborock app — the AnyVac integration matches rooms by this name (auto-seating, live positions from the integration, room pinning).</p>
-            ${this._textField("Display name", room.name,
-              v => this._setRoom(vacIdx, roomIdx, { name: v }), "e.g. Bedroom")}
-            ${this._renderRoomMetaFields(room, u => this._setRoom(vacIdx, roomIdx, u))}
-            <p class="hint">Cleaning sequence is a shared, backend-owned reorderable list
-              (requires the AnyVac integration + merged mode) — reorder it in the
-              <strong>Global tab → Rooms (shared)</strong> section once merged mode is on,
-              or in the Roborock app otherwise.</p>
-            ${this._intEntityFor(this._config.vacuums[vacIdx])
-              ? html`<p class="hint">Segment resolution, timing and clean history are handled
-                  server-side by the AnyVac integration for this vacuum — nothing to set here.</p>`
-              : this._config.vacuums[vacIdx]?.clean_action?.type === "native-area"
-                ? html`
-                  <div class="field field--row">
-                    <label>Effective area</label>
-                    <strong style="font-size:13px">${
-                      /* must mirror the card's resolution order */
-                      room.area_id ?? this._config.area_mappings?.[room.key] ?? room.key
-                    }</strong>
-                  </div>
-                  <p class="hint map-hint" @click=${() => { this._tab = "global"; }}>
-                    Set in <strong>Global tab → Area mappings</strong> →
-                  </p>`
-                : html`
-                  <div class="field field--row">
-                    <label>Segment ID</label>
-                    <input class="text-input text-input--sm" type="number"
-                      .value=${String(room.segment_id ?? "")} placeholder="e.g. 16"
-                      @change=${(e: Event) => {
-                        const v = parseInt((e.target as HTMLInputElement).value);
-                        this._setRoom(vacIdx, roomIdx, { segment_id: isNaN(v) ? undefined : v });
-                      }} />
-                  </div>
-                  <p class="hint">Find IDs: Developer Tools → Actions → roborock.get_maps</p>
-                  ${this._numberSlider("Est. clean time (fallback)", room.clean_time_mins ?? 0, 0, 120, 1,
-                    v => this._setRoom(vacIdx, roomIdx, { clean_time_mins: v > 0 ? v : undefined }), " min")}
-                  ${this._entityPicker("Clean time fallback (input_number, legacy)", room.clean_time_entity, ["input_number"],
-                    v => this._setRoom(vacIdx, roomIdx, { clean_time_entity: v || undefined }))}
-                  ${this._entityPicker("Last clean fallback (input_datetime, legacy)", room.last_clean_entity, ["input_datetime"],
-                    v => this._setRoom(vacIdx, roomIdx, { last_clean_entity: v || undefined }))}
-                  <p class="hint">Legacy read-only fallbacks for setups without the AnyVac
-                    integration — the card never writes these helpers.</p>`}
-            <p class="hint">Position and size are set in the Visual editor's Rooms
-              tool, not here — open it from the card's own "Align"/edit entry point.</p>
-          </div>
-        ` : nothing}
-      </div>`;
+    const vac = this._config.vacuums[vacIdx];
+    const set = (u: Partial<RoomConfig>) => this._setRoom(vacIdx, roomIdx, u);
+    return this._roomRow(room, vacIdx, roomIdx, isOpen,
+      () => this._toggleRoom(vacIdx, roomIdx),
+      () => this._deleteRoom(vacIdx, roomIdx),
+      (from) => this._moveRoom(vacIdx, from, roomIdx),
+      room.segment_id !== undefined && !this._intEntityFor(vac)
+        ? html`<span class="room-acc-meta">seg ${room.segment_id}</span>` : nothing,
+      () => html`
+        ${this._textField("Key (unique ID)", room.key, v => set({ key: v }), "e.g. bedroom")}
+        ${this._hint("Keep it identical to the room's name in the Roborock app.",
+          "The AnyVac integration matches rooms by this name (auto-seating, live positions, room pinning).")}
+        ${this._textField("Display name", room.name, v => set({ name: v }), "e.g. Bedroom")}
+        ${this._renderRoomMetaFields(room, set)}
+        ${this._renderRoomBackendFields(room, vac, set,
+          html`<p class="hint link" @click=${() => { this._tab = "global"; }}>Set in Global tab → Area mappings →</p>`)}
+        ${this._hint("Position and size are set in the Visual editor's Rooms tool.",
+          "The cleaning sequence is shared and backend-owned — reorder it on the Global tab in merged mode, or in the Roborock app.")}`);
   }
 
-  /** Shared-room accordion for merged mode (`_config.rooms`, Global tab) —
-   *  mirrors `_renderRoomAccordion`'s per-vacuum version above. A merged room
-   *  isn't "owned" by any one vacuum, so the segment-ID/native-area/legacy
-   *  fallback block below uses the FIRST configured vacuum as a stand-in for
-   *  "is there an AnyVac integration / native-area strategy in play at all" —
-   *  accurate for the common case (every vacuum sharing one merged floorplan
-   *  also shares one integration setup); a mixed fleet isn't modelled here,
-   *  same as it wasn't in the old Maps tab. Reuses the existing `_openRoom`/
-   *  `_dragRoom` state maps under a `-1` vacIdx slot (never a real vacuum
-   *  index) rather than adding new state just for this one list. */
+  /** Shared-room accordion for merged mode (`_config.rooms`, Global tab). A
+   *  merged room isn't "owned" by any one vacuum, so the backend-fields block
+   *  uses the FIRST configured vacuum as a stand-in for "is there an AnyVac
+   *  integration / native-area strategy in play at all". Reuses the
+   *  `_openRoom`/`_dragRoom` state under a `-1` vacIdx slot. */
   private _renderMergedRoomAccordion(room: RoomConfig, roomIdx: number) {
     const MERGED = -1;
     const isOpen = (this._openRoom.get(MERGED) ?? null) === roomIdx;
-    const rep = this._config.vacuums[0];
-    const repIntEntity = rep ? this._intEntityFor(rep) : undefined;
-    return html`
-      <div class="room-acc"
-        style=${this._dragRoom && this._dragRoom.vac === MERGED && this._dragRoom.idx !== roomIdx
-          ? styleMap({ outline: "2px dashed var(--primary-color,#3b82f6)", outlineOffset: "-2px" }) : nothing}
-        @dragover=${(e: DragEvent) => { if (this._dragRoom && this._dragRoom.vac === MERGED) e.preventDefault(); }}
-        @drop=${(e: DragEvent) => {
-          e.preventDefault();
-          if (this._dragRoom && this._dragRoom.vac === MERGED) this._moveMergedRoom(this._dragRoom.idx, roomIdx);
-          this._dragRoom = null;
-        }}>
-        <div class="room-acc-header" @click=${() => this._toggleRoom(MERGED, roomIdx)}>
-          <ha-icon icon="mdi:drag-horizontal-variant" title="Drag to reorder"
-            draggable="true" style="cursor:grab;opacity:0.5;--mdc-icon-size:18px;flex-shrink:0"
-            @click=${(e: Event) => e.stopPropagation()}
-            @dragstart=${(e: DragEvent) => { this._dragRoom = { vac: MERGED, idx: roomIdx }; if (e.dataTransfer) e.dataTransfer.effectAllowed = "move"; }}
-            @dragend=${() => { this._dragRoom = null; }}></ha-icon>
-          <ha-icon class="room-acc-icon" icon=${room.icon || "mdi:square"}></ha-icon>
-          <div class="room-acc-info">
-            <span class="room-acc-name">${room.name || room.key || "Unnamed room"}</span>
-          </div>
-          <button class="icon-btn icon-btn--danger icon-btn--sm"
-            @click=${(e: Event) => { e.stopPropagation(); this._deleteEditedRoom(roomIdx); }}>
-            <ha-icon icon="mdi:delete"></ha-icon>
-          </button>
-          <ha-icon icon=${isOpen ? "mdi:chevron-up" : "mdi:chevron-down"} class="acc-chevron"></ha-icon>
-        </div>
-        ${isOpen ? html`
-          <div class="room-acc-body">
-            ${this._textField("Key (unique ID)", room.key,
-              v => this._setEditedRoom(roomIdx, { key: v }), "e.g. bedroom")}
-            <p class="hint">Tip: keep this identical to the room's name in the Roborock app — the AnyVac integration matches rooms by this name (auto-seating, live positions from the integration, room pinning).</p>
-            ${this._textField("Display name", room.name,
-              v => this._setEditedRoom(roomIdx, { name: v }), "e.g. Bedroom")}
-            ${this._renderRoomMetaFields(room, u => this._setEditedRoom(roomIdx, u))}
-            ${repIntEntity
-              ? html`<p class="hint">Segment resolution, timing and clean history are handled
-                  server-side by the AnyVac integration — nothing to set here.</p>`
-              : rep?.clean_action?.type === "native-area"
-                ? html`
-                  <div class="field field--row">
-                    <label>Effective area</label>
-                    <strong style="font-size:13px">${
-                      /* must mirror the card's resolution order */
-                      room.area_id ?? this._config.area_mappings?.[room.key] ?? room.key
-                    }</strong>
-                  </div>
-                  <p class="hint">Set in <strong>Area mappings</strong>, further down this tab.</p>`
-                : html`
-                  <div class="field field--row">
-                    <label>Segment ID</label>
-                    <input class="text-input text-input--sm" type="number"
-                      .value=${String(room.segment_id ?? "")} placeholder="e.g. 16"
-                      @change=${(e: Event) => {
-                        const v = parseInt((e.target as HTMLInputElement).value);
-                        this._setEditedRoom(roomIdx, { segment_id: isNaN(v) ? undefined : v });
-                      }} />
-                  </div>
-                  <p class="hint">Find IDs: Developer Tools → Actions → roborock.get_maps</p>
-                  ${this._numberSlider("Est. clean time (fallback)", room.clean_time_mins ?? 0, 0, 120, 1,
-                    v => this._setEditedRoom(roomIdx, { clean_time_mins: v > 0 ? v : undefined }), " min")}
-                  ${this._entityPicker("Clean time fallback (input_number, legacy)", room.clean_time_entity, ["input_number"],
-                    v => this._setEditedRoom(roomIdx, { clean_time_entity: v || undefined }))}
-                  ${this._entityPicker("Last clean fallback (input_datetime, legacy)", room.last_clean_entity, ["input_datetime"],
-                    v => this._setEditedRoom(roomIdx, { last_clean_entity: v || undefined }))}
-                  <p class="hint">Legacy read-only fallbacks for setups without the AnyVac
-                    integration — the card never writes these helpers.</p>`}
-            <p class="hint">Position and size are set in the Visual editor's Rooms
-              tool, not here — open it from the card's own "Align"/edit entry point.</p>
-          </div>
-        ` : nothing}
-      </div>`;
+    const set = (u: Partial<RoomConfig>) => this._setEditedRoom(roomIdx, u);
+    return this._roomRow(room, MERGED, roomIdx, isOpen,
+      () => this._toggleRoom(MERGED, roomIdx),
+      () => this._deleteEditedRoom(roomIdx),
+      (from) => this._moveMergedRoom(from, roomIdx),
+      nothing,
+      () => html`
+        ${this._textField("Key (unique ID)", room.key, v => set({ key: v }), "e.g. bedroom")}
+        ${this._hint("Keep it identical to the room's name in the Roborock app.",
+          "The AnyVac integration matches rooms by this name (auto-seating, live positions, room pinning).")}
+        ${this._textField("Display name", room.name, v => set({ name: v }), "e.g. Bedroom")}
+        ${this._renderRoomMetaFields(room, set)}
+        ${this._renderRoomBackendFields(room, this._config.vacuums[0], set,
+          this._hint("Set in Area mappings, further down this tab."))}
+        ${this._hint("Position and size are set in the Visual editor's Rooms tool.")}`);
   }
 
   private _moveMergedRoom(from: number, to: number): void {
@@ -1548,10 +1606,8 @@ export class AnyVacCardEditor extends LitElement {
     this._setConfig({ rooms });
   }
 
-  /** Backend-owned cleaning-sequence reorder list (docs/19), relocated out of
-   *  the removed Maps tab (fáze L) — merged mode only (the sequence is
-   *  card-wide, not per-vacuum) and only shown once an integration sensor is
-   *  actually available to read/write it from. */
+  /** Backend-owned cleaning-sequence reorder list (docs/19) — merged mode
+   *  only, and only once an integration sensor exists to read/write it. */
   private _renderSequenceSection() {
     const seqVac = this._config.vacuums.find(v => this._intEntityFor(v));
     if (!seqVac) return nothing;
@@ -1560,35 +1616,33 @@ export class AnyVacCardEditor extends LitElement {
     const seqMap = this._roomSequence(seqVac);
     const ordered = this._roomsInSequenceOrder(rooms, seqMap);
     return html`
-      <div class="section-title" style="margin-top:4px">Cleaning sequence</div>
-      <p class="hint">The order rooms clean in, shared across every vacuum (backend-owned —
-        drag to reorder here, or in the Roborock app).</p>
-      ${ordered.map((r, i) => html`
-        <div class="var-row"
-          style=${this._dragSeq !== null && this._dragSeq !== i
-            ? styleMap({ outline: "2px dashed var(--primary-color,#3b82f6)", outlineOffset: "-2px" }) : nothing}
-          @dragover=${(e: DragEvent) => { if (this._dragSeq !== null) e.preventDefault(); }}
-          @drop=${(e: DragEvent) => {
-            e.preventDefault();
-            if (this._dragSeq !== null) this._moveSequence(seqVac, ordered, this._dragSeq, i);
-            this._dragSeq = null;
-          }}>
-          <ha-icon icon="mdi:drag-horizontal-variant" title="Drag to reorder"
-            draggable="true" style="cursor:grab;opacity:0.5;--mdc-icon-size:18px;flex-shrink:0"
-            @dragstart=${(e: DragEvent) => { this._dragSeq = i; if (e.dataTransfer) e.dataTransfer.effectAllowed = "move"; }}
-            @dragend=${() => { this._dragSeq = null; }}></ha-icon>
-          <ha-icon icon=${r.icon || "mdi:square"} style="--mdc-icon-size:18px;flex-shrink:0"></ha-icon>
-          <span style="flex:1">${r.name || r.key}</span>
-          <span style="font-size:11px;color:var(--secondary-text-color)">${i + 1}</span>
-        </div>
-      `)}
-    `;
+      <div class="section-title">Cleaning sequence</div>
+      ${this._hint("Shared by every vacuum — drag to reorder.", "Backend-owned; the Roborock app's room order is the same list.")}
+      <div class="seq-list">
+        ${ordered.map((r, i) => html`
+          <div class="seq-row ${this._dragSeq !== null && this._dragSeq !== i ? "seq-row--drop" : ""}"
+            @dragover=${(e: DragEvent) => { if (this._dragSeq !== null) e.preventDefault(); }}
+            @drop=${(e: DragEvent) => {
+              e.preventDefault();
+              if (this._dragSeq !== null) this._moveSequence(seqVac, ordered, this._dragSeq, i);
+              this._dragSeq = null;
+            }}>
+            <ha-icon class="drag" icon="mdi:drag-horizontal-variant" title="Drag to reorder"
+              draggable="true"
+              @dragstart=${(e: DragEvent) => { this._dragSeq = i; if (e.dataTransfer) e.dataTransfer.effectAllowed = "move"; }}
+              @dragend=${() => { this._dragSeq = null; }}></ha-icon>
+            <ha-icon class="seq-icon" icon=${r.icon || "mdi:square"}></ha-icon>
+            <span class="seq-name">${r.name || r.key}</span>
+            <span class="seq-pos">${i + 1}</span>
+          </div>
+        `)}
+      </div>`;
   }
 
   private _dbgRow(label: string, value: unknown) {
     return html`<div class="field field--row">
       <label>${label}</label>
-      <span style="font-size:12px;font-family:monospace;word-break:break-all">${
+      <span class="mono">${
         value === undefined || value === null || value === "" ? "—" : String(value)
       }</span>
     </div>`;
@@ -1596,30 +1650,17 @@ export class AnyVacCardEditor extends LitElement {
 
   private _renderDebugTab() {
     const fmt = (v: unknown) => { try { return JSON.stringify(v, null, 1); } catch { return String(v); } };
-    const pre = "font-size:11px;font-family:monospace;white-space:pre-wrap;word-break:break-all;background:rgba(127,127,127,0.12);padding:6px;border-radius:6px;margin:0;max-height:220px;overflow:auto";
     return html`
       <div class="tab-body">
-        <p class="hint">Live values from Home Assistant, read-only — to check the integration is writing data correctly.</p>
-        <div class="field field--row">
-          <label>Room progress gauges on map</label>
-          <label class="toggle-wrap">
-            <input type="checkbox" class="toggle-input"
-              .checked=${this._config.debug_room_progress ?? false}
-              @change=${(e: Event) => this._setConfig({ debug_room_progress: (e.target as HTMLInputElement).checked || undefined })} />
-            <span class="toggle-track"></span>
-          </label>
-        </div>
-        <p class="hint">Draws a small % gauge on each room (spatial coverage). Spatial % is approximate — the room box includes furniture, so it plateaus below 100%.</p>
-        <div class="field field--row">
-          <label>Dense portrait room list</label>
-          <label class="toggle-wrap">
-            <input type="checkbox" class="toggle-input"
-              .checked=${this._config.debug_dense_dock ?? false}
-              @change=${(e: Event) => this._setConfig({ debug_dense_dock: (e.target as HTMLInputElement).checked || undefined })} />
-            <span class="toggle-track"></span>
-          </label>
-        </div>
-        <p class="hint">Brings back the old portrait room list (name, age, pin, assigned vacuum) below the map — the minimalist cockpit (docs/25 §7c) drops it in favor of map-tap selection. Independent of the gauges toggle above — you can debug coverage % (which shows on the map either way) without this.</p>
+        ${this._hint("Live values from Home Assistant, read-only.")}
+        ${this._toggle("Room progress gauges on map", this._config.debug_room_progress ?? false,
+          (v) => this._setConfig({ debug_room_progress: v || undefined }))}
+        ${this._hint("A small % gauge on each room.",
+          "Spatial coverage — approximate: the room box includes furniture, so it plateaus below 100%.")}
+        ${this._toggle("Dense portrait room list", this._config.debug_dense_dock ?? false,
+          (v) => this._setConfig({ debug_dense_dock: v || undefined }))}
+        ${this._hint("The old portrait room list instead of the rail.",
+          "Name, age, pin and assigned vacuum per room. Independent of the gauges toggle above.")}
         ${this._config.vacuums.map((vac) => {
           const ie = this._intEntityFor(vac);
           const st = ie ? this.hass.states[ie] : undefined;
@@ -1629,9 +1670,9 @@ export class AnyVacCardEditor extends LitElement {
             <div class="section-title">${vac.name ?? vac.entity}</div>
             <div class="sub-section">
               ${!ie
-                ? html`<p class="hint">No AnyVac integration sensor found (config or auto-resolve) — backend values unavailable.</p>`
+                ? this._hint("No AnyVac integration sensor found — backend values unavailable.")
                 : !st
-                  ? html`<p class="hint">Sensor <code>${ie}</code> not found.</p>`
+                  ? this._hint(html`Sensor <code>${ie}</code> not found.`)
                   : html`
                     ${this._dbgRow("sensor", `${ie} = ${st.state}`)}
                     ${this._dbgRow("schema_version", at.schema_version)}
@@ -1645,16 +1686,18 @@ export class AnyVacCardEditor extends LitElement {
                     ${this._dbgRow("path pts (raw)", at.path_points)}
                     ${this._dbgRow("mop pts (raw)", at.mop_path_points)}
                     <div class="sub-title">calib — last single-room decision</div>
-                    <pre style=${pre}>${fmt(at.calib_debug)}</pre>
+                    <pre class="pre">${fmt(at.calib_debug)}</pre>
                     <div class="sub-title">rooms_estimate (per vacuum)</div>
-                    <pre style=${pre}>${fmt(at.rooms_estimate)}</pre>
+                    <pre class="pre">${fmt(at.rooms_estimate)}</pre>
                     <div class="sub-title">rooms_last_cleaned (cross-vacuum)</div>
-                    <pre style=${pre}>${fmt(at.rooms_last_cleaned)}</pre>
+                    <pre class="pre">${fmt(at.rooms_last_cleaned)}</pre>
                     <div class="sub-title">rooms_progress — spatial % + time ratio (live)</div>
-                    <pre style=${pre}>${fmt(at.rooms_progress)}</pre>
+                    <pre class="pre">${fmt(at.rooms_progress)}</pre>
+                    <div class="sub-title">job_progress (live)</div>
+                    <pre class="pre">${fmt(at.job_progress)}</pre>
                     <div class="sub-title">rooms (geometry — for spatial coverage)</div>
-                    <pre style=${pre}>${fmt((at.rooms ?? []).map((r: any) => ({ name: r.name, bbox_px: r.bbox_px, x0: r.x0, y0: r.y0, x1: r.x1, y1: r.y1 })))}</pre>
-                    <details><summary class="hint" style="cursor:pointer">Raw attributes</summary><pre style=${pre}>${fmt(at)}</pre></details>
+                    <pre class="pre">${fmt((at.rooms ?? []).map((r: any) => ({ name: r.name, bbox_px: r.bbox_px, x0: r.x0, y0: r.y0, x1: r.x1, y1: r.y1 })))}</pre>
+                    <details><summary class="hint">Raw attributes</summary><pre class="pre">${fmt(at)}</pre></details>
                   `}
             </div>`;
         })}
@@ -1670,131 +1713,59 @@ export class AnyVacCardEditor extends LitElement {
 
         <div class="section-title">Appearance</div>
         ${this._selectField<CardTheme>("Theme", this._config.theme ?? DEFAULT_THEME,
-          [{ value: "dark", label: "Dark — lifted surfaces, soft elevation" },
-           { value: "light", label: "Light — for a light HA theme" },
-           { value: "auto", label: "Auto — follow the system setting" },
+          [{ value: "dark", label: "Dark" },
+           { value: "light", label: "Light" },
+           { value: "auto", label: "Auto — follow the system" },
            { value: "legacy", label: "Legacy — the pre-1.2.0 look" }],
           v => this._setConfig({ theme: v === DEFAULT_THEME ? undefined : v }))}
-        <p class="hint">Before 1.2.0 the card was dark-only and unreadable on a light dashboard.
-          "Legacy" is the exact previous appearance, kept as a way back if a dashboard was
-          tuned around it.</p>
-
-        ${this._hexColorField("Accent colour", this._config.accent,
+        ${this._colorField("Accent colour", this._config.accent, ACCENT_PRESETS,
           v => this._setConfig({ accent: v || undefined }), DEFAULT_ACCENT)}
-        <div class="hex-color-row" style="flex-wrap:wrap;gap:6px;margin:-4px 0 0">
-          ${ACCENT_PRESETS.map((p) => {
-            const on = (this._config.accent ?? DEFAULT_ACCENT).toLowerCase() === p.hex.toLowerCase();
-            return html`<button type="button" title=${p.label}
-              style=${"width:24px;height:24px;padding:0;border-radius:50%;cursor:pointer;background:" + p.hex
-                + ";border:2px solid " + (on ? "#fff" : "transparent")
-                + ";box-shadow:0 0 0 1px rgba(0,0,0,0.35)"}
-              @click=${() => this._setConfig({ accent: p.hex })}></button>`;
-          })}
-        </div>
-        <p class="hint">Drives the primary action (START), room selection and focus rings.
-          Status colours are deliberately left alone — their saturation carries meaning
-          (cleaning / mopping / error), not taste.</p>
+        ${this._hint("START, room selection and focus rings.",
+          "Status colours are deliberately left alone — their saturation carries meaning (cleaning / mopping / error).")}
+        ${this._toggle("Calm resting state", this._config.calm_state !== false,
+          (v) => this._setConfig({ calm_state: v ? undefined : false }))}
+        ${this._hint("Idle: the leftover trace and secondary numbers step back.", "Nothing is hidden or disabled — it's purely de-emphasis.")}
+        ${this._toggle("Reduce motion", !!this._config.reduce_motion,
+          (v) => this._setConfig({ reduce_motion: v ? true : undefined }))}
+        ${this._hint("Turns off animations on the map and the start sequence.",
+          "The operating system's own \"reduce motion\" setting already does this — this is for switching them off without changing that.")}
 
-        <div class="field field--row">
-          <label>Calm resting state</label>
-          <label class="toggle-wrap">
-            <input type="checkbox" class="toggle-input"
-              .checked=${this._config.calm_state !== false}
-              @change=${(e: Event) => this._setConfig({
-                calm_state: (e.target as HTMLInputElement).checked ? undefined : false,
-              })} />
-            <span class="toggle-track"></span>
-          </label>
-        </div>
-        <p class="hint">When nothing is running and nothing is selected, the leftover map trace
-          and the secondary numbers step back so the one thing worth touching stands out.
-          Nothing is hidden or disabled — it's purely de-emphasis.</p>
-
-        <div class="field field--row">
-          <label>Reduce motion</label>
-          <label class="toggle-wrap">
-            <input type="checkbox" class="toggle-input"
-              .checked=${!!this._config.reduce_motion}
-              @change=${(e: Event) => this._setConfig({
-                reduce_motion: (e.target as HTMLInputElement).checked ? true : undefined,
-              })} />
-            <span class="toggle-track"></span>
-          </label>
-        </div>
-        <p class="hint">Turns off the press feedback and the live pulses. Your operating
-          system's own "reduce motion" setting already does this on its own — this is for
-          switching them off without changing that.</p>
-
-        <div class="section-title" style="margin-top:4px">Layout</div>
-        <div class="field field--row">
-          <label>Fit card to available screen space</label>
-          <label class="toggle-wrap">
-            <input type="checkbox" class="toggle-input"
-              .checked=${!!this._config.layout}
-              @change=${(e: Event) => this._setConfig({
-                layout: (e.target as HTMLInputElement).checked ? (this._config.layout ?? {}) : undefined,
-              })} />
-            <span class="toggle-track"></span>
-          </label>
-        </div>
-        <p class="hint">Recommended for most dashboards — the card sizes itself to fit the space
-          it's given (portrait/landscape profiles, tuned spacing, responsive map rotation)
-          instead of growing as tall as its content needs. Off keeps the older, simpler
-          rendering for dashboards already tuned around it. Advanced per-profile tuning
-          (column/row overrides, map crop, orientation) is still YAML-only — this toggle
-          turns the system on with its built-in defaults; switch to YAML mode to fine-tune.</p>
-
+        <div class="section-title">Layout</div>
+        ${this._toggle("Fit card to available screen space", !!this._config.layout,
+          (v) => this._setConfig({ layout: v ? (this._config.layout ?? {}) : undefined }))}
+        ${this._hint("Recommended — portrait/landscape profiles sized to the screen.",
+          "Off keeps the older rendering that grows as tall as its content. Per-profile tuning (columns/rows, crop, orientation, topology) is YAML-only.")}
         ${this._config.layout ? html`
-          <div class="field field--row">
-            <label>Flip portrait map 180°</label>
-            <label class="toggle-wrap">
-              <input type="checkbox" class="toggle-input"
-                .checked=${this._config.layout.portrait?.crop?.flip === true}
-                @change=${(e: Event) => this._setLayoutFlip("portrait", (e.target as HTMLInputElement).checked)} />
-              <span class="toggle-track"></span>
-            </label>
-          </div>
-          <div class="field field--row">
-            <label>Flip landscape map 180°</label>
-            <label class="toggle-wrap">
-              <input type="checkbox" class="toggle-input"
-                .checked=${this._config.layout.landscape?.crop?.flip === true}
-                @change=${(e: Event) => this._setLayoutFlip("landscape", (e.target as HTMLInputElement).checked)} />
-              <span class="toggle-track"></span>
-            </label>
-          </div>
-          <p class="hint">Turns the map upside down if it doesn't match the compass direction
-            you're used to (docs/32) — a persisted default for this card. There's also a
-            "Flip map" button in the running card's map toolbar for a quick, unsaved
-            per-screen try-out that doesn't touch this setting.</p>
+          ${this._toggle("Flip portrait map 180°", this._config.layout.portrait?.crop?.flip === true,
+            (v) => this._setLayoutFlip("portrait", v))}
+          ${this._toggle("Flip landscape map 180°", this._config.layout.landscape?.crop?.flip === true,
+            (v) => this._setLayoutFlip("landscape", v))}
+          ${this._hint("A saved default; the map toolbar's Flip is a quick, unsaved try-out.")}
         ` : nothing}
 
-        <div class="section-title" style="margin-top:4px">Controller</div>
-        ${this._selectField<"auto" | "manual">("Mode", this._config.ui_mode ?? "auto",
-          [{ value: "auto", label: "Auto — one orchestrated controller" },
-           { value: "manual", label: "Manual — per-robot controllers" }],
+        <div class="section-title">Controller</div>
+        ${this._segmented<"auto" | "manual">("Mode", this._config.ui_mode ?? "auto",
+          [{ value: "auto", label: "Auto — one START" },
+           { value: "manual", label: "Manual — per robot" }],
           v => this._setConfig({ ui_mode: v }))}
 
         ${this._mergedEdit ? html`
-          <div class="section-title" style="margin-top:4px">Floorplan</div>
+          <div class="section-title">Floorplan</div>
           ${this._textField("Image src (URL)", this._config.image_base?.src,
             v => this._setConfig({ image_base: { ...(this._config.image_base ?? { src: "" }), src: v } }),
             "/local/anyvac/flat.svg")}
-          <p class="hint">${this._config.image_base?.src
-            ? html`Rotation/scale/position and room layout are set in the Visual editor
-                (open it from the card) — this field is only for pointing at a new file
-                (e.g. after snapshotting or tracing one externally).`
-            : html`Set this once to bootstrap the shared floorplan — after that, use the
-                Visual editor's own "Snapshot" buttons or this field again to replace the
-                file; rotation/scale/position are then set in the Visual editor.`}</p>
+          ${this._hint("Rotation, scale and room layout are set in the Visual editor.",
+            this._config.image_base?.src
+              ? "This field is only for pointing at a new file (e.g. after snapshotting or tracing one externally)."
+              : "Set this once to bootstrap the shared floorplan — after that, the Visual editor's Snapshot buttons can replace it.")}
           ${this._numberSlider("Stage height (0 = auto)", this._config.base_height ?? 0, 0, 1200, 10,
             v => this._setConfig({ base_height: v > 0 ? v : undefined }), " px")}
 
-          <div class="section-title" style="margin-top:4px">Rooms (shared)</div>
-          <p class="hint">Merged mode shares one room list across every vacuum.
-            ${this._config.vacuums.some(v => this._intEntityFor(v))
-              ? " With the AnyVac integration, rooms appear automatically from the shared floorplan — add a room below only to override its icon/display name or clean-time estimates."
-              : " Add one entry per room."}</p>
+          <div class="section-title">Rooms (shared)</div>
+          ${this._config.vacuums.some(v => this._intEntityFor(v))
+            ? this._hint("Rooms come from the integration automatically.",
+                "Add a room here only to override its icon/display name or clean-time estimates.")
+            : this._hint("One list for every vacuum — add one entry per room.")}
           ${(this._config.rooms ?? []).map((r, ri) => this._renderMergedRoomAccordion(r, ri))}
           <button class="btn btn--add" @click=${() => this._addEditedRoom()}>
             <ha-icon icon="mdi:plus"></ha-icon> Add room
@@ -1802,26 +1773,23 @@ export class AnyVacCardEditor extends LitElement {
           ${this._renderSequenceSection()}
         ` : nothing}
 
-        <div class="section-title" style="margin-top:4px">Global presets (Auto mode)</div>
-        <p class="hint">Targeted whole-home cleans for Auto mode (e.g. "After dinner", "Whole home"). The integration decides which robots and the order; you pick the scope.</p>
+        <div class="section-title">Global presets (Auto mode)</div>
+        ${this._hint("Targeted whole-home cleans, e.g. “After dinner”.", "The integration decides which robots and the order; you pick the scope and mode.")}
         ${(this._config.global_presets ?? []).map((gp, i) => html`
           <div class="sub-section">
-            <div class="sub-title" style="display:flex;align-items:center;justify-content:space-between">
+            <div class="sub-title sub-title--row">
               <span>${gp.label || gp.id}</span>
-              <button class="icon-btn icon-btn--danger" title="Delete preset"
-                @click=${() => this._deleteGlobalPreset(i)}>
-                <ha-icon icon="mdi:delete"></ha-icon>
-              </button>
+              ${this._rowMenu("gp-" + i, gp.label || gp.id, [], () => this._deleteGlobalPreset(i))}
             </div>
             ${this._textField("Label", gp.label, v => this._setGlobalPreset(i, { label: v }), "e.g. After dinner")}
-            ${this._textField("Icon", gp.icon, v => this._setGlobalPreset(i, { icon: v || undefined }), "mdi:silverware-fork-knife")}
-            ${this._selectField<"all" | "select">("Scope", (gp.scope === "all" ? "all" : "select"),
-              [{ value: "all", label: "Whole flat" }, { value: "select", label: "Pick rooms on map" }],
+            ${this._iconPickerField(gp.icon, v => this._setGlobalPreset(i, { icon: v || undefined }))}
+            ${this._segmented<"all" | "select">("Scope", (gp.scope === "all" ? "all" : "select"),
+              [{ value: "all", label: "Whole home" }, { value: "select", label: "Pick on map" }],
               v => this._setGlobalPreset(i, { scope: v }))}
-            ${this._selectField<"dry" | "wet" | "both">("Mode", gp.mode ?? "dry",
-              [{ value: "dry", label: "Dry only" },
-               { value: "wet", label: "Wet only" },
-               { value: "both", label: "Dry then wet (wet follows dry)" }],
+            ${this._segmented<"dry" | "wet" | "both">("Mode", gp.mode ?? "dry",
+              [{ value: "dry", label: "Dry", icon: "mdi:broom" },
+               { value: "wet", label: "Wet", icon: "mdi:water" },
+               { value: "both", label: "Both", icon: "mdi:water-plus" }],
               v => this._setGlobalPreset(i, { mode: v }))}
           </div>
         `)}
@@ -1829,51 +1797,37 @@ export class AnyVacCardEditor extends LitElement {
           <ha-icon icon="mdi:plus"></ha-icon> Add global preset
         </button>
 
-        <div class="section-title" style="margin-top:4px">Global actions</div>
-        <p class="hint">Badges that trigger a script across all vacuums (e.g. "Clean whole flat").</p>
-        ${globals.length === 0
-          ? html`<p class="hint">None configured.</p>`
-          : globals.map((ga, i) => this._renderGlobalAccordion(ga, i))}
+        <div class="section-title">Global actions</div>
+        ${this._hint("Badges that run a script across all vacuums.")}
+        ${globals.map((ga, i) => this._renderGlobalAccordion(ga, i))}
         <button class="btn btn--add" @click=${() => this._addGlobal()}>
           <ha-icon icon="mdi:plus"></ha-icon> Add global action
         </button>
 
-        <div class="section-title" style="margin-top:4px">Room appearance</div>
-        <p class="hint">Applies to all vacuums.</p>
-        <div class="field field--row">
-          <label>Hide room icons</label>
-          <label class="toggle-wrap">
-            <input type="checkbox" class="toggle-input"
-              .checked=${this._config.room_icon_hidden ?? false}
-              @change=${(e: Event) => this._setConfig({ room_icon_hidden: (e.target as HTMLInputElement).checked || undefined })} />
-            <span class="toggle-track"></span>
-          </label>
-        </div>
+        <div class="section-title">Room appearance</div>
+        ${this._toggle("Hide room icons", this._config.room_icon_hidden ?? false,
+          (v) => this._setConfig({ room_icon_hidden: v || undefined }))}
         ${this._numberSlider("Border (idle)",     this._config.room_border_normal   ?? 2, 0, 12, 1,
           v => this._setConfig({ room_border_normal: v }), "px")}
         ${this._numberSlider("Border (selected)", this._config.room_border_selected ?? 4, 0, 12, 1,
           v => this._setConfig({ room_border_selected: v }), "px")}
 
-        <div class="section-title" style="margin-top:4px">Thresholds (border colour by last clean age)</div>
-        <p class="hint">Rules ascending — first match wins. Beyond the last = red.</p>
+        <div class="section-title">Thresholds</div>
+        ${this._hint("Room age colours — first match wins, beyond the last is red.")}
         ${ths.map((th, ti) => html`
           <div class="var-row threshold-row">
             <span class="threshold-label">≤</span>
-            <input type="number" class="text-input text-input--sm threshold-days"
-              min="0" max="365" .value=${String(th.days)}
-              @change=${(e: Event) => {
-                const days = parseInt((e.target as HTMLInputElement).value);
-                const next = ths.map((t, i) => i === ti ? { ...t, days: isNaN(days) ? t.days : days } : t);
-                this._setConfig({ room_thresholds: next });
-              }} />
-            <span class="threshold-label">days</span>
-            <input type="color" class="threshold-color" .value=${th.color}
+            ${this._numberBox("Days", th.days, (days) => {
+              const next = ths.map((t, i) => i === ti ? { ...t, days: days ?? t.days } : t);
+              this._setConfig({ room_thresholds: next });
+            }, { min: 0, max: 365 })}
+            <input type="color" class="threshold-color" aria-label="Colour" .value=${th.color}
               @input=${(e: Event) => {
                 const color = (e.target as HTMLInputElement).value;
                 const next = ths.map((t, i) => i === ti ? { ...t, color } : t);
                 this._setConfig({ room_thresholds: next });
               }} />
-            <button class="icon-btn icon-btn--danger icon-btn--sm"
+            <button class="icon-btn icon-btn--sm" aria-label="Remove threshold"
               @click=${() => {
                 const next = ths.filter((_, i) => i !== ti);
                 this._setConfig({ room_thresholds: next.length ? next : undefined });
@@ -1881,7 +1835,7 @@ export class AnyVacCardEditor extends LitElement {
               <ha-icon icon="mdi:close"></ha-icon>
             </button>
           </div>`)}
-        <div style="display:flex;gap:8px;flex-wrap:wrap">
+        <div class="btn-row">
           <button class="btn btn--add btn--sm" @click=${() =>
             this._setConfig({ room_thresholds: [...ths, { days: 14, color: "#ff4d4f" }] })}>
             <ha-icon icon="mdi:plus"></ha-icon> Add threshold
@@ -1893,20 +1847,12 @@ export class AnyVacCardEditor extends LitElement {
           ` : nothing}
         </div>
 
-        <div class="section-title" style="margin-top:4px">Notifications</div>
-        <p class="hint">
-          Notifications are built from the AnyVac integration's server-side events
-          three ready-made automation blueprints (Settings → Automations →
-          Create with blueprint) — the card no longer sends notifications itself:
-        </p>
-        <ul style="margin:0;padding-left:18px;font-size:12px;color:var(--secondary-text-color);display:flex;flex-direction:column;gap:2px">
-          <li><strong>Clean finished</strong> — fires on the integration's <code>anyvac_clean_finished</code> event.</li>
-          <li><strong>Vacuum error</strong> — watches the official Roborock error sensor's state directly (not an AnyVac event).</li>
-          <li><strong>Room overdue</strong> — polls an AnyVac per-room "last cleaned" timestamp sensor hourly against a day threshold you set.</li>
-        </ul>
-        <p class="hint">The integration also fires <code>anyvac_clean_started</code> and
-          <code>anyvac_room_done</code> events, but neither has a shipped blueprint yet —
-          build a custom automation on the event if you need one.</p>
+        <div class="section-title">Notifications</div>
+        ${this._hint("Built from the integration's events with ready-made blueprints.",
+          html`Settings → Automations → Create with blueprint: <strong>Clean finished</strong>
+            (<code>anyvac_clean_finished</code>), <strong>Vacuum error</strong> (the Roborock error sensor)
+            and <strong>Room overdue</strong> (hourly check against a day threshold).
+            <code>anyvac_clean_started</code> and <code>anyvac_room_done</code> have no blueprint yet.`)}
 
         ${(() => {
           const usesAreaMappings = this._config.vacuums.some(v => v.clean_action?.type === "native-area");
@@ -1916,10 +1862,11 @@ export class AnyVacCardEditor extends LitElement {
           )].sort();
           const mappings = this._config.area_mappings ?? {};
           return html`
-            <div class="section-title" style="margin-top:4px">Area mappings</div>
-            <p class="hint">Maps room keys to HA areas for the <strong>native-area</strong> strategy (degraded mode only — irrelevant once the AnyVac integration is active for a vacuum). Set once here — applies to all vacuums.</p>
+            <div class="section-title">Area mappings</div>
+            ${this._hint("Room key → HA area, for the native-area strategy.",
+              "Used without the AnyVac integration only. Applies to all vacuums.")}
             ${allKeys.length === 0
-              ? html`<p class="hint">No rooms configured yet.</p>`
+              ? this._hint("No rooms configured yet.")
               : allKeys.map(key => this._areaPicker(key, mappings[key], v => {
                   const next = { ...mappings };
                   if (v) next[key] = v; else delete next[key];
@@ -1937,19 +1884,20 @@ export class AnyVacCardEditor extends LitElement {
     const action = ga.action;
     const watches = ga.watch_entities ?? [];
     return html`
-      <div class="acc-row" style=${styleMap({ borderLeft: "3px solid " + color })}>
-        <div class="acc-header" @click=${() => this._toggleGlobal(idx)}>
-          ${ga.image
-            ? html`<img class="acc-img" src=${ga.image} alt=${ga.name} />`
-            : html`<ha-icon icon="mdi:home-floor-a" style=${styleMap({ color, width: "36px", height: "36px" })}></ha-icon>`}
+      <div class="acc-row ${isOpen ? "acc-row--open" : ""}">
+        <div class="acc-header" role="button" tabindex="0" aria-expanded=${isOpen ? "true" : "false"}
+          @click=${() => this._toggleGlobal(idx)}
+          @keydown=${(e: KeyboardEvent) => { if (e.key === "Enter" || e.key === " ") { e.preventDefault(); this._toggleGlobal(idx); } }}>
+          <span class="acc-avatar" style=${styleMap({ borderColor: color })}>
+            ${ga.image
+              ? html`<img src=${ga.image} alt="" />`
+              : html`<ha-icon icon="mdi:home-floor-a" style=${styleMap({ color })}></ha-icon>`}
+          </span>
           <div class="acc-info">
             <span class="acc-name">${ga.name || "Unnamed action"}</span>
             <span class="acc-sub">${action.type === "script" ? action.entity_id : (action as any).service}</span>
           </div>
-          <button class="icon-btn icon-btn--danger"
-            @click=${(e: Event) => { e.stopPropagation(); this._deleteGlobal(idx); }}>
-            <ha-icon icon="mdi:delete"></ha-icon>
-          </button>
+          ${this._rowMenu("ga-" + idx, ga.name || "this action", [], () => this._deleteGlobal(idx))}
           <ha-icon icon=${isOpen ? "mdi:chevron-up" : "mdi:chevron-down"} class="acc-chevron"></ha-icon>
         </div>
         ${isOpen ? html`
@@ -1958,31 +1906,34 @@ export class AnyVacCardEditor extends LitElement {
               v => this._setGlobal(idx, { name: v }), "e.g. Whole flat")}
             ${this._textField("Image path", ga.image,
               v => this._setGlobal(idx, { image: v || undefined }), "/local/...")}
-            ${this._hexColorField("Accent colour", ga.color ? this._resolveColor(ga.color, "orange") : undefined,
+            ${this._colorField("Colour", ga.color ? this._resolveColor(ga.color, "orange") : undefined,
+              DEFAULT_VACUUM_PALETTE.map((hex) => ({ hex })),
               v => this._setGlobal(idx, { color: v || undefined }), "#faad14")}
+            ${this._ha
+              ? this._sel("Watch entities (badge glows while any is cleaning)",
+                  { entity: { domain: "vacuum", multiple: true } }, watches,
+                  (v) => this._setGlobal(idx, { watch_entities: (Array.isArray(v) ? v : []).filter(Boolean) }))
+              : html`
+                <div class="sub-title">Watch entities (badge glows while any is cleaning)</div>
+                ${watches.map((e, wi) => html`
+                  <div class="var-row">
+                    ${this._entityPicker("Vacuum", e, ["vacuum"], (v) => {
+                      const updated = [...watches];
+                      updated[wi] = v;
+                      this._setGlobal(idx, { watch_entities: updated.filter(Boolean) });
+                    })}
+                    <button class="icon-btn icon-btn--sm" aria-label="Remove"
+                      @click=${() => this._setGlobal(idx, { watch_entities: watches.filter((_, i) => i !== wi) })}>
+                      <ha-icon icon="mdi:close"></ha-icon>
+                    </button>
+                  </div>`)}
+                <button class="btn btn--add btn--sm"
+                  @click=${() => this._setGlobal(idx, { watch_entities: [...watches, ""] })}>
+                  <ha-icon icon="mdi:plus"></ha-icon> Add entity
+                </button>`}
 
-            <div class="sub-title">Watch entities (badge glows when any is cleaning)</div>
-            ${watches.map((e, wi) => html`
-              <div class="var-row">
-                <ha-entity-picker .hass=${this.hass} .value=${e} .includeDomains=${["vacuum"]}
-                  allow-custom-entity style="flex:1"
-                  @value-changed=${(ev: CustomEvent) => {
-                    const updated = [...watches];
-                    updated[wi] = ev.detail.value;
-                    this._setGlobal(idx, { watch_entities: updated.filter(Boolean) });
-                  }}></ha-entity-picker>
-                <button class="icon-btn icon-btn--danger icon-btn--sm"
-                  @click=${() => this._setGlobal(idx, { watch_entities: watches.filter((_, i) => i !== wi) })}>
-                  <ha-icon icon="mdi:close"></ha-icon>
-                </button>
-              </div>`)}
-            <button class="btn btn--add btn--sm"
-              @click=${() => this._setGlobal(idx, { watch_entities: [...watches, ""] })}>
-              <ha-icon icon="mdi:plus"></ha-icon> Add entity
-            </button>
-
-            <div class="sub-title">Action (hold-to-activate)</div>
-            ${this._selectField<"script" | "service">("Type", action.type,
+            <div class="sub-title">Action (hold to run)</div>
+            ${this._segmented<"script" | "service">("Type", action.type,
               [{ value: "script", label: "Script" }, { value: "service", label: "Service call" }],
               v => this._setGlobal(idx, { action: v === "script"
                 ? { type: "script", entity_id: "" }
@@ -2001,384 +1952,272 @@ export class AnyVacCardEditor extends LitElement {
 
   render() {
     if (!this._config) return nothing;
+    // docs/44 F6: wait (briefly) for HA's form elements instead of flashing
+    // the plain inputs first; `_ensureHaElements` settles within ~4 s at worst.
+    if (this._ha === null) return html`<div class="loading">Loading…</div>`;
+    this._hintSeq = 0;
     return html`
-      <datalist id="ha-entities"></datalist>
-      <div class="editor-root">
-        <div class="tabs-bar">
+      ${this._ha ? nothing : html`<datalist id="ha-entities"></datalist>`}
+      <div class="editor-root" @click=${() => { if (this._menu) { this._menu = null; this._confirm = null; } }}>
+        <div class="tabs-bar" role="tablist">
           ${(["vacuums", "global"] as const).map(t => html`
-            <button class="tab-btn ${this._tab === t ? "tab-btn--active" : ""}"
+            <button class="tab-btn ${this._tab === t ? "tab-btn--active" : ""}" role="tab"
+              aria-selected=${this._tab === t ? "true" : "false"}
               @click=${() => { this._tab = t; }}>
-              ${{ vacuums: "🤖 Vacuums", global: "⚙ Global" }[t]}
+              <ha-icon icon=${t === "vacuums" ? "mdi:robot-vacuum" : "mdi:tune-variant"}></ha-icon>
+              ${{ vacuums: "Vacuums", global: "Global" }[t]}
             </button>`)}
         </div>
         ${this._tab === "vacuums" ? this._renderVacuumsTab()
           : this._tab === "debug"   ? this._renderDebugTab()
           : this._renderGlobalTab()}
         <div class="editor-footer">
-          <span class="footer-link" @click=${() => { this._tab = this._tab === "debug" ? "vacuums" : "debug"; }}>
-            ${this._tab === "debug" ? "← Back" : "🐞 Show debug info"}
-          </span>
+          <button type="button" class="link-btn" @click=${() => { this._tab = this._tab === "debug" ? "vacuums" : "debug"; }}>
+            ${this._tab === "debug" ? "← Back" : "Debug info"}
+          </button>
           <span>anyvac-card v${CARD_VERSION}</span>
         </div>
       </div>`;
   }
 
   // ── Styles ────────────────────────────────────────────────────────────────
+  // docs/44 F6 (E5): Home Assistant's own variables only — the editor lives in
+  // HA's dialog, not on the card, so the card's design tokens don't apply.
 
   static styles = css`
-    .editor-root { display:flex; flex-direction:column; }
+    :host { display: block; }
+    .editor-root { display: flex; flex-direction: column; }
+    .loading { padding: 16px 0; color: var(--secondary-text-color); font-size: 14px; }
 
     /* ── Tabs ── */
-    .tabs-bar {
-      display:flex;
-      border-bottom:1px solid var(--divider-color,rgba(0,0,0,.12));
-      margin-bottom:2px;
-    }
+    .tabs-bar { display: flex; border-bottom: 1px solid var(--divider-color); margin-bottom: 4px; }
     .tab-btn {
-      flex:1; padding:10px 4px; background:none; border:none; cursor:pointer;
-      font-size:12px; font-weight:600; font-family:inherit;
-      color:var(--secondary-text-color);
-      border-bottom:2px solid transparent;
-      transition:color .15s, border-color .15s;
+      flex: 1; display: flex; align-items: center; justify-content: center; gap: 6px;
+      padding: 12px 4px; background: none; border: none; cursor: pointer;
+      font: inherit; font-size: 14px; font-weight: 500;
+      color: var(--secondary-text-color);
+      border-bottom: 2px solid transparent;
     }
-    .tab-btn--active { color:var(--primary-color); border-bottom-color:var(--primary-color); }
+    .tab-btn ha-icon { --mdc-icon-size: 18px; }
+    .tab-btn--active { color: var(--primary-color); border-bottom-color: var(--primary-color); }
 
-    /* ── Tab body ── */
-    .tab-body { display:flex; flex-direction:column; gap:8px; padding:10px 0 4px; }
+    .tab-body { display: flex; flex-direction: column; gap: 12px; padding: 12px 0 4px; }
 
-    /* ── YAML preview ── */
-    .yaml-preview {
-      background:var(--code-editor-background-color,#1e1e1e);
-      color:var(--code-editor-foreground-color,#d4d4d4);
-      padding:12px;
-      border-radius:6px;
-      font-size:11px;
-      line-height:1.6;
-      overflow-x:auto;
-      white-space:pre;
-      margin:0;
-      font-family:monospace;
-    }
-
-    /* ── Vacuum accordion ── */
+    /* ── Vacuum / global-action rows ── */
     .acc-row {
-      border-radius:10px;
-      border:1px solid var(--divider-color,rgba(0,0,0,.12));
-      background:var(--secondary-background-color);
-      overflow:hidden;
+      border-radius: var(--ha-card-border-radius, 12px);
+      border: 1px solid var(--divider-color);
+      background: var(--card-background-color);
     }
+    .acc-row--open { border-color: var(--primary-color); }
     .acc-header {
-      display:flex; align-items:center; gap:8px;
-      padding:10px 10px 10px 12px; cursor:pointer;
+      display: flex; align-items: center; gap: 12px;
+      padding: 10px 8px 10px 12px; cursor: pointer; border-radius: inherit;
     }
-    .acc-header:hover { background:rgba(0,0,0,.03); }
-    .acc-img  { width:36px; height:36px; border-radius:50%; object-fit:cover; flex-shrink:0; }
-    .acc-info { flex:1; display:flex; flex-direction:column; min-width:0; }
-    .acc-name { font-weight:600; font-size:14px; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
-    .acc-sub  { font-size:11px; color:var(--secondary-text-color); white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
-    .acc-chevron { color:var(--secondary-text-color); flex-shrink:0; }
+    .acc-header:focus-visible { outline: 2px solid var(--primary-color); outline-offset: -2px; }
+    .acc-avatar {
+      width: 40px; height: 40px; border-radius: 50%; flex-shrink: 0; overflow: hidden;
+      display: flex; align-items: center; justify-content: center;
+      border: 2px solid var(--divider-color); box-sizing: border-box;
+      background: var(--secondary-background-color);
+    }
+    .acc-avatar img { width: 100%; height: 100%; object-fit: cover; }
+    .acc-info { flex: 1; display: flex; flex-direction: column; min-width: 0; gap: 2px; }
+    .acc-name { display: flex; align-items: center; gap: 6px; font-weight: 500; font-size: 15px;
+      white-space: nowrap; overflow: hidden; text-overflow: ellipsis; color: var(--primary-text-color); }
+    .acc-dot { width: 8px; height: 8px; border-radius: 50%; flex-shrink: 0; }
+    .acc-sub { font-size: 12px; color: var(--secondary-text-color); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+    .acc-chevron { color: var(--secondary-text-color); flex-shrink: 0; }
     .acc-body {
-      padding:12px; display:flex; flex-direction:column; gap:8px;
-      border-top:1px solid var(--divider-color,rgba(0,0,0,.12));
+      padding: 12px; display: flex; flex-direction: column; gap: 12px;
+      border-top: 1px solid var(--divider-color);
     }
 
-    /* ── Collapsible (sensors / clean action) ── */
-    .collapsible {
-      border-radius:6px; border:1px solid var(--divider-color,rgba(0,0,0,.1)); overflow:hidden;
-    }
-    .collapsible-header {
-      display:flex; align-items:center; gap:8px; padding:8px 10px; cursor:pointer;
-      background:rgba(0,0,0,.02);
-    }
-    .collapsible-header:hover { background:rgba(0,0,0,.05); }
-    .collapsible-title {
-      flex:1; font-size:11px; font-weight:700; letter-spacing:.7px;
-      text-transform:uppercase; color:var(--primary-color);
-    }
-    .collapsible-body { padding:10px; display:flex; flex-direction:column; gap:8px; }
-
+    /* ── Sub-panels ── */
+    .panel { display: block; --expansion-panel-summary-padding: 0 12px; }
+    .panel-body { display: flex; flex-direction: column; gap: 12px; padding: 4px 0 8px; }
+    .collapsible { border-radius: 8px; border: 1px solid var(--divider-color); }
+    .collapsible-header { display: flex; align-items: center; gap: 8px; padding: 10px 12px; cursor: pointer; }
+    .collapsible-title { flex: 1; font-size: 14px; font-weight: 500; color: var(--primary-text-color); }
+    .collapsible-body { padding: 4px 12px 12px; display: flex; flex-direction: column; gap: 12px; }
     .badge {
-      font-size:10px; font-weight:600; padding:2px 7px; border-radius:10px;
-      background:rgba(0,0,0,.07); color:var(--secondary-text-color);
+      font-size: 12px; padding: 2px 8px; border-radius: 10px; max-width: 55%;
+      white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+      background: var(--secondary-background-color); color: var(--secondary-text-color);
     }
 
-    /* ── Cleaning sequence list (docs/19) ── */
-    .seq-list { display:flex; flex-direction:column; gap:2px; }
-    .seq-row {
-      display:flex; align-items:center; gap:8px; padding:6px 8px;
-      border-radius:6px; border:1px solid var(--divider-color,rgba(0,0,0,.1));
-      background:rgba(0,0,0,.015);
+    /* ── ⋮ menu ── */
+    .menu-wrap { position: relative; display: inline-flex; }
+    .menu {
+      position: absolute; right: 0; top: 100%; z-index: 10; min-width: 170px;
+      display: flex; flex-direction: column; padding: 4px 0;
+      background: var(--card-background-color); color: var(--primary-text-color);
+      border: 1px solid var(--divider-color); border-radius: 8px;
+      box-shadow: var(--ha-card-box-shadow, none);
     }
-    .seq-row--dragging { opacity:0.4; }
-    .seq-pos {
-      flex-shrink:0; width:20px; text-align:center; font-size:12px; font-weight:700;
-      color:var(--secondary-text-color);
+    .menu-item {
+      display: flex; align-items: center; gap: 12px; padding: 10px 14px;
+      background: none; border: none; cursor: pointer; text-align: left;
+      font: inherit; font-size: 14px; color: inherit;
     }
-    .seq-name { flex:1; font-size:13px; }
-    .seq-flag {
-      flex-shrink:0; width:16px; height:16px; border-radius:50%; background:#faad14;
-      color:#000; font-size:11px; font-weight:700; display:flex; align-items:center;
-      justify-content:center;
-    }
+    .menu-item ha-icon { --mdc-icon-size: 20px; color: var(--secondary-text-color); }
+    .menu-item:hover:not(:disabled) { background: var(--secondary-background-color); }
+    .menu-item:disabled { opacity: 0.4; cursor: default; }
+    .menu-item--danger, .menu-item--danger ha-icon { color: var(--error-color); }
+    .menu-confirm { padding: 10px 14px 6px; font-size: 14px; }
+    .menu-confirm-row { display: flex; justify-content: flex-end; gap: 4px; padding: 4px 8px 6px; }
+    .menu-btn { padding: 6px 12px; border: none; border-radius: 6px; background: none; cursor: pointer;
+      font: inherit; font-size: 14px; font-weight: 500; color: var(--primary-color); }
+    .menu-btn--danger { color: var(--error-color); }
 
-    /* ── Room accordion ── */
-    .room-acc {
-      border-radius:6px; border:1px solid var(--divider-color,rgba(0,0,0,.1));
-      background:rgba(0,0,0,.015); overflow:hidden;
-    }
-    .room-acc-header { display:flex; align-items:center; gap:8px; padding:8px 10px; cursor:pointer; }
-    .room-acc-header:hover { background:rgba(0,0,0,.04); }
-    .room-acc-icon { flex-shrink:0; }
-    .room-acc-info { flex:1; display:flex; flex-direction:column; }
-    .room-acc-name { font-weight:600; font-size:13px; }
-    .room-acc-meta { font-size:11px; color:var(--secondary-text-color); }
-    .room-acc-body {
-      padding:10px; display:flex; flex-direction:column; gap:8px;
-      border-top:1px solid var(--divider-color,rgba(0,0,0,.1));
-    }
+    /* ── Rooms ── */
+    .room-acc { border-radius: 8px; border: 1px solid var(--divider-color); }
+    .room-acc--drop, .seq-row--drop { outline: 2px dashed var(--primary-color); outline-offset: -2px; }
+    .room-acc-header { display: flex; align-items: center; gap: 8px; padding: 6px 6px 6px 8px; cursor: pointer; }
+    .room-acc-icon { flex-shrink: 0; color: var(--secondary-text-color); }
+    .room-acc-info { flex: 1; display: flex; flex-direction: column; min-width: 0; }
+    .room-acc-name { font-weight: 500; font-size: 14px; color: var(--primary-text-color); }
+    .room-acc-meta { font-size: 12px; color: var(--secondary-text-color); }
+    .room-acc-body { padding: 12px; display: flex; flex-direction: column; gap: 12px; border-top: 1px solid var(--divider-color); }
+    .drag { cursor: grab; color: var(--secondary-text-color); --mdc-icon-size: 18px; flex-shrink: 0; }
 
-    /* ── Toggle switch ── */
-    .toggle-wrap { position:relative; display:inline-flex; align-items:center; cursor:pointer; }
-    .toggle-input { position:absolute; opacity:0; width:0; height:0; }
-    .toggle-track {
-      width:36px; height:20px; border-radius:10px;
-      background:var(--divider-color,rgba(0,0,0,.2)); transition:background .2s; position:relative;
-    }
-    .toggle-track::after {
-      content:""; position:absolute; top:2px; left:2px;
-      width:16px; height:16px; border-radius:50%; background:white; transition:transform .2s;
-    }
-    .toggle-input:checked + .toggle-track { background:var(--primary-color); }
-    .toggle-input:checked + .toggle-track::after { transform:translateX(16px); }
-
-    /* ── Map hint link ── */
-    .map-hint {
-      cursor:pointer; color:var(--primary-color) !important;
-      text-decoration:underline; text-underline-offset:2px;
-    }
-    .map-hint:hover { opacity:.8; }
-
-    /* ── Pill rows (Maps tab vacuum/room selectors) ── */
-    .pill-row { display:flex; gap:6px; flex-wrap:wrap; }
-    .vac-pill {
-      padding:5px 12px; border-radius:20px; font-size:12px; font-weight:600; cursor:pointer;
-      border:1px solid var(--divider-color,rgba(0,0,0,.15));
-      background:var(--secondary-background-color); color:var(--secondary-text-color);
-      font-family:inherit;
-    }
-    .vac-pill--active { background:var(--primary-color); color:white; border-color:var(--primary-color); }
-    .room-pill {
-      display:flex; align-items:center; gap:4px;
-      padding:4px 10px; border-radius:16px; font-size:12px; font-weight:500; cursor:pointer;
-      border:1px solid var(--divider-color,rgba(0,0,0,.15));
-      background:var(--secondary-background-color); color:var(--secondary-text-color);
-      font-family:inherit;
-    }
-    .room-pill--active { background:rgba(33,150,243,.12); color:var(--primary-color); border-color:var(--primary-color); }
-
-    /* ── Map preview ── */
-    .map-pos-container { border-radius:8px; overflow:hidden; }
-    .map-pos-container--active { cursor:crosshair; }
-    .map-preview-wrap {
-      position:relative; width:100%; padding-top:27.5%;
-      overflow:hidden; border-radius:8px; background:rgba(0,0,0,.06);
-    }
-    .map-preview-img { position:absolute; transform-origin:center center; object-fit:cover; }
-
-    .pos-dot {
-      position:absolute; transform:translate(-50%,-50%);
-      width:26px; height:26px; border-radius:6px;
-      background:rgba(0,0,0,.55); border:2px solid rgba(255,255,255,.4);
-      display:flex; align-items:center; justify-content:center;
-      color:rgba(255,255,255,.7); cursor:grab;
-      touch-action:none; -webkit-user-select:none; user-select:none;
-    }
-    .pos-dot--active { background:rgba(33,150,243,.75); border-color:#2196F3; color:white; }
-
-    /* Rectangle overlay mode (map_w/map_h set) — draws the actual box instead of
-       just a centre dot, with drag-to-move + corner handles to drag-to-resize
-       (2026-07-26: sliders used to move a box nobody could see). */
-    .room-rect {
-      position:absolute; box-sizing:border-box; transform:translate(-50%,-50%);
-      border:2px solid rgba(255,255,255,.55); border-radius:4px;
-      background:rgba(0,0,0,.25);
-      display:flex; align-items:center; justify-content:center;
-      color:rgba(255,255,255,.8); cursor:grab;
-      touch-action:none; -webkit-user-select:none; user-select:none;
-    }
-    .room-rect--active { border-color:#2196F3; background:rgba(33,150,243,.25); color:white; }
-    .room-rect-handle {
-      position:absolute; transform:translate(-50%,-50%);
-      width:14px; height:14px; border-radius:50%;
-      background:#2196F3; border:2px solid white;
-      touch-action:none;
-    }
-    .room-rect-handle--nw { left:0%;   top:0%;   cursor:nwse-resize; }
-    .room-rect-handle--se { left:100%; top:100%; cursor:nwse-resize; }
-    .room-rect-handle--ne { left:100%; top:0%;   cursor:nesw-resize; }
-    .room-rect-handle--sw { left:0%;   top:100%; cursor:nesw-resize; }
-
-    /* ── Manual calibration from clicked points (docs/39) ──
-       docs/39 §9: the click target needs to be BIG on screen — the editor's
-       own column can be a few hundred px wide (or less on mobile), which
-       turns any click imprecision into a proportionally large geometric
-       error no amount of averaging fully cures. Rendered as a fixed
-       full-viewport overlay instead of inline, so the image is as large as
-       the whole screen allows regardless of how narrow the surrounding form
-       is — the click-handling math (_onCalibRawClick/_onCalibFloorClick)
-       is a plain ratio of the clicked element's own boundingClientRect, so
-       it's completely unaffected by how big that rect actually renders. */
-    .calib-overlay {
-      position:fixed; inset:0; z-index:1000;
-      background:rgba(0,0,0,.85);
-      display:flex; flex-direction:column; gap:10px;
-      padding:14px; box-sizing:border-box; overflow:auto;
-    }
-    .calib-banner {
-      flex:0 0 auto;
-      display:flex; align-items:center; justify-content:space-between; gap:8px;
-      padding:8px 10px; border-radius:8px;
-      background:rgba(250,173,20,.15); border:1px solid rgba(250,173,20,.4);
-      font-size:12px; color:#fff;
-    }
-    .calib-stage {
-      flex:1 1 auto; min-height:0;
-      display:flex; align-items:center; justify-content:center;
-    }
-    /* Sized from the image's own aspect ratio (--calib-ar, set inline per
-       render) via CSS alone — as wide/tall as the viewport allows (92vw by
-       92vh, whichever the aspect ratio hits first), no JS measurement needed. */
-    .calib-stage .map-preview-wrap {
-      position:relative; overflow:hidden; border-radius:8px;
-      background:rgba(255,255,255,.06);
-      width:min(92vw, calc(88vh * var(--calib-ar, 1.5)));
-      /* Overrides the base rule's padding-top aspect-ratio hack — this one
-         uses the aspect-ratio property instead, driven by --calib-ar, so
-         width can be computed from viewport units without any JS measuring. */
-      padding-top:0;
-      aspect-ratio:var(--calib-ar, 1.5);
-    }
-    .calib-marker {
-      position:absolute; transform:translate(-50%,-50%);
-      width:28px; height:28px; border-radius:50%;
-      background:rgba(250,173,20,.85); border:2px solid white;
-      display:flex; align-items:center; justify-content:center;
-      color:#000; font-size:14px; font-weight:700;
-      pointer-events:none;
-    }
-
-    .two-col { display:flex; gap:8px; }
-    .two-col > * { flex:1; min-width:0; }
-
-    /* ── Section title ── */
-    .section-title {
-      font-size:12px; font-weight:700; letter-spacing:.8px;
-      text-transform:uppercase; color:var(--primary-color);
-      border-bottom:1px solid var(--divider-color,rgba(0,0,0,.12));
-      padding-bottom:4px; margin-bottom:2px;
-    }
-    .sub-section {
-      display:flex; flex-direction:column; gap:8px;
-      padding-left:8px; border-left:3px solid var(--divider-color,rgba(0,0,0,.1));
-    }
-    .sub-title { font-size:11px; font-weight:600; color:var(--secondary-text-color); margin-top:4px; }
+    .seq-list { display: flex; flex-direction: column; gap: 4px; }
+    .seq-row { display: flex; align-items: center; gap: 8px; padding: 6px 8px; border-radius: 8px; border: 1px solid var(--divider-color); }
+    .seq-icon { --mdc-icon-size: 18px; flex-shrink: 0; color: var(--secondary-text-color); }
+    .seq-name { flex: 1; font-size: 14px; }
+    .seq-pos { font-size: 12px; color: var(--secondary-text-color); }
 
     /* ── Fields ── */
-    .field { display:flex; flex-direction:column; gap:4px; }
-    .field--row { flex-direction:row; align-items:center; }
-    .field--row label { width:130px; flex-shrink:0; }
-    label { font-size:13px; color:var(--secondary-text-color); }
-    .required { color:var(--error-color,#f44336); }
+    .sel { display: block; }
+    .field { display: flex; flex-direction: column; gap: 6px; }
+    .field--row { flex-direction: row; align-items: center; gap: 8px; }
+    .field--row label { width: 130px; flex-shrink: 0; }
+    label, .field-label { font-size: 14px; color: var(--secondary-text-color); }
+    .required { color: var(--error-color); }
+    .value { font-size: 14px; color: var(--primary-text-color); }
+    .mono { font-size: 12px; font-family: var(--code-font-family, monospace); word-break: break-all; }
+    .pre {
+      font-size: 11px; font-family: var(--code-font-family, monospace); white-space: pre-wrap; word-break: break-all;
+      background: var(--secondary-background-color); padding: 6px; border-radius: 6px; margin: 0; max-height: 220px; overflow: auto;
+    }
 
+    .segmented {
+      display: flex; border: 1px solid var(--divider-color); border-radius: 8px; overflow: hidden;
+    }
+    .seg {
+      flex: 1; display: flex; align-items: center; justify-content: center; gap: 6px;
+      padding: 8px 6px; border: none; background: none; cursor: pointer;
+      font: inherit; font-size: 13px; color: var(--primary-text-color);
+    }
+    .seg + .seg { border-left: 1px solid var(--divider-color); }
+    .seg ha-icon { --mdc-icon-size: 16px; }
+    .seg--on { background: rgba(var(--rgb-primary-color, 3, 169, 244), 0.15); color: var(--primary-color); font-weight: 500; }
+    .seg:focus-visible, .swatch:focus-visible, .link-btn:focus-visible, .icon-btn:focus-visible, .hint-more:focus-visible {
+      outline: 2px solid var(--primary-color); outline-offset: 1px;
+    }
+
+    .swatches { display: flex; align-items: center; flex-wrap: wrap; gap: 8px; }
+    .swatch {
+      position: relative; width: 28px; height: 28px; border-radius: 50%; padding: 0; cursor: pointer;
+      border: 2px solid transparent; box-shadow: 0 0 0 1px var(--divider-color); box-sizing: border-box;
+      display: inline-flex; align-items: center; justify-content: center; overflow: hidden;
+    }
+    .swatch--on { border-color: var(--card-background-color); box-shadow: 0 0 0 2px var(--primary-color); }
+    .swatch--custom ha-icon { --mdc-icon-size: 16px; color: var(--secondary-text-color); }
+    .swatch--custom input { position: absolute; inset: 0; opacity: 0; cursor: pointer; width: 100%; height: 100%; }
+
+    /* Plain-input fallback (no HA form elements) */
     .text-input {
-      width:100%; box-sizing:border-box; padding:8px 10px;
-      border:1px solid var(--divider-color,rgba(0,0,0,.2)); border-radius:6px;
-      background:var(--card-background-color); color:var(--primary-text-color);
-      font-size:13px; font-family:inherit;
+      width: 100%; box-sizing: border-box; padding: 8px 10px;
+      border: 1px solid var(--divider-color); border-radius: 6px;
+      background: var(--card-background-color); color: var(--primary-text-color);
+      font: inherit; font-size: 14px;
     }
-    .text-input--sm   { width:auto; flex:1; }
-    .text-input--half { flex:1; min-width:0; }
-
+    .text-input--sm { width: auto; flex: 1; }
     .select-input {
-      flex:1; padding:6px 8px;
-      border:1px solid var(--divider-color,rgba(0,0,0,.2)); border-radius:6px;
-      background:var(--card-background-color); color:var(--primary-text-color);
-      font-size:13px; font-family:inherit; cursor:pointer;
+      flex: 1; padding: 6px 8px; border: 1px solid var(--divider-color); border-radius: 6px;
+      background: var(--card-background-color); color: var(--primary-text-color); font: inherit; font-size: 14px;
     }
-
-    .slider-wrap { display:flex; align-items:center; gap:8px; flex:1; }
-    .slider { flex:1; accent-color:var(--primary-color); }
-    .slider-val-wrap { display:flex; align-items:center; gap:2px; flex-shrink:0; }
+    .slider-wrap { display: flex; align-items: center; gap: 8px; flex: 1; }
+    .slider { flex: 1; accent-color: var(--primary-color); }
+    .slider-val-wrap { display: flex; align-items: center; gap: 2px; flex-shrink: 0; }
     .slider-val-input {
-      width:48px; text-align:right; font-size:13px; font-weight:600; color:var(--primary-color);
-      font-family:inherit; border:none; border-radius:4px; background:transparent; padding:2px 3px;
-      -moz-appearance:textfield;
+      width: 48px; text-align: right; font: inherit; font-size: 14px; font-weight: 500; color: var(--primary-color);
+      border: none; border-radius: 4px; background: transparent; padding: 2px 3px; -moz-appearance: textfield;
     }
-    .slider-val-input:hover, .slider-val-input:focus {
-      background:var(--secondary-background-color,rgba(127,127,127,.15)); outline:none;
-    }
+    .slider-val-input:hover, .slider-val-input:focus { background: var(--secondary-background-color); outline: none; }
     .slider-val-input::-webkit-outer-spin-button,
-    .slider-val-input::-webkit-inner-spin-button { -webkit-appearance:none; margin:0; }
-    .slider-val-suffix { font-size:13px; font-weight:600; color:var(--primary-color); }
+    .slider-val-input::-webkit-inner-spin-button { -webkit-appearance: none; margin: 0; }
+    .slider-val-suffix { font-size: 14px; font-weight: 500; color: var(--primary-color); }
+    .toggle-wrap { position: relative; display: inline-flex; align-items: center; cursor: pointer; }
+    .toggle-input { position: absolute; opacity: 0; width: 0; height: 0; }
+    .toggle-track { width: 36px; height: 20px; border-radius: 10px; background: var(--divider-color); position: relative; }
+    .toggle-track::after {
+      content: ""; position: absolute; top: 2px; left: 2px; width: 16px; height: 16px; border-radius: 50%;
+      background: var(--card-background-color); transition: transform 0.2s;
+    }
+    .toggle-input:checked + .toggle-track { background: var(--primary-color); }
+    .toggle-input:checked + .toggle-track::after { transform: translateX(16px); }
+
+    /* ── Sections ── */
+    .section-title {
+      font-size: 14px; font-weight: 500; color: var(--primary-text-color);
+      padding-top: 8px; border-top: 1px solid var(--divider-color);
+    }
+    .tab-body > .section-title:first-child { border-top: none; padding-top: 0; }
+    .sub-section { display: flex; flex-direction: column; gap: 12px; padding-left: 12px; border-left: 2px solid var(--divider-color); }
+    .sub-title { font-size: 13px; font-weight: 500; color: var(--secondary-text-color); }
+    .sub-title--row { display: flex; align-items: center; justify-content: space-between; }
+    .fp-preview { max-width: 100%; border-radius: 8px; display: block; }
 
     /* ── Buttons ── */
     .btn {
-      display:flex; align-items:center; gap:6px;
-      padding:8px 14px; border-radius:8px;
-      cursor:pointer; font-size:13px; font-weight:600; font-family:inherit; border:none;
+      display: flex; align-items: center; gap: 6px; align-self: flex-start;
+      padding: 8px 14px; border-radius: 8px; cursor: pointer;
+      font: inherit; font-size: 14px; font-weight: 500;
+      border: 1px solid var(--divider-color); background: none; color: var(--primary-text-color);
     }
-    .btn--add {
-      background:rgba(33,150,243,.1); color:var(--primary-color);
-      border:1px dashed var(--primary-color) !important;
-    }
-    .btn--sm { padding:4px 10px; font-size:12px; }
-
+    .btn:disabled { opacity: 0.5; cursor: default; }
+    .btn--add { color: var(--primary-color); border-style: dashed; border-color: var(--primary-color); }
+    .btn--sm { padding: 6px 10px; font-size: 13px; }
+    .btn-row { display: flex; gap: 8px; flex-wrap: wrap; }
     .icon-btn {
-      display:flex; align-items:center; justify-content:center;
-      width:32px; height:32px; border-radius:6px;
-      cursor:pointer; background:transparent; border:none; color:var(--secondary-text-color);
-      flex-shrink:0;
+      display: flex; align-items: center; justify-content: center; width: 36px; height: 36px; border-radius: 50%;
+      cursor: pointer; background: transparent; border: none; color: var(--secondary-text-color); flex-shrink: 0;
     }
-    .icon-btn:hover { background:rgba(0,0,0,.08); }
-    .icon-btn:disabled { opacity:.35; cursor:default; }
-    .icon-btn--danger { color:var(--error-color,#f44336); }
-    .icon-btn--sm { width:24px; height:24px; }
+    .icon-btn:hover { background: var(--secondary-background-color); }
+    .icon-btn--sm { width: 28px; height: 28px; }
+    .link-btn {
+      background: none; border: none; padding: 0; cursor: pointer; font: inherit; font-size: 13px;
+      color: var(--primary-color); text-decoration: underline; text-underline-offset: 2px;
+    }
 
-    /* ── Misc ── */
-    .hint { font-size:12px; color:var(--secondary-text-color); margin:0; }
+    /* ── Hints ── */
+    .hint { font-size: 13px; line-height: 1.4; color: var(--secondary-text-color); margin: 0; }
+    .hint--error { color: var(--error-color); }
+    .hint.link { cursor: pointer; color: var(--primary-color); }
+    .hint-more {
+      display: inline-flex; vertical-align: middle; padding: 0; margin-left: 2px; border: none; background: none;
+      cursor: pointer; color: var(--secondary-text-color); border-radius: 50%;
+    }
+    .hint-more ha-icon { --mdc-icon-size: 16px; }
+    .hint-long { display: block; margin-top: 4px; }
+    summary.hint { cursor: pointer; }
 
     .editor-footer {
-      margin-top:8px; padding-top:6px;
-      border-top:1px solid var(--divider-color,rgba(0,0,0,.12));
-      font-size:11px;
-      color:var(--secondary-text-color); opacity:.7;
-      display:flex; align-items:center; justify-content:space-between; gap:8px;
+      margin-top: 12px; padding-top: 8px; border-top: 1px solid var(--divider-color);
+      font-size: 12px; color: var(--secondary-text-color);
+      display: flex; align-items: center; justify-content: space-between; gap: 8px;
     }
-    .footer-link { cursor:pointer; text-decoration:underline; text-underline-offset:2px; }
-    .footer-link:hover { opacity:.8; }
 
-    .var-row { display:flex; align-items:center; gap:6px; }
-    .var-sep { color:var(--secondary-text-color); flex-shrink:0; }
-
-    .anchor-picker { display:grid; grid-template-columns:repeat(3, 32px); gap:3px; }
-    .anchor-cell {
-      width:32px; height:32px; border-radius:6px; cursor:pointer;
-      background:var(--secondary-background-color);
-      border:1px solid var(--divider-color,rgba(0,0,0,.2));
-      font-size:15px; display:flex; align-items:center; justify-content:center;
-    }
-    .anchor-cell--active { background:var(--primary-color); color:white; border-color:var(--primary-color); }
-
-    .threshold-row { align-items:center; gap:6px; }
-    .threshold-label { font-size:12px; color:var(--secondary-text-color); flex-shrink:0; }
-    .threshold-days { width:56px !important; flex:none; padding:6px 8px; }
+    .var-row { display: flex; align-items: center; gap: 6px; }
+    .var-row > .sel, .var-row > .field { flex: 1; min-width: 0; }
+    .var-sep { color: var(--secondary-text-color); flex-shrink: 0; }
+    .threshold-row .sel, .threshold-row .field { flex: 1; }
+    .threshold-label { font-size: 14px; color: var(--secondary-text-color); flex-shrink: 0; }
     .threshold-color {
-      width:36px; height:28px; padding:2px; border-radius:6px;
-      border:1px solid var(--divider-color,rgba(0,0,0,.2));
-      background:var(--card-background-color); cursor:pointer;
+      width: 40px; height: 32px; padding: 2px; border-radius: 6px; cursor: pointer;
+      border: 1px solid var(--divider-color); background: var(--card-background-color);
     }
-
-    .hex-color-row { display:flex; align-items:center; gap:6px; }
-    .hex-color-row .text-input { flex:1; }
   `;
 }

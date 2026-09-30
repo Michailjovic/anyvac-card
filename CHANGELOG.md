@@ -6,6 +6,35 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [1.43.0] - 2026-09-30
+
+Sixth phase of the "living home" redesign (docs/44 F6): the config editor on
+Home Assistant's own form elements. Card-only; the config format is unchanged —
+every field writes the same keys as before.
+
+### Changed
+
+- **HA selectors instead of plain inputs.** Entity (domain-filtered, multi-entity
+  for a global action's watch list), text, number (slider with typed entry, or
+  box), dropdown, boolean, icon and area fields are `ha-selector`s, so the
+  editor looks and behaves like the rest of Home Assistant (including the
+  entity picker with names and areas). HA loads these elements lazily; the
+  editor pulls them in through a stock card's config element and falls back
+  to its own plain inputs if they never appear.
+- **Vacuums as summary rows.** Collapsed: avatar in the vacuum's colour, name,
+  role and entity; only one vacuum is expanded at a time. Sensors, Map &
+  floorplan, Clean action and Setting presets are `ha-expansion-panel`s whose
+  summary says what was found automatically.
+- **Role and other short choices as segmented controls**; colour as a palette
+  plus a custom colour; accent presets use the same control.
+- **⋮ menu** (move up/down, delete with confirmation) instead of a red bin on
+  every row — vacuums, rooms, presets, global presets and global actions.
+- Tabs and the footer without emoji; hints are one line with an (i) that
+  expands the longer explanation in place (works on a phone, unlike a tooltip).
+- The retired `native-auto` strategy now reads "Native (segments)" everywhere.
+- Editor stylesheet uses Home Assistant's variables only (no literal colours);
+  unused styles from the removed Maps tab are gone.
+
 ## [1.42.0] - 2026-09-30
 
 Fifth phase of the "living home" redesign (docs/44 F5): the start sequence.
