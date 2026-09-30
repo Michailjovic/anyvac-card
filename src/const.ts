@@ -1,6 +1,6 @@
 export const CARD_NAME = "anyvac-card";
 export const EDITOR_NAME = "anyvac-card-editor";
-export const CARD_VERSION = "1.37.0";
+export const CARD_VERSION = "1.38.0";
 
 /** Hold duration in ms required to trigger START / PAUSE actions */
 export const HOLD_DURATION_MS = 600;
@@ -16,37 +16,40 @@ export const HOLD_DURATION_MS = 600;
 export const HOLD_MOVE_CANCEL_PX = 12;
 
 /**
- * Maps Roborock status strings to [human-readable label, accent colour].
+ * Maps Roborock status strings to [human-readable label, accent colour, mdi icon].
+ * docs/44 F1 (K4): no emoji in labels any more — they rendered as each
+ * platform's own colour emoji (different on Windows/Android/iOS) and were the
+ * last "hobby dashboard" signal; the icon is rendered as an <ha-icon> instead.
  * This unified map covers S6 / S7 / S8 MaxV Ultra.
  */
-export const STATUS_MAP: Readonly<Record<string, readonly [string, string]>> = {
+export const STATUS_MAP: Readonly<Record<string, readonly [string, string, string]>> = {
   // ── Dry cleaning ──────────────────────────────────────────────────────
-  cleaning:                         ["🧹 Cleaning",              "#52c41a"],
-  segment_cleaning:                 ["🧹 Cleaning rooms",        "#52c41a"],
-  zoned_cleaning:                   ["🧹 Zone cleaning",         "#52c41a"],
-  spot_cleaning:                    ["🎯 Spot cleaning",         "#52c41a"],
-  starting:                         ["▶️ Starting",              "#52c41a"],
+  cleaning:                         ["Cleaning",                "#52c41a", "mdi:broom"],
+  segment_cleaning:                 ["Cleaning rooms",          "#52c41a", "mdi:broom"],
+  zoned_cleaning:                   ["Zone cleaning",           "#52c41a", "mdi:broom"],
+  spot_cleaning:                    ["Spot cleaning",           "#52c41a", "mdi:target"],
+  starting:                         ["Starting",                "#52c41a", "mdi:play"],
   // ── Wet / mop ────────────────────────────────────────────────────────
-  segment_mopping:                  ["🫧 Mopping rooms",         "#40a9ff"],
-  zoned_mopping:                    ["🫧 Zone mopping",          "#40a9ff"],
-  robot_status_mopping:             ["🫧 Mopping",               "#40a9ff"],
+  segment_mopping:                  ["Mopping rooms",           "#40a9ff", "mdi:water"],
+  zoned_mopping:                    ["Zone mopping",            "#40a9ff", "mdi:water"],
+  robot_status_mopping:             ["Mopping",                 "#40a9ff", "mdi:water"],
   // ── Combined dry + wet ───────────────────────────────────────────────
-  clean_mop_cleaning:               ["🧹🫧 Vacuuming+mopping",  "#52c41a"],
-  clean_mop_mopping:                ["🧹🫧 Vacuuming+mopping",  "#52c41a"],
-  segment_clean_mop_cleaning:       ["🧹🫧 Rooms (vac)",        "#52c41a"],
-  segment_clean_mop_mopping:        ["🧹🫧 Rooms (mop)",        "#52c41a"],
-  zoned_clean_mop_cleaning:         ["🧹🫧 Zones (vac)",        "#52c41a"],
-  zoned_clean_mop_mopping:          ["🧹🫧 Zones (mop)",        "#52c41a"],
+  clean_mop_cleaning:               ["Vacuuming+mopping",       "#52c41a", "mdi:water-plus"],
+  clean_mop_mopping:                ["Vacuuming+mopping",       "#52c41a", "mdi:water-plus"],
+  segment_clean_mop_cleaning:       ["Rooms (vac)",             "#52c41a", "mdi:water-plus"],
+  segment_clean_mop_mopping:        ["Rooms (mop)",             "#52c41a", "mdi:water-plus"],
+  zoned_clean_mop_cleaning:         ["Zones (vac)",             "#52c41a", "mdi:water-plus"],
+  zoned_clean_mop_mopping:          ["Zones (mop)",             "#52c41a", "mdi:water-plus"],
   // ── Mop washing ──────────────────────────────────────────────────────
-  washing_the_mop:                  ["🚿 Washing mop",           "#9254de"],
-  washing_the_mop_2:                ["🚿 Washing mop",           "#9254de"],
-  going_to_wash_the_mop:            ["🚿 Going to wash mop",    "#9254de"],
-  air_drying_stopping:              ["💨 Drying mop",            "#9254de"],
-  back_to_dock_washing_duster:      ["🏠 Dock + washing",       "#faad14"],
+  washing_the_mop:                  ["Washing mop",             "#9254de", "mdi:shower-head"],
+  washing_the_mop_2:                ["Washing mop",             "#9254de", "mdi:shower-head"],
+  going_to_wash_the_mop:            ["Going to wash mop",       "#9254de", "mdi:shower-head"],
+  air_drying_stopping:              ["Drying mop",              "#9254de", "mdi:weather-windy"],
+  back_to_dock_washing_duster:      ["Dock + washing",          "#faad14", "mdi:home-import-outline"],
   // ── Navigation ───────────────────────────────────────────────────────
-  returning_home:                   ["🏠 Returning home",        "#faad14"],
-  docking:                          ["🏠 Docking",               "#faad14"],
-  going_to_target:                  ["🎯 Going to target",       "#40a9ff"],
+  returning_home:                   ["Returning home",          "#faad14", "mdi:home-import-outline"],
+  docking:                          ["Docking",                 "#faad14", "mdi:home-import-outline"],
+  going_to_target:                  ["Going to target",         "#40a9ff", "mdi:target"],
   // ── Docked / idle ────────────────────────────────────────────────────
   // The neutral (non-semantic) states resolve through the ink channel token
   // instead of a hardcoded white, so they stay legible when the card runs on a
@@ -56,25 +59,25 @@ export const STATUS_MAP: Readonly<Record<string, readonly [string, string]>> = {
   // consumed as a whole colour value (borderColor / labelColor / statusColor) —
   // the `+ "80"` hex-alpha suffix trick elsewhere in the card operates on the
   // vacuum's IDENTITY colour (`_color`), never on this one.
-  charging:                         ["⚡ Charging",              "rgba(var(--avc-ink-rgb),0.75)"],
-  charging_complete:                ["✅ Fully charged",          "#52c41a"],
-  docked:                           ["✅ Docked",                "rgba(var(--avc-ink-rgb),0.75)"],
-  charger_disconnected:             ["🔌 Charger disconnected",  "#faad14"],
-  emptying_the_bin:                 ["🗑️ Emptying bin",          "#faad14"],
-  idle:                             ["💤 Idle",                  "rgba(var(--avc-ink-rgb),0.45)"],
-  paused:                           ["⏸️ Paused",                "#faad14"],
+  charging:                         ["Charging",                "rgba(var(--avc-ink-rgb),0.75)", "mdi:lightning-bolt"],
+  charging_complete:                ["Fully charged",           "#52c41a", "mdi:check-circle-outline"],
+  docked:                           ["Docked",                  "rgba(var(--avc-ink-rgb),0.75)", "mdi:check-circle-outline"],
+  charger_disconnected:             ["Charger disconnected",    "#faad14", "mdi:power-plug-off-outline"],
+  emptying_the_bin:                 ["Emptying bin",            "#faad14", "mdi:delete-empty-outline"],
+  idle:                             ["Idle",                    "rgba(var(--avc-ink-rgb),0.45)", "mdi:sleep"],
+  paused:                           ["Paused",                  "#faad14", "mdi:pause"],
   // ── Special ──────────────────────────────────────────────────────────
-  mapping:                          ["🗺️ Mapping",               "#40a9ff"],
-  remote_control_active:            ["🕹️ Remote control",       "#40a9ff"],
-  manual_mode:                      ["🕹️ Manual mode",          "#40a9ff"],
-  updating:                         ["⬆️ Updating",              "#faad14"],
-  in_call:                          ["📞 In call",               "#faad14"],
-  shutting_down:                    ["⏹️ Shutting down",        "rgba(var(--avc-ink-rgb),0.4)"],
+  mapping:                          ["Mapping",                 "#40a9ff", "mdi:map-search-outline"],
+  remote_control_active:            ["Remote control",          "#40a9ff", "mdi:gamepad-variant-outline"],
+  manual_mode:                      ["Manual mode",             "#40a9ff", "mdi:gamepad-variant-outline"],
+  updating:                         ["Updating",                "#faad14", "mdi:update"],
+  in_call:                          ["In call",                 "#faad14", "mdi:phone"],
+  shutting_down:                    ["Shutting down",           "rgba(var(--avc-ink-rgb),0.4)", "mdi:power"],
   // ── Error states ─────────────────────────────────────────────────────
-  error:                            ["❌ Error",                 "#ff4d4f"],
-  charging_problem:                 ["⚠️ Charging problem",     "#ff4d4f"],
-  locked:                           ["🔒 Locked",                "#ff4d4f"],
-  device_offline:                   ["📴 Offline",               "#ff4d4f"],
+  error:                            ["Error",                   "#ff4d4f", "mdi:alert-circle-outline"],
+  charging_problem:                 ["Charging problem",        "#ff4d4f", "mdi:alert-outline"],
+  locked:                           ["Locked",                  "#ff4d4f", "mdi:lock-outline"],
+  device_offline:                   ["Offline",                 "#ff4d4f", "mdi:wifi-off"],
 };
 
 /** Colour hex values for VacuumColor variants */

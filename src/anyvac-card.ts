@@ -1513,9 +1513,9 @@ export class AnyVacCard extends LitElement {
     return explicit ?? this._autoEntities(vac)[kind];
   }
 
-  private _statusInfo(vac: VacuumConfig): readonly [string, string] {
+  private _statusInfo(vac: VacuumConfig): readonly [string, string, string] {
     const raw = this.hass.states[this._ent(vac, "status") ?? vac.entity]?.state ?? "unknown";
-    return STATUS_MAP[raw] ?? [raw, "rgba(var(--avc-ink-rgb),0.5)"];
+    return STATUS_MAP[raw] ?? [raw, "rgba(var(--avc-ink-rgb),0.5)", "mdi:robot-vacuum"];
   }
 
   /** docs/25 §10 follow-up (2026-07-24): consumable/"care" rows auto-discovered from
@@ -2912,6 +2912,7 @@ export class AnyVacCard extends LitElement {
     // sidebar is a separate, established design (docs/18/19 A5) and keeps the
     // room list unconditionally — this gate only ever hides it in portrait.
     const showRoomList = this._profile !== "portrait" || !!this._config.debug_dense_dock;
+    const themedRows = this._themed();
     return html`
       <div class="dock">
         ${withPicker ? this._renderVacuumPicker() : nothing}
@@ -2956,7 +2957,11 @@ export class AnyVacCard extends LitElement {
             const dry = this._ageDaysFromIso(rec?.dry);
             const wet = this._ageDaysFromIso(rec?.wet);
             const cov = this._roomCoverageRec(v, r);
-            const covBadge = (pct: number | null | undefined) => (pct == null ? "—" : pct + "%");
+            // docs/44 F1 (K6): themed rows only show coverage when it's actually
+            // informative (< 100 %); "—"/100 % on every row was pure noise.
+            const covBadge = (pct: number | null | undefined) => themedRows
+              ? (pct == null || pct >= 100 ? "" : pct + "%")
+              : (pct == null ? "—" : pct + "%");
             const sel = this._isRoomSelectedAny(r.key, vacs);
             // Cycle relative to what THIS chip currently shows (dry vs. wet
             // can differ), not the raw pin store — see _cycleRoomPin. Each
@@ -8622,14 +8627,24 @@ export class AnyVacCard extends LitElement {
     const withInt = vacs.filter((v) => this._intAttrs(v));
     if (!withInt.length) return nothing;
     const L = this._layersEff();
+    // docs/44 F1 (K5): icon-only visibility toggles. The oldest-room age used
+    // to sit inside the button ("9d"/"15d"), which made a visibility switch
+    // read like a status readout — it now lives in the tooltip (and moves to
+    // the F2 hero bar).
+    const ageTip = (t: "dry" | "wet") => {
+      const a = this._ageBadgeStr(this._oldestAgeDays(withInt, t));
+      return a && a !== "—" ? ` \u00b7 oldest room ${a}` : "";
+    };
     return html`
-      <button class="mtbtn ${L.dry ? "on" : ""}" title="Dry layer visibility \u2014 tap to toggle"
+      <button class="mtbtn mtbtn--icon ${L.dry ? "on" : ""}" title="Show dry trail \u2014 tap to toggle${ageTip("dry")}"
+        aria-label="Dry trail" aria-pressed=${L.dry ? "true" : "false"}
         @click=${() => this._onLayerClick("dry")}>
-        <ha-icon icon="mdi:broom"></ha-icon><span>${this._ageBadgeStr(this._oldestAgeDays(withInt, "dry"))}</span>
+        <ha-icon icon="mdi:broom"></ha-icon>
       </button>
-      <button class="mtbtn ${L.wet ? "on" : ""}" title="Wet layer visibility \u2014 tap to toggle"
+      <button class="mtbtn mtbtn--icon ${L.wet ? "on" : ""}" title="Show wet trail \u2014 tap to toggle${ageTip("wet")}"
+        aria-label="Wet trail" aria-pressed=${L.wet ? "true" : "false"}
         @click=${() => this._onLayerClick("wet")}>
-        <ha-icon icon="mdi:water"></ha-icon><span>${this._ageBadgeStr(this._oldestAgeDays(withInt, "wet"))}</span>
+        <ha-icon icon="mdi:water"></ha-icon>
       </button>
     `;
   }
@@ -8637,20 +8652,22 @@ export class AnyVacCard extends LitElement {
   private _renderLayerToggles(vacs: VacuumConfig[]) {
     const withInt = vacs.filter((v) => this._intAttrs(v));
     if (!withInt.length) return nothing;
-    const oldest = (type: "dry" | "wet") => this._oldestAgeDays(withInt, type);
-    const badge = (d: number | null) => this._ageBadgeStr(d);
+    const oldestTip = (type: "dry" | "wet") => {
+      const a = this._ageBadgeStr(this._oldestAgeDays(withInt, type));
+      return a && a !== "—" ? ` \u00b7 oldest room ${a}` : "";
+    };
     const L = this._layersEff();
     return html`
       <div class="layer-toggles">
-        <button class="layer-btn ${L.dry ? "on" : ""}" title="Dry \u2014 tap to toggle, hold for rooms"
+        <button class="layer-btn ${L.dry ? "on" : ""}" title="Dry trail \u2014 tap to toggle, hold for rooms${oldestTip("dry")}" aria-label="Dry trail"
           @pointerdown=${() => this._onLayerDown("dry")} @pointerup=${() => this._onLayerUp()} @pointerleave=${() => this._onLayerUp()}
           @click=${() => this._onLayerClick("dry")}>
-          <ha-icon icon="mdi:broom"></ha-icon><span>${badge(oldest("dry"))}</span>
+          <ha-icon icon="mdi:broom"></ha-icon>
         </button>
-        <button class="layer-btn ${L.wet ? "on" : ""}" title="Wet \u2014 tap to toggle, hold for rooms"
+        <button class="layer-btn ${L.wet ? "on" : ""}" title="Wet trail \u2014 tap to toggle, hold for rooms${oldestTip("wet")}" aria-label="Wet trail"
           @pointerdown=${() => this._onLayerDown("wet")} @pointerup=${() => this._onLayerUp()} @pointerleave=${() => this._onLayerUp()}
           @click=${() => this._onLayerClick("wet")}>
-          <ha-icon icon="mdi:water"></ha-icon><span>${badge(oldest("wet"))}</span>
+          <ha-icon icon="mdi:water"></ha-icon>
         </button>
         ${this._layerMenu ? this._renderLayerMenu(withInt, this._layerMenu) : nothing}
       </div>
@@ -9082,6 +9099,47 @@ export class AnyVacCard extends LitElement {
    *  configured vacuum does mop the room — user saw one dot where two were
    *  expected. Likely fix: gate on capability across `opts.vacs`, not just
    *  `vac` — needs its own pass, not bundled into this one. */
+  /** Dry/wet age-dot colours for a room, in the card-wide dry→wet order —
+   *  shared by the legacy corner dots and the docs/44 room label. */
+  private _roomAgeDotColors(room: RoomConfig, vac: VacuumConfig, vacs?: VacuumConfig[]): Array<{ kind: string; color: string; days: number | null }> {
+    const rec = this._intRoomRec(vac, room);
+    if (rec) {
+      // Merged map: the room's freshness is the fleet's (dry-only + wet-only
+      // robots together still clean a room both ways), not just whichever
+      // vacuum happened to define the room.
+      const ct = (vacs?.length ? vacs : [vac]).map((v) => this._vacCleanType(v))
+        .reduce((a, c) => ({ dry: a.dry || c.dry, wet: a.wet || c.wet }), { dry: false, wet: false });
+      const out: Array<{ kind: string; color: string; days: number | null }> = [];
+      if (ct.dry) { const d = this._ageDaysFromIso(rec.dry); out.push({ kind: "dry", color: this._colorForAgeDays(d), days: d }); }
+      if (ct.wet) { const d = this._ageDaysFromIso(rec.wet); out.push({ kind: "wet", color: this._colorForAgeDays(d), days: d }); }
+      return out;
+    }
+    if (!room.last_clean_entity) return [];
+    const d = this._roomAgeDays(room);
+    return [{ kind: "any", color: this._colorForAgeDays(d), days: d }];
+  }
+
+  /** docs/44 F1 (K3/W5): one calm pill per room — optional icon, the room's
+   *  name and its dry/wet freshness dots — replacing the bare icon plus the
+   *  7px corner dots. Sits where the icon used to sit (the room's
+   *  `icon_anchor`), counter-rotated with the map like every other on-map
+   *  chip. Name/icon collapse via container queries when the room is too
+   *  narrow ON SCREEN — which on a quarter-turned map is the room's LOCAL
+   *  height, hence the `--q` variant querying height instead of width. */
+  private _renderRoomLabel(room: RoomConfig, vac: VacuumConfig, anchor: string, vacs?: VacuumConfig[]) {
+    const dots = this._roomAgeDotColors(room, vac, vacs);
+    const q = this._mapRotationDeg() % 180 !== 0;
+    const nameless = anchor === "none";
+    if (nameless && !dots.length) return nothing;
+    const tip = dots.map((d) => (d.kind === "any" ? "" : d.kind + " ") + this._ageBadgeStr(d.days)).join(" · ");
+    return html`
+      <span class="room-label ${q ? "room-label--q" : ""} ${nameless ? "room-label--dots" : ""}" title=${tip}>
+        ${!nameless && !this._config.room_icon_hidden && room.icon ? html`<ha-icon icon=${room.icon}></ha-icon>` : nothing}
+        ${!nameless ? html`<span class="room-label-name">${room.name ?? room.key}</span>` : nothing}
+        ${dots.length ? html`<span class="room-label-dots">${dots.map((d) => html`<span class="room-label-dot" style=${styleMap({ background: d.color })}></span>`)}</span>` : nothing}
+      </span>`;
+  }
+
   private _renderRoomAgeDots(room: RoomConfig, vac: VacuumConfig) {
     const rec = this._intRoomRec(vac, room);
     if (rec) {
@@ -9247,9 +9305,10 @@ export class AnyVacCard extends LitElement {
         bl: ["flex-start","flex-end"],   b:  ["center","flex-end"],   br: ["flex-end","flex-end"],
       };
       const [jc, ai] = ANCHOR[anchor] ?? ["center", "center"];
+      const themed = this._themed();
       const borderW = (selected
         ? (this._config.room_border_selected ?? 4)
-        : wholeHome ? Math.max(3, this._config.room_border_normal ?? 2)
+        : wholeHome && !themed ? Math.max(3, this._config.room_border_normal ?? 2)
         : (this._config.room_border_normal ?? 2)) + "px";
       // First pass at this (0.68.2) was too subtle to read at a glance on a
       // real floorplan image (field feedback 2026-07-23: "if I didn't know
@@ -9257,9 +9316,20 @@ export class AnyVacCard extends LitElement {
       // added a soft glow so whole-home clearly reads as "highlighted",
       // while still staying a visible notch below `selected`'s crisp
       // gradient border + strong glow.
-      const borderC = selected ? SEL + "E0" : wholeHome ? "rgba(255,255,255,0.75)" : NEUTRAL_BORDER;
-      const bg = selected ? SEL + "22" : wholeHome ? "rgba(255,255,255,0.16)" : "rgba(0,0,0,0.06)";
-      const shadow = selected ? "0 0 18px rgba(255,255,255,0.7)" : wholeHome ? "0 0 10px rgba(255,255,255,0.4)" : "none";
+      let borderC = selected ? SEL + "E0" : wholeHome ? "rgba(255,255,255,0.75)" : NEUTRAL_BORDER;
+      let bg = selected ? SEL + "22" : wholeHome ? "rgba(255,255,255,0.16)" : "rgba(0,0,0,0.06)";
+      let shadow = selected ? "0 0 18px rgba(255,255,255,0.7)" : wholeHome ? "0 0 10px rgba(255,255,255,0.4)" : "none";
+      // docs/44 F1 (K3): themed map is calm by default. Whole-home stops
+      // outlining every room (that "this is what START runs" message now lives
+      // in text — dock footer / START bar, later the F2 hero), and an explicit
+      // pick becomes an accent inner edge + tint instead of a white glowing
+      // frame, so five selected rooms no longer read as five alarms. Border
+      // WIDTHS still come from room_border_normal/selected. Legacy unchanged.
+      if (themed) {
+        borderC = selected ? "rgb(var(--avc-accent-rgb))" : NEUTRAL_BORDER;
+        bg = selected ? "rgba(var(--avc-accent-rgb), 0.14)" : "rgba(0,0,0,0.04)";
+        shadow = selected ? "inset 0 0 22px rgba(var(--avc-accent-rgb), 0.32)" : "none";
+      }
       // Who's assigned (dry/wet), from the backend plan preview — only known
       // once selected (the preview is computed for the current selection).
       const dryEnt = selected ? this._planPreview?.dry.get(room.key) : undefined;
@@ -9273,7 +9343,7 @@ export class AnyVacCard extends LitElement {
             left: (room.map_x ?? 0) + "%", top: (room.map_y ?? 0) + "%",
             width: room.map_w + "%", height: room.map_h + "%",
             border: borderW + " solid " + borderC,
-            borderImage: selected ? SEL_GRADIENT : "none",
+            borderImage: selected && !themed ? SEL_GRADIENT : "none",
             background: bg, boxShadow: shadow,
             justifyContent: jc, alignItems: ai,
           })}
@@ -9285,12 +9355,13 @@ export class AnyVacCard extends LitElement {
           aria-pressed=${selected ? "true" : "false"}
         >
           <div class="hold-ring"></div>
-          ${!this._config.room_icon_hidden && anchor !== "none" && room.icon ? html`
-            <ha-icon icon=${room.icon}
-              style=${styleMap({ color: selected ? "white" : NEUTRAL_ICON, "--mdc-icon-size": "16px" })}>
-            </ha-icon>
-          ` : nothing}
-          ${this._renderRoomAgeDots(room, vac)}
+          ${themed ? this._renderRoomLabel(room, vac, anchor, opts?.vacs) : html`
+            ${!this._config.room_icon_hidden && anchor !== "none" && room.icon ? html`
+              <ha-icon icon=${room.icon}
+                style=${styleMap({ color: selected ? "white" : NEUTRAL_ICON, "--mdc-icon-size": "16px" })}>
+              </ha-icon>
+            ` : nothing}
+            ${this._renderRoomAgeDots(room, vac)}`}
           ${/* Field fixes same day (2026-08-03), full history in CHANGELOG
                1.0.1-1.0.6: the edge-anchored approach (CSS top/bottom/left/
                right, counter-rotated via .avc-rot's --map-rot rule) picked
@@ -9349,7 +9420,7 @@ export class AnyVacCard extends LitElement {
               const dx = (-INSET * (Math.cos(rad) + Math.sin(rad))).toFixed(2);
               const dy = (-INSET * (Math.cos(rad) - Math.sin(rad))).toFixed(2);
               return html`
-                <span class="room-overlay-assign-anchor" style=${styleMap(outerPos)}>
+                <span class="room-overlay-assign-anchor ${totalRot % 180 !== 0 ? "room-overlay-assign-anchor--q" : ""}" style=${styleMap(outerPos)}>
                   <span class="room-overlay-assign"
                     style=${styleMap({ transform: `translate(${dx}px, ${dy}px) rotate(calc(-1 * var(--map-rot)))` })}>
                     ${dryEnt ? this._vacChip(dryEnt) : nothing}
@@ -9409,7 +9480,7 @@ export class AnyVacCard extends LitElement {
    *  (`_renderProgress` below still renders the actual bar; this is just the
    *  number, so it's visible even where the bar's thin track is easy to miss). */
   private _renderStatusRow(vac: VacuumConfig) {
-    const [label, labelColor] = this._statusInfo(vac);
+    const [label, labelColor, statusIcon] = this._statusInfo(vac);
     const bat = this._battery(vac);
     const lastClean = this._lastCleanStr(vac);
     const name = vac.name ?? vac.entity.split(".")[1] ?? vac.entity;
@@ -9436,7 +9507,7 @@ export class AnyVacCard extends LitElement {
       <div class="status-line1">
         <span class="model-label">${name}</span>
         <span class="status-label" style=${styleMap({ color: labelColor })}>
-          ${label}${prog !== null ? html` &middot; ${prog}&thinsp;%` : nothing}
+          <ha-icon class="status-icon" icon=${statusIcon}></ha-icon>${label}${prog !== null ? html` &middot; ${prog}&thinsp;%` : nothing}
         </span>
       </div>
       <div class="status-line2">
@@ -9816,6 +9887,12 @@ export class AnyVacCard extends LitElement {
    * `avc-still` is the config-level motion opt-out; `prefers-reduced-motion`
    * covers the OS-level one on its own, in CSS.
    */
+  /** Any theme except `legacy` (docs/35). docs/44 F1+ visual changes are
+   *  gated on this so `theme: legacy` keeps the exact previous map look. */
+  private _themed(): boolean {
+    return (this._config.theme ?? DEFAULT_THEME) !== "legacy";
+  }
+
   private _rootClasses(): string {
     const theme = this._config.theme ?? DEFAULT_THEME;
     const cls: string[] = [];
@@ -9950,6 +10027,18 @@ export class AnyVacCard extends LitElement {
     :host {
       display: block;
       width: 100%;
+
+      /* docs/44 F1 (K8): one type and one radius scale for everything new;
+       * older rules migrate to these as later phases touch them. */
+      --avc-fs-xs: 11px;
+      --avc-fs-s: 12px;
+      --avc-fs-m: 13px;
+      --avc-fs-l: 15px;
+      --avc-fs-xl: 20px;
+      --avc-r-s: 6px;
+      --avc-r-m: 10px;
+      --avc-r-l: 16px;
+      --avc-r-pill: 999px;
 
       /* Channel bases */
       --avc-ink-rgb: 255, 255, 255;
@@ -11155,6 +11244,70 @@ export class AnyVacCard extends LitElement {
     /* Rounder rooms read softer without touching the field-tuned selection
      * ring itself (0.52/0.53 spent real effort landing that gradient). */
     .avc-theme .room-overlay { border-radius: 10px; }
+
+    /* ── docs/44 F1: calm map ─────────────────────────────────────────
+     * Room label pill (name + dry/wet freshness dots) replaces the bare icon
+     * and corner dots in every non-legacy theme. Sizes are queried on the
+     * room itself (container-type: size — the room already has an explicit
+     * size, so containment changes nothing about its own layout). On a
+     * quarter-turned map the ON-SCREEN width is the room's local height,
+     * hence the --q variants querying height. */
+    .avc-theme .room-overlay { container-type: size; }
+    .room-label {
+      display: inline-flex; align-items: center; gap: 5px;
+      max-width: calc(100cqw - 8px);
+      padding: 3px 8px; box-sizing: border-box;
+      border-radius: var(--avc-r-pill);
+      background: rgba(10, 12, 15, 0.8);
+      box-shadow: 0 1px 4px rgba(0, 0, 0, 0.35);
+      color: rgba(255, 255, 255, 0.92);
+      font-size: var(--avc-fs-s); font-weight: 500; line-height: 1.25;
+      white-space: nowrap; pointer-events: none;
+    }
+    .room-label--q { max-width: calc(100cqh - 8px); }
+    .room-label ha-icon { --mdc-icon-size: 14px; color: rgba(255, 255, 255, 0.72); flex-shrink: 0; }
+    .room-label-name { overflow: hidden; text-overflow: ellipsis; min-width: 0; }
+    .room-label-dots { display: inline-flex; gap: 3px; flex-shrink: 0; }
+    .room-label-dot { width: 7px; height: 7px; border-radius: 50%; box-shadow: 0 0 0 1px rgba(0, 0, 0, 0.35); }
+    .room-label--dots { padding: 4px 6px; }
+    .avc-rot .room-overlay > .room-label { transform: rotate(calc(-1 * var(--map-rot))); }
+    @container (max-width: 92px) {
+      .room-label:not(.room-label--q) ha-icon,
+      .room-label:not(.room-label--q) .room-label-name { display: none; }
+      .room-label:not(.room-label--q) { padding: 4px 6px; }
+      .room-overlay-assign-anchor:not(.room-overlay-assign-anchor--q) { display: none; }
+    }
+    @container (max-height: 92px) {
+      .room-label--q ha-icon,
+      .room-label--q .room-label-name { display: none; }
+      .room-label--q { padding: 4px 6px; }
+      .room-overlay-assign-anchor--q { display: none; }
+    }
+    @container (max-width: 28px) { .room-label:not(.room-label--q) { display: none; } }
+    @container (max-height: 28px) { .room-label--q { display: none; } }
+
+    /* Status icon replaces the emoji that used to prefix every status label. */
+    .status-icon { --mdc-icon-size: 14px; margin-right: 4px; vertical-align: -2px; }
+
+    /* Icon-only trail toggles (K5). */
+    .mtbtn--icon { padding: 5px 9px; }
+
+    /* Dock rows without a box per row (K6): hairline separators, selection is
+     * a soft accent wash, and the list fades out instead of showing a
+     * platform scrollbar (wheel/touch scrolling unchanged). */
+    .avc-theme .dock-rows {
+      scrollbar-width: none;
+      padding-bottom: 10px;
+      -webkit-mask-image: linear-gradient(to bottom, #000 calc(100% - 16px), transparent);
+      mask-image: linear-gradient(to bottom, #000 calc(100% - 16px), transparent);
+    }
+    .avc-theme .dock-rows::-webkit-scrollbar { display: none; }
+    .avc-theme .dock-row {
+      background: transparent;
+      border: none;
+      border-bottom: 1px solid rgba(var(--avc-ink-rgb), 0.06);
+      border-radius: var(--avc-r-m);
+    }
     .avc-theme .room-btn { border-radius: 14px; }
     /* The age dots were the most instrument-like detail on the map: two 7px
      * discs with a hard 1px black stroke. Same information, softer edge. */
@@ -11194,7 +11347,7 @@ export class AnyVacCard extends LitElement {
 
     .avc-theme .dock-row.on {
       background: rgba(var(--avc-accent-rgb), 0.14);
-      border-color: rgba(var(--avc-accent-rgb), 0.5);
+      border-bottom-color: transparent;
     }
 
     /* Type floor (docs/35 §4). 8–10px is instrument sizing; nothing sits

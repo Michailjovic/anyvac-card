@@ -6,6 +6,58 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [1.38.0] - 2026-09-30
+
+First phase of the "living home" redesign (docs/43 analysis, docs/44 plan,
+F1 "calm map"). No behaviour changes to cleaning or selection — this release
+only takes noise off the map and the dock. Every map change is gated on a
+non-`legacy` theme, so `theme: legacy` keeps the exact previous look.
+
+### Changed
+
+- **Whole-home no longer outlines every room.** With nothing selected, rooms
+  stay unframed (border width = `room_border_normal`, no glow). The 0.68.2/
+  0.68.3 whole-home frame is dropped on purpose: "START runs the whole home"
+  is already said in text by the dock footer / START bar, and on the map it
+  made five rooms look like five alarms. Legacy keeps the old frame.
+- **Selection is an accent inner edge + tint** instead of the white gradient
+  frame with an outer glow. Border width still comes from
+  `room_border_selected`.
+- **Room label pill** replaces the bare room icon and the 7px corner age dots:
+  optional icon, the room's name and its dry/wet freshness dots (colours from
+  `room_thresholds`, unchanged). In merged mode the dots follow the fleet's
+  capabilities (a dry-only + wet-only pair shows both). The pill is
+  counter-rotated with the map; icon and name collapse to dots-only via
+  container queries when the room is too narrow on screen — on a
+  quarter-turned map that is the room's local height, which the query
+  accounts for. `room_icon_hidden` and `icon_anchor: none` are honoured.
+- **Assignment chips hide on rooms too narrow to hold them** (same container
+  query) instead of spilling past the room edge on rotated portrait maps;
+  hold-to-inspect still shows the assignment.
+- **Status labels carry no emoji.** `STATUS_MAP` is now
+  `[label, colour, mdi icon]`; the icon renders as an `<ha-icon>` in front of
+  the label. Emoji rendered as each platform's own colour glyph (different on
+  Windows/Android/iOS). Status colours themselves are unchanged in this
+  release (docs/44 §2 — they change only after a contrast pass).
+- **Trail toggles are icon-only.** The oldest-room age ("9d"/"15d") that sat
+  inside the visibility buttons moved into their tooltip; the buttons gained
+  `aria-label`/`aria-pressed`.
+- **Dock room rows lost their per-row box** (themed): hairline separators, a
+  soft accent wash for selected rows, and the list fades out at the bottom
+  instead of showing a platform scrollbar (scrolling unchanged). Coverage %
+  only shows when it is below 100 %.
+
+### Added
+
+- Type and radius scale tokens on `:host` (`--avc-fs-xs…xl`,
+  `--avc-r-s/m/l/pill`), used by the new rules; older rules migrate as later
+  phases touch them.
+- `tests/calm-map.spec.ts` (4 tests) — whole-home unframed + labelled,
+  accent selection honouring `room_border_selected`, legacy markup unchanged,
+  no emoji in status labels / no age text in trail toggles. Verified that the
+  three behaviour tests fail against the 1.37.0 build (the legacy test is a
+  guard and passes on both).
+
 ## [1.37.0] - 2026-09-20
 
 ### Added
