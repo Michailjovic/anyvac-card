@@ -113,6 +113,7 @@ import {
 } from "./layout";
 import { fmtPts, trailTail, type Pt } from "./trail";
 import { planOrder } from "./startseq";
+import { hexToRgb, tintMapImage } from "./maptint";
 
 /** docs/25 §10 follow-up: one auto-discovered "care" row (consumable time-left +
  *  reset button, or a dock tank binary status). See `_careItems()` for how these
@@ -597,6 +598,12 @@ export class AnyVacCard extends LitElement {
   private _fillMap: Map<string, { frac: number; done: boolean; color: string; sheen: boolean }> | null = null;
   private _doneSeen: Set<string> | null = null;
   private _sheenRooms = new Set<string>();
+  /** docs/44 F7 (V3): tint the raw maps in the Seat tool into each vacuum's
+   *  colour. A view preference of the Visual editor, never written anywhere. */
+  @state() private _veTint = true;
+  /** url|colour → tinted object URL (null = couldn't be tinted). */
+  private _tintCache = new Map<string, string | null>();
+  private _tintPending = new Set<string>();
   /** docs/44 F5: the start sequence being played (see `_playStartSeq`). */
   @state() private _startSeq: {
     id: number; delay: Map<string, number>; first: Array<{ entity: string; room: string }>;
@@ -5632,6 +5639,29 @@ export class AnyVacCard extends LitElement {
     };
   }
 
+  /** docs/44 F7: exact geometry for the selected room from the side panel —
+   *  one undoable step per committed value, same as a drag. Centre stays in
+   *  0–100 %, size at least 1 %. */
+  private _roomsSetGeom(key: string, field: "x" | "y" | "w" | "h", raw: string): void {
+    const s = this._roomsSession;
+    const d = s?.rooms[key];
+    const n = parseFloat(raw);
+    if (!s || !d || !Number.isFinite(n)) return;
+    const v = field === "w" || field === "h" ? Math.min(100, Math.max(1, n)) : Math.min(100, Math.max(0, n));
+    if (d[field] === v) return;
+    this._roomsSession = {
+      ...s, rooms: { ...s.rooms, [key]: { ...d, [field]: v } },
+      history: [...s.history, s.rooms], future: [],
+    };
+  }
+
+  /** Display name for a Rooms-tool key (the config room's name when it has
+   *  one) — labels on the canvas and the side panel's title. */
+  private _roomDisplayName(key: string): string {
+    const all = [...(this._config.rooms ?? []), ...this._config.vacuums.flatMap((v) => v.rooms ?? [])];
+    return all.find((r) => r.key === key)?.name || key;
+  }
+
   private _roomsSetStyle(field: "border_normal" | "border_selected", raw: string): void {
     const s = this._roomsSession;
     if (!s) return;
@@ -7057,6 +7087,37 @@ export class AnyVacCard extends LitElement {
    *  actual tool body is `_renderSeatTool()` (the only one implemented
    *  through fáze H) or `_renderVePlaceholder()` (Rooms/Floorplan &
    *  Calibrate, fáze I/J). */
+  /** docs/44 F7 (V3): the tinted version of a raw map image, once it's
+   *  ready (the original until then, and whenever tinting is off, the card
+   *  is on `legacy`, the colour isn't a plain hex, or the image can't be
+   *  read back). Map URLs change with every map refresh, so the cache is
+   *  kept small and its object URLs are released. */
+  private _tinted(url: string, color: string): string {
+    if (!this._veTint || !this._themed() || !hexToRgb(color)) return url;
+    const key = url + "|" + color.toLowerCase();
+    const hit = this._tintCache.get(key);
+    if (hit) return hit;
+    if (hit === null || this._tintPending.has(key)) return url;
+    this._tintPending.add(key);
+    void tintMapImage(url, color).then((out) => {
+      this._tintPending.delete(key);
+      this._tintCache.set(key, out);
+      while (this._tintCache.size > 12) {
+        const [oldKey, oldUrl] = this._tintCache.entries().next().value as [string, string | null];
+        this._tintCache.delete(oldKey);
+        if (oldUrl) URL.revokeObjectURL(oldUrl);
+      }
+      if (out) this.requestUpdate();
+    });
+    return url;
+  }
+
+  private _veAvatar(v: VacuumConfig) {
+    return v.image
+      ? html`<img class="ve-chip-avatar" src=${v.image} alt="" />`
+      : html`<span class="ve-chip-avatar ve-chip-avatar--dot" style=${styleMap({ background: this._color(v) })}></span>`;
+  }
+
   private _renderVisualEditor() {
     const session = this._alignSession;
     if (!session) return nothing;
@@ -7097,19 +7158,20 @@ export class AnyVacCard extends LitElement {
     const tierBtn = (t: NudgeTier, label: string, title: string) => html`
       <button class="align-tier-btn ${tier === t ? "on" : ""}" title=${title}
         @click=${() => this._alignSetNudgeTier(t)}>${label}</button>`;
-    const toolTab = (tool: VisualEditorTool, label: string) => html`
-      <button class="ve-tool-tab ${this._veTool === tool ? "on" : ""}"
-        @click=${() => this._setVeTool(tool)}>${label}</button>`;
+    const toolTab = (tool: VisualEditorTool, label: string, icon: string) => html`
+      <button class="ve-tool-tab ${this._veTool === tool ? "on" : ""}" role="tab"
+        aria-selected=${this._veTool === tool ? "true" : "false"} title=${label}
+        @click=${() => this._setVeTool(tool)}><ha-icon icon=${icon}></ha-icon><span>${label}</span></button>`;
+    // docs/44 F7: one top bar — vacuum chips (with avatars) left, the tool
+    // tabs in the middle, the active tool's actions + Cancel/Save right.
     return html`
-      <div class="align-overlay ${this._rootClasses()}" tabindex="0" @keydown=${(e: KeyboardEvent) => this._alignKeyDown(e)}>
-        <div class="align-toolbar">
-          <div class="align-toolbar-title">
-            <ha-icon icon="mdi:vector-square-edit"></ha-icon>
-            <span>Visual editor — ${vac.name ?? vac.entity}</span>
-          </div>
-          ${candidates.length > 1 ? html`<div class="align-vac-picker">
-            ${candidates.map((v) => html`
+      <div class="align-overlay ${this._rootClasses()}" tabindex="0" role="dialog" aria-label="Visual editor — ${vac.name ?? vac.entity}"
+        @keydown=${(e: KeyboardEvent) => this._alignKeyDown(e)}>
+        <div class="align-toolbar ve-topbar">
+          <div class="align-vac-picker">
+            ${candidates.length > 1 ? candidates.map((v) => html`
               <button class="align-vac-chip ${v.entity === vac.entity ? "on" : ""}"
+                aria-pressed=${v.entity === vac.entity ? "true" : "false"}
                 @click=${() => {
                   // Switching vacuum via this chip keeps whatever tool is
                   // currently open (docs/42 §8 bod 4 only covers a FRESH entry
@@ -7122,11 +7184,16 @@ export class AnyVacCard extends LitElement {
                   if (tool === "rooms") this._openRooms();
                   if (tool === "floorplan") this._openFloorplan();
                 }}>
-                ${v.name ?? v.entity}
+                ${this._veAvatar(v)}<span>${v.name ?? v.entity}</span>
               </button>
-            `)}
-          </div>` : nothing}
-          <div class="align-toolbar-spacer"></div>
+            `) : html`<span class="align-vac-chip align-vac-chip--static on">${this._veAvatar(vac)}<span>${vac.name ?? vac.entity}</span></span>`}
+          </div>
+          <div class="ve-tool-row" role="tablist" aria-label="Tool">
+            ${toolTab("seat", "Seat & Appearance", "mdi:vector-square-edit")}
+            ${toolTab("rooms", "Rooms", "mdi:select-group")}
+            ${toolTab("floorplan", "Floorplan & Calibrate", "mdi:image-edit-outline")}
+          </div>
+          <div class="ve-topbar-actions">
           ${this._veTool === "seat" ? html`
             <div class="align-tier-group" title="Nudge step size — hold Ctrl for Fine, Shift for Jump">
               ${tierBtn("fine", "Fine", "Fine step (0,1×) — or hold Ctrl")}
@@ -7245,11 +7312,7 @@ export class AnyVacCard extends LitElement {
               <ha-icon icon="mdi:content-save"></ha-icon><span>Save</span>
             </button>
           ` : nothing}
-        </div>
-        <div class="ve-tool-row">
-          ${toolTab("seat", "Seat & Appearance")}
-          ${toolTab("rooms", "Rooms")}
-          ${toolTab("floorplan", "Floorplan & Calibrate")}
+          </div>
         </div>
         ${this._veTool === "seat" ? this._renderSeatTool(session, vac)
           : this._veTool === "rooms" ? this._renderRoomsTool(session, vac)
@@ -7341,7 +7404,7 @@ export class AnyVacCard extends LitElement {
                   })} />` : nothing}
               ${others.map((v) => {
                 const gm = this._mapEntityFor(v);
-                const gUrl = gm ? this._mapUrl(gm) : null;
+                const gUrl = gm ? this._tinted(this._mapUrl(gm), this._color(v)) : null;
                 const gs = this._effectiveSeat(v);
                 return html`
                   <div class="align-ghost">
@@ -7358,7 +7421,7 @@ export class AnyVacCard extends LitElement {
                 @pointermove=${(e: PointerEvent) => this._alignGestureMove(e)}
                 @pointerup=${(e: PointerEvent) => this._alignGestureEnd(e)}
                 @pointercancel=${(e: PointerEvent) => this._alignGestureEnd(e)}>
-                ${mapUrl ? html`<img class="align-seat-img" src=${mapUrl} alt="Vacuum map"
+                ${mapUrl ? html`<img class="align-seat-img" src=${this._tinted(mapUrl, this._color(vac))} alt="Vacuum map"
                     style=${styleMap({
                       opacity: String(session.layers.rawMap),
                       left: (50 + draft.offset_x) + "%", top: (50 + draft.offset_y) + "%", width: draft.scale + "%",
@@ -7441,6 +7504,14 @@ export class AnyVacCard extends LitElement {
                 @input=${(e: Event) => this._alignSetLayerOpacity("rawMap", (e.target as HTMLInputElement).value)}
                 @change=${() => this._alignRefocusOverlay()} />
             </div>
+            ${this._themed() ? html`
+              <div class="align-field-row align-field-row--check">
+                <label title="Each vacuum's map in its own colour, background removed — easier to see what lines up with what">
+                  <input type="checkbox" .checked=${this._veTint}
+                    @change=${(e: Event) => { this._veTint = (e.target as HTMLInputElement).checked; this._alignRefocusOverlay(); }} />
+                  Tint maps in vacuum colour
+                </label>
+              </div>` : nothing}
             <div class="align-field-row">
               <label>Rotation<span>°</span></label>
               <input type="number" step="0.1" .value=${String(Math.round(draft.rotation * 100) / 100)}
@@ -7593,8 +7664,9 @@ export class AnyVacCard extends LitElement {
                   })} />` : nothing}
               ${Object.entries(rs.rooms).map(([key, d]) => {
                 const isSel = key === selectedKey;
+                const label = this._roomDisplayName(key);
                 return html`
-                  <div class="rooms-rect ${isSel ? "rooms-rect--selected" : ""}"
+                  <div class="rooms-rect ${isSel ? "rooms-rect--selected" : ""}" title=${label}
                     style=${styleMap({
                       left: d.x + "%", top: d.y + "%", width: d.w + "%", height: d.h + "%",
                       borderWidth: (isSel ? style.border_selected : style.border_normal) + "px",
@@ -7603,7 +7675,7 @@ export class AnyVacCard extends LitElement {
                     @pointermove=${(e: PointerEvent) => this._roomsGestureMove(e)}
                     @pointerup=${() => this._roomsGestureEnd()}
                     @pointercancel=${() => this._roomsGestureEnd()}>
-                    <span class="rooms-rect-label">${key}</span>
+                    <span class="rooms-rect-label">${label}</span>
                     ${isSel ? (["nw", "ne", "sw", "se"] as const).map((corner) => html`
                       <div class="align-handle align-handle--corner rooms-handle--${corner}"
                         @pointerdown=${(e: PointerEvent) => this._roomsStartGesture(e, key, "resize", corner)}
@@ -7643,7 +7715,14 @@ export class AnyVacCard extends LitElement {
             </div>
             <div class="align-side-panel-divider"></div>
             ${selectedKey && selected ? html`
-              <div class="section-title">${selectedKey}</div>
+              <div class="section-title">${this._roomDisplayName(selectedKey)}</div>
+              ${(["x", "y", "w", "h"] as const).map((f) => html`
+                <div class="align-field-row">
+                  <label>${{ x: "Centre X", y: "Centre Y", w: "Width", h: "Height" }[f]}<span>%</span></label>
+                  <input type="number" step="0.1" min=${f === "w" || f === "h" ? 1 : 0} max="100"
+                    .value=${String(Math.round(selected[f] * 10) / 10)}
+                    @change=${(e: Event) => this._roomsSetGeom(selectedKey, f, (e.target as HTMLInputElement).value)} />
+                </div>`)}
               ${selected.isNew ? html`
                 <div class="align-field-row align-field-row--color">
                   <label>Key</label>
@@ -7768,7 +7847,7 @@ export class AnyVacCard extends LitElement {
             })}>
               ${ghosts.map((v) => {
                 const gm = this._mapEntityFor(v);
-                const gUrl = gm ? this._mapUrl(gm) : null;
+                const gUrl = gm ? this._tinted(this._mapUrl(gm), this._color(v)) : null;
                 const gs = this._effectiveSeat(v);
                 return html`
                   <div class="align-ghost">
@@ -12648,6 +12727,62 @@ export class AnyVacCard extends LitElement {
     .rooms-handle--sw { left: 0; top: 100%; }
     .rooms-handle--se { left: 100%; top: 100%; }
     .rooms-side-note { font-size: 12px; color: rgba(var(--avc-ink-rgb), 0.6); line-height: 1.4; }
+    /* == docs/44 F7: Visual editor — canvas, top bar, room labels ========= */
+    /* V1: an opaque canvas with a fine dot grid — the dashboard no longer
+     * shows through behind the editor. Themed only; legacy keeps its scrim. */
+    .avc-theme.align-overlay { background: rgb(var(--avc-scrim-2-rgb)); }
+    .avc-theme .align-canvas {
+      background-image: radial-gradient(rgba(var(--avc-ink-rgb), 0.09) 1px, transparent 1.4px);
+      background-size: 22px 22px;
+    }
+    /* One top bar: vacuums left, tools centre, actions right (wraps to two
+     * rows on narrow screens, tools then take the whole second row). */
+    .ve-topbar {
+      display: grid; grid-template-columns: auto minmax(0, 1fr) auto;
+      align-items: center; gap: 8px 12px;
+    }
+    .ve-topbar .ve-tool-row { justify-self: center; }
+    .ve-topbar .align-vac-picker { justify-self: start; min-width: 0; flex-wrap: nowrap; overflow-x: auto; scrollbar-width: none; }
+    .ve-topbar .align-vac-picker::-webkit-scrollbar { display: none; }
+    .ve-topbar-actions { justify-self: end; display: flex; align-items: center; gap: 6px; flex-wrap: nowrap; }
+    .align-vac-chip {
+      display: inline-flex; align-items: center; gap: 6px; flex-shrink: 0;
+      padding: 3px 12px 3px 3px; font-size: 12px;
+    }
+    .align-vac-chip--static { cursor: default; }
+    .ve-chip-avatar { width: 24px; height: 24px; border-radius: 50%; object-fit: cover; flex-shrink: 0; }
+    .ve-chip-avatar--dot { display: inline-block; width: 12px; height: 12px; margin: 0 2px 0 6px; }
+    .ve-topbar .ve-tool-row {
+      padding: 3px; gap: 2px; border: 1px solid var(--avc-panel-line); border-top: 1px solid var(--avc-panel-line);
+      border-radius: 999px; background: var(--avc-panel); flex-wrap: nowrap;
+    }
+    .ve-topbar .ve-tool-tab {
+      display: inline-flex; align-items: center; gap: 6px; border: none; background: transparent;
+      padding: 6px 14px; white-space: nowrap;
+    }
+    .ve-topbar .ve-tool-tab ha-icon { --mdc-icon-size: 16px; }
+    .ve-topbar .ve-tool-tab.on { background: rgba(var(--avc-accent-rgb), 0.2); color: rgb(var(--avc-ink-rgb)); }
+    @media (max-width: 1180px) {
+      .ve-topbar { grid-template-columns: minmax(0, 1fr) auto; }
+      .ve-topbar .ve-tool-row { grid-column: 1 / -1; grid-row: 2; justify-self: stretch; }
+      .ve-topbar .ve-tool-tab { flex: 1; justify-content: center; }
+    }
+    @media (max-width: 520px) {
+      .ve-topbar .ve-tool-tab span { display: none; }
+    }
+    /* V2: room labels whole — inside the room at the top; a room too narrow
+     * for its name shows it on hover/selection above the rectangle, and
+     * always as a tooltip (title). */
+    .rooms-rect { container-type: size; }
+    .rooms-rect-label { max-width: none; overflow: visible; text-overflow: clip; }
+    @container (max-width: 76px) {
+      .rooms-rect-label { display: none; }
+      .rooms-rect--selected > .rooms-rect-label, .rooms-rect:hover > .rooms-rect-label {
+        /* clear of the 26 px corner handles a selected room carries */
+        display: block; top: auto; bottom: calc(100% + 18px); left: 50%; transform: translateX(-50%);
+        box-shadow: var(--avc-elev-1); z-index: 2;
+      }
+    }
     /* == Align mode: home-frame degradation (docs/41 §4.8) =============== */
     .align-seat-layer--readonly { cursor: default; }
     .align-seat-layer--readonly .align-seat-img { cursor: default; }

@@ -6,6 +6,35 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [1.44.0] - 2026-09-30
+
+Seventh and last phase of the "living home" redesign (docs/44 F7): the Visual
+editor. Card-only; nothing it saves changes.
+
+### Changed
+
+- **Opaque canvas with a fine dot grid** (every theme except `legacy`) — the
+  dashboard no longer shows through behind the editor.
+- **One top bar:** vacuum chips with avatars on the left, the three tool tabs
+  (with icons) in the middle, the active tool's actions and Cancel/Save on the
+  right. On narrower screens the tabs move to a second row; on a phone they
+  are icon-only.
+- **Rooms tool: whole room names.** Labels show the room's display name in
+  full inside the room; a room too narrow for it shows the name only when
+  selected or hovered, above the rectangle, and always as a tooltip. The side
+  panel is titled with the selected room's name and now edits its exact
+  centre and size (each committed value one undo step, same as a drag).
+
+### Added
+
+- **Tinted maps in the Seat tool (V3).** Each vacuum's raw map is shown in its
+  own colour with the vendor background keyed out, so it's obvious which map
+  is being aligned onto what; other vacuums on the same floorplan (the ghosts)
+  get their own colours. Rooms stay readable by brightness, walls stay dark.
+  Tried on real Roborock maps before building it. "Tint maps in vacuum colour"
+  switches it off; never on `legacy`, and a map that can't be read back
+  (cross-origin) simply shows as before.
+
 ## [1.43.0] - 2026-09-30
 
 Sixth phase of the "living home" redesign (docs/44 F6): the config editor on
