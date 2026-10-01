@@ -7,7 +7,7 @@
  *  room, from an `anyvac.plan` response. Pure reordering of what the backend
  *  computed (`timeline` = per-room finish minutes, sequence-aware, docs/19) —
  *  no estimate of the card's own. */
-export function planOrder(plan: Record<string, any>): { order: string[]; first: Map<string, string> } {
+export function planOrder(plan: Record<string, any>): { order: string[]; first: Map<string, string>; finish: Map<string, number> } {
   const tl = (plan?.timeline ?? {}) as { dry?: Record<string, number>; wet?: Record<string, number> };
   const fin = new Map<string, number>();
   for (const kind of ["dry", "wet"] as const) {
@@ -17,6 +17,14 @@ export function planOrder(plan: Record<string, any>): { order: string[]; first: 
     }
   }
   const order = [...fin.keys()].sort((a, b) => fin.get(a)! - fin.get(b)!);
+  // docs/46 G2: when each room is DONE (its last pass), for the plan column.
+  const finish = new Map<string, number>();
+  for (const kind of ["dry", "wet"] as const) {
+    for (const [room, t] of Object.entries(tl[kind] ?? {})) {
+      if (typeof t !== "number") continue;
+      finish.set(room, Math.max(finish.get(room) ?? -Infinity, t));
+    }
+  }
   const first = new Map<string, string>();
   for (const kind of ["dry", "wet"] as const) {
     for (const [ent, rooms] of Object.entries((plan?.[kind] ?? {}) as Record<string, string[]>)) {
@@ -26,5 +34,5 @@ export function planOrder(plan: Record<string, any>): { order: string[]; first: 
       first.set(ent, best);
     }
   }
-  return { order, first };
+  return { order, first, finish };
 }

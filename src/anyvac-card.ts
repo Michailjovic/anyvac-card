@@ -223,6 +223,8 @@ export class AnyVacCard extends LitElement {
   /** 1.47.1: vacuum whose Visual editor was requested on a screen it doesn't
    *  fit (`_veFitsScreen`) — the notice sheet is showing instead. */
   @state() private _veNotice: VacuumConfig | null = null;
+  /** A tile hold just toggled map visibility — swallow the click that follows. */
+  private _tileHoldFired = false;
   /** docs/25 §10 follow-up (2026-07-25): the START bar's left segment mirrors
    *  the manufacturer app's 3-section bottom bar (mode / START / Dock, see
    *  docs/25 §10) — mode picker sheet, in-flow in the dock region. (The dock
@@ -2659,6 +2661,8 @@ export class AnyVacCard extends LitElement {
     /** docs/44 F5: rooms in the backend timeline's order (earliest finish
      *  first) and each robot's first room — the start sequence's script. */
     order?: string[]; first?: Map<string, string>;
+    /** docs/46 G2: minutes from start until each room's last pass is done. */
+    finish?: Map<string, number>;
   } | null = null;
   private _planFetchKey = "";
   /** Identity of a plan preview: everything the backend's answer depends on.
@@ -3327,6 +3331,10 @@ export class AnyVacCard extends LitElement {
     // Stack keeps its full-width row, landscape its picker + room list, and
     // `debug_dense_dock` (§7e) its dense view.
     if (this._isRail()) return this._renderRail(vacs);
+    // docs/46 G2: the landscape column answers "what happens when I press
+    // START" — mode, the plan, START. `legacy` and `debug_dense_dock` keep the
+    // old picker + room list (same split as the F3 rail).
+    if (withRun && this._usesPlanColumn()) return this._renderPlanColumn(vacs);
     const rooms = this._mergedRoomDefs(vacs);
     // Room-less configs (e.g. a fresh install before any rooms exist, docs/30)
     // used to make the WHOLE picker region disappear too, back when picker
@@ -3476,6 +3484,131 @@ export class AnyVacCard extends LitElement {
   }
 
 
+
+  /** docs/46 G2: does the landscape right column render as the plan column
+   *  (themed, integration present, not the `debug_dense_dock` dense view)? */
+  private _usesPlanColumn(): boolean {
+    return this._profile === "landscape" && !!this._config.layout && this._themed() && !this._config.debug_dense_dock
+      && this._config.vacuums.some((v) => this._intAttrs(v));
+  }
+
+  /** docs/46 G2: the landscape right column. Top to bottom: the pass mode;
+   *  the plan — the picked rooms (or the whole home) in the order they get
+   *  done, each with the robot assigned to its dry / wet pass (tap = pin, as
+   *  before) and the time it's done; while a job runs, its passes exactly as
+   *  `job_progress` publishes them; and the footer with the finish time and
+   *  the one hold-START (CANCEL while running). Every number comes from the
+   *  integration (`anyvac.plan` timeline, `job_progress`), docs/14. */
+  private _renderPlanColumn(vacs: VacuumConfig[]) {
+    const mode = this._planMode;
+    const allKeys = this._allRoomKeys();
+    const selKeys = allKeys.filter((k) => this._isRoomSelectedAny(k, vacs));
+    const runKeys = selKeys.length ? selKeys : allKeys;
+    if (runKeys.length) this._fetchPlan(runKeys, mode);
+    const pv = this._planPreview && this._planPreview.key === this._planKey(runKeys, mode) ? this._planPreview : null;
+    const names = new Map(this._mergedRoomDefs(vacs).map(({ r }) => [r.key, r.name ?? r.key] as const));
+    const byEnt = new Map(this._config.vacuums.map((v) => [v.entity, v] as const));
+    const jp = this._jobProgress();
+    const runHid = "dock-run";
+    const holdBtn = (cls: string, icon: string, text: string, enabled: boolean, fn: () => void) => html`
+      <button class="action-btn dock-run ${cls} ${enabled && this._holdId === runHid ? "action-btn--holding" : ""}"
+        ?disabled=${!enabled}
+        @pointerdown=${enabled ? this._holdStart(runHid, fn) : nothing}
+        @pointermove=${this._holdMove}
+        @pointerup=${this._holdEnd} @pointerleave=${this._holdEnd} @pointercancel=${this._holdEnd}>
+        <div class="hold-ring"></div>
+        <ha-icon icon=${icon}></ha-icon><span>${text}</span>
+      </button>`;
+
+    if (jp && Array.isArray(jp.rooms)) {
+      const rows = jp.rooms as Array<Record<string, any>>;
+      const left = typeof jp.eta_min_left === "number" ? Math.round(jp.eta_min_left) : null;
+      return html`
+        <div class="dock plan-col">
+          <div class="plan-head">
+            <span>Plan · ${jp.passes_done ?? 0} of ${jp.passes_total ?? rows.length} passes done</span>
+          </div>
+          <div class="plan-rows">
+            ${rows.map((r) => {
+              const vc = byEnt.get(r.vacuum);
+              const st = r.state === "done" ? "done" : r.state === "active" ? "active" : "queued";
+              return html`
+                <div class="plan-row plan-row--${st}">
+                  <ha-icon class="plan-kind" icon=${r.kind === "wet" ? "mdi:water" : "mdi:broom"}></ha-icon>
+                  <span class="plan-name">${names.get(r.room) ?? r.room}</span>
+                  <span class="dock-avatars">${vc ? this._vacChip(vc.entity) : nothing}</span>
+                  <span class="plan-when">${st === "done" ? html`<ha-icon icon="mdi:check"></ha-icon>`
+                    : st === "active" ? html`<b>${Math.round(Number(r.pct ?? 0))} %</b>` : nothing}</span>
+                </div>`;
+            })}
+          </div>
+          <div class="plan-foot">
+            <span class="plan-sum">
+              <b>${jp.finish_at ? "Done around " + this._clockStr(jp.finish_at) : "Cleaning"}</b>
+              <small>${left !== null ? "~" + left + " min left" : ""}</small>
+            </span>
+            ${holdBtn("plan-cancel", "mdi:stop", "Cancel · hold", true, () => void this._call("anyvac", "cancel", {}))}
+          </div>
+        </div>`;
+    }
+
+    const dryOf = pv?.dry ?? new Map<string, string>();
+    const wetOf = pv?.wet ?? new Map<string, string>();
+    const unsequenced = new Set(pv?.unsequenced ?? []);
+    const unassigned = new Set(this._unassignedRooms(runKeys, mode, true));
+    const fin = pv?.finish;
+    const order = [...runKeys].sort((a, b) => (fin?.get(a) ?? Infinity) - (fin?.get(b) ?? Infinity));
+    const now = Date.now();
+    const at = (min: number | undefined) =>
+      min === undefined ? "" : this._clockStr(new Date(now + min * 60000).toISOString());
+    const pinTap = (key: string, kind: "dry" | "wet", shown: string | undefined) =>
+      this._pinCandidates(key, kind).length > 1
+        ? (e: Event) => { e.stopPropagation(); this._cycleRoomPin(key, kind, shown); }
+        : undefined;
+    const modeBtn = (m: "dry" | "wet" | "both", icon: string, label: string) => html`
+      <button class="dock-mode ${mode === m ? "on" : ""}" aria-pressed=${mode === m ? "true" : "false"}
+        @click=${(e: Event) => { e.stopPropagation(); this._planMode = m; }}>
+        <ha-icon icon=${icon}></ha-icon><span>${label}</span>
+      </button>`;
+    const who = (m: Map<string, string>) => [...new Set(runKeys.map((k) => m.get(k)).filter((e): e is string => !!e))]
+      .map((e) => (byEnt.get(e) ? this._vacName(byEnt.get(e)!) : e)).join(" + ");
+    const dryWho = mode !== "wet" ? who(dryOf) : "";
+    const wetWho = mode !== "dry" ? who(wetOf) : "";
+    const how = [dryWho && "dry " + dryWho, wetWho && "wet " + wetWho].filter(Boolean).join(", then ");
+    const eta = pv?.eta ?? null;
+    return html`
+      <div class="dock plan-col">
+        <div class="dock-head">
+          ${modeBtn("dry", "mdi:broom", "Dry")}${modeBtn("wet", "mdi:water", "Wet")}${modeBtn("both", "mdi:water-plus", "Both")}
+        </div>
+        <div class="plan-head">
+          <span>${selKeys.length ? `Selected · ${selKeys.length} room${selKeys.length === 1 ? "" : "s"}` : `Whole home · ${allKeys.length} room${allKeys.length === 1 ? "" : "s"}`}</span>
+          ${selKeys.length ? html`<button class="plan-clear" @click=${() => this._clearRoomSelection()}>Clear · whole home</button>` : nothing}
+        </div>
+        <div class="plan-rows">
+          ${order.map((k) => html`
+            <div class="plan-row">
+              <span class="plan-name">${names.get(k) ?? k}</span>
+              ${unassigned.has(k) ? html`<ha-icon class="dock-unassigned" icon="mdi:robot-off"
+                title="No available robot for this room's ${mode} pass — check that a vacuum is configured with the right role and knows this room."></ha-icon>` : nothing}
+              ${unsequenced.has(k) ? html`<ha-icon class="dock-unseq" icon="mdi:sort-variant-off"
+                title="No cleaning order set for this room — the time estimate may be off. Set the order in the card editor's Global tab."></ha-icon>` : nothing}
+              <span class="dock-avatars">
+                ${mode !== "wet" ? this._vacChip(dryOf.get(k), pinTap(k, "dry", dryOf.get(k))) : nothing}
+                ${mode !== "dry" ? this._vacChip(wetOf.get(k), pinTap(k, "wet", wetOf.get(k))) : nothing}
+              </span>
+              <span class="plan-when">${at(fin?.get(k))}</span>
+            </div>`)}
+        </div>
+        <div class="plan-foot">
+          <span class="plan-sum">
+            <b>${eta !== null ? "Done around " + at(eta) : "Whole plan"}</b>
+            <small>${[how, eta !== null ? "~" + this._timeStr(eta).replace(/^~/, "") : ""].filter(Boolean).join(" · ")}</small>
+          </span>
+          ${holdBtn("", "mdi:play", "Hold to start", runKeys.length > 0, () => this._runOrchestrated(runKeys, this._planMode))}
+        </div>
+      </div>`;
+  }
 
   /** docs/25 §10 third follow-up (2026-07-24): dock hardware tier, read from
    *  `dock_status.dock_type` (already flowing through the integration sensor,
@@ -9835,6 +9968,11 @@ export class AnyVacCard extends LitElement {
     const dry = this._ageDaysFromIso(rec?.dry);
     const wet = this._ageDaysFromIso(rec?.wet);
     const badge = (d: number | null) => (d === null ? "—" : d < 1 ? "<1d" : Math.round(d) + "d");
+    // docs/46 G2: how complete the last clean was (+ the "part of the room was
+    // not reached" warning) — moved here from the landscape room list. Only
+    // below 100 %, like the themed rows showed it.
+    const cov = this._roomCoverageRec(vac, room);
+    const covFmt = (pct: number | null | undefined) => (pct == null || pct >= 100 ? "" : pct + "%");
     const dryEnt = selected ? this._planPreview?.dry.get(room.key) : undefined;
     const wetEnt = selected ? this._planPreview?.wet.get(room.key) : undefined;
     // Each chip cycles only among vacuums capable of ITS OWN type — see the
@@ -9856,8 +9994,8 @@ export class AnyVacCard extends LitElement {
         <div class="room-inspect-inner">
           <div class="room-inspect-name">${room.name ?? room.key}</div>
           <div class="room-inspect-ages">
-            <span class="dock-age"><ha-icon icon="mdi:broom"></ha-icon><b style=${styleMap({ color: this._colorForAgeDays(dry) })}>${badge(dry)}</b></span>
-            <span class="dock-age"><ha-icon icon="mdi:water"></ha-icon><b style=${styleMap({ color: this._colorForAgeDays(wet) })}>${badge(wet)}</b></span>
+            <span class="dock-age"><ha-icon icon="mdi:broom"></ha-icon><b style=${styleMap({ color: this._colorForAgeDays(dry) })}>${badge(dry)}</b>${this._renderCovBadge(cov, "dry", covFmt)}</span>
+            <span class="dock-age"><ha-icon icon="mdi:water"></ha-icon><b style=${styleMap({ color: this._colorForAgeDays(wet) })}>${badge(wet)}</b>${this._renderCovBadge(cov, "wet", covFmt)}</span>
           </div>
           ${dryEnt || wetEnt ? html`
             <div class="dock-avatars">
@@ -10551,14 +10689,41 @@ export class AnyVacCard extends LitElement {
     // full-width bar — three robots cleaning used to mean three big Pause bars.
     const pauseId = "pause-" + vacIdx;
     const showPause = cleaning && !urgent;
+    const tileHold = "tile-" + vacIdx;
+    const shown = this._shownSet.has(vacIdx);
     const cardBorder = cleaning ? "1.5px solid " + color : "1px solid var(--avc-panel-line)";
     return html`
       <div class="status-card status-tile ${cleaning ? "status-tile--live" : ""}" style=${styleMap({ border: cardBorder })}>
         <div class="tile-row">
-        <button class="tile-main" aria-label="${name} — open controls" @click=${() => { this._robotSheet = vacIdx; }}>
+        <button class="tile-main ${this._holdId === tileHold ? "tile-main--holding" : ""} ${shown ? "" : "tile-main--hidden"}"
+          aria-label="${name} — open controls" aria-pressed=${shown ? "true" : "false"}
+          title="${name} — tap for controls, hold to ${shown ? "hide it on" : "show it on"} the map"
+          @pointerdown=${(e: PointerEvent) => {
+            // docs/46 G2: hold hides/shows the robot on the shared map (the
+            // job the picker pills did); a tap still opens the robot sheet.
+            this._cancelHold();
+            this._tileHoldFired = false;
+            this._holdId = tileHold;
+            this._holdStartPos = { x: e.clientX, y: e.clientY };
+            this._holdTimer = setTimeout(() => {
+              this._holdTimer = null;
+              this._holdId = null;
+              this._tileHoldFired = true;
+              this._toggleShownMulti(vacIdx);
+            }, HOLD_DURATION_MS);
+          }}
+          @pointermove=${this._holdMove}
+          @pointerup=${() => { if (this._holdId === tileHold) this._cancelHold(); }}
+          @pointerleave=${() => { if (this._holdId === tileHold) this._cancelHold(); }}
+          @pointercancel=${() => { if (this._holdId === tileHold) this._cancelHold(); }}
+          @click=${() => {
+            if (this._tileHoldFired) { this._tileHoldFired = false; return; }
+            this._robotSheet = vacIdx;
+          }}>
+          <div class="hold-ring"></div>
           ${this._renderBattRing(vac, 50)}
           <span class="tile-text">
-            <span class="tile-name"><span class="tile-dot" style=${styleMap({ background: color })}></span>${name}</span>
+            <span class="tile-name"><span class="tile-dot" style=${styleMap({ background: color })}></span>${name}${shown ? nothing : html`<ha-icon class="tile-hidden-ico" icon="mdi:eye-off-outline"></ha-icon>`}</span>
             <span class="tile-status" style=${styleMap({ color: errState ? "rgb(var(--avc-err-rgb))" : labelColor })}>
               <ha-icon icon=${errState ? "mdi:alert-circle-outline" : statusIcon}></ha-icon>${label}${room ? html`<span class="tile-room"> · ${room}</span>` : nothing}
             </span>
@@ -10742,7 +10907,12 @@ export class AnyVacCard extends LitElement {
       case "start":
         return this._renderStartBar();
       case "status":
-        return html`${shown.map((i) => this._renderStatusCard(this._config.vacuums[i], i))}`;
+        // docs/46 G2: with the plan column the tiles ARE the show/hide control
+        // (hold), so a hidden robot keeps its (dimmed) tile — else it could
+        // never be brought back.
+        return this._usesPlanColumn()
+          ? html`${this._config.vacuums.map((v, i) => this._renderStatusCard(v, i))}`
+          : html`${shown.map((i) => this._renderStatusCard(this._config.vacuums[i], i))}`;
       default:
         return null;
     }
@@ -11607,6 +11777,7 @@ export class AnyVacCard extends LitElement {
     .badge--holding .hold-ring,
     .vac-icon-btn--holding .hold-ring,
     .rail-tile--holding .hold-ring,
+    .tile-main--holding .hold-ring,
     .room-overlay--holding .hold-ring {
       animation: hold-fill var(--hold-ms) linear forwards;
     }
@@ -12400,6 +12571,44 @@ export class AnyVacCard extends LitElement {
     .rail-tile > :not(.hold-ring) { position: relative; z-index: 1; }
     .rail-tile--live { border-color: var(--vac); }
     .rail-tile--hidden { opacity: 0.4; }
+    /* docs/46 G2: landscape tile hold = hide/show on the map */
+    .tile-main { position: relative; border-radius: var(--avc-r-m); touch-action: manipulation; -webkit-touch-callout: none; user-select: none; }
+    .tile-main--hidden { opacity: 0.45; }
+    .tile-hidden-ico { --mdc-icon-size: 14px; color: rgba(var(--avc-ink-rgb), 0.55); }
+    /* ── docs/46 G2: the landscape plan column ─────────────────────────── */
+    .plan-col { gap: 10px; min-width: 340px; }
+    .plan-head {
+      display: flex; align-items: baseline; justify-content: space-between; gap: 8px; padding: 2px 4px 0;
+      font-size: var(--avc-fs-m); font-weight: 600;
+    }
+    .plan-clear {
+      border: none; background: none; padding: 0; cursor: pointer; font: inherit;
+      font-size: var(--avc-fs-s); font-weight: 500; color: rgb(var(--avc-accent-rgb));
+    }
+    .plan-rows { display: flex; flex-direction: column; min-height: 0; overflow-y: auto; }
+    .plan-row {
+      display: flex; align-items: center; gap: 8px; min-height: 34px; padding: 0 4px;
+      border-bottom: 1px solid rgba(var(--avc-ink-rgb), 0.06); font-size: var(--avc-fs-m);
+    }
+    .plan-name { flex: 1; min-width: 0; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+    .plan-kind { --mdc-icon-size: 15px; color: rgba(var(--avc-ink-rgb), 0.55); flex-shrink: 0; }
+    .plan-when {
+      min-width: 52px; display: flex; justify-content: flex-end; text-align: right;
+      font-size: var(--avc-fs-s); color: rgba(var(--avc-ink-rgb), 0.6); font-variant-numeric: tabular-nums; --mdc-icon-size: 16px;
+    }
+    .plan-row--done .plan-name { color: rgba(var(--avc-ink-rgb), 0.5); }
+    .plan-row--done .plan-when, .plan-row--active .plan-when { color: rgb(var(--avc-ok-rgb)); font-weight: 600; }
+    .plan-foot { margin-top: auto; display: flex; align-items: center; justify-content: space-between; gap: 12px; }
+    .plan-sum { display: flex; flex-direction: column; gap: 1px; min-width: 0; }
+    .plan-sum b { font-size: var(--avc-fs-m); font-weight: 600; }
+    .plan-sum small { font-size: var(--avc-fs-s); color: rgba(var(--avc-ink-rgb), 0.6); }
+    .plan-foot .dock-run { flex: 0 0 auto; min-width: 180px; }
+    .plan-foot .dock-run span { font-size: var(--avc-fs-m); }
+    .plan-foot .dock-run { padding: 12px 18px; justify-content: center; }
+    .avc-theme .dock-run.plan-cancel:not(:disabled) {
+      background: rgba(var(--avc-err-rgb), 0.16); border-color: rgba(var(--avc-err-rgb), 0.5);
+      color: rgb(var(--avc-err-rgb)); box-shadow: none;
+    }
     .rail-tile-text { display: flex; flex-direction: column; gap: 1px; min-width: 0; flex: 1; }
     .rail-tile-name {
       display: flex; align-items: center; gap: 4px; min-width: 0;

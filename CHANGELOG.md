@@ -6,6 +6,38 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [1.49.0] - 2026-10-01
+
+Card-only (integration unchanged). docs/46 G2: the landscape right column
+says what START will do.
+
+### Changed
+
+- **The right column is the plan.** Top to bottom: Dry / Wet / Both; the rooms
+  START will clean — the picked ones, or the whole home — in the order they
+  get done, each with the robot assigned to its dry and wet pass (tap the
+  avatar to pin another robot, as before) and the time it's done; then
+  "Done around HH:MM" with who does what, and the hold-to-start button.
+  Picked rooms get **Clear · whole home**. All of it is the integration's
+  plan (`anyvac.plan` timeline), nothing estimated by the card.
+- **While a job runs** the column lists its passes exactly as the
+  integration publishes them (done ✓ / running % / queued, with the robot),
+  the finish time, the minutes left and **Cancel · hold**.
+- **Robot pills are gone from the column; hold a robot's tile instead** to
+  hide it on the map (hold again to bring it back — a hidden robot keeps its
+  dimmed tile with an eye-off mark). A tap still opens the robot sheet.
+- **The permanent room list is gone from the column** — room ages are on the
+  map labels. Hold a room on the map for the details, which now also carry
+  how complete its last clean was and the "part of the room was not reached"
+  warning that used to sit in the list.
+- `theme: legacy` and `debug_dense_dock` keep the previous column (pills,
+  room list), as the portrait rail did in 1.40.0.
+
+### Internal
+
+- New `_renderPlanColumn`, `_usesPlanColumn`; `planOrder()` also returns each
+  room's finish minute. New `tests/plan-column.spec.ts` (6).
+
 ## [1.48.0] - 2026-10-01
 
 Card-only (integration unchanged). docs/46 G1: care and dock belong to the
