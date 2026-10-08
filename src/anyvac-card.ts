@@ -56,6 +56,7 @@ import {
   recropFromGesture,
   cropBoxToYaml,
   canvasScaleForCrop,
+  mapPxDims,
   type SeatParams,
   type SeatFitResult,
   type CropBox,
@@ -586,6 +587,10 @@ export class AnyVacCard extends LitElement {
    *  event" convention `_pvNat` (editor.ts) already uses for the analogous
    *  per-vacuum crop_box hint. */
   @state() private _recropNat: { w: number; h: number } | null = null;
+  /** Natural size of the map image the Seat tool is moving, learned from
+   *  its own `load` event — the gizmo box's real proportions (see
+   *  `_alignMapAspect`). */
+  @state() private _alignMapNat: { w: number; h: number } | null = null;
   /** Active layout profile (docs/18) — picked by viewport aspect ratio. */
   @state() private _profile: LayoutProfile = "landscape";
   /** Measured inner box of the map region (grid mode) for the exact rotated fit. */
@@ -5010,6 +5015,7 @@ export class AnyVacCard extends LitElement {
 
   private _openAlign(vac: VacuumConfig): void {
     if (this._alignSession) return;
+    this._alignMapNat = null; // re-learned from the new map's own <img> load
     const src = resolveImageBaseSrc(this._config, vac);
     if (!src || !this._intAttrs(vac)) return;
     // ONE-TIME read of the effective seat — the draft below is an independent
@@ -5375,17 +5381,45 @@ export class AnyVacCard extends LitElement {
     return { x: (lx / sw + 0.5) * 100, y: (ly / sh + 0.5) * 100 };
   }
 
-  /** A corner of the seated layer's own unit box (`cx`/`cy` in 0..1, (0,0) =
+  /** A point of the seated layer's own box (`cx`/`cy` in 0..1, (0,0) =
    *  NW .. (1,1) = SE) projected through `seat`, in wrap-relative PERCENT.
    *  Reuses `seatToMatrix` (docs/14 rule 1 — the one shared geometry
-   *  primitive, not a second implementation) with a 1×1 "natural size" so
-   *  its content coordinates ARE the unit box directly. */
+   *  primitive, not a second implementation) with a 1 × `aspect` "natural
+   *  size", so the box has the layer's REAL proportions.
+   *
+   *  `aspect` = layer height / width (NH/NW). It used to be a fixed 1×1
+   *  unit square, so for any non-square map the gizmo box (and every handle
+   *  on it) sat inside/outside the real image instead of on its edges —
+   *  field report 2026-10-08: with the side handles now anchored to the
+   *  opposite edge, dragging the top handle still visibly moved the map's
+   *  bottom, because the "opposite edge" was the square box's edge, ~40 px
+   *  inside the real bottom of a tall map. Defaults to 1 (old behaviour)
+   *  when the real proportions aren't known. */
   private _alignCornerPct(
-    seat: SeatParams, cx: number, cy: number, wrapW: number, wrapH: number,
+    seat: SeatParams, cx: number, cy: number, wrapW: number, wrapH: number, aspect = 1,
   ): { x: number; y: number } {
-    const m = seatToMatrix(seat, wrapW, wrapH, 1, 1);
-    const p = m.transformPoint({ x: cx, y: cy });
+    const a = aspect > 0 && Number.isFinite(aspect) ? aspect : 1;
+    const m = seatToMatrix(seat, wrapW, wrapH, 1, a);
+    const p = m.transformPoint({ x: cx, y: cy * a });
     return { x: (p.x / wrapW) * 100, y: (p.y / wrapH) * 100 };
+  }
+
+  /** NH/NW of the map image the Seat tool moves: the loaded `<img>`'s own
+   *  natural size first (it IS what the user sees and drags), else the
+   *  integration's `image_dims` (what the overlay renderer sizes itself by —
+   *  the two agree on a real Roborock map), else 1 (old square box). */
+  private _alignMapAspect(vac: VacuumConfig): number {
+    const n = this._alignMapNat;
+    if (n && n.w > 0 && n.h > 0) return n.h / n.w;
+    const d = mapPxDims(this._intAttrs(vac)?.image_dims);
+    return d ? d.NH / d.NW : 1;
+  }
+
+  private _onAlignMapLoad(e: Event): void {
+    const im = e.currentTarget as HTMLImageElement;
+    if (!im.naturalWidth || !im.naturalHeight) return;
+    if (this._alignMapNat?.w === im.naturalWidth && this._alignMapNat?.h === im.naturalHeight) return;
+    this._alignMapNat = { w: im.naturalWidth, h: im.naturalHeight };
   }
 
   /** A resize cursor for a side handle whose UNROTATED axis is horizontal
@@ -7705,11 +7739,13 @@ export class AnyVacCard extends LitElement {
       path_color: appearance.path_color ?? undefined,
       mop_path_color: appearance.mop_path_color ?? undefined,
     };
-    const corner = (cx: number, cy: number) => this._alignCornerPct(draft, cx, cy, wrapW, wrapH);
+    const aspect = this._alignMapAspect(vac);
+    const corner = (cx: number, cy: number) => this._alignCornerPct(draft, cx, cy, wrapW, wrapH, aspect);
     const nw = corner(0, 0), ne = corner(1, 0), sw = corner(0, 1), se = corner(1, 1);
     const nMid = corner(0.5, 0), sMid = corner(0.5, 1), wMid = corner(0, 0.5), eMid = corner(1, 0.5);
     const centre = { x: 50 + draft.offset_x, y: 50 + draft.offset_y };
-    const rotateHandle = this._alignCornerPct(draft, 0.5, -0.18, wrapW, wrapH);
+    // 18 % of the layer's WIDTH above its top edge, whatever its proportions.
+    const rotateHandle = this._alignCornerPct(draft, 0.5, -0.18 / aspect, wrapW, wrapH, aspect);
     const readOnly = this._alignReadOnly();
     return html`
         <div class="align-body">
@@ -7749,6 +7785,7 @@ export class AnyVacCard extends LitElement {
                 @pointerup=${(e: PointerEvent) => this._alignGestureEnd(e)}
                 @pointercancel=${(e: PointerEvent) => this._alignGestureEnd(e)}>
                 ${mapUrl ? html`<img class="align-seat-img" src=${this._tinted(mapUrl, this._color(vac))} alt="Vacuum map"
+                    @load=${(e: Event) => this._onAlignMapLoad(e)}
                     style=${styleMap({
                       opacity: String(session.layers.rawMap),
                       left: (50 + draft.offset_x) + "%", top: (50 + draft.offset_y) + "%", width: draft.scale + "%",
@@ -8153,10 +8190,13 @@ export class AnyVacCard extends LitElement {
   private _renderFloorplanGeoTool(session: FloorplanEditSession) {
     const { w: wrapW, h: wrapH } = this._alignSceneSize();
     const draft = session.draft;
-    const corner = (cx: number, cy: number) => this._alignCornerPct(draft, cx, cy, wrapW, wrapH);
+    // The floorplan <img> fills the whole scene (`.align-floorplan-img`
+    // inset:0), so its real box is wrapW × wrapH, not a square.
+    const aspect = wrapH / wrapW;
+    const corner = (cx: number, cy: number) => this._alignCornerPct(draft, cx, cy, wrapW, wrapH, aspect);
     const nw = corner(0, 0), ne = corner(1, 0), sw = corner(0, 1), se = corner(1, 1);
     const centre = { x: 50 + draft.offset_x, y: 50 + draft.offset_y };
-    const rotateHandle = this._alignCornerPct(draft, 0.5, -0.18, wrapW, wrapH);
+    const rotateHandle = this._alignCornerPct(draft, 0.5, -0.18 / aspect, wrapW, wrapH, aspect);
     const ghosts = this._config.vacuums.filter(
       (v) => resolveImageBaseSrc(this._config, v) === session.floorplan && this._intAttrs(v),
     );

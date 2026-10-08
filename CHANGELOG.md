@@ -6,6 +6,26 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [1.51.4] - 2026-10-08
+
+Integration unchanged (1.51.2).
+
+### Fixed
+
+- **Visual editor gizmo box now matches the real map image.** The Seat
+  tool's box, side handles and corner handles were drawn on a unit SQUARE,
+  not on the map image's real proportions — on a tall/narrow map they sat
+  well inside (or outside) the image. Since 1.51.3 anchors a side handle to
+  the opposite edge, that "opposite edge" was the square's edge, ~40 px
+  inside the real bottom of a tall map, so dragging the top handle still
+  visibly moved the map's bottom (field report 2026-10-08). The box now
+  takes the loaded map `<img>`'s natural size (fallback: the integration's
+  `image_dims`), so handles sit on the image's real edges and the opposite
+  edge really stays put. Same fix for the Floorplan geometry tool, whose
+  box was also a square instead of the floorplan's wrapW × wrapH. Test in
+  `visual-editor.spec.ts` uses a real raster map (the old code put the
+  handle 419 px off the image edge); full suite 336/336.
+
 ## [1.51.3] - 2026-10-08
 
 Integration unchanged (1.51.2). Card skips 1.51.1–1.51.2 — those numbers are integration-only releases paired with card 1.51.0.
