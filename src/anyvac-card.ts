@@ -112,6 +112,7 @@ import {
   type ResolvedProfileGrid,
 } from "./layout";
 import { fmtPts, trailTail, traceSince, pointAtFraction, glideKeyframes, arcLength, type Pt } from "./trail";
+import { mergeLive } from "./live";
 import { planOrder } from "./startseq";
 import { hexToRgb, tintMapImage } from "./maptint";
 
@@ -8934,7 +8935,7 @@ export class AnyVacCard extends LitElement {
    *  Split mode's `_renderMap` renders one fully independent box per vacuum
    *  (no shared stacking context), so it keeps using the default "both". */
   private _renderIntegrationOverlay(vac: VacuumConfig, m: any, part: "both" | "paths" | "marker" = "both") {
-    const at = this._intAttrs(vac);
+    const at = mergeLive(this._intAttrs(vac)); // docs/48 live position
     if (!at) return nothing;
     const dims = at.image_dims;
     if (!dims) return nothing;
@@ -9182,7 +9183,7 @@ export class AnyVacCard extends LitElement {
    *  `sin` to undo a flip baked into THAT contract's solved affine. Since
    *  home-px space needs no such correction, this uses `+sin`. */
   private _renderHomeFrameOverlay(vac: VacuumConfig, crop: CropBox, part: "both" | "paths" | "marker" = "both") {
-    const at = this._intAttrs(vac);
+    const at = mergeLive(this._intAttrs(vac)); // docs/48 live position
     if (!at) return nothing;
     const cropW = crop.x1 - crop.x0;
     const cropH = crop.y1 - crop.y0;
@@ -9245,7 +9246,7 @@ export class AnyVacCard extends LitElement {
     ar: number,
     part: "both" | "paths" | "marker" = "both",
   ) {
-    const at = this._intAttrs(vac);
+    const at = mergeLive(this._intAttrs(vac)); // docs/48 live position
     if (!at || !(ar > 0)) return nothing;
     const proj = (p: { x: number; y: number }): Pt => {
       const pct = projectHomePxThroughFit(p, dims, fit, ar);

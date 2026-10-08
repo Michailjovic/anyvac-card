@@ -6,6 +6,20 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [1.51.0] - 2026-10-08
+
+Pairs with integration **1.51.0** (docs/48).
+
+### Added
+
+- **The robot moves on the map every few seconds.** With integration 1.51.0
+  the map sensor carries `live` — the robot's newest position and trace from
+  its local connection. The card draws it on top of the last full map (all
+  three overlays: per-vacuum seat, home-frame snapshot, calibrated floorplan),
+  only while it belongs to the map being shown, and never bridges a gap the
+  integration did not bridge (new `src/live.ts`). Older integrations: no
+  change.
+
 ## [1.50.0] - 2026-10-08
 
 Pairs with integration **1.50.0** (docs/47).
