@@ -432,7 +432,7 @@ test.describe("Align mode overlay (docs/41, C2b)", () => {
     expect(Math.abs(scaleRatio - scaleYRatio)).toBeGreaterThan(0.05);
   });
 
-  test("a drag on the top side handle stretches scaleY only (offset and scale untouched) and enables Independent Y", async ({ page }) => {
+  test("a centre-anchored top-side stretch (no pivot — the Alt fallback) changes scaleY only (offset and scale untouched) and enables Independent Y", async ({ page }) => {
     await mountCard(page);
     await openAlign(page);
     const before = await session(page);
@@ -462,6 +462,34 @@ test.describe("Align mode overlay (docs/41, C2b)", () => {
     expect(after.draft.scale).toBeCloseTo(before.draft.scale, 6);
     expect(after.draft.offset_x).toBeCloseTo(before.draft.offset_x, 6);
     expect(after.draft.offset_y).toBeCloseTo(before.draft.offset_y, 6);
+  });
+
+  test("dragging the real top side handle moves only the top edge — the bottom edge stays put on screen (field report 2026-10-08)", async ({ page }) => {
+    await mountCard(page);
+    await openAlign(page);
+    const res = await page.evaluate(() => {
+      const host = document.querySelector("anyvac-visual-editor") as any;
+      const q = (sel: string) => host.shadowRoot.querySelector(sel) as HTMLElement;
+      const mid = (el: HTMLElement) => { const r = el.getBoundingClientRect(); return { x: r.left + r.width / 2, y: r.top + r.height / 2 }; };
+      const n = q('.align-handle--side[data-side="n"]');
+      (n as any).setPointerCapture = () => {};
+      const sBefore = mid(q('.align-handle--side[data-side="s"]'));
+      const nBefore = mid(n);
+      const opts = (x: number, y: number) => ({ bubbles: true, composed: true, pointerId: 11, clientX: x, clientY: y });
+      n.dispatchEvent(new PointerEvent("pointerdown", opts(nBefore.x, nBefore.y)));
+      n.dispatchEvent(new PointerEvent("pointermove", opts(nBefore.x + 3, nBefore.y - 40)));
+      n.dispatchEvent(new PointerEvent("pointerup", opts(nBefore.x + 3, nBefore.y - 40)));
+      return { sBefore, nBefore, sAfter: null as any, nAfter: null as any };
+    });
+    await page.waitForTimeout(50);
+    const after = await page.evaluate(() => {
+      const host = document.querySelector("anyvac-visual-editor") as any;
+      const mid = (sel: string) => { const r = (host.shadowRoot.querySelector(sel) as HTMLElement).getBoundingClientRect(); return { x: r.left + r.width / 2, y: r.top + r.height / 2 }; };
+      return { s: mid('.align-handle--side[data-side="s"]'), n: mid('.align-handle--side[data-side="n"]') };
+    });
+    expect(Math.abs(after.s.x - res.sBefore.x)).toBeLessThan(1);
+    expect(Math.abs(after.s.y - res.sBefore.y)).toBeLessThan(1);
+    expect(res.nBefore.y - after.n.y).toBeGreaterThan(30); // top edge followed the pointer up
   });
 
   test("a focused side-panel field defers only the arrow keys to its own native behavior — ,/.[ ] still nudge the seat (field report 2026-09-18)", async ({ page }) => {

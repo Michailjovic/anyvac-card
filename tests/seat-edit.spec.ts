@@ -8,6 +8,7 @@ import {
   stretchSeatY,
   stretchSeatX,
   localAxisScaleRatio,
+  stretchSeatAxisAbout,
   pinchSeat,
   nudgeOffset,
   nudgeRotation,
@@ -717,4 +718,59 @@ test.describe("seatToMatrix: matches a real rendered .map-img (docs/41 Fáze A g
       }
     });
   }
+});
+
+// Field report 2026-10-08: a side handle must move ONLY its own edge — the
+// opposite edge stays fixed on screen (centre-anchored stretch moved both).
+// Ground truth: project the opposite edge's content points through
+// `forwardPct` (independent reimplementation) before and after.
+test.describe("seatedit: stretchSeatAxisAbout (edge-anchored side handles)", () => {
+  const ar = 2.2;
+  const seats: SeatParams[] = [
+    { rotation: 0, scale: 100, offset_x: 0, offset_y: 0 },
+    { rotation: 37, scale: 85, offset_x: 6, offset_y: -4, scaleY: 60 },
+    { rotation: 270, scale: 120, offset_x: -3, offset_y: 2 },
+  ];
+  for (const seat of seats) {
+    test(`north handle keeps the whole south edge fixed (rotation ${seat.rotation})`, () => {
+      const pivot = forwardPct({ x: 0, y: 0.5 }, seat, ar); // S mid = opposite of N
+      const s0 = forwardPct({ x: 0.02, y: -0.5 }, seat, ar); // grabbed slightly off the handle centre
+      const s1 = { x: s0.x + 7, y: s0.y - 13 }; // arbitrary drag incl. sideways drift
+      const next = stretchSeatAxisAbout(seat, "y", s0, s1, pivot, ar);
+      for (const qx of [-0.5, 0, 0.5]) {
+        const before = forwardPct({ x: qx, y: 0.5 }, seat, ar);
+        const after = forwardPct({ x: qx, y: 0.5 }, next, ar);
+        expect(after.x).toBeCloseTo(before.x, 6);
+        expect(after.y).toBeCloseTo(before.y, 6);
+      }
+      expect(next.scale).toBeCloseTo(seat.scale, 9); // X untouched
+      expect(next.rotation).toBe(seat.rotation);
+    });
+
+    test(`east handle keeps the whole west edge fixed and the north edge's Y extent unchanged (rotation ${seat.rotation})`, () => {
+      const pivot = forwardPct({ x: -0.5, y: 0 }, seat, ar); // W mid = opposite of E
+      const s0 = forwardPct({ x: 0.5, y: 0.03 }, seat, ar);
+      const s1 = { x: s0.x - 9, y: s0.y + 4 };
+      const next = stretchSeatAxisAbout(seat, "x", s0, s1, pivot, ar);
+      // Content points along the west edge (q.x = -0.5); Y is frozen, so the
+      // same q.y must land on the same screen point.
+      for (const qy of [-0.3, 0, 0.3]) {
+        const before = forwardPct({ x: -0.5, y: qy }, seat, ar);
+        const after = forwardPct({ x: -0.5, y: qy }, next, ar);
+        expect(after.x).toBeCloseTo(before.x, 6);
+        expect(after.y).toBeCloseTo(before.y, 6);
+      }
+      expect(next.scaleY!).toBeCloseTo(seat.scaleY ?? seat.scale, 9); // Y frozen
+    });
+  }
+
+  test("a pure along-axis drag recovers the exact factor: dragging N twice as far from S doubles scaleY", () => {
+    const seat: SeatParams = { rotation: 0, scale: 100, offset_x: 0, offset_y: 0 };
+    const pivot = forwardPct({ x: 0, y: 0.5 }, seat, ar);
+    const s0 = forwardPct({ x: 0, y: -0.5 }, seat, ar);
+    const s1 = { x: s0.x, y: pivot.y + (s0.y - pivot.y) * 2 };
+    const next = stretchSeatAxisAbout(seat, "y", s0, s1, pivot, ar);
+    expect(next.scaleY!).toBeCloseTo(200, 6);
+    expect(next.offset_x).toBeCloseTo(0, 9);
+  });
 });

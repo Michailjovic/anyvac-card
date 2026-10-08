@@ -68,6 +68,7 @@ import {
   scaleSeatCornerAniso,
   stretchSeatX,
   stretchSeatY,
+  stretchSeatAxisAbout,
   localAxisScaleRatio,
   rotateSeatAbout,
   pinchSeat,
@@ -5521,14 +5522,21 @@ export class AnyVacCard extends LitElement {
         const d1 = this._alignIsoDist(s1, g.pivotPct, ar);
         if (d0 > 1e-6) next = scaleSeatAbout(g.startSeat, d1 / d0, g.pivotPct, ar);
       }
-    } else if (g.kind === "stretchY") {
+    } else if (g.kind === "stretchX" || g.kind === "stretchY") {
+      // Side handles move ONLY their own edge — the opposite edge
+      // (`pivotPct`) stays put (field report 2026-10-08). Holding Alt
+      // switches live to the old centre-anchored stretch (both edges move
+      // symmetrically), same modifier convention design tools use; a
+      // gesture started without a pivot also keeps the centred behaviour.
       const id = e.pointerId;
       const s0 = g.startPos.get(id)!, s1 = g.livePos.get(id)!;
-      next = stretchSeatY(g.startSeat, localAxisScaleRatio(g.startSeat, "y", s0, s1, ar));
-    } else if (g.kind === "stretchX") {
-      const id = e.pointerId;
-      const s0 = g.startPos.get(id)!, s1 = g.livePos.get(id)!;
-      next = stretchSeatX(g.startSeat, localAxisScaleRatio(g.startSeat, "x", s0, s1, ar));
+      const axis = g.kind === "stretchX" ? "x" : "y";
+      if (g.pivotPct && !e.altKey) {
+        next = stretchSeatAxisAbout(g.startSeat, axis, s0, s1, g.pivotPct, ar);
+      } else {
+        const k = localAxisScaleRatio(g.startSeat, axis, s0, s1, ar);
+        next = axis === "x" ? stretchSeatX(g.startSeat, k) : stretchSeatY(g.startSeat, k);
+      }
     } else if (g.kind === "rotate" && g.pivotPct) {
       const id = e.pointerId;
       const s0 = g.startPos.get(id)!, s1 = g.livePos.get(id)!;
@@ -7771,18 +7779,18 @@ export class AnyVacCard extends LitElement {
                   </div>
                 `)}
                 ${([
-                  ["n", nMid, "stretchY", 90, "mdi:arrow-up-down"],
-                  ["s", sMid, "stretchY", 90, "mdi:arrow-up-down"],
-                  ["w", wMid, "stretchX", 0, "mdi:arrow-left-right"],
-                  ["e", eMid, "stretchX", 0, "mdi:arrow-left-right"],
-                ] as const).map(([key, pos, kind, baseAxisDeg, icon]) => html`
+                  ["n", nMid, sMid, "stretchY", 90, "mdi:arrow-up-down"],
+                  ["s", sMid, nMid, "stretchY", 90, "mdi:arrow-up-down"],
+                  ["w", wMid, eMid, "stretchX", 0, "mdi:arrow-left-right"],
+                  ["e", eMid, wMid, "stretchX", 0, "mdi:arrow-left-right"],
+                ] as const).map(([key, pos, opp, kind, baseAxisDeg, icon]) => html`
                   <div class="align-handle align-handle--side align-handle--${key}" data-side=${key}
-                    title=${kind === "stretchX" ? "Scale X" : "Scale Y"}
+                    title=${(kind === "stretchX" ? "Scale X" : "Scale Y") + " — opposite edge stays put (hold Alt to scale from the centre)"}
                     style=${styleMap({
                       left: pos.x + "%", top: pos.y + "%",
                       cursor: this._alignResizeCursor(baseAxisDeg, draft.rotation + this._alignView.rot),
                     })}
-                    @pointerdown=${(e: PointerEvent) => this._alignStartGesture(e, kind)}
+                    @pointerdown=${(e: PointerEvent) => this._alignStartGesture(e, kind, opp)}
                     @pointermove=${(e: PointerEvent) => this._alignGestureMove(e)}
                     @pointerup=${(e: PointerEvent) => this._alignGestureEnd(e)}
                     @pointercancel=${(e: PointerEvent) => this._alignGestureEnd(e)}>

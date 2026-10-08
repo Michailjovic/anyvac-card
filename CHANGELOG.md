@@ -6,6 +6,23 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [1.51.3] - 2026-10-08
+
+Integration unchanged (1.51.2). Card skips 1.51.1–1.51.2 — those numbers are integration-only releases paired with card 1.51.0.
+
+### Changed
+
+- **Visual editor → Seat: side handles move only their own edge.** Dragging
+  the top handle used to stretch the map about its centre, so the bottom edge
+  moved too (same for left/right) — you couldn't line up one side of the map
+  with the floorplan without knocking the other side off. Now the opposite
+  edge stays put and only the dragged one follows the pointer, also on a
+  rotated map. Hold **Alt** while dragging for the old centre-anchored
+  stretch. Corner handles already pinned the opposite corner — unchanged.
+  New pure `stretchSeatAxisAbout()` in `seatedit.ts`; tests in
+  `seat-edit.spec.ts` (south/west edge fixed at 0°/37°/270°) and
+  `visual-editor.spec.ts` (real handle drag).
+
 ## [1.51.0] - 2026-10-08
 
 Pairs with integration **1.51.0** (docs/48).

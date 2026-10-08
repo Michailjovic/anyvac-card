@@ -517,6 +517,47 @@ export function localAxisScaleRatio(
   return Math.abs(v0) > 1e-6 ? v1 / v0 : 1;
 }
 
+/** Edge-anchored side-handle stretch (field report 2026-10-08): dragging the
+ *  NORTH handle must move only the north edge — the south edge stays where it
+ *  is — instead of the centre-anchored `stretchSeatX/Y` + `localAxisScaleRatio`
+ *  pair, which grows/shrinks both opposite edges at once and so made it
+ *  impossible to calibrate one side of the map against the floorplan without
+ *  disturbing the other.
+ *
+ *  `pivotPct` is the OPPOSITE side's midpoint (fixed for the whole gesture,
+ *  same convention as `scaleSeatAbout`/`scaleSeatCornerAniso`'s opposite
+ *  corner). The pivot->pointer vector is projected onto the seat's own
+ *  (rotated) local `axis` only — the perpendicular component is ignored on
+ *  purpose, so sideways pointer drift (and the pointer not landing exactly on
+ *  the handle's centre) can't leak into the other axis the way reusing
+ *  `scaleSeatCornerAniso` would (its perpendicular ratio would divide by the
+ *  ~0 pivot->handle offset on that axis). The centre is then scaled about the
+ *  pivot along that one local axis, which is what keeps the opposite edge's
+ *  content fixed on screen; scale/scaleY follow `stretchSeatX`/`stretchSeatY`
+ *  exactly (one copy of the "freeze the other axis" rule, docs/14 rule 1). */
+export function stretchSeatAxisAbout(
+  seat: SeatParams, axis: "x" | "y",
+  s0Pct: { x: number; y: number }, s1Pct: { x: number; y: number },
+  pivotPct: { x: number; y: number }, ar: number,
+): SeatParams {
+  const pivot = pctToFrac(pivotPct, ar);
+  const f0 = pctToFrac(s0Pct, ar), f1 = pctToFrac(s1Pct, ar);
+  const rel0 = rotatePoint({ x: f0.x - pivot.x, y: f0.y - pivot.y }, -seat.rotation);
+  const rel1 = rotatePoint({ x: f1.x - pivot.x, y: f1.y - pivot.y }, -seat.rotation);
+  const v0 = axis === "x" ? rel0.x : rel0.y;
+  const v1 = axis === "x" ? rel1.x : rel1.y;
+  const k = Math.abs(v0) > 1e-6 ? v1 / v0 : 1;
+  const c = seatCentreFrac(seat, ar);
+  const relC = rotatePoint({ x: c.x - pivot.x, y: c.y - pivot.y }, -seat.rotation);
+  const scaledRelC = rotatePoint(
+    axis === "x" ? { x: relC.x * k, y: relC.y } : { x: relC.x, y: relC.y * k },
+    seat.rotation,
+  );
+  const off = frameToOffset({ x: pivot.x + scaledRelC.x, y: pivot.y + scaledRelC.y }, ar);
+  const base = axis === "x" ? stretchSeatX(seat, k) : stretchSeatY(seat, k);
+  return { ...base, offset_x: off.offset_x, offset_y: off.offset_y };
+}
+
 /** Solves the similarity transform (rotation + uniform scale + translation)
  *  mapping percent-space point `a0`->`b0` and `a1`->`b1` — closed-form via
  *  complex division, the 2-point case of the same least-squares idea
