@@ -6,6 +6,26 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [1.51.5] - 2026-10-08
+
+Integration unchanged (1.51.2).
+
+### Fixed
+
+- **Visual editor Seat gizmo wraps the home, not the empty map canvas.**
+  Roborock draws its map on a canvas much larger than the explored area, so
+  even with the box on the real image (1.51.4) every handle sat far out in
+  empty space and the "opposite edge" a side handle holds still was the
+  canvas edge, not the edge of the home. The box (corners, side handles,
+  rotate handle, centre) now wraps the union of the rooms' `bbox_px` — the
+  same area `anyvac.snapshot_map_as_floorplan` crops to — so dragging the
+  top handle keeps the bottom of the home put. Alt now stretches
+  symmetrically about the home's centre, and rotation pivots there too.
+  Whole image as before when no room bbox is known. New pure
+  `contentBoxFrac()` in `seatedit.ts`; tests in `seat-edit.spec.ts` and
+  `visual-editor.spec.ts` (the 1.51.4 code puts the handle 78 px off the
+  home's edge); full suite 340/340.
+
 ## [1.51.4] - 2026-10-08
 
 Integration unchanged (1.51.2).

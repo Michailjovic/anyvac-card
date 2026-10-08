@@ -558,6 +558,32 @@ export function stretchSeatAxisAbout(
   return { ...base, offset_x: off.offset_x, offset_y: off.offset_y };
 }
 
+/** The part of a vacuum map image that actually holds the home, as
+ *  fractions of the image (0..1, (0,0) = top-left) — the union of every
+ *  room's `bbox_px`, the SAME union `anyvac.snapshot_map_as_floorplan`
+ *  crops to (`_room_union_bbox_px`, services.py). Roborock draws the map on
+ *  a canvas much larger than the explored area, so a gizmo built on the
+ *  whole image puts its handles far out in empty space (field report
+ *  2026-10-08) — the Seat tool builds its box on this instead. `null` when
+ *  no room has a usable bbox yet (caller falls back to the whole image). */
+export function contentBoxFrac(
+  rooms: Array<{ bbox_px?: { x0?: number; y0?: number; x1?: number; y1?: number } | null }> | null | undefined,
+  NW: number, NH: number,
+): { x0: number; y0: number; x1: number; y1: number } | null {
+  if (!rooms?.length || !(NW > 0) || !(NH > 0)) return null;
+  let x0 = Infinity, y0 = Infinity, x1 = -Infinity, y1 = -Infinity;
+  for (const r of rooms) {
+    const b = r?.bbox_px;
+    if (!b || b.x0 == null || b.y0 == null || b.x1 == null || b.y1 == null) continue;
+    x0 = Math.min(x0, b.x0, b.x1); x1 = Math.max(x1, b.x0, b.x1);
+    y0 = Math.min(y0, b.y0, b.y1); y1 = Math.max(y1, b.y0, b.y1);
+  }
+  if (!Number.isFinite(x0) || x1 - x0 < 1e-6 || y1 - y0 < 1e-6) return null;
+  const c = (v: number) => Math.min(1, Math.max(0, v));
+  const out = { x0: c(x0 / NW), y0: c(y0 / NH), x1: c(x1 / NW), y1: c(y1 / NH) };
+  return out.x1 - out.x0 > 1e-6 && out.y1 - out.y0 > 1e-6 ? out : null;
+}
+
 /** Solves the similarity transform (rotation + uniform scale + translation)
  *  mapping percent-space point `a0`->`b0` and `a1`->`b1` — closed-form via
  *  complex division, the 2-point case of the same least-squares idea

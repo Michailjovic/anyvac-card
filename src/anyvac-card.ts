@@ -70,6 +70,7 @@ import {
   stretchSeatX,
   stretchSeatY,
   stretchSeatAxisAbout,
+  contentBoxFrac,
   localAxisScaleRatio,
   rotateSeatAbout,
   pinchSeat,
@@ -531,6 +532,10 @@ export class AnyVacCard extends LitElement {
     /** Layer-space (percent) pivot for scale/rotate — the opposite corner /
      *  the layer's own centre, fixed for the lifetime of one gesture. */
     pivotPct?: { x: number; y: number };
+    /** Side-handle stretch only: the content box's centre — the pivot used
+     *  while Alt is held (symmetric stretch about the visible map, not about
+     *  the much larger image canvas). */
+    altPivotPct?: { x: number; y: number };
     /** pointerId -> wrap-percent position captured when that pointer joined
      *  the gesture (or when a pinch was (re-)baselined). */
     startPos: Map<number, { x: number; y: number }>;
@@ -5415,6 +5420,15 @@ export class AnyVacCard extends LitElement {
     return d ? d.NH / d.NW : 1;
   }
 
+  /** Fractions of the map image that hold the home (`contentBoxFrac` over
+   *  the integration's room bboxes) — what the Seat tool's gizmo box wraps.
+   *  Whole image when no room bbox is known yet. */
+  private _alignContentBox(vac: VacuumConfig): { x0: number; y0: number; x1: number; y1: number } {
+    const at = this._intAttrs(vac);
+    const d = mapPxDims(at?.image_dims);
+    return (d && contentBoxFrac(at?.rooms, d.NW, d.NH)) || { x0: 0, y0: 0, x1: 1, y1: 1 };
+  }
+
   private _onAlignMapLoad(e: Event): void {
     const im = e.currentTarget as HTMLImageElement;
     if (!im.naturalWidth || !im.naturalHeight) return;
@@ -5498,7 +5512,7 @@ export class AnyVacCard extends LitElement {
    *  corner for scale, the layer's own centre for rotate). */
   private _alignStartGesture(
     e: PointerEvent, kind: "drag" | "scale" | "rotate" | "stretchX" | "stretchY",
-    pivotPct?: { x: number; y: number },
+    pivotPct?: { x: number; y: number }, altPivotPct?: { x: number; y: number },
   ): void {
     const session = this._alignSession;
     if (!session || this._alignReadOnly()) return;
@@ -5525,7 +5539,7 @@ export class AnyVacCard extends LitElement {
     // not per pointermove (docs/41 SS4.4 undo/redo).
     this._alignPushHistory(session.draft);
     this._alignGesture = {
-      kind, startSeat: { ...session.draft }, pivotPct,
+      kind, startSeat: { ...session.draft }, pivotPct, altPivotPct,
       startPos: new Map([[e.pointerId, pt]]),
       livePos: new Map([[e.pointerId, pt]]),
     };
@@ -5559,14 +5573,16 @@ export class AnyVacCard extends LitElement {
     } else if (g.kind === "stretchX" || g.kind === "stretchY") {
       // Side handles move ONLY their own edge — the opposite edge
       // (`pivotPct`) stays put (field report 2026-10-08). Holding Alt
-      // switches live to the old centre-anchored stretch (both edges move
-      // symmetrically), same modifier convention design tools use; a
-      // gesture started without a pivot also keeps the centred behaviour.
+      // switches live to a symmetric stretch about the content box's centre
+      // (`altPivotPct`), same modifier convention design tools use; a
+      // gesture started without any pivot keeps the old image-centred
+      // stretch.
       const id = e.pointerId;
       const s0 = g.startPos.get(id)!, s1 = g.livePos.get(id)!;
       const axis = g.kind === "stretchX" ? "x" : "y";
-      if (g.pivotPct && !e.altKey) {
-        next = stretchSeatAxisAbout(g.startSeat, axis, s0, s1, g.pivotPct, ar);
+      const pivot = e.altKey ? g.altPivotPct : g.pivotPct;
+      if (pivot) {
+        next = stretchSeatAxisAbout(g.startSeat, axis, s0, s1, pivot, ar);
       } else {
         const k = localAxisScaleRatio(g.startSeat, axis, s0, s1, ar);
         next = axis === "x" ? stretchSeatX(g.startSeat, k) : stretchSeatY(g.startSeat, k);
@@ -7740,12 +7756,17 @@ export class AnyVacCard extends LitElement {
       mop_path_color: appearance.mop_path_color ?? undefined,
     };
     const aspect = this._alignMapAspect(vac);
-    const corner = (cx: number, cy: number) => this._alignCornerPct(draft, cx, cy, wrapW, wrapH, aspect);
+    // The box wraps the CONTENT (union of room bboxes), not the whole image
+    // canvas — Roborock pads the map with lots of empty space, which put
+    // every handle far away from the actual home (field report 2026-10-08).
+    const cb = this._alignContentBox(vac);
+    const corner = (u: number, v: number) => this._alignCornerPct(
+      draft, cb.x0 + u * (cb.x1 - cb.x0), cb.y0 + v * (cb.y1 - cb.y0), wrapW, wrapH, aspect);
     const nw = corner(0, 0), ne = corner(1, 0), sw = corner(0, 1), se = corner(1, 1);
     const nMid = corner(0.5, 0), sMid = corner(0.5, 1), wMid = corner(0, 0.5), eMid = corner(1, 0.5);
-    const centre = { x: 50 + draft.offset_x, y: 50 + draft.offset_y };
-    // 18 % of the layer's WIDTH above its top edge, whatever its proportions.
-    const rotateHandle = this._alignCornerPct(draft, 0.5, -0.18 / aspect, wrapW, wrapH, aspect);
+    const centre = corner(0.5, 0.5);
+    // 18 % of the content's WIDTH above its top edge, whatever its proportions.
+    const rotateHandle = corner(0.5, -0.18 * ((cb.x1 - cb.x0) / (cb.y1 - cb.y0)) / aspect);
     const readOnly = this._alignReadOnly();
     return html`
         <div class="align-body">
@@ -7827,7 +7848,7 @@ export class AnyVacCard extends LitElement {
                       left: pos.x + "%", top: pos.y + "%",
                       cursor: this._alignResizeCursor(baseAxisDeg, draft.rotation + this._alignView.rot),
                     })}
-                    @pointerdown=${(e: PointerEvent) => this._alignStartGesture(e, kind, opp)}
+                    @pointerdown=${(e: PointerEvent) => this._alignStartGesture(e, kind, opp, centre)}
                     @pointermove=${(e: PointerEvent) => this._alignGestureMove(e)}
                     @pointerup=${(e: PointerEvent) => this._alignGestureEnd(e)}
                     @pointercancel=${(e: PointerEvent) => this._alignGestureEnd(e)}>

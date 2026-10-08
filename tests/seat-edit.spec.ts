@@ -9,6 +9,7 @@ import {
   stretchSeatX,
   localAxisScaleRatio,
   stretchSeatAxisAbout,
+  contentBoxFrac,
   pinchSeat,
   nudgeOffset,
   nudgeRotation,
@@ -772,5 +773,28 @@ test.describe("seatedit: stretchSeatAxisAbout (edge-anchored side handles)", () 
     const next = stretchSeatAxisAbout(seat, "y", s0, s1, pivot, ar);
     expect(next.scaleY!).toBeCloseTo(200, 6);
     expect(next.offset_x).toBeCloseTo(0, 9);
+  });
+});
+
+// Field report 2026-10-08: the Seat gizmo box must wrap the HOME (union of
+// room bboxes), not the whole, heavily padded Roborock image canvas.
+test.describe("seatedit: contentBoxFrac", () => {
+  test("unions every room bbox into image fractions", () => {
+    const box = contentBoxFrac([
+      { bbox_px: { x0: 100, y0: 400, x1: 300, y1: 900 } },
+      { bbox_px: { x0: 150, y0: 800, x1: 260, y1: 1200 } },
+      { bbox_px: null },
+      {},
+    ], 400, 1600);
+    expect(box).toEqual({ x0: 0.25, y0: 0.25, x1: 0.75, y1: 0.75 });
+  });
+  test("null without any usable bbox, or without image dims (caller falls back to the whole image)", () => {
+    expect(contentBoxFrac([], 400, 1600)).toBeNull();
+    expect(contentBoxFrac([{ bbox_px: null }], 400, 1600)).toBeNull();
+    expect(contentBoxFrac([{ bbox_px: { x0: 1, y0: 1, x1: 2, y1: 2 } }], 0, 0)).toBeNull();
+  });
+  test("clamps to the image and tolerates swapped corners", () => {
+    expect(contentBoxFrac([{ bbox_px: { x0: 500, y0: -10, x1: -20, y1: 800 } }], 400, 1600))
+      .toEqual({ x0: 0, y0: 0, x1: 1, y1: 0.5 });
   });
 });
