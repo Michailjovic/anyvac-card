@@ -497,6 +497,7 @@ generated from
 | `anyvac.set_layers` | Set shared dry/wet path visibility on the map (synced across browsers). |
 | `anyvac.set_room_sequence` | Replace the stored room cleaning order (for sequence-aware ETA) — should mirror the order configured in the Roborock app. |
 | `anyvac.reset_learning` | Clear learned clean-time estimates and/or coverage baselines, e.g. after moving furniture or resetting a robot's map. |
+| `anyvac.dock_resolve_error` | Confirm the dock's latched error, like "Resolved" in the Roborock app (card 1.50.0: the Resolved button in the Dock tab, shown only while the dock reports an error). |
 | `anyvac.dock_empty` / `dock_wash` / `dock_dry` / `dock_pump` / `dock_self_clean` | Manual dock control (empty dustbin, wash/dry mop, pump, Fill&Drain self-clean) — the Dock tab of each robot's sheet (card 1.48.0; before that one shared dock sheet). Shown/hidden per vacuum based on detected dock capability. |
 | `anyvac.snapshot_map_as_floorplan` | Save a map image entity's current picture as a static file and return its URL — powers the Maps tab's "Use this vacuum's current map as floorplan" button. |
 | `anyvac.snap_wall_corner` | Snap a home-frame pixel point to the nearest wall corner (docs/40 §5.B) — powers the click-snap step of the Maps tab's "Calibrate floorplan against home frame" button. Requires integration ≥ 1.9.0. |

@@ -3731,7 +3731,10 @@ export class AnyVacCard extends LitElement {
       .filter((k) => this._dockRunning(vac, k))
       .map((k) => ({ empty: "Emptying the bin", wash: "Washing the mop", dry: "Drying the mop" })[k]);
     const bad = hasErr || badTanks.length > 0;
-    const stateText = hasErr ? "The dock reports an error"
+    // docs/47 §3: the backend names the error (`dock_status.dock_error`, an
+    // enum name like "water_empty"); older integrations only send the code.
+    const errName = typeof dock?.dock_error === "string" ? dock.dock_error.replace(/_/g, " ") : "";
+    const stateText = hasErr ? (errName ? `Dock error: ${errName}` : "The dock reports an error")
       : badTanks.length ? badTanks.map((r) => r.label).join(", ") + " — check"
       : runningLabel.length ? runningLabel.join(" · ")
       : "Dock ready";
@@ -3740,6 +3743,11 @@ export class AnyVacCard extends LitElement {
         <div class="rs-dock-state ${bad ? "bad" : ""}">
           <ha-icon icon=${bad ? "mdi:alert-circle-outline" : runningLabel.length ? "mdi:progress-clock" : "mdi:check-circle-outline"}></ha-icon>
           <span>${stateText}</span>
+          ${hasErr ? html`
+            <button class="rs-dock-resolve" title="Confirm the error is fixed, like Resolved in the Roborock app"
+              @click=${act("dock_resolve_error")}>
+              <ha-icon icon="mdi:check-circle-outline"></ha-icon><span>Resolved</span>
+            </button>` : nothing}
         </div>
         ${tanks.length ? html`
           <div class="dock-sheet-care">
@@ -11348,6 +11356,15 @@ export class AnyVacCard extends LitElement {
     }
     .rs-dock-state ha-icon { color: rgb(var(--avc-ok-rgb)); }
     .rs-dock-state.bad ha-icon { color: rgb(var(--avc-err-rgb)); }
+    /* docs/47 §3: confirm a latched dock error. */
+    .rs-dock-resolve {
+      margin-left: auto; display: inline-flex; align-items: center; gap: 6px; flex-shrink: 0;
+      padding: 6px 12px; border-radius: var(--avc-r-pill); border: 1px solid rgba(var(--avc-ink-rgb), 0.16);
+      background: rgba(var(--avc-ink-rgb), 0.06); color: inherit; font: inherit; font-size: var(--avc-fs-m);
+      cursor: pointer; --mdc-icon-size: 16px;
+    }
+    .rs-dock-state .rs-dock-resolve ha-icon { color: rgb(var(--avc-ok-rgb)); }
+    .rs-dock-resolve:active { transform: scale(0.97); }
     .rs-care { gap: 0; }
     .rs-care .dock-sheet-care-row { padding: 8px 2px; border-bottom: 1px solid rgba(var(--avc-ink-rgb), 0.06); }
     .rs-care-main { display: flex; flex-direction: column; gap: 5px; flex: 1; min-width: 0; }

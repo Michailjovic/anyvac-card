@@ -14,15 +14,15 @@ import { test, expect, type Page } from "@playwright/test";
 
 const FLOOR = "/tests/harness/_floor.webp";
 
-interface Opts { w?: number; h?: number; warn?: number; dirtyTank?: boolean; filterH?: number }
+interface Opts { w?: number; h?: number; warn?: number; dirtyTank?: boolean; filterH?: number; dockErr?: boolean }
 
 async function mount(page: Page, o: Opts = {}): Promise<void> {
-  const { w = 1270, h = 714, warn, dirtyTank = false, filterH = 12 } = o;
+  const { w = 1270, h = 714, warn, dirtyTank = false, filterH = 12, dockErr = false } = o;
   await page.setViewportSize({ width: w, height: h });
   await page.goto("/tests/harness/mock-ha.html");
   await page.waitForFunction(() => (window as any).__mockHaReady === true);
   await page.evaluate(async () => { await customElements.whenDefined("anyvac-card"); });
-  await page.evaluate(({ w, h, warn, dirtyTank, filterH, FLOOR }) => {
+  await page.evaluate(({ w, h, warn, dirtyTank, filterH, dockErr, FLOOR }) => {
     const win = window as any;
     win.__calls = [];
     const card = document.createElement("anyvac-card") as any;
@@ -48,7 +48,9 @@ async function mount(page: Page, o: Opts = {}): Promise<void> {
     };
     for (const id of ["s6", "s7", "s8"]) {
       ent("vacuum." + id, "docked", { battery_level: 90 });
-      ent("sensor.anyvac_" + id, "0", { schema_version: 2, dock_status: { features: features[id], dock_error_status: 0 } });
+      const err = dockErr && id === "s8";
+      ent("sensor.anyvac_" + id, "0", { schema_version: 2, dock_status: {
+        features: features[id], dock_error_status: err ? 38 : 0, dock_error: err ? "water_empty" : null } });
     }
     // Registry: S6 has its own body consumables, S7 none, S8 body + dock parts.
     const entities: Record<string, unknown> = {};
@@ -73,7 +75,7 @@ async function mount(page: Page, o: Opts = {}): Promise<void> {
     win.__mockHa.cardWrap.style.height = h + "px";
     win.__mockHa.cardWrap.appendChild(card);
     win.__card = card;
-  }, { w, h, warn, dirtyTank, filterH, FLOOR });
+  }, { w, h, warn, dirtyTank, filterH, dockErr, FLOOR });
   await page.waitForFunction(() => (window as any).__card?._mapAR > 1);
   await page.waitForTimeout(400);
 }
@@ -96,7 +98,7 @@ const sheet = (page: Page) => page.evaluate(() => {
     care: Array.from(s.querySelectorAll(".rs-care .dock-sheet-care-row")).map((r) =>
       (r.querySelector(".dock-sheet-care-label")?.textContent ?? "").trim() + " " + (r.querySelector(".dock-sheet-care-value")?.textContent ?? "").trim()
       + (r.classList.contains("low") ? " LOW" : "")),
-    state: (s.querySelector(".rs-dock-state")?.textContent ?? "").trim(),
+    state: (s.querySelector(".rs-dock-state")?.textContent ?? "").replace(/\s+/g, " ").trim(),
     headDot: !!s.querySelector(".robot-sheet-head .vac-attn-dot"),
   };
 });
@@ -165,6 +167,25 @@ test("a tank flag marks the Dock tab and says what to check", async ({ page }) =
   expect((await sheet(page))!.state).toBe("Dirty water tank — check");
 });
 
+test("a dock error names itself and offers Resolved (docs/47 §3)", async ({ page }) => {
+  await mount(page, { dockErr: true, filterH: 120 });
+  await openSheet(page, 2);
+  expect((await sheet(page))!.tabs).toEqual(["Clean*", "Dock!", "Care"]);
+  await openSheet(page, 2, "dock");
+  expect((await sheet(page))!.state).toBe("Dock error: water empty Resolved");
+  const calls = await page.evaluate(async () => {
+    const c = (window as any).__card;
+    (c.shadowRoot.querySelector(".robot-sheet .rs-dock-resolve") as HTMLElement).click();
+    await c.updateComplete;
+    return (window as any).__calls;
+  });
+  expect(calls).toContainEqual(["anyvac", "dock_resolve_error", { entity_id: "vacuum.s8" }]);
+  // No error, no button.
+  await mount(page);
+  await openSheet(page, 2, "dock");
+  expect(await page.evaluate(() => (window as any).__card.shadowRoot.querySelectorAll(".rs-dock-resolve").length)).toBe(0);
+});
+
 test("no global dock any more: no Dock segment, no Dock button, no dock sheet", async ({ page }) => {
   for (const [w, h] of [[1270, 714], [412, 780]]) {
     await mount(page, { w, h });
@@ -182,7 +203,7 @@ test("no global dock any more: no Dock segment, no Dock button, no dock sheet", 
 });
 
 test("every tab stays on the K8 type and corner scale", async ({ page }) => {
-  await mount(page, { dirtyTank: true });
+  await mount(page, { dirtyTank: true, dockErr: true });
   for (const tab of ["clean", "dock", "care"]) {
     await openSheet(page, 2, tab);
     const off = await page.evaluate(() => {

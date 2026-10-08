@@ -6,6 +6,24 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [1.50.0] - 2026-10-08
+
+Pairs with integration **1.50.0** (docs/47).
+
+### Added
+
+- **Resolved button for dock errors.** While a robot's dock reports an error,
+  the Dock tab names it ("Dock error: water empty") and offers **Resolved**,
+  which calls `anyvac.dock_resolve_error` — the same as "Resolved" in the
+  Roborock app. The cleared state arrives with the next update; nothing is
+  changed optimistically. With an older integration the tab still says "The
+  dock reports an error".
+
+### Changed
+
+- Nothing else in the card. The faster live position comes from integration
+  1.50.0 (the sensor now follows the Roborock map instead of a 30 s timer).
+
 ## [1.49.0] - 2026-10-01
 
 Card-only (integration unchanged). docs/46 G2: the landscape right column
