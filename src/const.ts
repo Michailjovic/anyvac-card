@@ -1,6 +1,6 @@
 export const CARD_NAME = "anyvac-card";
 export const EDITOR_NAME = "anyvac-card-editor";
-export const CARD_VERSION = "1.52.0";
+export const CARD_VERSION = "1.53.0";
 
 /** Hold duration in ms required to trigger START / PAUSE actions */
 export const HOLD_DURATION_MS = 600;
@@ -161,18 +161,20 @@ export function hexToRgba(hex: string, alpha: number): string {
  * Theme keys accepted by the `theme` config option.
  *
  *  - `dark`   the v1.2.0 look: lifted surfaces, soft elevation, no hairline
- *             grid. This is the default.
+ *             grid.
  *  - `light`  same structure on a porcelain surface, for dashboards running a
  *             light HA theme (before v1.2.0 the card was unusable there — it
  *             painted white text and white-alpha panels unconditionally).
- *  - `auto`   `dark`, flipping to `light` under `prefers-color-scheme: light`.
+ *  - `auto`   the default (1.52.x): `dark` or `light` as Home Assistant's own
+ *             theme says (`hass.themes.darkMode`), the browser's
+ *             `prefers-color-scheme` only as the fallback.
  *  - `legacy` the pre-1.2.0 appearance, kept as an escape hatch for dashboards
  *             already tuned around it. Every token in this theme is the exact
  *             literal the 1.1.0 stylesheet used, so it renders unchanged.
  */
 export const CARD_THEMES = ["dark", "light", "auto", "legacy"] as const;
 export type CardTheme = (typeof CARD_THEMES)[number];
-export const DEFAULT_THEME: CardTheme = "dark";
+export const DEFAULT_THEME: CardTheme = "auto";
 
 /**
  * Curated accent colours for the `accent` config option. The accent drives the

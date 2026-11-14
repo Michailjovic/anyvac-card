@@ -11020,10 +11020,37 @@ export class AnyVacCard extends LitElement {
     return (this._config.theme ?? DEFAULT_THEME) !== "legacy";
   }
 
+  /**
+   * `auto` resolved to a concrete palette (docs/49 E3). Home Assistant's own
+   * verdict wins (`hass.themes.darkMode` — the profile's theme choice, which is
+   * what the dashboard behind the card actually looks like); the browser's
+   * `prefers-color-scheme` is only the fallback when the frontend does not say.
+   * The old pure-CSS `@media (prefers-color-scheme)` flip followed the OS, so a
+   * light OS with a dark HA theme (or the reverse) put a light card on a dark
+   * dashboard and vice versa.
+   */
+  private _resolvedPalette(): "dark" | "light" {
+    const theme = this._config.theme ?? DEFAULT_THEME;
+    if (theme === "light") return "light";
+    if (theme !== "auto") return "dark";
+    const ha = (this.hass as { themes?: { darkMode?: unknown } } | undefined)?.themes?.darkMode;
+    if (typeof ha === "boolean") return ha ? "dark" : "light";
+    try {
+      return window.matchMedia?.("(prefers-color-scheme: light)").matches ? "light" : "dark";
+    } catch {
+      return "dark";
+    }
+  }
+
   private _rootClasses(): string {
     const theme = this._config.theme ?? DEFAULT_THEME;
     const cls: string[] = [];
-    if (theme !== "legacy") cls.push("avc-theme", "avc-theme--" + theme);
+    if (theme !== "legacy") {
+      // `auto` carries its own class AND the resolved palette's, so every
+      // `.avc-theme--light …` rule applies to it with no restated copy.
+      cls.push("avc-theme", "avc-theme--" + theme);
+      if (theme === "auto") cls.push("avc-theme--" + this._resolvedPalette());
+    }
     if (this._config.reduce_motion) cls.push("avc-still");
     if (this._isCalm()) cls.push("avc-calm");
     return cls.join(" ");
@@ -11252,6 +11279,18 @@ export class AnyVacCard extends LitElement {
     }
     /* micro numerals need a slightly larger disc than legacy's 8px did. */
     .avc-theme .mini-gauge span { width: 18px; height: 18px; }
+
+    /* docs/49 E1: the card root carries its OWN ink. Titles and names that set
+     * no colour used to inherit --primary-text-color from Home Assistant — white
+     * on a dark HA theme, dark on a light one — whatever palette the card itself
+     * was painting (measured: theme dark on a light HA gave unreadable titles).
+     * rgb(var(--avc-ink-rgb)) is spelled out here, at the use site, on purpose
+     * (see the channel note in :host). */
+    ha-card.avc-theme { color: rgb(var(--avc-ink-rgb)); }
+    /* ...and what is painted on the vacuum's own map bitmap stays white-on-dark:
+     * .map-wrap resets the channels, this resets the colour that would otherwise
+     * be inherited from the root. */
+    .avc-theme .map-wrap { color: rgb(var(--avc-ink-rgb)); }
 
     ha-card {
       position: relative;
@@ -12351,6 +12390,9 @@ export class AnyVacCard extends LitElement {
      * unreadable. The palette darkens rather than just inverting: the same
      * hue at the same lightness that reads as "calm" on near-black reads as
      * "washed out" on porcelain. */
+    /* docs/49 E2 (below, with the structural pass): the themed root paints its own
+     * opaque base from --avc-scrim-rgb, so the palette never depends on what
+     * dashboard colour happens to sit behind the card. */
     .avc-theme--light {
       --avc-ink-rgb: 26, 29, 37;
       --avc-shade-rgb: 30, 36, 48;
@@ -12380,36 +12422,11 @@ export class AnyVacCard extends LitElement {
       --avc-live: avc-live-breathe 3.4s ease-in-out infinite;
     }
 
-    /* auto = dark, flipped by the OS/browser preference. The light values
-     * are restated rather than shared because CSS custom properties have no
-     * conditional aliasing — a media query can only re-declare them. Kept
-     * adjacent to the block above so the two never drift apart unnoticed. */
-    @media (prefers-color-scheme: light) {
-      .avc-theme--auto {
-        --avc-ink-rgb: 26, 29, 37;
-        --avc-shade-rgb: 30, 36, 48;
-        --avc-scrim-rgb: 252, 252, 253;
-        --avc-scrim-2-rgb: 244, 245, 248;
-
-        --avc-ok-rgb: 52, 131, 70;
-        --avc-warn-rgb: 154, 106, 21;
-        --avc-err-rgb: 197, 58, 66;
-        --avc-hint-rgb: 147, 110, 28;
-        --avc-tool-rgb: 42, 104, 210;
-        --avc-info-rgb: 34, 121, 184;
-
-        --avc-surface: rgba(255, 255, 255, 0.93);
-        --avc-panel: rgba(255, 255, 255, 0.68);
-        --avc-panel-line: rgba(var(--avc-ink-rgb), 0.07);
-        --avc-panel-strong: rgba(255, 255, 255, 0.94);
-        --avc-panel-strong-line: rgba(var(--avc-ink-rgb), 0.09);
-        --avc-sunken: rgba(var(--avc-ink-rgb), 0.045);
-        --avc-disabled: rgba(var(--avc-ink-rgb), 0.06);
-
-        --avc-elev-1: 0 1px 2px rgba(24, 30, 45, 0.06), 0 8px 20px rgba(24, 30, 45, 0.08);
-        --avc-elev-2: 0 2px 6px rgba(24, 30, 45, 0.08), 0 18px 40px rgba(24, 30, 45, 0.12);
-      }
-    }
+    /* auto = the dark palette, or the light one: _resolvedPalette() adds the
+     * matching .avc-theme--dark / .avc-theme--light class next to
+     * .avc-theme--auto (Home Assistant's own dark-mode verdict first, the
+     * browser's preference as the fallback), so no palette is restated here and
+     * a transition is a class swap, not a media query (docs/49 E3). */
 
     /* ══ Structural pass — every theme except legacy ═════════════════════
      * The token flip above only changes colour. This is the part that changes
@@ -12417,6 +12434,7 @@ export class AnyVacCard extends LitElement {
      * Corners and type sizes are NOT set here any more — they come from the
      * one K8 scale (--avc-th-*, see the token block at the top). legacy
      * simply never gets the .avc-theme class, so none of this applies to it. */
+    ha-card.avc-theme { background: rgb(var(--avc-scrim-rgb)); }
     .avc-theme .status-card { box-shadow: var(--avc-elev-1); }
     .avc-theme .dock,
     .avc-theme .vac-picker { box-shadow: var(--avc-elev-1); }
@@ -12574,10 +12592,6 @@ export class AnyVacCard extends LitElement {
      * as text (the same approach docs/35 §9b took for the age colours). */
     .avc-theme--light .status-label,
     .avc-theme--light .tile-status { filter: brightness(0.6) saturate(1.2); }
-    @media (prefers-color-scheme: light) {
-      .avc-theme--auto .status-label,
-      .avc-theme--auto .tile-status { filter: brightness(0.6) saturate(1.2); }
-    }
 
     /* ── docs/44 F4: living map ───────────────────────────────────────── */
     /* The marker's glide is a Web Animation along the trail (1.47.0,
@@ -12988,28 +13002,6 @@ export class AnyVacCard extends LitElement {
     .avc-theme--light .dock-age b,
     .avc-theme--light .dock-cov,
     .avc-theme--light .dbg-prog-item b { filter: brightness(0.45) saturate(1.4); }
-
-    @media (prefers-color-scheme: light) {
-      .avc-theme--auto .dock-est,
-      .avc-theme--auto .last-clean,
-      .avc-theme--auto .current-room,
-      .avc-theme--auto .map-tools-label,
-      .avc-theme--auto .mtbtn--ghost,
-      .avc-theme--auto .dock-mode,
-      .avc-theme--auto .dock-sheet-debug,
-      .avc-theme--auto .dock-sheet-care-value,
-      .avc-theme--auto .dbg-prog-item,
-      .avc-theme--auto .dbg-prog-name,
-      .avc-theme--auto .layer-menu-head { color: rgba(var(--avc-ink-rgb), 0.68); }
-      .avc-theme--auto .last-clean ha-icon,
-      .avc-theme--auto .dock-age ha-icon,
-      .avc-theme--auto .dbg-prog-item small { color: rgba(var(--avc-ink-rgb), 0.55); }
-      .avc-theme--auto .dock-cov { opacity: 0.72; }
-      .avc-theme--auto.avc-calm .dock-cov { opacity: 0.6; }
-      .avc-theme--auto .dock-age b,
-      .avc-theme--auto .dock-cov,
-      .avc-theme--auto .dbg-prog-item b { filter: brightness(0.45) saturate(1.4); }
-    }
 
     /* Motion opt-outs. The OS preference wins unconditionally; .avc-still
      * is the config-level equivalent (reduce_motion: true) for people who

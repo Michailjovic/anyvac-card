@@ -23,17 +23,25 @@ interface MountOpts {
   config?: Record<string, unknown>;
   /** Vacuum entity state; "cleaning" takes the card out of its resting state. */
   state?: string;
+  /**
+   * What the Home Assistant dashboard behind the card looks like (docs/49 E4).
+   * Reproduces the two things a real HA gives a card: `hass.themes.darkMode`
+   * and the page colours — `ha-card { color: var(--primary-text-color) }` is
+   * inherited by everything the card does not colour itself, which is how the
+   * mismatch bug hid from the older tests.
+   */
+  ha?: "light" | "dark";
 }
 
 async function mountCard(page: Page, opts: MountOpts = {}): Promise<void> {
-  const { width = 1200, height = 800, config = {}, state = "docked" } = opts;
+  const { width = 1200, height = 800, config = {}, state = "docked", ha } = opts;
   await page.goto("/tests/harness/mock-ha.html");
   await page.waitForFunction(() => (window as any).__mockHaReady === true);
   await page.evaluate(async () => {
     await customElements.whenDefined("anyvac-card");
   });
   await page.evaluate(
-    ({ width, height, config, state, PIXEL }) => {
+    ({ width, height, config, state, PIXEL, ha }) => {
       const w = window as any;
       const card = document.createElement("anyvac-card") as any;
       card.setConfig({
@@ -67,13 +75,64 @@ async function mountCard(page: Page, opts: MountOpts = {}): Promise<void> {
         language: "en",
         callService: async () => {},
         callWS: async () => ({}),
+        ...(ha ? { themes: { darkMode: ha === "dark" } } : {}),
       };
+      if (ha) {
+        const wrap = w.__mockHa.cardWrap as HTMLElement;
+        const dark = ha === "dark";
+        wrap.style.setProperty("--primary-text-color", dark ? "#e1e1e1" : "#212121");
+        wrap.style.background = dark ? "#111111" : "#fafafa";
+        // What <ha-card> gives its children: inherited text colour.
+        wrap.style.color = "var(--primary-text-color)";
+      }
       w.__mockHa.cardWrap.style.width = width + "px";
       w.__mockHa.cardWrap.style.height = height + "px";
       w.__mockHa.cardWrap.appendChild(card);
     },
-    { width, height, config, state, PIXEL }
+    { width, height, config, state, PIXEL, ha }
   );
+}
+
+/**
+ * WCAG contrast of an element's text against what is really painted behind it:
+ * its ancestors' backgrounds (across shadow boundaries) composited over white.
+ * Returns null when the element is not rendered.
+ */
+function contrastOf(page: Page, selector: string): Promise<number | null> {
+  return page.evaluate((selector) => {
+    const card = (window as any).__mockHa.cardWrap.querySelector("anyvac-card") as any;
+    const el = card?.shadowRoot?.querySelector(selector) as HTMLElement | null;
+    if (!el) return null;
+    const parse = (c: string): [number, number, number, number] => {
+      const m = c.match(/rgba?\(([^)]+)\)/);
+      if (!m) return [0, 0, 0, 0];
+      const p = m[1].split(/[ ,/]+/).filter(Boolean).map(Number);
+      return [p[0], p[1], p[2], p.length > 3 ? p[3] : 1];
+    };
+    const chain: HTMLElement[] = [];
+    let n: Element | null = el;
+    while (n) {
+      chain.push(n as HTMLElement);
+      const parent: Element | null = n.parentElement;
+      n = parent ?? ((n.getRootNode() as ShadowRoot).host ?? null);
+    }
+    let bg: [number, number, number] = [255, 255, 255];
+    for (const e of chain.reverse()) {
+      const [r, g, b, a] = parse(getComputedStyle(e).backgroundColor);
+      if (a > 0) bg = [r * a + bg[0] * (1 - a), g * a + bg[1] * (1 - a), b * a + bg[2] * (1 - a)];
+    }
+    const [fr, fg, fb, fa] = parse(getComputedStyle(el).color);
+    const fgc = [fr * fa + bg[0] * (1 - fa), fg * fa + bg[1] * (1 - fa), fb * fa + bg[2] * (1 - fa)];
+    const lum = (c: number[]) => {
+      const f = c.map((v) => {
+        const x = v / 255;
+        return x <= 0.03928 ? x / 12.92 : Math.pow((x + 0.055) / 1.055, 2.4);
+      });
+      return 0.2126 * f[0] + 0.7152 * f[1] + 0.0722 * f[2];
+    };
+    const l1 = lum(fgc), l2 = lum(bg);
+    return (Math.max(l1, l2) + 0.05) / (Math.min(l1, l2) + 0.05);
+  }, selector);
 }
 
 /** Resolved value of a custom property at the given selector inside the card. */
@@ -97,9 +156,80 @@ function rootClass(page: Page): Promise<string> {
 }
 
 test.describe("theming (docs/35)", () => {
-  test("defaults to the dark theme without any config", async ({ page }) => {
+  test("defaults to auto without any config (R4, docs/49)", async ({ page }) => {
+    await mountCard(page, { ha: "dark" });
+    await expect.poll(() => rootClass(page)).toContain("avc-theme--auto");
+  });
+
+  test("auto follows Home Assistant, not the OS (docs/49 E3)", async ({ page }) => {
+    // HA light + OS dark, and the reverse: the palette is HA's verdict.
+    await page.emulateMedia({ colorScheme: "dark" });
+    await mountCard(page, { ha: "light" });
+    await expect.poll(() => rootClass(page)).toContain("avc-theme--light");
+    await expect.poll(() => rootClass(page)).not.toContain("avc-theme--dark");
+    await page.reload();
+    await page.emulateMedia({ colorScheme: "light" });
+    await mountCard(page, { ha: "dark" });
+    await expect.poll(() => rootClass(page)).toContain("avc-theme--dark");
+  });
+
+  test("auto falls back to the OS preference when HA does not say", async ({ page }) => {
+    await page.emulateMedia({ colorScheme: "light" });
+    await mountCard(page);
+    await expect.poll(() => rootClass(page)).toContain("avc-theme--light");
+    await page.reload();
+    await page.emulateMedia({ colorScheme: "dark" });
     await mountCard(page);
     await expect.poll(() => rootClass(page)).toContain("avc-theme--dark");
+  });
+
+  // docs/49 E4 — the matrix the 1.51.5 audit measured by hand. Titles used to
+  // inherit Home Assistant's text colour while the card painted its own panel,
+  // so dark-on-dark / light-on-light was possible for any mismatch.
+  for (const ha of ["light", "dark"] as const) {
+    for (const theme of ["dark", "light", "auto"] as const) {
+      for (const os of ["light", "dark"] as const) {
+        test(`titles stay readable: HA ${ha} · theme ${theme} · OS ${os}`, async ({ page }) => {
+          await page.emulateMedia({ colorScheme: os });
+          await mountCard(page, { ha, config: { theme } });
+          await expect.poll(() => rootClass(page)).toContain("avc-theme");
+          let seen = 0;
+          for (const sel of [".hero-title", ".tile-name", ".plan-name"]) {
+            const c = await contrastOf(page, sel);
+            if (c === null) continue;
+            seen++;
+            expect(c, `${sel} contrast`).toBeGreaterThanOrEqual(4.5);
+          }
+          expect(seen, "at least one title element rendered").toBeGreaterThan(0);
+        });
+      }
+    }
+  }
+
+  test("what is painted on the map keeps its own white ink in a light theme", async ({ page }) => {
+    await mountCard(page, { ha: "light", config: { theme: "light" } });
+    await page.waitForFunction(() => {
+      const card = (window as any).__mockHa.cardWrap.querySelector("anyvac-card") as any;
+      return !!card?.shadowRoot?.querySelector(".map-wrap");
+    });
+    const color = await page.evaluate(() => {
+      const card = (window as any).__mockHa.cardWrap.querySelector("anyvac-card") as any;
+      return getComputedStyle(card.shadowRoot.querySelector(".map-wrap")).color;
+    });
+    expect(color).toBe("rgb(255, 255, 255)");
+  });
+
+  test("a themed card paints its own opaque base (docs/49 E2)", async ({ page }) => {
+    await mountCard(page, { ha: "dark", config: { theme: "light" } });
+    await expect
+      .poll(() =>
+        page.evaluate(() => {
+          const card = (window as any).__mockHa.cardWrap.querySelector("anyvac-card") as any;
+          const root = card?.shadowRoot?.querySelector("ha-card") as HTMLElement | null;
+          return root ? getComputedStyle(root).backgroundColor : "";
+        })
+      )
+      .toBe("rgb(252, 252, 253)");
   });
 
   test("theme: legacy applies no theme class at all", async ({ page }) => {

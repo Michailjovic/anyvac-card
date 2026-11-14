@@ -448,8 +448,8 @@ export interface AnyVacCardConfig {
   /** Show debug details (raw geometry readouts etc.) in the production grid UI.
    *  Off by default (docs/18 §7c) — debug data moves behind this toggle. */
   debug?: boolean;
-  /** Visual theme (v1.2.0, docs/35). "dark" (default) / "light" / "auto"
-   *  (follows prefers-color-scheme) / "legacy" (the exact pre-1.2.0 look). */
+  /** Visual theme (v1.2.0, docs/35). "auto" (default: follows Home Assistant's
+   *  dark/light theme) / "dark" / "light" / "legacy" (the exact pre-1.2.0 look). */
   theme?: CardTheme;
   /** Accent colour driving START, room selection and focus rings. Any hex; the
    *  editor offers curated presets (`ACCENT_PRESETS`). Deliberately does NOT

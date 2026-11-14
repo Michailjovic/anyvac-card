@@ -6,6 +6,40 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [1.53.0] - 2026-11-14
+
+Integration unchanged (1.52.3). Audit plan 1.51.5, block E.
+
+### Changed
+
+- **`theme` now defaults to `auto`, and `auto` follows Home Assistant.** It reads
+  the dashboard's own dark/light verdict (`hass.themes.darkMode`); the browser's
+  `prefers-color-scheme` is only the fallback when Home Assistant does not report
+  one. It used to follow the OS, so a light OS with a dark Home Assistant theme
+  gave a light card on a dark dashboard. On a dark Home Assistant theme nothing
+  changes for a card without a `theme:` setting; set `theme: dark` to pin the
+  old default.
+- **A themed card paints its own opaque base** (`dark`, `light`, `auto`). The
+  surfaces were translucent and assumed a dark dashboard behind them. `legacy`
+  still draws nothing of its own.
+
+### Fixed
+
+- **Titles and names are readable on any Home Assistant theme.** `.hero-title`,
+  `.tile-name`, `.plan-name` and every other text without its own colour inherited
+  Home Assistant's text colour (white on a dark theme, near-black on a light one)
+  while the card painted a palette of its own, so any mismatch — `theme: dark` on
+  a light dashboard, `theme: light` on a dark one — was dark-on-dark or
+  light-on-light. The card root now carries its own ink; labels painted on the
+  vacuum's map bitmap stay white as before.
+
+### Tests
+
+- `tests/theme.spec.ts`: a matrix of Home Assistant light/dark × `dark`/`light`/`auto`
+  × OS light/dark with measured title contrast ≥ 4.5:1 (five of its cells fail on
+  1.52.0), plus `auto`-follows-Home-Assistant, OS fallback, opaque base and
+  on-map ink. Full suite: 356 passed.
+
 ## [1.52.0] - 2026-11-14
 
 Integration 1.52.0 (docs/49).

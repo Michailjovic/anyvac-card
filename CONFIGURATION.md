@@ -52,7 +52,7 @@ Everything is optional unless stated otherwise — the whole card boots from
 | `debug_room_progress` | boolean | `false` | Integration only | Draws a live per-room coverage gauge on the map. Testing aid, not for everyday use. |
 | `debug_dense_dock` | boolean | `false` | Always, portrait only | Restores the pre-1.0 dense portrait room list (age/pin/assigned-vacuum per row) instead of the minimalist map-tap cockpit. Landscape's dock/picker sidebar always shows the room list regardless of this flag. |
 | `layout` | `LayoutConfig` | unset | Always | Opts into the responsive percentage-grid layout. See [Layout](#layout-responsive-grid). |
-| `theme` | `"dark" \| "light" \| "auto" \| "legacy"` | `"dark"` | Always | Visual theme. `auto` follows the browser/OS `prefers-color-scheme`. `legacy` is the exact pre-1.2.0 appearance. See [Appearance](#appearance-theme-accent-calm-state). |
+| `theme` | `"dark" \| "light" \| "auto" \| "legacy"` | `"auto"` | Always | Visual theme. `auto` follows Home Assistant's own dark/light theme. `legacy` is the exact pre-1.2.0 appearance. See [Appearance](#appearance-theme-accent-calm-state). |
 | `accent` | hex string | `"#6FBF73"` | Always | Accent colour for START, room selection and focus rings. Status colours are unaffected. See [Appearance](#appearance-theme-accent-calm-state). |
 | `calm_state` | boolean | `true` | Always | Step the leftover map trace and secondary numbers back when nothing is running and nothing is selected. Purely de-emphasis — nothing is hidden or disabled. |
 | `reduce_motion` | boolean | `false` | Always | Turn off press feedback and live pulses. The OS `prefers-reduced-motion` setting already does this on its own; this is for switching them off without it. |
@@ -411,7 +411,7 @@ editor's **Global → Appearance** section.
 
 ```yaml
 type: custom:anyvac-card
-theme: dark          # dark (default) | light | auto | legacy
+theme: auto          # auto (default) | dark | light | legacy
 accent: "#6FBF73"    # any hex
 calm_state: true     # default
 reduce_motion: false # default
@@ -423,10 +423,13 @@ vacuums: [...]
 
 | Value | What it is |
 |---|---|
-| `dark` | Default. Lifted surfaces, soft elevation instead of hairline outlines, a softened semantic palette. |
+| `dark` | Lifted surfaces, soft elevation instead of hairline outlines, a softened semantic palette. |
 | `light` | The same structure on a porcelain surface, for dashboards running a light Home Assistant theme. Before 1.2.0 the card painted white text and white-alpha panels unconditionally, so it was not merely ugly there but unreadable. |
-| `auto` | `dark`, flipping to `light` under `prefers-color-scheme: light`. |
+| `auto` | Default since 1.53.0. `dark` or `light` as Home Assistant's own theme says (the profile's dark/light setting, `hass.themes.darkMode`). Only if Home Assistant does not report it does the browser's `prefers-color-scheme` decide. Before 1.53.0 `auto` followed the OS, so a light OS with a dark Home Assistant theme (or the reverse) gave a mismatched card. |
 | `legacy` | The pre-1.2.0 appearance, kept as a way back for dashboards already tuned around it. |
+
+Every themed card (all but `legacy`) paints its own opaque base and its own text
+colour, so it reads the same on any dashboard background.
 
 Colours drawn **on the vacuum's own map bitmap** (room labels, gauges, the zone
 rectangle, the hold-to-inspect popup) stay white-on-dark in every theme,
