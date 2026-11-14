@@ -3528,6 +3528,12 @@ export class AnyVacCard extends LitElement {
     const byEnt = new Map(this._config.vacuums.map((v) => [v.entity, v] as const));
     const jp = this._jobProgress();
     const runHid = "dock-run";
+    // docs/49 F1: the list reserves room for the rooms the card is configured
+    // with (2..6 rows, scrolling inside beyond that), whatever is selected or
+    // planned. Its height used to follow the row count, and in a fixed-height
+    // card the map is what gives way: 323 → 434 → 393 → 323 px for 0 / 1 / 3 / 5
+    // picked rooms.
+    const planRows = String(Math.min(6, Math.max(2, allKeys.length)));
     const holdBtn = (cls: string, icon: string, text: string, enabled: boolean, fn: () => void) => html`
       <button class="action-btn dock-run ${cls} ${enabled && this._holdId === runHid ? "action-btn--holding" : ""}"
         ?disabled=${!enabled}
@@ -3546,7 +3552,7 @@ export class AnyVacCard extends LitElement {
           <div class="plan-head">
             <span>Plan · ${jp.passes_done ?? 0} of ${jp.passes_total ?? rows.length} passes done</span>
           </div>
-          <div class="plan-rows">
+          <div class="plan-rows" style=${styleMap({ "--plan-n": planRows })}>
             ${rows.map((r) => {
               const vc = byEnt.get(r.vacuum);
               const st = r.state === "done" ? "done" : r.state === "active" ? "active" : "queued";
@@ -3603,7 +3609,7 @@ export class AnyVacCard extends LitElement {
           <span>${selKeys.length ? `Selected · ${selKeys.length} room${selKeys.length === 1 ? "" : "s"}` : `Whole home · ${allKeys.length} room${allKeys.length === 1 ? "" : "s"}`}</span>
           ${selKeys.length ? html`<button class="plan-clear" @click=${() => this._clearRoomSelection()}>Clear · whole home</button>` : nothing}
         </div>
-        <div class="plan-rows">
+        <div class="plan-rows" style=${styleMap({ "--plan-n": planRows })}>
           ${order.map((k) => html`
             <div class="plan-row">
               <span class="plan-name">${names.get(k) ?? k}</span>
@@ -12685,14 +12691,19 @@ export class AnyVacCard extends LitElement {
     /* ── docs/46 G2: the landscape plan column ─────────────────────────── */
     .plan-col { gap: 10px; min-width: 340px; }
     .plan-head {
-      display: flex; align-items: baseline; justify-content: space-between; gap: 8px; padding: 2px 4px 0;
+      min-height: 22px; display: flex; align-items: baseline; justify-content: space-between; gap: 8px; padding: 2px 4px 0;
       font-size: var(--avc-fs-m); font-weight: 600;
     }
     .plan-clear {
       border: none; background: none; padding: 0; cursor: pointer; font: inherit;
       font-size: var(--avc-fs-s); font-weight: 500; color: rgb(var(--avc-accent-rgb));
     }
-    .plan-rows { display: flex; flex-direction: column; min-height: 0; overflow-y: auto; }
+    /* F1: a fixed height (rows reserved, docs/49), not one that follows the row
+     * count — the map next to it must not move when the selection changes. */
+    .plan-rows {
+      display: flex; flex-direction: column; min-height: 0; overflow-y: auto;
+      flex: 0 0 auto; height: calc(var(--plan-n, 3) * 35px);
+    }
     .plan-row {
       display: flex; align-items: center; gap: 8px; min-height: 34px; padding: 0 4px;
       border-bottom: 1px solid rgba(var(--avc-ink-rgb), 0.06); font-size: var(--avc-fs-m);

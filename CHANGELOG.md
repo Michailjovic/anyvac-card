@@ -6,6 +6,22 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [1.53.1] - 2026-11-14
+
+Integration unchanged (1.52.3). Audit plan 1.51.5, step F1.
+
+### Fixed
+
+- **The landscape map no longer jumps when you pick rooms.** The plan list in the
+  right column was exactly as tall as its rows, so in a fixed-height card the map
+  above it gave way: about 323 → 434 → 393 → 323 px for 0 / 1 / 3 / 5 picked
+  rooms. The list now reserves room for the rooms the card is configured with (2 to
+  6 rows) and scrolls inside beyond that, so the map and the dock keep their size
+  whatever is selected or planned, and while a job runs. With only a room or two
+  picked there is some empty space under the list. New `tests/dock-stable.spec.ts`
+  (the map measures 285 px at 0 picked rooms and 349 px at 1 without the fix); full
+  suite 357 passed.
+
 ## [1.53.0] - 2026-11-14
 
 Integration unchanged (1.52.3). Audit plan 1.51.5, block E.
