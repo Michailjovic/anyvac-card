@@ -35,6 +35,7 @@ import {
   DEFAULT_THEME,
   CLEANING_STATES,
 } from "./const";
+import { tr, plural, fmtClock, fmtDay } from "./i18n";
 import {
   resolveSeat,
   resolveStaticRooms,
@@ -1610,7 +1611,7 @@ export class AnyVacCard extends LitElement {
     // tile surface (dark) and, through the light-theme brightness filter on
     // `.status-label`/`.tile-status`, on light surfaces. Legacy unchanged.
     const muted = this._themed() ? STATUS_MUTED[info[1]] : undefined;
-    return muted ? [info[0], muted, info[2]] : info;
+    return muted ? [this._t(info[0]), muted, info[2]] : [this._t(info[0]), info[1], info[2]];
   }
 
   /** docs/25 §10 follow-up (2026-07-24): consumable/"care" rows auto-discovered from
@@ -1671,7 +1672,7 @@ export class AnyVacCard extends LitElement {
     const consumable = (label: string, tk: string, resetTk: string, deviceId: string | undefined) => {
       const entity = byTk(deviceId, tk, "sensor");
       const reset = byTk(deviceId, resetTk, "button");
-      if (entity || reset) rows.push({ key: tk, label, entity, reset, totalHours: CARE_TOTAL_HOURS[tk] });
+      if (entity || reset) rows.push({ key: tk, label: this._t(label), entity, reset, totalHours: CARE_TOTAL_HOURS[tk] });
     };
     consumable("Main brush", "main_brush_time_left", "reset_main_brush_consumable", devId);
     consumable("Side brush", "side_brush_time_left", "reset_side_brush_consumable", devId);
@@ -1691,7 +1692,7 @@ export class AnyVacCard extends LitElement {
 
       const binary = (label: string, tk: string) => {
         const entity = byTk(dockDevId, tk, "binary_sensor");
-        if (entity) rows.push({ key: tk, label, binary: entity });
+        if (entity) rows.push({ key: tk, label: this._t(label), binary: entity });
       };
       binary("Dirty water tank", "dirty_box_full");
       binary("Clean water tank", "clean_box_empty");
@@ -1765,8 +1766,9 @@ export class AnyVacCard extends LitElement {
   private _attnDot(vac: VacuumConfig) {
     const a = this._vacAttention(vac);
     if (!a.dock && !a.care) return nothing;
-    const what = a.dock && a.care ? "dock and care" : a.dock ? "dock" : "care";
-    return html`<span class="vac-attn-dot" role="img" aria-label="Needs attention: ${what}" title="Needs attention: ${what}"></span>`;
+    const what = this._t(a.dock && a.care ? "dock and care" : a.dock ? "dock" : "care");
+    const tip = this._t("Needs attention: {what}", { what });
+    return html`<span class="vac-attn-dot" role="img" aria-label=${tip} title=${tip}></span>`;
   }
 
   private _openRobotSheet(idx: number, tab: RobotSheetTab = "clean"): void {
@@ -1803,10 +1805,10 @@ export class AnyVacCard extends LitElement {
     if (!raw || raw === "unavailable" || raw === "unknown") return "—";
     const d = new Date(raw);
     const diff = Math.floor((Date.now() - d.getTime()) / 86_400_000);
-    const t = d.toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" });
-    if (diff === 0) return "Today · " + t;
-    if (diff === 1) return "Yesterday · " + t;
-    return d.toLocaleDateString([], { day: "2-digit", month: "2-digit" }) + " · " + t;
+    const t = fmtClock(this.hass, d);
+    if (diff === 0) return this._t("Today · {time}", { time: t });
+    if (diff === 1) return this._t("Yesterday · {time}", { time: t });
+    return this._t("{date} · {time}", { date: fmtDay(this.hass, d), time: t });
   }
 
   private _progress(vac: VacuumConfig): number | null {
@@ -2284,9 +2286,9 @@ export class AnyVacCard extends LitElement {
     if (total >= 60) {
       const h = Math.floor(total / 60);
       const m = total % 60;
-      return m > 0 ? "~" + h + " h " + m + " min" : "~" + h + " h";
+      return m > 0 ? this._t("~{h} h {m} min", { h, m }) : this._t("~{h} h", { h });
     }
-    return "~" + total + " min";
+    return this._t("~{n} min", { n: total });
   }
 
   // ── Global action helpers ───────────────────────────────────────────────
@@ -2916,7 +2918,7 @@ export class AnyVacCard extends LitElement {
     const modeBtn = (m: "dry" | "wet" | "both", label: string) => {
       const on = mode === m;
       return html`<button @click=${(e: Event) => { e.stopPropagation(); this._planMode = m; }}
-        style="padding:2px 8px;border-radius:var(--avc-th-r-m,8px);font-size:var(--avc-th-fs-xs,10px);font-weight:700;cursor:pointer;font-family:inherit;border:1px solid ${on ? "rgba(var(--avc-ink-rgb),0.5)" : "rgba(var(--avc-ink-rgb),0.15)"};background:${on ? "rgba(var(--avc-ink-rgb),0.12)" : "transparent"};color:${on ? "rgb(var(--avc-ink-rgb))" : "rgba(var(--avc-ink-rgb),0.72)"}">${label}</button>`;
+        style="padding:2px 8px;border-radius:var(--avc-th-r-m,8px);font-size:var(--avc-th-fs-xs,10px);font-weight:700;cursor:pointer;font-family:inherit;border:1px solid ${on ? "rgba(var(--avc-ink-rgb),0.5)" : "rgba(var(--avc-ink-rgb),0.15)"};background:${on ? "rgba(var(--avc-ink-rgb),0.12)" : "transparent"};color:${on ? "rgb(var(--avc-ink-rgb))" : "rgba(var(--avc-ink-rgb),0.72)"}">${this._t(label)}</button>`;
     };
     const runHid = "plan-run";
     return html`
@@ -3224,8 +3226,8 @@ export class AnyVacCard extends LitElement {
         @keydown=${(e: KeyboardEvent) => { if (e.key === "Enter" || e.key === " ") { e.preventDefault(); this._robotSheet = i; } }}
         @pointerleave=${this._holdEnd}
         @pointercancel=${this._holdEnd}
-        title="${name} \u2014 tap for controls, hold to ${shown ? "hide it on" : "show it on"} the map"
-        aria-label="${name} \u2014 open controls" aria-pressed=${shown ? "true" : "false"}>
+        title=${this._t(shown ? "{name} — tap for controls, hold to hide it on the map" : "{name} — tap for controls, hold to show it on the map", { name })}
+        aria-label=${this._t("{name} — open controls", { name })} aria-pressed=${shown ? "true" : "false"}>
         <div class="hold-ring"></div>
         ${this._renderBattRing(v, 36)}
         <span class="rail-tile-text">
@@ -3251,8 +3253,8 @@ export class AnyVacCard extends LitElement {
       const rows = jp.rooms as Array<Record<string, any>>;
       return html`
         <div class="rail-card rail-plan">
-          <div class="rail-card-head"><ha-icon icon="mdi:format-list-checks"></ha-icon><span>Plan</span>
-            <small>${jp.passes_done ?? 0} of ${jp.passes_total ?? rows.length} passes</small></div>
+          <div class="rail-card-head"><ha-icon icon="mdi:format-list-checks"></ha-icon><span>${this._t("Plan")}</span>
+            <small>${this._t("{done} of {total} passes", { done: jp.passes_done ?? 0, total: jp.passes_total ?? rows.length })}</small></div>
           ${rows.map((r) => {
             const vc = byEnt.get(r.vacuum);
             const st = r.state === "done" ? "done" : r.state === "active" ? "active" : "queued";
@@ -3278,15 +3280,15 @@ export class AnyVacCard extends LitElement {
       <div class="rail-card rail-sel">
         <div class="rail-card-head">
           <ha-icon icon=${selKeys.length ? "mdi:checkbox-multiple-marked-outline" : "mdi:home-outline"}></ha-icon>
-          <span>${selKeys.length ? `${selKeys.length} ${selKeys.length === 1 ? "room" : "rooms"}` : "Whole home"}</span>
-          ${est ? html`<small>~${est} min</small>` : nothing}
+          <span>${selKeys.length ? this._t("{n} {rooms}", { n: selKeys.length, rooms: this._pl(selKeys.length, "room|rooms") }) : this._t("Whole home")}</span>
+          ${est ? html`<small>${this._t("~{n} min", { n: est })}</small>` : nothing}
         </div>
         ${selKeys.length
           ? html`<div class="rail-chips">${selKeys.map((k) => html`<span class="rail-chip">${names.get(k) ?? k}</span>`)}</div>
               <button class="mtbtn rail-clear" @click=${() => this._clearRoomSelection()}>
-                <ha-icon icon="mdi:close"></ha-icon><span>Clear</span></button>`
-          : html`<span class="rail-hint">Tap rooms on the map to pick them</span>`}
-        ${unassigned.length && selKeys.length ? html`<span class="rail-warn"><ha-icon icon="mdi:robot-off"></ha-icon>${unassigned.length} without a robot for this mode</span>` : nothing}
+                <ha-icon icon="mdi:close"></ha-icon><span>${this._t("Clear")}</span></button>`
+          : html`<span class="rail-hint">${this._t("Tap rooms on the map to pick them")}</span>`}
+        ${unassigned.length && selKeys.length ? html`<span class="rail-warn"><ha-icon icon="mdi:robot-off"></ha-icon>${this._t("{n} without a robot for this mode", { n: unassigned.length })}</span>` : nothing}
       </div>`;
   }
 
@@ -3305,13 +3307,13 @@ export class AnyVacCard extends LitElement {
     return html`
       <div class="rail-tools">
         ${this._renderLayerToggleCompact(vacs)}
-        ${withMap.length ? html`<button class="mtbtn mtbtn--icon" title="Refresh map" aria-label="Refresh map" @click=${refreshTap}>
+        ${withMap.length ? html`<button class="mtbtn mtbtn--icon" title=${this._t("Refresh map")} aria-label=${this._t("Refresh map")} @click=${refreshTap}>
             <ha-icon icon="mdi:refresh"></ha-icon></button>` : nothing}
         ${this._config.layout ? html`<button class="mtbtn mtbtn--icon ${this._flipEff ? "on" : ""}"
-            title="Flip map 180° for this screen (this session only)" aria-label="Flip map"
+            title=${this._t("Flip map 180° for this screen (this session only)")} aria-label=${this._t("Flip map")}
             aria-pressed=${this._flipEff ? "true" : "false"} @click=${() => this._toggleFlipLive()}>
             <ha-icon icon="mdi:flip-vertical"></ha-icon></button>` : nothing}
-        ${alignCand.length ? html`<button class="mtbtn mtbtn--icon" title="Align — full-screen manual floorplan seating" aria-label="Align"
+        ${alignCand.length ? html`<button class="mtbtn mtbtn--icon" title=${this._t("Align — full-screen manual floorplan seating")} aria-label=${this._t("Align")}
             @click=${() => this._requestVisualEditor(alignCand[0])}>
             <ha-icon icon="mdi:vector-square-edit"></ha-icon></button>` : nothing}
       </div>`;
@@ -3383,7 +3385,7 @@ export class AnyVacCard extends LitElement {
     const modeBtn = (m: "dry" | "wet" | "both", icon: string, label: string) => html`
       <button class="dock-mode ${mode === m ? "on" : ""}"
         @click=${(e: Event) => { e.stopPropagation(); this._planMode = m; }}>
-        <ha-icon icon=${icon}></ha-icon><span>${label}</span>
+        <ha-icon icon=${icon}></ha-icon><span>${this._t(label)}</span>
       </button>`;
     const runHid = "dock-run";
     // docs/25 §7c (field diskuze 2026-07-24): portrait cockpit minimalism drops
@@ -3412,14 +3414,14 @@ export class AnyVacCard extends LitElement {
           this._profile === "portrait" ? html`
             <div class="dock-layers">${this._renderLayerToggleCompact(vacs)}
               ${this._config.layout ? html`<button class="mtbtn ${this._flipEff ? "on" : ""}"
-                  title="Flip map 180° for this screen (this session only)" aria-label="Flip map"
+                  title=${this._t("Flip map 180° for this screen (this session only)")} aria-label=${this._t("Flip map")}
                   aria-pressed=${this._flipEff ? "true" : "false"}
                   @click=${() => this._toggleFlipLive()}>
                 <ha-icon icon="mdi:flip-vertical"></ha-icon>
               </button>` : nothing}
               ${(() => {
                 const alignCand = this._alignCandidates(vacs);
-                return alignCand.length ? html`<button class="mtbtn" title="Align — full-screen manual floorplan seating"
+                return alignCand.length ? html`<button class="mtbtn" title=${this._t("Align — full-screen manual floorplan seating")}
                     @click=${() => this._requestVisualEditor(alignCand[0])}>
                   <ha-icon icon="mdi:vector-square-edit"></ha-icon>
                 </button>` : nothing;
@@ -3457,15 +3459,15 @@ export class AnyVacCard extends LitElement {
             const locked = this._mapMode !== "normal";
             return html`
               <button class="dock-row ${sel ? "on" : ""} ${locked ? "room-overlay--locked" : ""}" ?disabled=${locked}
-                title=${locked ? "Room selection is off while placing a pin/zone" : ""}
+                title=${locked ? this._t("Room selection is off while placing a pin/zone") : ""}
                 @click=${() => { if (!locked) this._toggleRoomAcross(r.key, vacs); }}>
                 <ha-icon class="dock-ric" icon=${r.icon ?? "mdi:square"}></ha-icon>
                 <span class="dock-name">${r.name ?? r.key}</span>
                 <span class="dock-info">
                   ${sel && unassigned.has(r.key) ? html`<ha-icon class="dock-unassigned" icon="mdi:robot-off"
-                    title="No available robot for this room's ${mode} pass — check that a vacuum is configured with the right role and knows this room."></ha-icon>` : nothing}
+                    title=${this._t("No available robot for this room's {mode} pass — check that a vacuum is configured with the right role and knows this room.", { mode: this._t(mode) })}></ha-icon>` : nothing}
                   ${sel && unsequenced.has(r.key) ? html`<ha-icon class="dock-unseq" icon="mdi:sort-variant-off"
-                    title="No cleaning order set for this room — the time estimate may be off. Set the order in the card editor's Global tab."></ha-icon>` : nothing}
+                    title=${this._t("No cleaning order set for this room — the time estimate may be off. Set the order in the card editor's Global tab.")}></ha-icon>` : nothing}
                   <span class="dock-ages">
                     <span class="dock-age">${this._renderProgChip(this._roomProgForType(r, vacs, "dry"))}<ha-icon icon="mdi:broom"></ha-icon><b style=${styleMap({ color: this._colorForAgeDays(dry) })}>${badge(dry)}</b>${this._renderCovBadge(cov, "dry", covBadge)}</span>
                     <span class="dock-age">${this._renderProgChip(this._roomProgForType(r, vacs, "wet"))}<ha-icon icon="mdi:water"></ha-icon><b style=${styleMap({ color: this._colorForAgeDays(wet) })}>${badge(wet)}</b>${this._renderCovBadge(cov, "wet", covBadge)}</span>
@@ -3481,11 +3483,11 @@ export class AnyVacCard extends LitElement {
         </div>`}
         ${withRun && hasInt ? html`
           <div class="dock-foot">
-            <span class="dock-est">${selKeys.length ? selKeys.length + " rooms · ~" + this._etaFor(runKeys, mode, hasInt) + " min" : "Whole home · ~" + this._etaFor(runKeys, mode, hasInt) + " min"}
+            <span class="dock-est">${selKeys.length ? this._t("{n} {rooms} · ~{min} min", { n: selKeys.length, rooms: this._pl(selKeys.length, "room|rooms"), min: this._etaFor(runKeys, mode, hasInt) ?? 0 }) : this._t("Whole home · ~{min} min", { min: this._etaFor(runKeys, mode, hasInt) ?? 0 })}
               ${unassigned.size ? html`<ha-icon class="dock-unassigned" icon="mdi:robot-off"
-                title="${unassigned.size} selected room${unassigned.size > 1 ? "s have" : " has"} no available robot for the ${mode} pass — it/they will be silently skipped. Check vacuum roles/config."></ha-icon>` : nothing}
+                title=${this._t("{n} selected {rooms} without an available robot for the {mode} pass — skipped. Check vacuum roles/config.", { n: unassigned.size, rooms: this._pl(unassigned.size, "room|rooms"), mode: this._t(mode) })}></ha-icon>` : nothing}
               ${unsequenced.size ? html`<ha-icon class="dock-unseq" icon="mdi:sort-variant-off"
-                title="${unsequenced.size} selected room${unsequenced.size > 1 ? "s have" : " has"} no cleaning order set — the time above may be off. Set the order in the card editor's Global tab."></ha-icon>` : nothing}</span>
+                title=${this._t("{n} selected {rooms} without a cleaning order — the time above may be off. Set the order in the card editor's Global tab.", { n: unsequenced.size, rooms: this._pl(unsequenced.size, "room|rooms") })}></ha-icon>` : nothing}</span>
             <button class="action-btn dock-run ${this._holdId === runHid ? "action-btn--holding" : ""}"
               ?disabled=${!runKeys.length}
               @pointerdown=${runKeys.length ? this._holdStart(runHid, () => this._runOrchestrated(runKeys, this._planMode)) : nothing}
@@ -3551,7 +3553,7 @@ export class AnyVacCard extends LitElement {
       return html`
         <div class="dock plan-col">
           <div class="plan-head">
-            <span>Plan · ${jp.passes_done ?? 0} of ${jp.passes_total ?? rows.length} passes done</span>
+            <span>${this._t("Plan · {done} of {total} passes done", { done: jp.passes_done ?? 0, total: jp.passes_total ?? rows.length })}</span>
           </div>
           <div class="plan-rows" style=${styleMap({ "--plan-n": planRows })}>
             ${rows.map((r) => {
@@ -3569,10 +3571,10 @@ export class AnyVacCard extends LitElement {
           </div>
           <div class="plan-foot">
             <span class="plan-sum">
-              <b>${jp.finish_at ? "Done around " + this._clockStr(jp.finish_at) : "Cleaning"}</b>
-              <small>${left !== null ? "~" + left + " min left" : ""}</small>
+              <b>${jp.finish_at ? this._t("Done around {time}", { time: this._clockStr(jp.finish_at) }) : this._t("Cleaning")}</b>
+              <small>${left !== null ? this._t("~{min} min left", { min: left }) : ""}</small>
             </span>
-            ${holdBtn("plan-cancel", "mdi:stop", "Cancel · hold", true, () => void this._call("anyvac", "cancel", {}))}
+            ${holdBtn("plan-cancel", "mdi:stop", this._t("Cancel · hold"), true, () => void this._call("anyvac", "cancel", {}))}
           </div>
         </div>`;
     }
@@ -3593,13 +3595,13 @@ export class AnyVacCard extends LitElement {
     const modeBtn = (m: "dry" | "wet" | "both", icon: string, label: string) => html`
       <button class="dock-mode ${mode === m ? "on" : ""}" aria-pressed=${mode === m ? "true" : "false"}
         @click=${(e: Event) => { e.stopPropagation(); this._planMode = m; }}>
-        <ha-icon icon=${icon}></ha-icon><span>${label}</span>
+        <ha-icon icon=${icon}></ha-icon><span>${this._t(label)}</span>
       </button>`;
     const who = (m: Map<string, string>) => [...new Set(runKeys.map((k) => m.get(k)).filter((e): e is string => !!e))]
       .map((e) => (byEnt.get(e) ? this._vacName(byEnt.get(e)!) : e)).join(" + ");
     const dryWho = mode !== "wet" ? who(dryOf) : "";
     const wetWho = mode !== "dry" ? who(wetOf) : "";
-    const how = [dryWho && "dry " + dryWho, wetWho && "wet " + wetWho].filter(Boolean).join(", then ");
+    const how = [dryWho && this._t("dry {who}", { who: dryWho }), wetWho && this._t("wet {who}", { who: wetWho })].filter(Boolean).join(this._t(", then "));
     const eta = pv?.eta ?? null;
     return html`
       <div class="dock plan-col">
@@ -3607,17 +3609,17 @@ export class AnyVacCard extends LitElement {
           ${modeBtn("dry", "mdi:broom", "Dry")}${modeBtn("wet", "mdi:water", "Wet")}${modeBtn("both", "mdi:water-plus", "Both")}
         </div>
         <div class="plan-head">
-          <span>${selKeys.length ? `Selected · ${selKeys.length} room${selKeys.length === 1 ? "" : "s"}` : `Whole home · ${allKeys.length} room${allKeys.length === 1 ? "" : "s"}`}</span>
-          ${selKeys.length ? html`<button class="plan-clear" @click=${() => this._clearRoomSelection()}>Clear · whole home</button>` : nothing}
+          <span>${selKeys.length ? this._t("Selected · {n} {rooms}", { n: selKeys.length, rooms: this._pl(selKeys.length, "room|rooms") }) : this._t("Whole home · {n} {rooms}", { n: allKeys.length, rooms: this._pl(allKeys.length, "room|rooms") })}</span>
+          ${selKeys.length ? html`<button class="plan-clear" @click=${() => this._clearRoomSelection()}>${this._t("Clear · whole home")}</button>` : nothing}
         </div>
         <div class="plan-rows" style=${styleMap({ "--plan-n": planRows })}>
           ${order.map((k) => html`
             <div class="plan-row">
               <span class="plan-name">${names.get(k) ?? k}</span>
               ${unassigned.has(k) ? html`<ha-icon class="dock-unassigned" icon="mdi:robot-off"
-                title="No available robot for this room's ${mode} pass — check that a vacuum is configured with the right role and knows this room."></ha-icon>` : nothing}
+                title=${this._t("No available robot for this room's {mode} pass — check that a vacuum is configured with the right role and knows this room.", { mode: this._t(mode) })}></ha-icon>` : nothing}
               ${unsequenced.has(k) ? html`<ha-icon class="dock-unseq" icon="mdi:sort-variant-off"
-                title="No cleaning order set for this room — the time estimate may be off. Set the order in the card editor's Global tab."></ha-icon>` : nothing}
+                title=${this._t("No cleaning order set for this room — the time estimate may be off. Set the order in the card editor's Global tab.")}></ha-icon>` : nothing}
               <span class="dock-avatars">
                 ${mode !== "wet" ? this._vacChip(dryOf.get(k), pinTap(k, "dry", dryOf.get(k))) : nothing}
                 ${mode !== "dry" ? this._vacChip(wetOf.get(k), pinTap(k, "wet", wetOf.get(k))) : nothing}
@@ -3627,10 +3629,10 @@ export class AnyVacCard extends LitElement {
         </div>
         <div class="plan-foot">
           <span class="plan-sum">
-            <b>${eta !== null ? "Done around " + at(eta) : "Whole plan"}</b>
+            <b>${eta !== null ? this._t("Done around {time}", { time: at(eta) }) : this._t("Whole plan")}</b>
             <small>${[how, eta !== null ? "~" + this._timeStr(eta).replace(/^~/, "") : ""].filter(Boolean).join(" · ")}</small>
           </span>
-          ${holdBtn("", "mdi:play", "Start · hold", runKeys.length > 0, () => this._runOrchestrated(runKeys, this._planMode))}
+          ${holdBtn("", "mdi:play", this._t("Start · hold"), runKeys.length > 0, () => this._runOrchestrated(runKeys, this._planMode))}
         </div>
       </div>`;
   }
@@ -3742,10 +3744,10 @@ export class AnyVacCard extends LitElement {
       const running = this._dockRunning(vac, kind);
       return html`
         <button class="dock-sheet-action ${running ? "running" : ""}"
-          title=${running ? `Stop ${label.toLowerCase()}` : label}
+          title=${running ? this._t("Stop {what}", { what: this._t(label).toLowerCase() }) : this._t(label)}
           @click=${act(service, running ? "stop" : "start")}>
           <ha-icon icon=${running ? "mdi:stop" : icon}></ha-icon>
-          <span>${running ? "Stop" : label}</span>
+          <span>${running ? this._t("Stop") : this._t(label)}</span>
         </button>`;
     };
     const tanks = this._careItems(vac).filter((r) => r.binary);
@@ -3754,24 +3756,24 @@ export class AnyVacCard extends LitElement {
     const hasErr = err !== null && err !== undefined && err !== 0 && err !== "0";
     const runningLabel = (["empty", "wash", "dry"] as const)
       .filter((k) => this._dockRunning(vac, k))
-      .map((k) => ({ empty: "Emptying the bin", wash: "Washing the mop", dry: "Drying the mop" })[k]);
+      .map((k) => this._t({ empty: "Emptying the bin", wash: "Washing the mop", dry: "Drying the mop" }[k]));
     const bad = hasErr || badTanks.length > 0;
     // docs/47 §3: the backend names the error (`dock_status.dock_error`, an
     // enum name like "water_empty"); older integrations only send the code.
     const errName = typeof dock?.dock_error === "string" ? dock.dock_error.replace(/_/g, " ") : "";
-    const stateText = hasErr ? (errName ? `Dock error: ${errName}` : "The dock reports an error")
-      : badTanks.length ? badTanks.map((r) => r.label).join(", ") + " — check"
+    const stateText = hasErr ? (errName ? this._t("Dock error: {name}", { name: errName }) : this._t("The dock reports an error"))
+      : badTanks.length ? badTanks.map((r) => r.label).join(", ") + " — " + this._t("check")
       : runningLabel.length ? runningLabel.join(" · ")
-      : "Dock ready";
+      : this._t("Dock ready");
     return html`
       <div class="rs-pane">
         <div class="rs-dock-state ${bad ? "bad" : ""}">
           <ha-icon icon=${bad ? "mdi:alert-circle-outline" : runningLabel.length ? "mdi:progress-clock" : "mdi:check-circle-outline"}></ha-icon>
           <span>${stateText}</span>
           ${hasErr ? html`
-            <button class="rs-dock-resolve" title="Confirm the error is fixed, like Resolved in the Roborock app"
+            <button class="rs-dock-resolve" title=${this._t("Confirm the error is fixed, like Resolved in the Roborock app")}
               @click=${act("dock_resolve_error")}>
-              <ha-icon icon="mdi:check-circle-outline"></ha-icon><span>Resolved</span>
+              <ha-icon icon="mdi:check-circle-outline"></ha-icon><span>${this._t("Resolved")}</span>
             </button>` : nothing}
         </div>
         ${tanks.length ? html`
@@ -3781,7 +3783,7 @@ export class AnyVacCard extends LitElement {
               return html`
                 <div class="dock-sheet-care-row">
                   <span class="dock-sheet-care-label">${row.label}</span>
-                  <span class="dock-sheet-care-badge ${on ? "warn" : ""}">${on ? "Check" : "OK"}</span>
+                  <span class="dock-sheet-care-badge ${on ? "warn" : ""}">${on ? this._t("Check") : "OK"}</span>
                 </div>`;
             })}
           </div>` : nothing}
@@ -3813,10 +3815,10 @@ export class AnyVacCard extends LitElement {
             ${caps.dry ? cycle("dock_dry", "dry", "mdi:hair-dryer", "Dry") : nothing}
             ${caps.wash ? html`
               <button class="dock-sheet-action" @click=${act("dock_pump")}>
-                <ha-icon icon="mdi:water-pump"></ha-icon><span>Pump</span>
+                <ha-icon icon="mdi:water-pump"></ha-icon><span>${this._t("Pump")}</span>
               </button>
               <button class="dock-sheet-action" @click=${act("dock_self_clean")}>
-                <ha-icon icon="mdi:autorenew"></ha-icon><span>Self-clean</span>
+                <ha-icon icon="mdi:autorenew"></ha-icon><span>${this._t("Self-clean")}</span>
               </button>` : nothing}
           </div>` : nothing}
       </div>
@@ -3871,7 +3873,7 @@ export class AnyVacCard extends LitElement {
                 </span>
                 ${row.reset ? html`
                   <button class="dock-sheet-care-reset ${pending ? "pending" : ""}"
-                    title="Reset ${row.label}" aria-label="Reset ${row.label}" ?disabled=${pending} @click=${reset(row)}>
+                    title=${this._t("Reset {label}", { label: row.label })} aria-label=${this._t("Reset {label}", { label: row.label })} ?disabled=${pending} @click=${reset(row)}>
                     <ha-icon icon=${pending ? "mdi:loading" : "mdi:refresh"}></ha-icon>
                   </button>` : nothing}
               </div>`;
@@ -3896,7 +3898,7 @@ export class AnyVacCard extends LitElement {
     };
     const modeBtn = (m: "dry" | "wet" | "both", icon: string, label: string) => html`
       <button class="dock-mode ${mode === m ? "on" : ""}" @click=${pick(m)}>
-        <ha-icon icon=${icon}></ha-icon><span>${label}</span>
+        <ha-icon icon=${icon}></ha-icon><span>${this._t(label)}</span>
       </button>`;
     return html`
       <div class="dock-sheet">
@@ -3927,10 +3929,10 @@ export class AnyVacCard extends LitElement {
     const anyCleaning = vacs.some((v) => this._isCleaning(v));
     const hid = "startbar";
     const modeIcon = { dry: "mdi:broom", wet: "mdi:water", both: "mdi:water-plus" }[this._planMode];
-    const modeLabel = { dry: "Dry", wet: "Wet", both: "Both" }[this._planMode];
+    const modeLabel = this._t({ dry: "Dry", wet: "Wet", both: "Both" }[this._planMode]);
     const modeSeg = html`
       <button class="start-seg start-seg--mode ${this._modeSheetOpen ? "on" : ""}"
-        title="Clean type — tap to change"
+        title=${this._t("Clean type — tap to change")}
         @click=${(e: Event) => { e.stopPropagation(); this._modeSheetOpen = !this._modeSheetOpen; }}>
         <ha-icon icon=${modeIcon}></ha-icon>
         <span>${modeLabel}</span>
@@ -3948,24 +3950,24 @@ export class AnyVacCard extends LitElement {
             @pointerup=${this._holdEnd} @pointerleave=${this._holdEnd} @pointercancel=${this._holdEnd}>
             <div class="hold-ring"></div>
             <ha-icon icon="mdi:stop"></ha-icon>
-            <span>Cancel · hold</span>
+            <span>${this._t("Cancel · hold")}</span>
           </button>
         </div>`;
     }
     const canStart = hasInt && runKeys.length > 0;
-    const scopeLabel = selKeys.length ? selKeys.length + (selKeys.length === 1 ? " room" : " rooms") : "whole home";
+    const scopeLabel = selKeys.length ? selKeys.length + " " + this._pl(selKeys.length, "room|rooms") : this._t("whole home");
     return html`
       <div class="start-row">
         ${modeSeg}
         <button class="start-bar ${canStart && this._holdId === hid ? "action-btn--holding" : ""}"
           ?disabled=${!canStart}
-          title=${hasInt ? "" : "Requires the AnyVac integration"}
+          title=${hasInt ? "" : this._t("Requires the AnyVac integration")}
           @pointerdown=${canStart ? this._holdStart(hid, () => this._runOrchestrated(runKeys, this._planMode)) : nothing}
           @pointermove=${this._holdMove}
           @pointerup=${this._holdEnd} @pointerleave=${this._holdEnd} @pointercancel=${this._holdEnd}>
           <div class="hold-ring"></div>
           <ha-icon icon="mdi:play"></ha-icon>
-          <span>Start · ${scopeLabel} · hold</span>
+          <span>${this._t("Start · {scope} · hold", { scope: scopeLabel })}</span>
         </button>
       </div>`;
   }
@@ -3976,7 +3978,7 @@ export class AnyVacCard extends LitElement {
     const ca = vac.clean_action as Partial<NativeAutoCleanAction> | undefined;
     return [{
       id: "default",
-      label: "Default",
+      label: this._t("Default"),
       suction_level: ca?.suction_level,
       mop_mode: ca?.mop_mode,
       mop_intensity: ca?.mop_intensity,
@@ -4236,7 +4238,7 @@ export class AnyVacCard extends LitElement {
         @pointerleave=${this._holdEnd}
         @pointercancel=${this._holdEnd}
         aria-label=${ga.name}
-        title=${"Hold to trigger: " + ga.name}
+        title=${this._t("Hold to trigger: {name}", { name: ga.name })}
       >
         <div class="hold-ring"></div>
         ${ga.image
@@ -4835,12 +4837,12 @@ export class AnyVacCard extends LitElement {
         ${this._renderHero(vacs)}
         <div class="meta-bar-cluster">
           <button class="mtbtn ${mode === "pin" ? "on" : ""}" ?disabled=${!canCmd}
-            @click=${() => this._armMode("pin")} title=${cmdTitle || "Pin & Go"}>
-            <ha-icon icon="mdi:map-marker-radius"></ha-icon><span>Pin &amp; Go</span>
+            @click=${() => this._armMode("pin")} title=${cmdTitle || this._t("Pin & Go")}>
+            <ha-icon icon="mdi:map-marker-radius"></ha-icon><span>${this._t("Pin & Go")}</span>
           </button>
           <button class="mtbtn ${mode === "zone" ? "on" : ""}" ?disabled=${!canCmd}
-            @click=${() => this._armMode("zone")} title=${cmdTitle || "Zone clean"}>
-            <ha-icon icon="mdi:select-drag"></ha-icon><span>Zone</span>
+            @click=${() => this._armMode("zone")} title=${cmdTitle || this._t("Zone clean")}>
+            <ha-icon icon="mdi:select-drag"></ha-icon><span>${this._t("Zone")}</span>
           </button>
         </div>
         <div class="meta-bar-spacer"></div>
@@ -4855,20 +4857,20 @@ export class AnyVacCard extends LitElement {
           </span>` : nothing}
           ${this._renderLayerToggleCompact(vacs)}
           ${this._config.layout ? html`<button class="mtbtn ${this._flipEff ? "on" : ""}"
-              title="Flip map 180° for this screen (this session only — the card editor's Layout section sets a permanent default)" aria-label="Flip map"
+              title=${this._t("Flip map 180° for this screen (this session only)")} aria-label=${this._t("Flip map")}
               aria-pressed=${this._flipEff ? "true" : "false"}
               @click=${() => this._toggleFlipLive()}>
             <ha-icon icon="mdi:flip-vertical"></ha-icon>
           </button>` : nothing}
           ${(() => {
             const alignCand = this._alignCandidates(vacs);
-            return alignCand.length ? html`<button class="mtbtn" title="Align — full-screen manual floorplan seating"
+            return alignCand.length ? html`<button class="mtbtn" title=${this._t("Align — full-screen manual floorplan seating")}
                 @click=${() => this._requestVisualEditor(alignCand[0])}>
               <ha-icon icon="mdi:vector-square-edit"></ha-icon>
             </button>` : nothing;
           })()}
           <div class="meta-bar-divider"></div>
-          <button class="mtbtn mtbtn--ghost" title="Refresh maps" @click=${refreshTap}>
+          <button class="mtbtn mtbtn--ghost" title=${this._t("Refresh maps")} @click=${refreshTap}>
             <ha-icon icon="mdi:refresh"></ha-icon>
           </button>
         </div>
@@ -4877,13 +4879,13 @@ export class AnyVacCard extends LitElement {
            lands — so pending state, not the armed mode, drives this panel. Only the
            "arm but haven't captured yet" hint depends on `mode`. */
         zoneCount ? html`<div class="calib-panel">
-          <div>Zone ready for ${zoneCount} vacuum${zoneCount > 1 ? "s" : ""} — drag the box or its corners to adjust, then pick one on its status card below.</div>
-          <div class="calib-actions"><button class="mtbtn" @click=${() => this._cancelZone()}>Cancel</button></div>
-        </div>` : mode === "zone" ? html`<div class="calib-panel">Drag a rectangle on the map to set a cleaning zone.</div>` : nothing}
+          <div>${this._t("Zone ready for {n} {vacuums} — drag the box or its corners to adjust, then pick one on its status card below.", { n: zoneCount, vacuums: this._pl(zoneCount, "vacuum|vacuums") })}</div>
+          <div class="calib-actions"><button class="mtbtn" @click=${() => this._cancelZone()}>${this._t("Cancel")}</button></div>
+        </div>` : mode === "zone" ? html`<div class="calib-panel">${this._t("Drag a rectangle on the map to set a cleaning zone.")}</div>` : nothing}
       ${pinCount ? html`<div class="calib-panel">
-          <div>Pin ready for ${pinCount} vacuum${pinCount > 1 ? "s" : ""} — pick one on its status card below.</div>
-          <div class="calib-actions"><button class="mtbtn" @click=${() => this._cancelPin()}>Cancel</button></div>
-        </div>` : mode === "pin" ? html`<div class="calib-panel">Tap the map to drop a pin.</div>` : nothing}
+          <div>${this._t("Pin ready for {n} {vacuums} — pick one on its status card below.", { n: pinCount, vacuums: this._pl(pinCount, "vacuum|vacuums") })}</div>
+          <div class="calib-actions"><button class="mtbtn" @click=${() => this._cancelPin()}>${this._t("Cancel")}</button></div>
+        </div>` : mode === "pin" ? html`<div class="calib-panel">${this._t("Tap the map to drop a pin.")}</div>` : nothing}
     `;
   }
 
@@ -4900,28 +4902,28 @@ export class AnyVacCard extends LitElement {
       <div class="map-tools">
         ${this._config.layout && this._config.vacuums.length > 1
           ? html`<span class="map-tools-label">${vac.name ?? vac.entity}</span>` : nothing}
-        ${mapEnt ? html`<button class="mtbtn" @click=${() => this._refreshMap(vac)} title="Refresh map">
-          <ha-icon icon="mdi:refresh"></ha-icon><span>Refresh</span>
+        ${mapEnt ? html`<button class="mtbtn" @click=${() => this._refreshMap(vac)} title=${this._t("Refresh map")}>
+          <ha-icon icon="mdi:refresh"></ha-icon><span>${this._t("Refresh")}</span>
         </button>` : nothing}
         <button class="mtbtn ${mode === "pin" ? "on" : ""}" ?disabled=${!canCmd}
-          @click=${() => this._toggleMode(vac.entity, "pin")} title=${cmdTitle || "Pin & Go"}>
-          <ha-icon icon="mdi:map-marker-radius"></ha-icon><span>Pin &amp; Go</span>
+          @click=${() => this._toggleMode(vac.entity, "pin")} title=${cmdTitle || this._t("Pin & Go")}>
+          <ha-icon icon="mdi:map-marker-radius"></ha-icon><span>${this._t("Pin & Go")}</span>
         </button>
         <button class="mtbtn ${mode === "zone" ? "on" : ""}" ?disabled=${!canCmd}
-          @click=${() => this._toggleMode(vac.entity, "zone")} title=${cmdTitle || "Zone clean"}>
-          <ha-icon icon="mdi:select-drag"></ha-icon><span>Zone</span>
+          @click=${() => this._toggleMode(vac.entity, "zone")} title=${cmdTitle || this._t("Zone clean")}>
+          <ha-icon icon="mdi:select-drag"></ha-icon><span>${this._t("Zone")}</span>
         </button>
         ${this._dbg && (this._config.debug || !this._config.layout) ? html`<span style="font-size:var(--avc-th-fs-xs,11px);opacity:0.65;align-self:center;font-family:monospace">${this._dbg}</span>` : nothing}
       </div>
-      ${mode === "pin" ? html`<div class="calib-panel">Tap the map to send the robot there.</div>` : nothing}
+      ${mode === "pin" ? html`<div class="calib-panel">${this._t("Tap the map to send the robot there.")}</div>` : nothing}
       ${mode === "zone" ? html`<div class="calib-panel">
         ${this._zonePending?.[vac.entity]
-          ? html`<div>Clean this zone? Drag the box or its corners to adjust.</div>
+          ? html`<div>${this._t("Clean this zone? Drag the box or its corners to adjust.")}</div>
               <div class="calib-actions">
-                <button class="mtbtn on" @click=${() => this._confirmZone(vac)}>Clean zone</button>
-                <button class="mtbtn" @click=${() => this._cancelZone()}>Cancel</button>
+                <button class="mtbtn on" @click=${() => this._confirmZone(vac)}>${this._t("Clean zone")}</button>
+                <button class="mtbtn" @click=${() => this._cancelZone()}>${this._t("Cancel")}</button>
               </div>`
-          : html`Drag a rectangle on the map to set a cleaning zone.`}
+          : html`${this._t("Drag a rectangle on the map to set a cleaning zone.")}`}
       </div>` : nothing}
     `;
   }
@@ -9439,13 +9441,13 @@ export class AnyVacCard extends LitElement {
       return a && a !== "—" ? ` \u00b7 oldest room ${a}` : "";
     };
     return html`
-      <button class="mtbtn mtbtn--icon ${L.dry ? "on" : ""}" title="Show dry trail \u2014 tap to toggle${ageTip("dry")}"
-        aria-label="Dry trail" aria-pressed=${L.dry ? "true" : "false"}
+      <button class="mtbtn mtbtn--icon ${L.dry ? "on" : ""}" title="${this._t("Show dry trail — tap to toggle")}${ageTip("dry")}"
+        aria-label=${this._t("Dry trail")} aria-pressed=${L.dry ? "true" : "false"}
         @click=${() => this._onLayerClick("dry")}>
         <ha-icon icon="mdi:broom"></ha-icon>
       </button>
-      <button class="mtbtn mtbtn--icon ${L.wet ? "on" : ""}" title="Show wet trail \u2014 tap to toggle${ageTip("wet")}"
-        aria-label="Wet trail" aria-pressed=${L.wet ? "true" : "false"}
+      <button class="mtbtn mtbtn--icon ${L.wet ? "on" : ""}" title="${this._t("Show wet trail — tap to toggle")}${ageTip("wet")}"
+        aria-label=${this._t("Wet trail")} aria-pressed=${L.wet ? "true" : "false"}
         @click=${() => this._onLayerClick("wet")}>
         <ha-icon icon="mdi:water"></ha-icon>
       </button>
@@ -9462,12 +9464,12 @@ export class AnyVacCard extends LitElement {
     const L = this._layersEff();
     return html`
       <div class="layer-toggles">
-        <button class="layer-btn ${L.dry ? "on" : ""}" title="Dry trail \u2014 tap to toggle, hold for rooms${oldestTip("dry")}" aria-label="Dry trail"
+        <button class="layer-btn ${L.dry ? "on" : ""}" title="${this._t("Dry trail — tap to toggle, hold for rooms")}${oldestTip("dry")}" aria-label=${this._t("Dry trail")}
           @pointerdown=${() => this._onLayerDown("dry")} @pointerup=${() => this._onLayerUp()} @pointerleave=${() => this._onLayerUp()}
           @click=${() => this._onLayerClick("dry")}>
           <ha-icon icon="mdi:broom"></ha-icon>
         </button>
-        <button class="layer-btn ${L.wet ? "on" : ""}" title="Wet trail \u2014 tap to toggle, hold for rooms${oldestTip("wet")}" aria-label="Wet trail"
+        <button class="layer-btn ${L.wet ? "on" : ""}" title="${this._t("Wet trail — tap to toggle, hold for rooms")}${oldestTip("wet")}" aria-label=${this._t("Wet trail")}
           @pointerdown=${() => this._onLayerDown("wet")} @pointerup=${() => this._onLayerUp()} @pointerleave=${() => this._onLayerUp()}
           @click=${() => this._onLayerClick("wet")}>
           <ha-icon icon="mdi:water"></ha-icon>
@@ -10244,7 +10246,7 @@ export class AnyVacCard extends LitElement {
           @pointerup=${this._onRoomPointerUp(room, vac, opts?.vacs, locked)}
           @pointerleave=${this._holdEnd}
           @pointercancel=${this._holdEnd}
-          title=${locked ? "Room selection is off while placing a pin/zone" : room.name} aria-label=${room.name}
+          title=${locked ? this._t("Room selection is off while placing a pin/zone") : room.name} aria-label=${room.name}
           aria-pressed=${selected ? "true" : "false"}
         >
           ${themed ? this._renderRoomFill(room) : nothing}
@@ -10350,7 +10352,7 @@ export class AnyVacCard extends LitElement {
         @pointerup=${this._onRoomPointerUp(room, vac, opts?.vacs, locked)}
         @pointerleave=${this._holdEnd}
         @pointercancel=${this._holdEnd}
-        title=${locked ? "Room selection is off while placing a pin/zone" : room.name} aria-label=${room.name}
+        title=${locked ? this._t("Room selection is off while placing a pin/zone") : room.name} aria-label=${room.name}
         aria-pressed=${selected ? "true" : "false"}
       >
         <div class="hold-ring"></div>
@@ -10545,7 +10547,7 @@ export class AnyVacCard extends LitElement {
     // unchanged; this just stopped being the tallest thing in the idle state.
     const rooms = this._roomsFor(vac);
     const selCount = rooms.filter((r) => this._isRoomSelected(r, vac)).length;
-    const roomsStr = rooms.length > 0 ? `${selCount}/${rooms.length} rooms` : "";
+    const roomsStr = rooms.length > 0 ? `${selCount}/${rooms.length} ${this._pl(rooms.length, "room|rooms")}` : "";
     const metaStr = [roomsStr, timeStr].filter(Boolean).join(" · ");
 
     return html`
@@ -10564,7 +10566,7 @@ export class AnyVacCard extends LitElement {
           <div class="hold-ring"></div>
           <ha-icon icon="mdi:play" style=${styleMap({ color: startIconColor })}></ha-icon>
           <div class="start-body">
-            <span style=${styleMap({ color: startTextColor })}>${hasRooms ? "START" : "Select rooms"}</span>
+            <span style=${styleMap({ color: startTextColor })}>${hasRooms ? this._t("START") : this._t("Select rooms")}</span>
             ${metaStr ? html`<small style="color:rgba(var(--avc-ink-rgb),0.4)">${metaStr}</small>` : nothing}
           </div>
         </button>
@@ -10582,11 +10584,20 @@ export class AnyVacCard extends LitElement {
     return null;
   }
 
+  /** The one place clock times are formatted (docs/50): follows hass.locale,
+   *  including the user's 12/24 h profile setting. */
   private _clockStr(iso: string | undefined): string {
-    if (!iso) return "";
-    const d = new Date(iso);
-    if (isNaN(d.getTime())) return "";
-    return d.toLocaleTimeString((this.hass as any)?.language || [], { hour: "2-digit", minute: "2-digit" });
+    return fmtClock(this.hass, iso);
+  }
+
+  /** docs/50: English source text is the key; `{name}` placeholders. */
+  private _t(key: string, params?: Record<string, string | number>): string {
+    return tr(this.hass, key, params);
+  }
+
+  /** Noun form for a count: `_pl(3, "room|rooms")`. */
+  private _pl(n: number, key: string): string {
+    return plural(this.hass, n, key);
   }
 
   private _vacName(vac: VacuumConfig): string {
@@ -10637,7 +10648,7 @@ export class AnyVacCard extends LitElement {
         .map(([ent, v]) => {
           const vc = this._config.vacuums.find((x) => x.entity === ent);
           const nm = vc ? this._vacName(vc) : ent.split(".")[1];
-          return `${nm} ${v.kind === "wet" ? "mopping" : "in"} ${v.room}`;
+          return this._t(v.kind === "wet" ? "{name} mopping {room}" : "{name} in {room}", { name: nm, room: v.room });
         });
       const left = Math.round(Number(jp.eta_min_left ?? 0));
       return html`
@@ -10651,24 +10662,24 @@ export class AnyVacCard extends LitElement {
             <b>${done}/${jp.rooms_total ?? 0}</b>
           </span>
           <span class="hero-text">
-            <span class="hero-title">Cleaning · done around ${this._clockStr(jp.finish_at)}</span>
-            <span class="hero-sub">${left} min left${who.length ? " · " + who.join(" · ") : ""}</span>
+            <span class="hero-title">${this._t("Cleaning · done around {time}", { time: this._clockStr(jp.finish_at) })}</span>
+            <span class="hero-sub">${this._t("{n} min left", { n: left })}${who.length ? " · " + who.join(" · ") : ""}</span>
           </span>
         </div>`;
     }
     const busy = vacs.filter((v) => this._isCleaning(v));
     const age = (t: "dry" | "wet") => {
       const d = this._oldestAgeDays(withInt, t);
-      return d === null ? null : d < 1 ? "today" : Math.round(d) + " d ago";
+      return d === null ? null : d < 1 ? this._t("today") : this._t("{n} d ago", { n: Math.round(d) });
     };
     const dry = age("dry"), wet = age("wet");
-    const sub = [dry ? "vacuumed " + dry : "", wet ? "mopped " + wet : ""].filter(Boolean).join(" · ");
+    const sub = [dry ? this._t("vacuumed {when}", { when: dry }) : "", wet ? this._t("mopped {when}", { when: wet }) : ""].filter(Boolean).join(" · ");
     return html`
       <div class="meta-hero">
         <span class="hero-badge"><ha-icon icon=${busy.length ? "mdi:broom" : "mdi:home-outline"}></ha-icon></span>
         <span class="hero-text">
-          <span class="hero-title">${busy.length ? busy.map((v) => this._vacName(v)).join(", ") + (busy.length > 1 ? " are" : " is") + " cleaning" : "Home is calm"}</span>
-          ${sub ? html`<span class="hero-sub">Oldest room: ${sub}</span>` : nothing}
+          <span class="hero-title">${busy.length ? this._t(busy.length > 1 ? "{names} are cleaning" : "{names} is cleaning", { names: busy.map((v) => this._vacName(v)).join(", ") }) : this._t("Home is calm")}</span>
+          ${sub ? html`<span class="hero-sub">${this._t("Oldest room: {sub}", { sub })}</span>` : nothing}
         </span>
       </div>`;
   }
@@ -10700,22 +10711,22 @@ export class AnyVacCard extends LitElement {
       <button class="rs-tab ${tab === t ? "on" : ""}" role="tab" aria-selected=${tab === t ? "true" : "false"}
         @click=${(e: Event) => { e.stopPropagation(); this._robotSheetTab = { idx, tab: t }; }}>
         <ha-icon icon=${icon}></ha-icon><span>${text}</span>
-        ${dot ? html`<span class="rs-tab-dot" role="img" aria-label="needs attention"></span>` : nothing}
+        ${dot ? html`<span class="rs-tab-dot" role="img" aria-label=${this._t("needs attention")}></span>` : nothing}
       </button>`;
     const clean = html`
       <div class="robot-sheet-rooms">
-        <span class="robot-sheet-label">Rooms</span>
+        <span class="robot-sheet-label">${this._t("Rooms")}</span>
         <span>${rooms.length
           ? html`${rooms.map((r) => r.name ?? r.key).join(", ")}${mins ? html` <small>· ${this._timeStr(mins)}</small>` : nothing}`
-          : html`<small>Pick rooms on the map first</small>`}</span>
+          : html`<small>${this._t("Pick rooms on the map first")}</small>`}</span>
       </div>
       ${this._renderActions(vac, idx)}
       <div class="robot-sheet-foot">
-        <button class="mtbtn" @click=${() => this._dock(vac)}><ha-icon icon="mdi:home-import-outline"></ha-icon><span>Send to dock</span></button>
+        <button class="mtbtn" @click=${() => this._dock(vac)}><ha-icon icon="mdi:home-import-outline"></ha-icon><span>${this._t("Send to dock")}</span></button>
       </div>`;
     return html`
       <div class="robot-sheet-scrim" @click=${close}></div>
-      <div class="robot-sheet" role="dialog" aria-modal="true" aria-label="${name} controls"
+      <div class="robot-sheet" role="dialog" aria-modal="true" aria-label=${this._t("{name} controls", { name })}
         @keydown=${(e: KeyboardEvent) => { if (e.key === "Escape") close(); }}>
         <span class="robot-sheet-grip" aria-hidden="true"></span>
         <div class="robot-sheet-head">
@@ -10725,17 +10736,17 @@ export class AnyVacCard extends LitElement {
             <span class="tile-status" style=${styleMap({ color: labelColor })}>
               <ha-icon icon=${statusIcon}></ha-icon>${label}${bat !== null ? html` · ${bat}&thinsp;%` : nothing}
             </span>
-            <span class="tile-sub">Last clean ${this._lastCleanStr(vac)}</span>
+            <span class="tile-sub">${this._t("Last clean {when}", { when: this._lastCleanStr(vac) })}</span>
           </span>
-          <button class="robot-sheet-icon" aria-label="Open ${name} in Home Assistant" title="Home Assistant details"
+          <button class="robot-sheet-icon" aria-label=${this._t("Open {name} in Home Assistant", { name })} title=${this._t("Home Assistant details")}
             @click=${() => this._fireMoreInfo(vac.entity)}><ha-icon icon="mdi:information-outline"></ha-icon></button>
-          <button class="robot-sheet-icon" aria-label="Close" @click=${close}><ha-icon icon="mdi:close"></ha-icon></button>
+          <button class="robot-sheet-icon" aria-label=${this._t("Close")} @click=${close}><ha-icon icon="mdi:close"></ha-icon></button>
         </div>
         ${hasDockTab || hasCareTab ? html`
-          <div class="rs-tabs" role="tablist" aria-label="${name} sections">
-            ${tabBtn("clean", "Clean", "mdi:broom", false)}
-            ${hasDockTab ? tabBtn("dock", "Dock", "mdi:home-outline", attn.dock) : nothing}
-            ${hasCareTab ? tabBtn("care", "Care", "mdi:toolbox-outline", attn.care) : nothing}
+          <div class="rs-tabs" role="tablist" aria-label=${this._t("{name} sections", { name })}>
+            ${tabBtn("clean", this._t("Clean"), "mdi:broom", false)}
+            ${hasDockTab ? tabBtn("dock", this._t("Dock"), "mdi:home-outline", attn.dock) : nothing}
+            ${hasCareTab ? tabBtn("care", this._t("Care"), "mdi:toolbox-outline", attn.care) : nothing}
           </div>` : nothing}
         ${tab === "dock" ? this._renderDockTab(vac) : tab === "care" ? this._renderCareTab(vac) : clean}
       </div>`;
@@ -10773,8 +10784,8 @@ export class AnyVacCard extends LitElement {
     const erid = this._ent(vac, "error");
     const errState = this._hasError(vac) ? this.hass.states[erid!]?.state : null;
     const sub = errState ? errState
-      : cleaning && jv?.next_room ? "Next: " + jv.next_room
-      : "Last clean " + this._lastCleanStr(vac);
+      : cleaning && jv?.next_room ? this._t("Next: {room}", { room: jv.next_room })
+      : this._t("Last clean {when}", { when: this._lastCleanStr(vac) });
     const urgent = !!(this._pinPending?.[vac.entity] || this._zonePending?.[vac.entity] || paused);
     // Cleaning: Pause is a compact hold button beside the tile instead of a
     // full-width bar — three robots cleaning used to mean three big Pause bars.
@@ -10829,7 +10840,7 @@ export class AnyVacCard extends LitElement {
           <ha-icon class="tile-chev" icon="mdi:chevron-right"></ha-icon>
         </button>
         ${showPause ? html`<button class="tile-pause ${this._holdId === pauseId ? "action-btn--holding" : ""}"
-            aria-label="Pause ${name} (hold)" title="Hold to pause"
+            aria-label=${this._t("Pause {name} (hold)", { name })} title=${this._t("Hold to pause")}
             @pointerdown=${this._holdStart(pauseId, () => this._pause(vac))}
             @pointermove=${this._holdMove}
             @pointerup=${this._holdEnd}

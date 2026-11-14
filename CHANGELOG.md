@@ -4,6 +4,13 @@ All notable changes to this project are documented here.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## 1.54.0
+
+- G: localization (en + cs, docs/50). New `src/i18n.ts`: the English source text is the key, `_t("…", {params})`, plural forms by language (Czech 1 / 2-4 / 5+). The language comes from `hass.locale.language` (fallback `hass.language`); any other language stays English. Covered: status labels, hero, robot tiles, plan column and rail, start/cancel, map tools and layer toggles, pin/zone prompts, robot sheet incl. dock and care tabs, tooltips and aria-labels.
+- One clock formatter (`fmtClock`) for every time on the card: follows `hass.locale` and the user's 12/24 h profile setting (it used to mix browser locale, `hass.language` and a fixed format).
+- Not translated on purpose: the visual editor, the card editor and debug strips (configuration tools).
+- Tests: `i18n.spec.ts` (cs/en/fallback, plurals, 12/24 h, and a static guard that every `_t()` key has a Czech entry with matching placeholders).
+
 ## 1.53.3
 
 - F4: light-theme contrast. Secondary text (tile subtitle, room in tile, plan times, plan summary, rail hint/head, done rows, "Clear · whole home") is one step stronger on light panels (3.3-4.4:1 -> >=4.5:1). Two inline hard-coded white texts (plan mode buttons, dock chips) now follow the theme ink. Painted-on-map white ink is intentionally kept.
