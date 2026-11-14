@@ -4,6 +4,12 @@ All notable changes to this project are documented here.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## 1.53.3
+
+- F4: light-theme contrast. Secondary text (tile subtitle, room in tile, plan times, plan summary, rail hint/head, done rows, "Clear · whole home") is one step stronger on light panels (3.3-4.4:1 -> >=4.5:1). Two inline hard-coded white texts (plan mode buttons, dock chips) now follow the theme ink. Painted-on-map white ink is intentionally kept.
+- F5: portrait touch targets: rail tool buttons (trails, flip, align, refresh) and "Clear" are at least 44x44 px; every "Flip map" button has an accessible name and pressed state.
+- Tests: `contrast-light.spec.ts`, `touch-targets.spec.ts`.
+
 ## 1.53.2
 
 - F2: one vocabulary in both orientations: "Start · hold" / "Cancel · hold" (portrait adds the scope), cancel is red in both (was amber in portrait), the ETA is no longer repeated inside the portrait start bar, rail plan header reads "N of M passes" like the landscape column.

@@ -2916,7 +2916,7 @@ export class AnyVacCard extends LitElement {
     const modeBtn = (m: "dry" | "wet" | "both", label: string) => {
       const on = mode === m;
       return html`<button @click=${(e: Event) => { e.stopPropagation(); this._planMode = m; }}
-        style="padding:2px 8px;border-radius:var(--avc-th-r-m,8px);font-size:var(--avc-th-fs-xs,10px);font-weight:700;cursor:pointer;font-family:inherit;border:1px solid ${on ? "rgba(var(--avc-ink-rgb),0.5)" : "rgba(var(--avc-ink-rgb),0.15)"};background:${on ? "rgba(var(--avc-ink-rgb),0.12)" : "transparent"};color:${on ? "#fff" : "rgba(var(--avc-ink-rgb),0.5)"}">${label}</button>`;
+        style="padding:2px 8px;border-radius:var(--avc-th-r-m,8px);font-size:var(--avc-th-fs-xs,10px);font-weight:700;cursor:pointer;font-family:inherit;border:1px solid ${on ? "rgba(var(--avc-ink-rgb),0.5)" : "rgba(var(--avc-ink-rgb),0.15)"};background:${on ? "rgba(var(--avc-ink-rgb),0.12)" : "transparent"};color:${on ? "rgb(var(--avc-ink-rgb))" : "rgba(var(--avc-ink-rgb),0.72)"}">${label}</button>`;
     };
     const runHid = "plan-run";
     return html`
@@ -2964,7 +2964,7 @@ export class AnyVacCard extends LitElement {
           const active = this._activeGlobalPreset === gp.id;
           return html`<button
             @click=${() => this._selectGlobalPreset(gp)}
-            style="flex:0 1 auto;min-width:128px;display:flex;flex-direction:row;align-items:center;justify-content:flex-start;gap:10px;padding:9px 14px;border-radius:var(--avc-th-r-m,14px);cursor:pointer;font-family:inherit;color:white;background:${active ? "rgba(var(--avc-ok-rgb),0.14)" : "rgba(var(--avc-ink-rgb),0.05)"};border:1px solid ${active ? "rgba(var(--avc-ok-rgb),0.6)" : "rgba(var(--avc-ink-rgb),0.12)"}">
+            style="flex:0 1 auto;min-width:128px;display:flex;flex-direction:row;align-items:center;justify-content:flex-start;gap:10px;padding:9px 14px;border-radius:var(--avc-th-r-m,14px);cursor:pointer;font-family:inherit;color:rgb(var(--avc-ink-rgb));background:${active ? "rgba(var(--avc-ok-rgb),0.14)" : "rgba(var(--avc-ink-rgb),0.05)"};border:1px solid ${active ? "rgba(var(--avc-ok-rgb),0.6)" : "rgba(var(--avc-ink-rgb),0.12)"}">
             <ha-icon icon=${gp.icon || "mdi:robot-vacuum-variant"} style="--mdc-icon-size:24px"></ha-icon>
             <div style="display:flex;flex-direction:column;align-items:flex-start;line-height:1.15">
               <span style="font-size:var(--avc-th-fs-m,13px);font-weight:700">${gp.label}</span>
@@ -3412,7 +3412,8 @@ export class AnyVacCard extends LitElement {
           this._profile === "portrait" ? html`
             <div class="dock-layers">${this._renderLayerToggleCompact(vacs)}
               ${this._config.layout ? html`<button class="mtbtn ${this._flipEff ? "on" : ""}"
-                  title="Flip map 180° for this screen (this session only)"
+                  title="Flip map 180° for this screen (this session only)" aria-label="Flip map"
+                  aria-pressed=${this._flipEff ? "true" : "false"}
                   @click=${() => this._toggleFlipLive()}>
                 <ha-icon icon="mdi:flip-vertical"></ha-icon>
               </button>` : nothing}
@@ -4854,7 +4855,8 @@ export class AnyVacCard extends LitElement {
           </span>` : nothing}
           ${this._renderLayerToggleCompact(vacs)}
           ${this._config.layout ? html`<button class="mtbtn ${this._flipEff ? "on" : ""}"
-              title="Flip map 180° for this screen (this session only — the card editor's Layout section sets a permanent default)"
+              title="Flip map 180° for this screen (this session only — the card editor's Layout section sets a permanent default)" aria-label="Flip map"
+              aria-pressed=${this._flipEff ? "true" : "false"}
               @click=${() => this._toggleFlipLive()}>
             <ha-icon icon="mdi:flip-vertical"></ha-icon>
           </button>` : nothing}
@@ -12597,6 +12599,19 @@ export class AnyVacCard extends LitElement {
      * as text (the same approach docs/35 §9b took for the age colours). */
     .avc-theme--light .status-label,
     .avc-theme--light .tile-status { filter: brightness(0.6) saturate(1.2); }
+    /* docs/49 F4: secondary text was tuned on the dark panel (ink at 0.5–0.6);
+     * on a light panel that is 3.3–4.4:1. One step stronger there, same hue. */
+    .avc-theme--light .tile-sub,
+    .avc-theme--light .tile-room,
+    .avc-theme--light .plan-when,
+    .avc-theme--light .plan-sum small,
+    .avc-theme--light .rail-hint,
+    .avc-theme--light .rail-card-head small,
+    .avc-theme--light .plan-kind { color: rgba(var(--avc-ink-rgb), 0.74); }
+    .avc-theme--light .plan-row--done .plan-name { color: rgba(var(--avc-ink-rgb), 0.7); }
+    .avc-theme--light .plan-row--done .plan-when,
+    .avc-theme--light .plan-row--active .plan-when { color: rgb(var(--avc-ok-rgb)); }
+    .avc-theme--light .plan-clear { color: rgb(var(--avc-ink-rgb)); text-decoration: underline; }
 
     /* ── docs/44 F4: living map ───────────────────────────────────────── */
     /* The marker's glide is a Web Animation along the trail (1.47.0,
@@ -12756,7 +12771,7 @@ export class AnyVacCard extends LitElement {
       white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
     }
     .rail-hint { color: rgba(var(--avc-ink-rgb), 0.55); font-size: var(--avc-fs-xs); }
-    .rail-clear { align-self: flex-start; padding: 4px 8px; }
+    .rail-clear { align-self: flex-start; padding: 4px 12px; min-height: 44px; }
     .rail-warn { display: flex; align-items: center; gap: 4px; color: rgb(var(--avc-err-rgb)); font-size: var(--avc-fs-xs); }
     .rail-warn ha-icon { --mdc-icon-size: 14px; flex-shrink: 0; }
     .rail-plan-row { display: flex; align-items: center; gap: 6px; min-width: 0; }
@@ -12766,8 +12781,8 @@ export class AnyVacCard extends LitElement {
     .rail-plan-row--done { opacity: 0.5; }
     .rail-plan-row--done .rail-plan-state { color: rgb(var(--avc-ok-rgb)); }
     .rail-plan-row--active .rail-plan-name { font-weight: 600; }
-    .rail-tools { display: grid; grid-template-columns: repeat(auto-fit, minmax(38px, 1fr)); gap: 4px; margin-top: auto; flex-shrink: 0; }
-    .rail-tools .mtbtn { justify-content: center; padding: 8px 0; min-width: 0; }
+    .rail-tools { display: grid; grid-template-columns: repeat(auto-fit, minmax(44px, 1fr)); gap: 4px; margin-top: auto; flex-shrink: 0; }
+    .rail-tools .mtbtn { justify-content: center; padding: 8px 0; min-width: 44px; min-height: 44px; box-sizing: border-box; } /* F5: touch target */
     .rail--sheet { overflow: auto; }
     .rail--sheet .dock-mode span { display: inline; }
     .rail--sheet .dock-head { flex-direction: column; }
