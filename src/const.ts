@@ -1,6 +1,6 @@
 export const CARD_NAME = "anyvac-card";
 export const EDITOR_NAME = "anyvac-card-editor";
-export const CARD_VERSION = "1.53.1";
+export const CARD_VERSION = "1.53.2";
 
 /** Hold duration in ms required to trigger START / PAUSE actions */
 export const HOLD_DURATION_MS = 600;
@@ -107,21 +107,21 @@ export const COLOR_HEX: Record<string, string> = {
  * `vacuums` array when it has no explicit `color` set — so a fresh
  * multi-vacuum config gets visually distinct vehicles out of the box instead
  * of every vacuum silently falling back to the same "green" (field report
- * 2026-07-31). The first three entries intentionally match the legacy
- * green/blue/orange presets, so a single-vacuum config with no `color` set
- * still looks exactly as it always has. `color` on a vacuum always overrides
+ * 2026-07-31). Since 1.53.2 (R5) the defaults deliberately avoid the status
+ * colours (ok green / info blue / warn orange), so a robot's colour is never
+ * mistaken for a state. Legacy `color: green|blue|orange` presets still work. `color` on a vacuum always overrides
  * this — it's purely a starting point, same spirit as `_hexColorField`'s
  * placeholder swatches.
  */
 export const DEFAULT_VACUUM_PALETTE: string[] = [
-  "#52c41a", // green
-  "#2196F3", // blue
-  "#faad14", // orange
-  "#eb2f96", // magenta
-  "#722ed1", // purple
   "#13c2c2", // cyan
-  "#fa541c", // volcano
+  "#eb2f96", // magenta
+  "#9254de", // purple
+  "#ff7a45", // coral
   "#a0d911", // lime
+  "#2f54eb", // indigo
+  "#c41d7f", // raspberry
+  "#8c8c8c", // grey
 ];
 
 /** rgba versions with reduced opacity for backgrounds */

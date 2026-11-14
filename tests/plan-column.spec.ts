@@ -112,7 +112,7 @@ test("idle, whole home: rooms in the order they get done, assigned robots, START
   expect(c.rows[0].chips.length).toBe(2); // dry + wet in Both
   expect(c.sum).toMatch(/^Done around \S+/);
   expect(c.sum).toContain("dry S6 + S7, then wet S8");
-  expect(c.btn).toBe("Hold to start");
+  expect(c.btn).toBe("Start · hold");
   expect(c.modes).toBe(3);
   expect(c.picker + c.roomList).toBe(0);
 });

@@ -200,7 +200,7 @@ test("while a job runs the rail lists its passes exactly as published", async ({
     .map((e: any) => e.className.match(/rail-plan-row--(\w+)/)[1] + ":" + e.textContent.replace(/\s+/g, " ").trim()));
   expect(rows).toEqual(["done:Kitchen", "active:Hall 42 %", "queued:Hall"]);
   const head = await page.evaluate(() => (window as any).__card.shadowRoot.querySelector(".rail-plan .rail-card-head").textContent.replace(/\s+/g, " ").trim());
-  expect(head).toContain("1/3");
+  expect(head).toContain("1 of 3 passes");
 });
 
 test("the START bar's mode sheet takes over the rail while open", async ({ page }) => {

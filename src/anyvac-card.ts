@@ -3252,7 +3252,7 @@ export class AnyVacCard extends LitElement {
       return html`
         <div class="rail-card rail-plan">
           <div class="rail-card-head"><ha-icon icon="mdi:format-list-checks"></ha-icon><span>Plan</span>
-            <small>${jp.passes_done ?? 0}/${jp.passes_total ?? rows.length}</small></div>
+            <small>${jp.passes_done ?? 0} of ${jp.passes_total ?? rows.length} passes</small></div>
           ${rows.map((r) => {
             const vc = byEnt.get(r.vacuum);
             const st = r.state === "done" ? "done" : r.state === "active" ? "active" : "queued";
@@ -3286,7 +3286,7 @@ export class AnyVacCard extends LitElement {
               <button class="mtbtn rail-clear" @click=${() => this._clearRoomSelection()}>
                 <ha-icon icon="mdi:close"></ha-icon><span>Clear</span></button>`
           : html`<span class="rail-hint">Tap rooms on the map to pick them</span>`}
-        ${unassigned.length ? html`<span class="rail-warn"><ha-icon icon="mdi:robot-off"></ha-icon>${unassigned.length} without a robot for this mode</span>` : nothing}
+        ${unassigned.length && selKeys.length ? html`<span class="rail-warn"><ha-icon icon="mdi:robot-off"></ha-icon>${unassigned.length} without a robot for this mode</span>` : nothing}
       </div>`;
   }
 
@@ -3629,7 +3629,7 @@ export class AnyVacCard extends LitElement {
             <b>${eta !== null ? "Done around " + at(eta) : "Whole plan"}</b>
             <small>${[how, eta !== null ? "~" + this._timeStr(eta).replace(/^~/, "") : ""].filter(Boolean).join(" · ")}</small>
           </span>
-          ${holdBtn("", "mdi:play", "Hold to start", runKeys.length > 0, () => this._runOrchestrated(runKeys, this._planMode))}
+          ${holdBtn("", "mdi:play", "Start · hold", runKeys.length > 0, () => this._runOrchestrated(runKeys, this._planMode))}
         </div>
       </div>`;
   }
@@ -3947,12 +3947,11 @@ export class AnyVacCard extends LitElement {
             @pointerup=${this._holdEnd} @pointerleave=${this._holdEnd} @pointercancel=${this._holdEnd}>
             <div class="hold-ring"></div>
             <ha-icon icon="mdi:stop"></ha-icon>
-            <span>CANCEL · hold</span>
+            <span>Cancel · hold</span>
           </button>
         </div>`;
     }
     const canStart = hasInt && runKeys.length > 0;
-    const est = this._etaFor(runKeys, this._planMode, hasInt);
     const scopeLabel = selKeys.length ? selKeys.length + (selKeys.length === 1 ? " room" : " rooms") : "whole home";
     return html`
       <div class="start-row">
@@ -3965,7 +3964,7 @@ export class AnyVacCard extends LitElement {
           @pointerup=${this._holdEnd} @pointerleave=${this._holdEnd} @pointercancel=${this._holdEnd}>
           <div class="hold-ring"></div>
           <ha-icon icon="mdi:play"></ha-icon>
-          <span>START · ${scopeLabel}${est ? " · ~" + est + " min" : ""}</span>
+          <span>Start · ${scopeLabel} · hold</span>
         </button>
       </div>`;
   }
@@ -11737,8 +11736,8 @@ export class AnyVacCard extends LitElement {
     .start-bar ha-icon { --mdc-icon-size: 22px; position: relative; z-index: 1; }
     .start-bar span { position: relative; z-index: 1; }
     .start-bar--cancel {
-      background: rgba(var(--avc-warn-rgb), 0.16);
-      border-color: rgba(var(--avc-warn-rgb), 0.6);
+      background: rgba(var(--avc-err-rgb), 0.16);
+      border-color: rgba(var(--avc-err-rgb), 0.6);
     }
     /* Side segments (mode / dock) — same family as .start-bar but a fixed
      * narrow width so the middle START segment keeps most of the bar. */
@@ -12807,9 +12806,9 @@ export class AnyVacCard extends LitElement {
       letter-spacing: 0.2px;
     }
     .avc-theme .start-bar--cancel:not(:disabled) {
-      background: linear-gradient(180deg, rgba(var(--avc-warn-rgb), 0.28), rgba(var(--avc-warn-rgb), 0.16));
-      border-color: rgba(var(--avc-warn-rgb), 0.55);
-      box-shadow: 0 6px 18px rgba(var(--avc-warn-rgb), 0.14);
+      background: linear-gradient(180deg, rgba(var(--avc-err-rgb), 0.28), rgba(var(--avc-err-rgb), 0.16));
+      border-color: rgba(var(--avc-err-rgb), 0.55);
+      box-shadow: 0 6px 18px rgba(var(--avc-err-rgb), 0.14);
       animation: var(--avc-live);
     }
     /* Landscape's primary action lives in the dock footer, not in the START

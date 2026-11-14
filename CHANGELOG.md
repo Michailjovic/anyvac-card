@@ -4,6 +4,12 @@ All notable changes to this project are documented here.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## 1.53.2
+
+- F2: one vocabulary in both orientations: "Start · hold" / "Cancel · hold" (portrait adds the scope), cancel is red in both (was amber in portrait), the ETA is no longer repeated inside the portrait start bar, rail plan header reads "N of M passes" like the landscape column.
+- F3 (R5): default robot palette no longer copies the status colours (green/blue/orange) - new order cyan, magenta, purple, coral, lime, indigo, raspberry, grey. Explicit `color` in config (incl. green/blue/orange presets) is unchanged.
+- The "N without a robot for this mode" warning is shown only when rooms are explicitly picked, no longer permanently when idle.
+
 ## [Unreleased]
 
 ## [1.53.1] - 2026-11-14
