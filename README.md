@@ -254,6 +254,8 @@ and a screenshot.
 - **[`CHANGELOG.md`](CHANGELOG.md)** — version history.
 - **[`anyvac` integration](https://github.com/Michailjovic/anyvac)** — the
   companion backend.
+- **[Room Overlay Card](https://github.com/Michailjovic/Room-Card)** — room photos, an overview
+  and a floor plan page that imports its rooms from the same AnyVac map and shows the vacuums on it.
 
 ## License
 

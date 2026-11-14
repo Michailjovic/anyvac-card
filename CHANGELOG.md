@@ -6,6 +6,23 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [1.52.0] - 2026-11-14
+
+Integration 1.52.0 (docs/49).
+
+### Fixed
+
+- **The dry/wet estimate follows what the backend knows about the run.** While a
+  clean is running the card reads the integration's `clean_type` (the verdict from
+  the run's real footprint); before a start it reads the new `mode_signal` (the
+  water-mode knob — `clean_type` itself is now `null` when idle). With an older
+  integration it still reads `clean_type` as before.
+
+### Changed
+
+- Visual editor, debug tab: shows `clean_type` (run), `clean_type_source`,
+  `mode_signal` and `last_run`.
+
 ## [1.51.5] - 2026-10-08
 
 Integration unchanged (1.51.2).

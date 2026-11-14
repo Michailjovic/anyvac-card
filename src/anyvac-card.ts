@@ -1990,8 +1990,8 @@ export class AnyVacCard extends LitElement {
   }
 
   /** Resolve a vacuum to a single current clean type ("dry"/"wet").
-   *  Prefers the live backend signal (integration sensor `clean_type`, which
-   *  follows the actual water mode), then the configured clean_action. This is
+   *  Prefers the backend (the running run's `clean_type`, else the `mode_signal`
+   *  knob — docs/49), then the configured clean_action. This is
    *  what makes a dual-capable vacuum (clean_type: both) pick the right estimate. */
   private _liveCleanType(vac: VacuumConfig): "dry" | "wet" {
     // 1) When the vacuum has selectable presets, the active one is the user's
@@ -2003,9 +2003,15 @@ export class AnyVacCard extends LitElement {
         || (ap.mop_mode != null && ap.mop_mode !== "");
       return wet ? "wet" : "dry";
     }
-    // 2) Live backend signal (follows the actual water mode).
-    const ct = this._intAttrs(vac)?.clean_type as string | undefined;
-    if (ct === "wet" || ct === "dry") return ct;
+    // 2) Backend (docs/49). While a run is going, its verdict (`clean_type`: backend
+    //    evidence, then the job plan, then the knob captured during cleaning). Before
+    //    a start the only hint is the knob itself (`mode_signal`); integrations older
+    //    than 1.52.0 published the knob as `clean_type`.
+    const at = this._intAttrs(vac);
+    const verdict = at?.clean_type as string | undefined;
+    if (at?.in_cleaning && (verdict === "wet" || verdict === "dry")) return verdict;
+    const knob = (at?.mode_signal ?? at?.clean_type) as string | undefined;
+    if (knob === "wet" || knob === "dry") return knob;
     // 3) Fallback: the vacuum's configured role (wet-only robots default to wet).
     const role = this._vacCleanType(vac);
     return role.wet && !role.dry ? "wet" : "dry";

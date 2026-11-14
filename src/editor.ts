@@ -1677,7 +1677,10 @@ export class AnyVacCardEditor extends LitElement {
                     ${this._dbgRow("sensor", `${ie} = ${st.state}`)}
                     ${this._dbgRow("schema_version", at.schema_version)}
                     ${this._dbgRow("pipeline_ok", at.pipeline_ok)}
-                    ${this._dbgRow("clean_type", at.clean_type)}
+                    ${this._dbgRow("clean_type (run)", at.clean_type)}
+                    ${this._dbgRow("clean_type_source", at.clean_type_source)}
+                    ${this._dbgRow("mode_signal (knob)", at.mode_signal)}
+                    ${this._dbgRow("last_run", at.last_run ? `${at.last_run.kind ?? "—"} (${at.last_run.source ?? "—"}) ${at.last_run.finished_at ?? ""}` : "—")}
                     ${this._dbgRow("in_cleaning", at.in_cleaning)}
                     ${this._dbgRow("vacuum_room_name", at.vacuum_room_name)}
                     ${this._dbgRow("water_mode_name", ms.water_mode_name)}
