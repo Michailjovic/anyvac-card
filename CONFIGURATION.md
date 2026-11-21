@@ -174,6 +174,7 @@ use **"Import missing rooms"** afterwards to place this vacuum's rooms from it.
 | `crop_box` | `{entity, x0, y0, x1, y1}` (legacy, per-vacuum) or `{frame_id, x0, y0, x1, y1}` (home frame, docs/40 Fáze 3) | — | The legacy shape is written automatically by **"Use this vacuum's current map as floorplan"** and by **"Use this crop for the floorplan"** (after "Export guide layers") — records exactly which vacuum and which pixel crop (same space as that vacuum's own `rooms[].bbox_px`) this `src` was cut from, valid only for that one vacuum. The `frame_id` shape is written by the newer **"Snapshot home frame as floorplan"** button — records which shared **home frame** (integration `home_frame.id`) this `src` was cut from, in that frame's own px space (same space as `rooms[].bbox_home_px`/`outline_home_px` and `vacuum_position_home_px`/`path_*_home_px`) — valid for *every* vacuum currently registered into that frame, not just one. Either way: read back by **"Place rooms from crop box"** (or automatically after a home-frame snapshot) to place rooms with no dragging or fit ambiguity, and by `anyvac.export_map_guide` so guide layers line up with the saved file. Not meant to be hand-edited; **Clear** it (Maps tab) whenever `src` is replaced by an image that didn't come from one of those buttons — e.g. a hand-entered URL, or a floorplan re-cropped outside the card — so stale geometry isn't assumed to still match. |
 | `home_anchors` | `{home_px: {x, y}, floor_pct: {x, y}}[]` (docs/40 §5.B, "cesta B") | — | Written by the editor's **"Calibrate floorplan against home frame"** button (merged mode only) — a foreign-origin floorplan (a photo or drawing, `crop_box` absent) calibrated against the home frame by clicking a handful of matching points, rather than snapshotted directly from it. Unlike `crop_box`, this is not a single fixed rectangle: it's the raw clicked point PAIRS, re-fitted into a live similarity transform (rotation + scale + offset) every render against the frame's *current* `home_frame.width_px`/`height_px` — so it keeps working as the frame's canvas grows (the robots exploring further) without needing to re-click anything. Mutually exclusive with `crop_box` in practice (a floorplan is either a home-frame snapshot, cesta A, or hand-calibrated against one, cesta B — not both); not meant to be hand-edited, use the editor button. |
 | `home_anchors_frame_id` | string | — | Which home frame `home_anchors` were calibrated against (integration `home_frame.id`), written alongside `home_anchors`. Only needed to disambiguate a real multi-floor home with more than one active frame; when omitted, the card defaults to the frame with the most currently-registered vacuums (same policy the integration's own `_select_home_frame` uses). |
+| `furniture` | list (docs/51) | — | Furniture drawn over the floorplan as separate, movable images — see **Furniture** below. |
 
 **Merged mode without a floorplan** overlays every vacuum's raw map at 1:1
 scale, unaligned — the editor warns about this on the Map mode selector. Set
@@ -187,6 +188,48 @@ different resolution (2×, a different DPI/screenshot scale, …) keeps the
 crop's own aspect ratio, and is recognized automatically (docs/40 §5.A.1):
 a quiet informational note replaces the warning, and nothing needs
 re-snapshotting or re-cropping.
+
+### Furniture (docs/51) — movable pieces instead of drawing them into the floorplan
+
+Draw only the walls into the floorplan and add furniture as separate images
+you can move, resize and rotate whenever you move it at home.
+
+1. Put the images (`.webp` or `.png` with a transparent background, `.svg`
+   works too) into `config/www/anyvac/furniture/`. The folder is created the
+   first time you open the Furniture tool.
+2. Open the **Visual editor → Furniture** tab (merged mode, card-level
+   floorplan), pick a file — it lands in the middle of the floorplan with its
+   own proportions — then drag it into place: corners resize (Shift = free
+   proportions), the top handle rotates in 15° steps (Alt = free), arrows
+   nudge, `[`/`]` rotate, Delete removes it. **Save**.
+
+Each piece is stored as:
+
+```yaml
+image_base:
+  src: /local/anyvac/floorplan.webp
+  furniture:
+    - id: sofa                                   # unique within the floorplan
+      src: /local/anyvac/furniture/sofa.webp
+      x: 42.5      # centre, % of the floorplan width
+      y: 61.0      # centre, % of the floorplan height
+      w: 18.0      # % of the floorplan width
+      h: 7.5       # % of the floorplan height
+      rot: 90      # optional, degrees clockwise about the centre
+      opacity: 0.8 # optional, 0-1
+      flip: true   # optional, mirror horizontally
+```
+
+The pieces live in the floorplan image's own space: they follow
+`image_base` rotation/scale/offset and the map's own rotation/flip, and are
+drawn above the floorplan and below rooms, paths and robots. They never react
+to taps, so room selection, Pin & Go and zones work through them. Later pieces
+are drawn on top. Saving from the Visual editor stores the whole list (it
+replaces a list written in YAML); **Copy YAML** gives you the same block to
+paste. When a snapshot floorplan is re-cut with a different crop (Re-crop, a
+new snapshot of the same vacuum or home frame), the pieces are moved with it
+so they stay on the same spot. The file list needs integration ≥ 1.55.0 and
+an administrator; without it, paste a `/local/...` URL into the tool instead.
 
 ### Home frame (docs/40, Fáze 3) — one shared identity crop instead of per-vacuum seating
 
@@ -505,6 +548,7 @@ generated from
 | `anyvac.snapshot_map_as_floorplan` | Save a map image entity's current picture as a static file and return its URL — powers the Maps tab's "Use this vacuum's current map as floorplan" button. |
 | `anyvac.snap_wall_corner` | Snap a home-frame pixel point to the nearest wall corner (docs/40 §5.B) — powers the click-snap step of the Maps tab's "Calibrate floorplan against home frame" button. Requires integration ≥ 1.9.0. |
 | `anyvac.detect_floorplan_fiducials` | Scan a floorplan file for invisible fiducial markers and return `home_anchors` with zero clicking (docs/40 §5.A.2) — powers the Maps tab's "Detect markers in edited file" button. Requires integration ≥ 1.10.0. |
+| `anyvac.list_assets` | List the images in `config/www/anyvac/furniture/` (URL + pixel size) for the Visual editor's Furniture tool (docs/51). Administrators only. Requires integration ≥ 1.55.0. |
 
 `anyvac.run_job` also exists but is an internal executor (not documented
 here or in the editor) — use `anyvac.clean`/`anyvac.plan` instead.

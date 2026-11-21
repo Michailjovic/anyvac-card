@@ -97,6 +97,7 @@ import {
   type RoomsEditSession,
   type SeatEditConfigLike,
   type VisualEditorTool,
+  type FurnitureEditSession,
 } from "./seatedit";
 import { clampPct, moveRect, resizeRect, round1, type Corner, type RectPct } from "./rectdrag";
 import { mountVisualEditor, unmountVisualEditor, type AnyVacVisualEditorHost } from "./visual-editor";
@@ -117,6 +118,11 @@ import {
 } from "./layout";
 import { fmtPts, trailTail, traceSince, pointAtFraction, glideKeyframes, arcLength, type Pt } from "./trail";
 import { mergeLive } from "./live";
+import {
+  normalizeFurniture, toUnit, fromUnit, moveBox, resizeBoxCorner, rotateBoxTo, groupTransform,
+  newFurnitureItem, remapFurnitureCrop, furnitureToYaml, cornerSign,
+  type FurnitureItem, type FurnitureCorner, type UnitBox,
+} from "./furniture";
 import { planOrder } from "./startseq";
 import { hexToRgb, tintMapImage } from "./maptint";
 
@@ -326,6 +332,18 @@ export class AnyVacCard extends LitElement {
    *  time, since the overlay can be entered straight into Seat & Appearance
    *  without ever touching Rooms). */
   @state() private _roomsSession: RoomsEditSession | null = null;
+  /** docs/51 §1.3 — Furniture tool session, opened lazily like Rooms. */
+  @state() private _furnSession: FurnitureEditSession | null = null;
+  private _furnGesture: {
+    pointerId: number; kind: "move" | "resize" | "rotate"; id: string; corner?: FurnitureCorner;
+    startBox: UnitBox; startPt: [number, number]; moved: boolean;
+  } | null = null;
+  @state() private _furnAssets: Array<{ name: string; url: string; width: number | null; height: number | null }> | null = null;
+  @state() private _furnAssetsBusy = false;
+  @state() private _furnAssetsError = "";
+  @state() private _furnUrlDraft = "";
+  @state() private _furnCopiedFlash = false;
+  @state() private _furnSaveError = "";
   /** In-progress room rect drag/resize gesture — mirrors `_alignGesture`'s
    *  own "start captured once, deltas computed against it" discipline
    *  (docs/38 §3.3's frozen-`orig` pattern, reused via `rectdrag.ts`'s pure
@@ -2508,7 +2526,7 @@ export class AnyVacCard extends LitElement {
   private _loadVeTool(): VisualEditorTool {
     try {
       const raw = localStorage.getItem(this._storeKey("ve-tool"));
-      if (raw === "seat" || raw === "rooms" || raw === "floorplan") return raw;
+      if (raw === "seat" || raw === "rooms" || raw === "floorplan" || raw === "furniture") return raw;
     } catch { /* ignore */ }
     return "seat";
   }
@@ -5073,12 +5091,15 @@ export class AnyVacCard extends LitElement {
     this._roomsDeleteConfirm = null;
     this._floorplanSession = null;
     this._floorGesture = null;
+    this._furnSession = null;
+    this._furnGesture = null;
     this._resetFloorplanSubmodes();
     this._veToolSwitchTarget = null;
     // docs/42 §8 bod 4: entry opens the last tool used on THIS browser.
     this._veTool = this._loadVeTool();
     if (this._veTool === "rooms") this._openRooms();
     else if (this._veTool === "floorplan") this._openFloorplan();
+    else if (this._veTool === "furniture") this._openFurniture();
     // Autofocus so keyboard nudges (docs/41 SS4.4, this session's C2b) work
     // immediately without the user first clicking into the overlay.
     requestAnimationFrame(() => this._alignRefocusOverlay());
@@ -5115,6 +5136,8 @@ export class AnyVacCard extends LitElement {
     this._roomsDeleteConfirm = null;
     this._floorplanSession = null;
     this._floorGesture = null;
+    this._furnSession = null;
+    this._furnGesture = null;
     this._resetFloorplanSubmodes();
     this._veToolSwitchTarget = null;
   }
@@ -5190,7 +5213,7 @@ export class AnyVacCard extends LitElement {
    *  (docs/41 risk #3: a bottom-edge swipe/back gesture must not be
    *  mistaken for confirming a destructive dialog). */
   private _alignCancel(): void {
-    if (this._alignHasChanges() || this._roomsHasUnsavedChanges() || this._floorplanHasChanges()) {
+    if (this._alignHasChanges() || this._roomsHasUnsavedChanges() || this._floorplanHasChanges() || this._furnHasUnsavedChanges()) {
       this._veToolSwitchTarget = null;
       this._alignCancelConfirm = true;
     } else this._closeAlign();
@@ -5214,6 +5237,9 @@ export class AnyVacCard extends LitElement {
     } else if (this._veTool === "floorplan") {
       this._floorplanSession = null;
       this._resetFloorplanSubmodes();
+    } else if (this._veTool === "furniture") {
+      this._furnSession = null;
+      this._furnGesture = null;
     }
     this._veTool = target;
     this._saveVeTool(target);
@@ -5221,6 +5247,7 @@ export class AnyVacCard extends LitElement {
     this._alignCancelConfirm = false;
     if (target === "rooms" && !this._roomsSession) this._openRooms();
     if (target === "floorplan" && !this._floorplanSession) this._openFloorplan();
+    if (target === "furniture" && !this._furnSession) this._openFurniture();
   }
   private _alignDismissCancelConfirm(): void {
     this._alignCancelConfirm = false;
@@ -5684,6 +5711,7 @@ export class AnyVacCard extends LitElement {
     if (tool === "seat") return this._alignHasChanges();
     if (tool === "rooms") return this._roomsHasUnsavedChanges();
     if (tool === "floorplan") return this._floorplanHasChanges();
+    if (tool === "furniture") return this._furnHasUnsavedChanges();
     return false;
   }
 
@@ -5705,6 +5733,7 @@ export class AnyVacCard extends LitElement {
     // switched to.
     if (tool === "rooms" && !this._roomsSession) this._openRooms();
     if (tool === "floorplan" && !this._floorplanSession) this._openFloorplan();
+    if (tool === "furniture" && !this._furnSession) this._openFurniture();
   }
 
   /** `Ctrl`/`Shift` held MOMENTARILY override the toolbar's persistent
@@ -5734,6 +5763,10 @@ export class AnyVacCard extends LitElement {
     // through to the branch below unaffected.
     if (this._veTool === "floorplan") {
       this._floorplanKeyDown(e);
+      return;
+    }
+    if (this._veTool === "furniture") {
+      this._furnKeyDown(e);
       return;
     }
     const session = this._alignSession;
@@ -6292,6 +6325,470 @@ export class AnyVacCard extends LitElement {
     }
   }
 
+  // ── Furniture tool (docs/51 §1.3) ──────────────────────────────────────────
+  //
+  // Same editing lifecycle as the Rooms tool (draft, undo/redo, Reset, Copy
+  // YAML, Save through `anyvac.set_floorplan_seat`), on the card-level
+  // floorplan only (merged mode — same scope boundary as the Floorplan tool,
+  // `_floorplanCardImageBase`). Pieces are stored in `image_base.furniture`;
+  // the override contract already treats `image_base` as an opaque record,
+  // so no backend change is needed for Save. All geometry is `furniture.ts`.
+
+  private _furnAr(): number {
+    return this._mapAR > 0.1 ? this._mapAR : 3.636;
+  }
+
+  /** Live `image_base.furniture` of the card-level floorplan, or undefined
+   *  when there is none. Every OTHER tool that resends `image_base` merges
+   *  this in at send time (`_withLiveFurniture`) instead of the copy it
+   *  captured when its own session opened — otherwise saving the floorplan
+   *  geometry after saving furniture would silently restore stale pieces. */
+  private _liveFurniture(): FurnitureItem[] | undefined {
+    const f = this._floorplanCardImageBase()?.furniture;
+    return f === undefined ? undefined : normalizeFurniture(f);
+  }
+
+  private _withLiveFurniture(rest: Record<string, unknown>, newCrop?: unknown): Record<string, unknown> {
+    const { furniture: _f, ...r } = rest;
+    let live = this._liveFurniture();
+    if (live === undefined) return r;
+    if (newCrop) {
+      const oldCrop = this._floorplanCardImageBase()?.crop_box;
+      live = remapFurnitureCrop(live, oldCrop as never, newCrop as never);
+    }
+    return { ...r, furniture: live };
+  }
+
+  private _openFurniture(): void {
+    if (this._furnSession) return;
+    const ib = this._floorplanCardImageBase();
+    const src = this._alignSession?.floorplan;
+    const floorplanKey = this._alignSession?.floorplanKey;
+    if (!ib || !src || !floorplanKey) return;
+    const items = normalizeFurniture(ib.furniture);
+    this._furnSession = {
+      floorplan: src, floorplanKey, items, start: items,
+      selected: null, history: [], future: [],
+    };
+    this._furnGesture = null;
+    this._furnSaveError = "";
+    if (this._furnAssets === null && !this._furnAssetsBusy) void this._furnLoadAssets();
+  }
+
+  private _furnHasUnsavedChanges(): boolean {
+    const s = this._furnSession;
+    return !!s && JSON.stringify(s.items) !== JSON.stringify(s.start);
+  }
+
+  /** One user-initiated change: snapshot the current list onto the undo
+   *  stack, then apply `items` (never per pointermove — gestures push once
+   *  when they start). */
+  private _furnCommit(items: FurnitureItem[], selected?: string | null): void {
+    const s = this._furnSession;
+    if (!s) return;
+    this._furnSession = {
+      ...s, items, history: [...s.history, s.items], future: [],
+      selected: selected === undefined ? s.selected : selected,
+    };
+  }
+
+  private _furnUndo(): void {
+    const s = this._furnSession;
+    if (!s?.history.length) return;
+    const prev = s.history[s.history.length - 1];
+    this._furnSession = {
+      ...s, items: prev, history: s.history.slice(0, -1), future: [s.items, ...s.future],
+      selected: prev.some((i) => i.id === s.selected) ? s.selected : null,
+    };
+  }
+
+  private _furnRedo(): void {
+    const s = this._furnSession;
+    if (!s?.future.length) return;
+    const next = s.future[0];
+    this._furnSession = {
+      ...s, items: next, history: [...s.history, s.items], future: s.future.slice(1),
+      selected: next.some((i) => i.id === s.selected) ? s.selected : null,
+    };
+  }
+
+  private _furnReset(): void {
+    const s = this._furnSession;
+    if (!s || JSON.stringify(s.items) === JSON.stringify(s.start)) return;
+    this._furnCommit(s.start, s.start.some((i) => i.id === s.selected) ? s.selected : null);
+  }
+
+  private _furnSelect(id: string | null): void {
+    const s = this._furnSession;
+    if (s && s.selected !== id) this._furnSession = { ...s, selected: id };
+  }
+
+  /** Adds a piece in the middle of the floorplan, 15 % of its width wide,
+   *  keeping the file's own aspect ratio. Size comes from `list_assets`
+   *  when known, otherwise from loading the image once. */
+  private async _furnAdd(url: string, nw?: number | null, nh?: number | null): Promise<void> {
+    const s = this._furnSession;
+    if (!s || !url) return;
+    if (!(nw && nh)) {
+      const dims = await new Promise<{ w: number; h: number } | null>((resolve) => {
+        const img = new Image();
+        img.onload = () => resolve(img.naturalWidth && img.naturalHeight ? { w: img.naturalWidth, h: img.naturalHeight } : null);
+        img.onerror = () => resolve(null);
+        img.src = url;
+      });
+      nw = dims?.w ?? null;
+      nh = dims?.h ?? null;
+    }
+    const cur = this._furnSession;
+    if (!cur) return;
+    const item = newFurnitureItem(url, this._furnAr(), cur.items, { nw, nh });
+    this._furnCommit([...cur.items, item], item.id);
+  }
+
+  private _furnAddFromUrl(): void {
+    const url = this._furnUrlDraft.trim();
+    if (!url) return;
+    this._furnUrlDraft = "";
+    void this._furnAdd(url);
+  }
+
+  private _furnDelete(id: string): void {
+    const s = this._furnSession;
+    if (!s) return;
+    this._furnCommit(s.items.filter((i) => i.id !== id), s.selected === id ? null : s.selected);
+  }
+
+  private _furnDuplicate(id: string): void {
+    const s = this._furnSession;
+    const it = s?.items.find((i) => i.id === id);
+    if (!s || !it) return;
+    const copy = newFurnitureItem(it.src, this._furnAr(), s.items, {});
+    const dup: FurnitureItem = { ...it, id: copy.id, x: Math.round((it.x + 3) * 100) / 100, y: Math.round((it.y + 3) * 100) / 100 };
+    this._furnCommit([...s.items, dup], dup.id);
+  }
+
+  /** Draw order: later pieces are drawn on top. */
+  private _furnReorder(id: string, dir: -1 | 1): void {
+    const s = this._furnSession;
+    if (!s) return;
+    const i = s.items.findIndex((x) => x.id === id);
+    const j = i + dir;
+    if (i < 0 || j < 0 || j >= s.items.length) return;
+    const items = [...s.items];
+    [items[i], items[j]] = [items[j], items[i]];
+    this._furnCommit(items);
+  }
+
+  private _furnUpdate(id: string, patch: (it: FurnitureItem) => FurnitureItem): void {
+    const s = this._furnSession;
+    if (!s) return;
+    const items = s.items.map((it) => (it.id === id ? patch(it) : it));
+    if (JSON.stringify(items) !== JSON.stringify(s.items)) this._furnCommit(items);
+  }
+
+  private _furnSetField(id: string, field: "x" | "y" | "w" | "h" | "rot" | "opacity", raw: string): void {
+    const n = parseFloat(raw);
+    if (!Number.isFinite(n)) return;
+    this._furnUpdate(id, (it) => {
+      const next = { ...it };
+      if (field === "w" || field === "h") next[field] = Math.max(0.1, Math.round(n * 100) / 100);
+      else if (field === "opacity") {
+        const o = Math.min(100, Math.max(0, n)) / 100;
+        if (o >= 1) delete next.opacity; else next.opacity = Math.round(o * 100) / 100;
+      } else if (field === "rot") {
+        const r = Math.round((((n % 360) + 540) % 360 - 180) * 100) / 100;
+        if (r) next.rot = r; else delete next.rot;
+      } else next[field] = Math.round(n * 100) / 100;
+      return next;
+    });
+  }
+
+  private _furnToggleFlip(id: string): void {
+    this._furnUpdate(id, (it) => {
+      const next = { ...it };
+      if (it.flip) delete next.flip; else next.flip = true;
+      return next;
+    });
+  }
+
+  /** Pointer -> floorplan unit space through the furniture SVG's own screen
+   *  matrix, which already folds in the view pan/zoom/rotation, the scene
+   *  box, `image_base`'s transform and the `meet` letterbox — no second copy
+   *  of any of those here. */
+  private _furnClientToUnit(clientX: number, clientY: number): [number, number] | null {
+    const el = this._alignHost?.shadowRoot?.querySelector(".furn-svg") as SVGSVGElement | null;
+    const m = el?.getScreenCTM();
+    if (!el || !m) return null;
+    const p = new DOMPoint(clientX, clientY).matrixTransform(m.inverse());
+    return [p.x, p.y];
+  }
+
+  private _furnStartGesture(e: PointerEvent, id: string, kind: "move" | "resize" | "rotate", corner?: FurnitureCorner): void {
+    const s = this._furnSession;
+    const it = s?.items.find((i) => i.id === id);
+    if (!s || !it || e.button > 0) return;
+    e.stopPropagation();
+    e.preventDefault();
+    this._alignRefocusOverlay();
+    const pt = this._furnClientToUnit(e.clientX, e.clientY);
+    if (!pt) return;
+    const group = (e.currentTarget as Element).closest(".furn-item") ?? (e.currentTarget as Element);
+    try { (group as Element).setPointerCapture(e.pointerId); } catch { /* detached */ }
+    const startBox = toUnit(it, this._furnAr());
+    this._furnSession = { ...s, selected: id, history: [...s.history, s.items], future: [] };
+    this._furnGesture = { pointerId: e.pointerId, kind, id, corner, startBox, startPt: pt, moved: false };
+  }
+
+  private _furnGestureMove(e: PointerEvent): void {
+    const g = this._furnGesture;
+    const s = this._furnSession;
+    if (!g || !s || g.pointerId !== e.pointerId) return;
+    const p = this._furnClientToUnit(e.clientX, e.clientY);
+    if (!p) return;
+    let b: UnitBox;
+    if (g.kind === "move") b = moveBox(g.startBox, p[0] - g.startPt[0], p[1] - g.startPt[1]);
+    else if (g.kind === "resize" && g.corner) b = resizeBoxCorner(g.startBox, g.corner, p, !e.shiftKey);
+    else b = rotateBoxTo(g.startBox, p, !e.altKey);
+    const ar = this._furnAr();
+    g.moved = true;
+    this._furnSession = { ...s, items: s.items.map((it) => (it.id === g.id ? fromUnit(it, b, ar) : it)) };
+  }
+
+  private _furnGestureEnd(e: PointerEvent): void {
+    const g = this._furnGesture;
+    if (!g || g.pointerId !== e.pointerId) return;
+    this._furnGesture = null;
+    const s = this._furnSession;
+    // A plain click (no movement) only selects — drop the history entry the
+    // gesture pushed when it started, so undo doesn't need an extra press.
+    if (s && !g.moved) this._furnSession = { ...s, history: s.history.slice(0, -1) };
+  }
+
+  private _furnCanvasPointerDown(e: PointerEvent): void {
+    this._furnSelect(null);
+    this._alignBgPointerDown(e);
+  }
+
+  private _furnKeyDown(e: KeyboardEvent): void {
+    const s = this._furnSession;
+    const target = e.target as HTMLElement | null;
+    const inField = !!target && (target.tagName === "INPUT" || target.tagName === "TEXTAREA" || target.tagName === "SELECT");
+    if (e.key === "Escape") { e.preventDefault(); this._alignCancel(); return; }
+    if (!s || inField) return;
+    const mod = e.ctrlKey || e.metaKey;
+    if (mod && !e.shiftKey && (e.key === "z" || e.key === "Z")) { e.preventDefault(); this._furnUndo(); return; }
+    if (mod && (e.key === "y" || e.key === "Y" || (e.shiftKey && (e.key === "z" || e.key === "Z")))) {
+      e.preventDefault(); this._furnRedo(); return;
+    }
+    const id = s.selected;
+    if (!id) return;
+    if (e.key === "Delete" || e.key === "Backspace") { e.preventDefault(); this._furnDelete(id); return; }
+    const step = 0.5 * nudgeTierMultiplier(this._alignEffectiveNudgeTier(e));
+    const ar = this._furnAr();
+    let du = 0, dv = 0, drot = 0;
+    if (e.key === "ArrowLeft") du = -step;
+    else if (e.key === "ArrowRight") du = step;
+    else if (e.key === "ArrowUp") dv = -step;
+    else if (e.key === "ArrowDown") dv = step;
+    else if (e.key === "[") drot = -Math.max(1, step * 2);
+    else if (e.key === "]") drot = Math.max(1, step * 2);
+    else return;
+    e.preventDefault();
+    this._furnUpdate(id, (it) => {
+      const b = toUnit(it, ar);
+      return fromUnit(it, { ...moveBox(b, du, dv), rot: b.rot + drot }, ar);
+    });
+  }
+
+  private async _furnLoadAssets(): Promise<void> {
+    if (!(this.hass?.services as any)?.["anyvac"]?.["list_assets"]) {
+      this._furnAssets = null;
+      this._furnAssetsError = "Update the AnyVac integration to 1.55.0 to list your files — or paste a /local/ URL below.";
+      return;
+    }
+    this._furnAssetsBusy = true;
+    this._furnAssetsError = "";
+    try {
+      const res = (await (this.hass as any).callService(
+        "anyvac", "list_assets", { kind: "furniture" }, undefined, false, true,
+      )) as { response?: { assets?: Array<{ name: string; url: string; width: number | null; height: number | null }> } } | undefined;
+      this._furnAssets = res?.response?.assets ?? [];
+    } catch (err) {
+      this._furnAssets = null;
+      this._furnAssetsError = "Couldn't list the furniture folder (administrators only) — you can still paste a /local/ URL below.";
+      console.warn("[anyvac-card] Furniture: list_assets failed", err);
+    } finally {
+      this._furnAssetsBusy = false;
+    }
+  }
+
+  private async _furnSave(): Promise<void> {
+    const s = this._furnSession;
+    const ib = this._floorplanCardImageBase();
+    if (!s || !ib || !this._alignServiceAvailable()) return;
+    const entry = this._floorplanSeatsRaw()?.[s.floorplanKey];
+    // Whole `image_base` record, same "no sentinel" contract every other
+    // card-level Save follows. An empty list is sent as `[]`, not omitted:
+    // the override is spread over the YAML `image_base`, so omitting the key
+    // could not clear pieces that came from YAML.
+    const image_base: Record<string, unknown> = { ...ib, src: s.floorplan, furniture: s.items.map((it) => ({ ...it })) };
+    const payload: Record<string, unknown> = { floorplan: s.floorplanKey, image_base };
+    if (entry?.room_style) payload.room_style = entry.room_style;
+    this._furnSaveError = "";
+    try {
+      await this.hass.callService("anyvac", "set_floorplan_seat", payload);
+      this._furnSession = { ...s, start: s.items, history: [], future: [] };
+    } catch (err) {
+      this._furnSaveError = "Save failed — your changes are still here, try again.";
+      console.warn("[anyvac-card] Furniture: set_floorplan_seat call failed", err);
+    }
+  }
+
+  private async _furnCopyYaml(): Promise<void> {
+    const s = this._furnSession;
+    if (!s) return;
+    try {
+      await navigator.clipboard.writeText(furnitureToYaml(s.items));
+      this._furnCopiedFlash = true;
+      setTimeout(() => { this._furnCopiedFlash = false; }, 1200);
+    } catch (err) {
+      console.warn("[anyvac-card] Furniture: clipboard write failed", err);
+    }
+  }
+
+  private _renderFurnitureTool(session: AlignSession, vac: VacuumConfig) {
+    const fs = this._furnSession;
+    const ib = this._floorplanCardImageBase();
+    if (!fs || !ib) {
+      return this._renderVePlaceholder(
+        this._config.map_mode !== "merged"
+          ? "Furniture is only available for a shared (merged-mode) floorplan."
+          : "No card-level floorplan image to place furniture on — set one from the Config editor's Global tab → Floorplan section first.",
+      );
+    }
+    const { w: wrapW, h: wrapH } = this._alignSceneSize();
+    const ar = this._furnAr();
+    // Constant on-screen handle size whatever the view zoom.
+    const unitPx = Math.max(0.01, (wrapW / 100) * (this._alignView.zoom || 1));
+    const hr = 7 / unitPx;
+    const sel = fs.items.find((i) => i.id === fs.selected) ?? null;
+    const rooms = this._roomsFor(vac).filter((r) => r.map_x != null && r.map_y != null && r.map_w != null && r.map_h != null);
+    const assets = this._furnAssets;
+    const fileName = (src: string) => decodeURIComponent(src.split("?")[0].split("/").pop() ?? src);
+    return html`
+        <div class="align-body">
+          <div class="align-canvas"
+            @wheel=${(e: WheelEvent) => this._alignWheel(e)}
+            @pointerdown=${(e: PointerEvent) => this._furnCanvasPointerDown(e)}
+            @pointermove=${(e: PointerEvent) => this._alignBgPointerMove(e)}
+            @pointerup=${(e: PointerEvent) => this._alignBgPointerUp(e)}
+            @pointercancel=${(e: PointerEvent) => this._alignBgPointerUp(e)}>
+            <div class="align-scene" style=${styleMap({
+              width: wrapW + "px", height: wrapH + "px",
+              transform: this._alignViewTransformCss(),
+            })}>
+              <img class="align-floorplan-img" src=${ib.src} alt="Floorplan"
+                @load=${this._onFloorplanLoad}
+                style=${styleMap({ transform: this._floorplanImgTransform(ib) })} />
+              ${rooms.map((r) => html`
+                <div class="rooms-rect furn-room-ref" style=${styleMap({
+                  left: r.map_x + "%", top: r.map_y + "%", width: r.map_w + "%", height: r.map_h + "%",
+                })}><span class="rooms-rect-label">${r.name ?? r.key}</span></div>`)}
+              <div class="furniture-layer furniture-layer--edit" style=${styleMap({ transform: this._floorplanImgTransform(ib) })}>
+                <svg class="furn-svg" viewBox="0 0 100 ${100 / ar}" preserveAspectRatio="xMidYMid meet">
+                  ${fs.items.map((it) => {
+                    const b = toUnit(it, ar);
+                    const isSel = it.id === fs.selected;
+                    const overlay = svg`
+                      <rect class="furn-hit" x=${-b.w / 2} y=${-b.h / 2} width=${b.w} height=${b.h}
+                        @pointerdown=${(e: PointerEvent) => this._furnStartGesture(e, it.id, "move")}></rect>
+                      ${isSel ? svg`
+                        <rect class="furn-outline" x=${-b.w / 2} y=${-b.h / 2} width=${b.w} height=${b.h}></rect>
+                        <line class="furn-rot-line" x1="0" y1=${-b.h / 2} x2="0" y2=${-b.h / 2 - hr * 4}></line>
+                        <circle class="furn-handle furn-handle--rot" cx="0" cy=${-b.h / 2 - hr * 4} r=${hr}
+                          @pointerdown=${(e: PointerEvent) => this._furnStartGesture(e, it.id, "rotate")}></circle>
+                        ${(["nw", "ne", "sw", "se"] as const).map((c) => {
+                          const [sx, sy] = cornerSign(c);
+                          return svg`<circle class="furn-handle furn-handle--${c}" cx=${(sx * b.w) / 2} cy=${(sy * b.h) / 2} r=${hr}
+                            @pointerdown=${(e: PointerEvent) => this._furnStartGesture(e, it.id, "resize", c)}></circle>`;
+                        })}
+                      ` : nothing}`;
+                    return svg`<g class="furn-edit-item ${isSel ? "furn-edit-item--sel" : ""}"
+                      @pointermove=${(e: PointerEvent) => this._furnGestureMove(e)}
+                      @pointerup=${(e: PointerEvent) => this._furnGestureEnd(e)}
+                      @pointercancel=${(e: PointerEvent) => this._furnGestureEnd(e)}>
+                      ${this._furnitureImage(it, b, overlay)}
+                    </g>`;
+                  })}
+                </svg>
+              </div>
+            </div>
+          </div>
+          <div class="align-side-panel">
+            <div class="section-title">Add furniture</div>
+            <div class="rooms-side-note">Put .webp/.png files into <code>config/www/anyvac/furniture/</code>, then pick one here.</div>
+            ${this._furnAssetsBusy ? html`<div class="rooms-side-note">Loading…</div>` : nothing}
+            ${this._furnAssetsError ? html`<div class="rooms-side-note">${this._furnAssetsError}</div>` : nothing}
+            ${assets && !assets.length ? html`<div class="rooms-side-note">The folder is empty.</div>` : nothing}
+            ${assets?.length ? html`
+              <div class="furn-assets">
+                ${assets.map((a) => html`
+                  <button class="furn-asset" title=${"Add " + a.name}
+                    @click=${() => this._furnAdd(a.url, a.width, a.height)}>
+                    <img src=${a.url} alt="" loading="lazy" /><span>${a.name}</span>
+                  </button>`)}
+              </div>` : nothing}
+            <div class="furn-url-row">
+              <input type="text" class="align-color-text" placeholder="/local/anyvac/furniture/sofa.webp"
+                .value=${this._furnUrlDraft}
+                @input=${(e: Event) => { this._furnUrlDraft = (e.target as HTMLInputElement).value; }}
+                @keydown=${(e: KeyboardEvent) => { if (e.key === "Enter") { e.preventDefault(); this._furnAddFromUrl(); } }} />
+              <button class="align-btn" title="Add from URL" ?disabled=${!this._furnUrlDraft.trim()}
+                @click=${() => this._furnAddFromUrl()}><ha-icon icon="mdi:plus"></ha-icon></button>
+              <button class="align-btn" title="Reload the file list" ?disabled=${this._furnAssetsBusy}
+                @click=${() => this._furnLoadAssets()}><ha-icon icon="mdi:refresh"></ha-icon></button>
+            </div>
+            <div class="align-side-panel-divider"></div>
+            ${sel ? html`
+              <div class="section-title">${sel.id}</div>
+              <div class="rooms-side-note furn-file" title=${sel.src}>${fileName(sel.src)}</div>
+              ${([["x", "Centre X", "%"], ["y", "Centre Y", "%"], ["w", "Width", "%"], ["h", "Height", "%"], ["rot", "Rotation", "°"]] as const).map(([f, label, unit]) => html`
+                <div class="align-field-row">
+                  <label>${label}<span>${unit}</span></label>
+                  <input type="number" step=${f === "rot" ? 1 : 0.1}
+                    .value=${String(f === "rot" ? (sel.rot ?? 0) : sel[f])}
+                    @change=${(e: Event) => this._furnSetField(sel.id, f, (e.target as HTMLInputElement).value)} />
+                </div>`)}
+              <div class="align-field-row">
+                <label>Opacity<span>%</span></label>
+                <input type="number" step="5" min="0" max="100" .value=${String(Math.round((sel.opacity ?? 1) * 100))}
+                  @change=${(e: Event) => this._furnSetField(sel.id, "opacity", (e.target as HTMLInputElement).value)} />
+              </div>
+              <label class="furn-check"><input type="checkbox" .checked=${!!sel.flip}
+                @change=${() => this._furnToggleFlip(sel.id)} /> Mirror</label>
+              <div class="furn-actions">
+                <button class="align-btn" title="Duplicate" @click=${() => this._furnDuplicate(sel.id)}><ha-icon icon="mdi:content-duplicate"></ha-icon></button>
+                <button class="align-btn" title="Send backward" @click=${() => this._furnReorder(sel.id, -1)}><ha-icon icon="mdi:arrange-send-backward"></ha-icon></button>
+                <button class="align-btn" title="Bring forward" @click=${() => this._furnReorder(sel.id, 1)}><ha-icon icon="mdi:arrange-bring-forward"></ha-icon></button>
+                <button class="align-btn" title="Delete (Del)" @click=${() => this._furnDelete(sel.id)}><ha-icon icon="mdi:delete"></ha-icon></button>
+              </div>
+              <div class="rooms-side-note">Drag to move, corners to resize (Shift = free proportions), top handle to rotate (Alt = no snap). Arrows nudge, [ ] rotate.</div>
+            ` : html`<div class="rooms-side-note">Click a piece on the map to edit it.</div>`}
+            ${fs.items.length ? html`
+              <div class="align-side-panel-divider"></div>
+              <div class="section-title">Pieces</div>
+              <div class="furn-list">
+                ${[...fs.items].reverse().map((it) => html`
+                  <button class="furn-list-item ${it.id === fs.selected ? "on" : ""}" @click=${() => this._furnSelect(it.id)}>
+                    <img src=${it.src} alt="" /><span>${it.id}</span>
+                  </button>`)}
+              </div>` : nothing}
+            ${this._furnSaveError ? html`<div class="rooms-side-note furn-error">${this._furnSaveError}</div>` : nothing}
+          </div>
+        </div>
+    `;
+  }
+
   // ── Floorplan & Calibrate tool: geometry (docs/42 §9 fáze J1) ─────────────
 
   /** Card-level `image_base` currently in effect — the SAME merged/split +
@@ -6384,7 +6881,7 @@ export class AnyVacCard extends LitElement {
     if (!session || !this._alignServiceAvailable()) return;
     const d = session.draft;
     const image_base: Record<string, unknown> = {
-      ...session.rest,
+      ...this._withLiveFurniture(session.rest),
       src: session.floorplan,
       rotation: Math.round(d.rotation * 100) / 100,
       scale: Math.round(d.scale * 100) / 100,
@@ -6589,10 +7086,11 @@ export class AnyVacCard extends LitElement {
     const newCrop = recropFromGesture(oldCrop, this._recropDraft);
     if (!newCrop) return;
     const d = session.draft;
+    const cropBox = { frame_id: oldCrop.frame_id, x0: Math.round(newCrop.x0), y0: Math.round(newCrop.y0),
+      x1: Math.round(newCrop.x1), y1: Math.round(newCrop.y1) };
     const image_base: Record<string, unknown> = {
-      ...session.rest,
-      crop_box: { frame_id: oldCrop.frame_id, x0: Math.round(newCrop.x0), y0: Math.round(newCrop.y0),
-        x1: Math.round(newCrop.x1), y1: Math.round(newCrop.y1) },
+      ...this._withLiveFurniture(session.rest, cropBox),
+      crop_box: cropBox,
       src: session.floorplan,
       rotation: Math.round(d.rotation * 100) / 100,
       scale: Math.round(d.scale * 100) / 100,
@@ -6909,7 +7407,7 @@ export class AnyVacCard extends LitElement {
     if (!session || !this._alignServiceAvailable()) return false;
     const d = session.draft;
     const image_base: Record<string, unknown> = {
-      ...session.rest,
+      ...this._withLiveFurniture(session.rest),
       src: session.floorplan,
       rotation: Math.round(d.rotation * 100) / 100,
       scale: Math.round(d.scale * 100) / 100,
@@ -6941,7 +7439,7 @@ export class AnyVacCard extends LitElement {
     const { home_anchors: _ha, home_anchors_frame_id: _hafi, ...rest } = session.rest;
     const d = session.draft;
     const image_base: Record<string, unknown> = {
-      ...rest, src: session.floorplan,
+      ...this._withLiveFurniture(rest), src: session.floorplan,
       rotation: Math.round(d.rotation * 100) / 100, scale: Math.round(d.scale * 100) / 100,
       offset_x: Math.round(d.offset_x * 100) / 100, offset_y: Math.round(d.offset_y * 100) / 100,
     };
@@ -7315,7 +7813,7 @@ export class AnyVacCard extends LitElement {
       const crop = res?.response?.crop;
       const d = fs.draft;
       const image_base: Record<string, unknown> = {
-        ...fs.rest,
+        ...this._withLiveFurniture(fs.rest, crop ? { entity: vac.entity, ...crop } : undefined),
         src: path,
         rotation: Math.round(d.rotation * 100) / 100,
         scale: Math.round(d.scale * 100) / 100,
@@ -7400,7 +7898,7 @@ export class AnyVacCard extends LitElement {
       if (!path || !frameId || !crop) throw new Error("incomplete response — integration too old?");
       const d = fs.draft;
       const image_base: Record<string, unknown> = {
-        ...fs.rest,
+        ...this._withLiveFurniture(fs.rest, { frame_id: frameId, ...crop }),
         src: path,
         crop_box: { frame_id: frameId, ...crop },
         rotation: Math.round(d.rotation * 100) / 100,
@@ -7575,6 +8073,7 @@ export class AnyVacCard extends LitElement {
                   this._veTool = tool;
                   if (tool === "rooms") this._openRooms();
                   if (tool === "floorplan") this._openFloorplan();
+                  if (tool === "furniture") this._openFurniture();
                 }}>
                 ${this._veAvatar(v)}<span>${v.name ?? v.entity}</span>
               </button>
@@ -7584,6 +8083,7 @@ export class AnyVacCard extends LitElement {
             ${toolTab("seat", "Seat & Appearance", "mdi:vector-square-edit")}
             ${toolTab("rooms", "Rooms", "mdi:select-group")}
             ${toolTab("floorplan", "Floorplan & Calibrate", "mdi:image-edit-outline")}
+            ${toolTab("furniture", "Furniture", "mdi:sofa-outline")}
           </div>
           <div class="ve-topbar-actions">
           ${this._veTool === "seat" ? html`
@@ -7626,6 +8126,24 @@ export class AnyVacCard extends LitElement {
             <button class="align-btn ${this._roomsCopiedFlash ? "align-btn--flash" : ""}"
               title="Copy as YAML (rooms: block, paste into the card config)" @click=${() => this._roomsCopyYaml()}>
               <ha-icon icon=${this._roomsCopiedFlash ? "mdi:check" : "mdi:content-copy"}></ha-icon>
+            </button>
+          ` : nothing}
+          ${this._veTool === "furniture" && this._furnSession ? html`
+            <button class="align-btn" title="Undo (Ctrl+Z)" ?disabled=${!this._furnSession.history.length} @click=${() => this._furnUndo()}>
+              <ha-icon icon="mdi:undo"></ha-icon>
+            </button>
+            <button class="align-btn" title="Redo (Ctrl+Y)" ?disabled=${!this._furnSession.future.length} @click=${() => this._furnRedo()}>
+              <ha-icon icon="mdi:redo"></ha-icon>
+            </button>
+            <button class="align-btn" title="Rotate view 90°" @click=${() => this._alignRotateView()}>
+              <ha-icon icon="mdi:screen-rotation"></ha-icon>
+            </button>
+            <button class="align-btn" title="Reset to the values this tab was opened with" @click=${() => this._furnReset()}>
+              <ha-icon icon="mdi:restore"></ha-icon>
+            </button>
+            <button class="align-btn ${this._furnCopiedFlash ? "align-btn--flash" : ""}"
+              title="Copy as YAML (image_base.furniture: block, paste into the card config)" @click=${() => this._furnCopyYaml()}>
+              <ha-icon icon=${this._furnCopiedFlash ? "mdi:check" : "mdi:content-copy"}></ha-icon>
             </button>
           ` : nothing}
           ${this._veTool === "floorplan" && fs && this._floorplanMode === "geo" ? html`
@@ -7678,6 +8196,13 @@ export class AnyVacCard extends LitElement {
               <ha-icon icon="mdi:content-save"></ha-icon><span>Save</span>
             </button>
           ` : nothing}
+          ${this._veTool === "furniture" && this._furnSession ? html`
+            <button class="align-btn align-save-btn" ?disabled=${!this._alignServiceAvailable() || !this._furnHasUnsavedChanges()}
+              title=${this._alignServiceAvailable() ? "Save" : "Update the AnyVac integration — or Copy YAML"}
+              @click=${() => this._furnSave()}>
+              <ha-icon icon="mdi:content-save"></ha-icon><span>Save</span>
+            </button>
+          ` : nothing}
           ${this._veTool === "floorplan" && fs && this._floorplanMode === "geo" ? html`
             <button class="align-btn align-save-btn" ?disabled=${!floorCanSave}
               title=${floorCanSave ? "Save" : "Update the AnyVac integration to 2.0.0 — or Copy YAML"}
@@ -7708,6 +8233,7 @@ export class AnyVacCard extends LitElement {
         </div>
         ${this._veTool === "seat" ? this._renderSeatTool(session, vac)
           : this._veTool === "rooms" ? this._renderRoomsTool(session, vac)
+          : this._veTool === "furniture" ? this._renderFurnitureTool(session, vac)
           : fs ? this._renderFloorplanTool(fs)
           : this._renderVePlaceholder(
               this._config.map_mode !== "merged"
@@ -9606,6 +10132,42 @@ export class AnyVacCard extends LitElement {
   }
 
   /** Learn the floorplan's aspect ratio once it loads, for the rotation maths. */
+  /** The floorplan `<img>`'s own transform (`image_base` rotation/scale/
+   *  offset) — one copy, shared by the image itself and by the furniture
+   *  layer drawn in the image's own space (docs/51 §1.2). */
+  private _floorplanImgTransform(ib?: { offset_x?: number; offset_y?: number; rotation?: number; scale?: number } | null): string {
+    return "translate(" + (ib?.offset_x ?? 0) + "%," + (ib?.offset_y ?? 0) + "%) rotate(" + (ib?.rotation ?? 0)
+      + "deg) scale(" + ((ib?.scale ?? 100) / 100) + ")";
+  }
+
+  /** docs/51 §1.2 — furniture pieces as one SVG over the floorplan, in the
+   *  floorplan image's own space: same box and transform as the `<img>`, and
+   *  a `viewBox` of the image's unit space (100 × 100/ar) with `meet`, which
+   *  reproduces the image's `object-fit: contain` letterboxing exactly when
+   *  `base_height` is set and is a no-op otherwise. `pointer-events: none` —
+   *  never in the way of room selection, Pin&Go or zones. */
+  private _renderFurnitureLayer(ib: { src?: string; furniture?: unknown; offset_x?: number; offset_y?: number; rotation?: number; scale?: number } | null | undefined) {
+    const items = normalizeFurniture(ib?.furniture);
+    if (!ib?.src || !items.length) return nothing;
+    const ar = this._mapAR > 0.1 ? this._mapAR : 3.636;
+    return html`
+      <div class="furniture-layer" style=${styleMap({ transform: this._floorplanImgTransform(ib) })}>
+        <svg viewBox="0 0 100 ${100 / ar}" preserveAspectRatio="xMidYMid meet" aria-hidden="true">
+          ${items.map((it) => this._furnitureImage(it, toUnit(it, ar)))}
+        </svg>
+      </div>`;
+  }
+
+  /** One piece's group — shared by the card layer and the Furniture tool. */
+  private _furnitureImage(it: FurnitureItem, b: UnitBox, extra: unknown = nothing) {
+    return svg`<g class="furn-item" data-id=${it.id} transform=${groupTransform(b)}>
+      <image href=${it.src} x=${-b.w / 2} y=${-b.h / 2} width=${b.w} height=${b.h}
+        preserveAspectRatio="none" opacity=${it.opacity ?? 1}
+        transform=${it.flip ? "scale(-1 1)" : ""}></image>
+      ${extra}
+    </g>`;
+  }
+
   private _onFloorplanLoad = (e: Event): void => {
     const img = e.target as HTMLImageElement;
     if (img?.naturalWidth && img.naturalHeight) {
@@ -9775,9 +10337,10 @@ export class AnyVacCard extends LitElement {
         ${hasImage ? html`
           <img class="${imgClass}" src=${ib!.src!} alt="Floorplan" @load=${this._onFloorplanLoad}
             style=${styleMap({
-              transform: "translate(" + (ib?.offset_x ?? 0) + "%," + (ib?.offset_y ?? 0) + "%) rotate(" + (ib?.rotation ?? 0) + "deg) scale(" + ((ib?.scale ?? 100) / 100) + ")",
+              transform: this._floorplanImgTransform(ib),
             })} />
         ` : nothing}
+        ${hasImage ? this._renderFurnitureLayer(ib) : nothing}
         ${shown.map((v, idx) => {
           const mapEnt = this._mapEntityFor(v);
           const mUrl = mapEnt ? this._mapUrl(mapEnt) : null;
@@ -9877,9 +10440,10 @@ export class AnyVacCard extends LitElement {
         ${showImage ? html`
           <img class="${imgClass}" src=${imgSrc!} alt="Floorplan" @load=${this._onFloorplanLoad}
             style=${styleMap({
-              transform: "translate(" + (ib?.offset_x ?? 0) + "%," + (ib?.offset_y ?? 0) + "%) rotate(" + (ib?.rotation ?? 0) + "deg) scale(" + ((ib?.scale ?? 100) / 100) + ")",
+              transform: this._floorplanImgTransform(ib),
             })} />
         ` : nothing}
+        ${showImage ? this._renderFurnitureLayer(ib) : nothing}
         ${showMap ? html`
           <img class="map-img ${showImage ? "map-img--overlay" : ""}" src=${mapUrl!} alt="Vacuum map"
             data-entity=${vac.entity}
@@ -11953,6 +12517,8 @@ export class AnyVacCard extends LitElement {
     }
 
     .map-wrap--image { padding-top: 0; }
+    .furniture-layer { position: absolute; inset: 0; pointer-events: none; transform-origin: center center; }
+    .furniture-layer svg { display: block; width: 100%; height: 100%; overflow: visible; }
     .image-base-img { position: relative; display: block; width: 100%; height: auto; transform-origin: center center; }
     .map-img--overlay { opacity: 0.55; pointer-events: none; }
     .map-vector { position: absolute; transform-origin: center center; pointer-events: none; overflow: visible; }
@@ -13348,6 +13914,35 @@ export class AnyVacCard extends LitElement {
      * for its name shows it on hover/selection above the rectangle, and
      * always as a tooltip (title). */
     .rooms-rect { container-type: size; }
+    /* == Visual editor: Furniture tool (docs/51 §1.3) ===================== */
+    .furn-room-ref { pointer-events: none; cursor: default; border-width: 1px; border-style: dashed; background: transparent; opacity: 0.55; }
+    .furniture-layer--edit { pointer-events: none; }
+    .furn-svg .furn-hit { fill: transparent; pointer-events: all; cursor: move; touch-action: none; }
+    .furn-svg .furn-outline { fill: none; stroke: rgb(var(--avc-tool-rgb)); stroke-width: 1.5; vector-effect: non-scaling-stroke; pointer-events: none; }
+    .furn-svg .furn-rot-line { stroke: rgb(var(--avc-tool-rgb)); stroke-width: 1.5; vector-effect: non-scaling-stroke; pointer-events: none; }
+    .furn-svg .furn-handle { fill: #fff; stroke: rgb(var(--avc-tool-rgb)); stroke-width: 2; vector-effect: non-scaling-stroke; pointer-events: all; touch-action: none; }
+    .furn-svg .furn-handle--nw, .furn-svg .furn-handle--se { cursor: nwse-resize; }
+    .furn-svg .furn-handle--ne, .furn-svg .furn-handle--sw { cursor: nesw-resize; }
+    .furn-svg .furn-handle--rot { cursor: grab; }
+    .furn-svg image { pointer-events: none; }
+    .furn-assets, .furn-list, .furn-url-row, .furn-actions, .furn-check { flex: 0 0 auto; }
+    .furn-file { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+    .furn-assets { display: grid; grid-template-columns: repeat(auto-fill, minmax(84px, 1fr)); gap: 6px; max-height: 220px; overflow: auto; }
+    .furn-asset, .furn-list-item {
+      display: flex; flex-direction: column; align-items: center; gap: 4px; padding: 6px; min-width: 0;
+      border: 1px solid rgba(var(--avc-ink-rgb), 0.12); border-radius: var(--avc-th-r-s, 6px);
+      background: rgba(var(--avc-ink-rgb), 0.04); color: inherit; font: inherit; font-size: var(--avc-th-fs-xs, 11px); cursor: pointer;
+    }
+    .furn-asset img, .furn-list-item img { width: 48px; height: 36px; object-fit: contain; }
+    .furn-asset span, .furn-list-item span { max-width: 100%; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+    .furn-list { display: flex; flex-direction: column; gap: 4px; }
+    .furn-list-item { flex-direction: row; justify-content: flex-start; }
+    .furn-list-item.on { border-color: rgb(var(--avc-tool-rgb)); background: rgba(var(--avc-tool-rgb), 0.12); }
+    .furn-url-row { display: flex; gap: 6px; align-items: center; }
+    .furn-url-row input { flex: 1 1 auto; min-width: 0; }
+    .furn-actions { display: flex; gap: 6px; }
+    .furn-check { display: flex; gap: 6px; align-items: center; font-size: var(--avc-th-fs-s, 12px); }
+    .furn-error { color: rgb(var(--avc-err-rgb)); }
     .rooms-rect-label { max-width: none; overflow: visible; text-overflow: clip; }
     @container (max-width: 76px) {
       .rooms-rect-label { display: none; }

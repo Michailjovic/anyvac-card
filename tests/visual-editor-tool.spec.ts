@@ -130,10 +130,10 @@ function activeTab(page: Page): Promise<string | undefined> {
 }
 
 test.describe("Visual editor tool-switcher (docs/42 §9 fáze H)", () => {
-  test("shows all three tools, Seat & Appearance active by default", async ({ page }) => {
+  test("shows all four tools, Seat & Appearance active by default", async ({ page }) => {
     await mountCard(page);
     await openVe(page);
-    expect(await tabLabels(page)).toEqual(["Seat & Appearance", "Rooms", "Floorplan & Calibrate"]);
+    expect(await tabLabels(page)).toEqual(["Seat & Appearance", "Rooms", "Floorplan & Calibrate", "Furniture"]);
     expect(await activeTab(page)).toBe("Seat & Appearance");
     expect(await page.evaluate(() => (window as any).__card._veTool)).toBe("seat");
   });

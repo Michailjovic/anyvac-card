@@ -106,7 +106,7 @@ test("V1 + top bar: opaque canvas, one bar with avatar chips, tool tabs and Save
   });
   expect(r.bg).toMatch(/^rgb\(/); // no alpha → nothing shows through
   expect(r.chips).toEqual(["S6+avatar", "S8+avatar"]);
-  expect(r.tabs).toBe(3);
+  expect(r.tabs).toBe(4); // + Furniture (docs/51)
   expect(r.save).toBe(true);
   expect(r.oldTitle).toBe(false);
   expect(r.bars).toBe(1);

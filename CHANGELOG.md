@@ -4,6 +4,17 @@ All notable changes to this project are documented here.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## 1.55.0
+
+Pairs with integration 1.55.0 (`anyvac.list_assets`; everything else works with any integration that has `set_floorplan_seat`).
+
+- **Furniture as movable layers on the floorplan (docs/51 §1).** Draw only the walls into the floorplan and add furniture as separate images (`.webp`/`.png`/`.svg` in `config/www/anyvac/furniture/`). New config key `image_base.furniture` — each piece has a centre and size in % of the floorplan image, optional rotation (about the centre), opacity and mirror.
+- Card: pieces are drawn above the floorplan and below rooms, paths and robots, in the floorplan image's own space, so they follow `image_base` rotation/scale/offset, the map's rotation/flip and the `base_height` letterboxing. They never catch taps — room selection, Pin & Go and zones work through them. Static `/local/` URLs: loaded once, never reloaded on state updates. Works in split mode and without the integration too.
+- Visual editor: new **Furniture** tab (merged mode, card-level floorplan). Pick a file from the folder (or paste a URL) — it lands in the middle with its own proportions; drag to move, corner handles resize with the opposite corner pinned (Shift = free proportions), the top handle rotates in 15° steps (Alt = free), arrows nudge, `[`/`]` rotate, Delete removes, duplicate and draw order in the side panel, exact numbers for every field. Undo/redo, Reset, Copy YAML and Save like the other tabs; Save stores the whole list through `anyvac.set_floorplan_seat` (an empty list clears pieces written in YAML).
+- Every other Visual editor save that resends `image_base` (floorplan geometry, re-crop, home calibration, snapshots) now carries the current furniture instead of the copy from when that tab opened, and a re-crop or new snapshot of the same vacuum/home frame moves the pieces with the new crop so they stay on the same spot.
+- New `src/furniture.ts` (pure geometry), tests `furniture.spec.ts` (27: geometry, render position with/without `base_height`, rotation, pointer events, override, editor gestures incl. a rotated view, keyboard, Save payload, tool switching). `visual-editor-tool.spec.ts` and `ve-redesign.spec.ts` updated for the fourth tab.
+- Not in this release: entering a piece's size in centimetres (docs/51 §1.3) — sizes are in % of the floorplan for now.
+
 ## 1.54.0
 
 - G: localization (en + cs, docs/50). New `src/i18n.ts`: the English source text is the key, `_t("…", {params})`, plural forms by language (Czech 1 / 2-4 / 5+). The language comes from `hass.locale.language` (fallback `hass.language`); any other language stays English. Covered: status labels, hero, robot tiles, plan column and rail, start/cancel, map tools and layer toggles, pin/zone prompts, robot sheet incl. dock and care tabs, tooltips and aria-labels.

@@ -1,5 +1,6 @@
 import type { LayoutConfig } from "./layout";
 import type { CardTheme } from "./const";
+import type { FurnitureItem } from "./furniture";
 
 // ── Home Assistant core types ─────────────────────────────────────────────
 
@@ -142,6 +143,11 @@ export interface ImageBaseConfig {
    *  the common single-frame home, only needed to disambiguate a real
    *  multi-floor one with more than one active frame at once. */
   home_anchors_frame_id?: string;
+  /** docs/51 §1 — furniture drawn on top of the floorplan as separate,
+   *  movable image layers (centre + size in % of the floorplan image,
+   *  rotation about the centre). Placed with the Visual editor's Furniture
+   *  tool; see `furniture.ts`. */
+  furniture?: FurnitureItem[];
 }
 
 export interface RoomThreshold {

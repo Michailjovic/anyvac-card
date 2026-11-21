@@ -59,7 +59,7 @@ export type AlignTool = "transform" | "pairs";
  *  as `_flipLive` — see `anyvac-card.ts`'s `_storeKey`/`_readStored`. Only
  *  `"seat"` has a real implementation through docs/42 fáze H; `"rooms"`/
  *  `"floorplan"` render a placeholder until fáze I/J. */
-export type VisualEditorTool = "seat" | "rooms" | "floorplan";
+export type VisualEditorTool = "seat" | "rooms" | "floorplan" | "furniture";
 
 /** One open Align-mode editing session for a single vacuum's seat against a
  *  single floorplan. `start` is captured ONCE, from the vacuum's effective
@@ -1055,4 +1055,21 @@ export function applyFloorplanSeats<C extends SeatEditConfigLike>(
     room_border_normal: roomBorderNormal,
     room_border_selected: roomBorderSelected,
   };
+}
+
+// ── Furniture tool session (docs/51 §1.3) ─────────────────────────────────
+// Same start-once/draft-evolves discipline as `RoomsEditSession`. Geometry
+// lives in `furniture.ts`; this is only the editing lifecycle.
+
+/** One open Furniture-tool session (merged mode's card-level floorplan). */
+export interface FurnitureEditSession {
+  /** `image_base.src` in effect (LIVE, same semantics as the other tools). */
+  floorplan: string;
+  /** STABLE identity key every `set_floorplan_seat` call must send. */
+  floorplanKey: string;
+  items: import("./furniture").FurnitureItem[];
+  start: import("./furniture").FurnitureItem[];
+  selected: string | null;
+  history: import("./furniture").FurnitureItem[][];
+  future: import("./furniture").FurnitureItem[][];
 }
