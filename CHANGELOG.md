@@ -4,6 +4,15 @@ All notable changes to this project are documented here.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## 1.57.0
+
+Pairs with integration 1.57.0. Completes docs/51.
+
+- **Furniture sizes in centimetres.** When the floorplan has a known scale — a snapshot of a vacuum map or of the home frame (`crop_box`), or a drawing calibrated against the home frame (`home_anchors`) — the Furniture tab shows **Width** and **Length** in cm next to the % fields, and typing a size resizes the piece. The scale comes from the integration (`anyvac.floorplan_scale`); the card only multiplies by it. Plain floorplans keep % only.
+- **Upload furniture from the studio.** **Upload image…** in the Furniture tab stores the file through `anyvac.upload_asset` into `config/www/anyvac/furniture/` and adds it as a piece — no file manager needed. Shown only when the integration offers the service (administrators).
+- **Reach mask on home-frame floorplans.** A vacuum drawn through the home frame (snapshot crop, cesta A) or through a home-frame calibration (cesta B) now gets its reach mask from the integration's home-frame image, placed through the same crop or fit as its rooms and paths — in the Furniture tab and the Seat tool. Other vacuums keep the map-canvas mask with their seat. A home-frame vacuum without a home raster shows none rather than a misplaced one.
+- Tests: `furniture-extras.spec.ts` (8).
+
 ## 1.56.0
 
 Pairs with integration 1.56.0 (needs it for the reach mask; everything else unchanged).

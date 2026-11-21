@@ -346,6 +346,10 @@ export class AnyVacCard extends LitElement {
   @state() private _furnSaveError = "";
   /** docs/51 §2.6 — reach masks under the pieces as a placement guide. */
   @state() private _furnShowReach = true;
+  /** docs/51 §1.3 — mm per floorplan unit from `anyvac.floorplan_scale`
+   *  (null = this floorplan has no known scale; sizes stay in %). */
+  @state() private _furnScale: number | null = null;
+  @state() private _furnUploadBusy = false;
   /** In-progress room rect drag/resize gesture — mirrors `_alignGesture`'s
    *  own "start captured once, deltas computed against it" discipline
    *  (docs/38 §3.3's frozen-`orig` pattern, reused via `rectdrag.ts`'s pure
@@ -1581,6 +1585,65 @@ export class AnyVacCard extends LitElement {
     if (!r?.entity_id || !r.updated || !Object.values(r.rooms ?? {}).some((x) => !x?.stale)) return undefined;
     const pic = this.hass?.states?.[r.entity_id]?.attributes?.entity_picture as string | undefined;
     return pic ? (this.hass.hassUrl ? this.hass.hassUrl(pic) : pic) : undefined;
+  }
+
+  /** Same mask on the robot's home-frame canvas (integration ≥ 1.57.0). */
+  private _reachHomeUrl(vac: VacuumConfig): string | undefined {
+    const r = this._intAttrs(vac)?.reach as { home_entity_id?: string; home_ready?: boolean; rooms?: Record<string, { stale?: boolean }> } | undefined;
+    if (!r?.home_entity_id || !r.home_ready || !Object.values(r.rooms ?? {}).some((x) => !x?.stale)) return undefined;
+    const pic = this.hass?.states?.[r.home_entity_id]?.attributes?.entity_picture as string | undefined;
+    return pic ? (this.hass.hassUrl ? this.hass.hassUrl(pic) : pic) : undefined;
+  }
+
+  /** docs/51 §2.6 — one vacuum's reach mask placed the way that vacuum is
+   *  rendered on the floorplan: through the home frame's identity crop
+   *  (cesta A), through the drawing's home-frame fit (cesta B), or — the
+   *  ordinary case — with the vacuum's seat, like its map image. `wrapW`/
+   *  `wrapH` are the scene's px size (only the cesta-B matrix needs them). */
+  private _renderReachImg(vac: VacuumConfig, seat: SeatParams, wrapW: number, wrapH: number, cls: string, opacity?: number) {
+    const ar = this._mapAR > 0.1 ? this._mapAR : 3.636;
+    const crop = this._homeFrameCropFor(vac);
+    const fitted = crop ? null : this._homeAnchorFitFor(vac, ar);
+    const op = opacity !== undefined ? { opacity: String(opacity) } : {};
+    if (crop || fitted) {
+      const url = this._reachHomeUrl(vac);
+      const hf = this._intAttrs(vac)?.home_frame as { width_px?: number; height_px?: number } | undefined;
+      const W = fitted ? fitted.dims.NW : hf?.width_px ?? 0;
+      const H = fitted ? fitted.dims.NH : hf?.height_px ?? 0;
+      if (!url || !(W > 0) || !(H > 0)) return nothing;
+      if (crop) {
+        const cw = crop.x1 - crop.x0, ch = crop.y1 - crop.y0;
+        if (!(cw > 0) || !(ch > 0)) return nothing;
+        return html`<img class="reach-home-img ${cls}" src=${url} alt="" style=${styleMap({
+          ...op, position: "absolute", left: (-crop.x0 / cw) * 100 + "%", top: (-crop.y0 / ch) * 100 + "%",
+          width: (W / cw) * 100 + "%", height: (H / ch) * 100 + "%", maxWidth: "none",
+        })} />`;
+      }
+      const f = fitted!;
+      const P = (x: number, y: number) => {
+        const q = projectHomePxThroughFit({ x, y }, f.dims, f.fit, ar);
+        return { x: (q.x / 100) * wrapW, y: (q.y / 100) * wrapH };
+      };
+      const o = P(0, 0), ex = P(W, 0), ey = P(0, H);
+      const m = [(ex.x - o.x) / W, (ex.y - o.y) / W, (ey.x - o.x) / H, (ey.y - o.y) / H, o.x, o.y];
+      return html`<img class="reach-home-img ${cls}" src=${url} alt="" style=${styleMap({
+        ...op, position: "absolute", left: "0", top: "0", width: W + "px", height: H + "px", maxWidth: "none",
+        transformOrigin: "0 0", transform: "matrix(" + m.join(",") + ")",
+      })} />`;
+    }
+    const url = this._reachUrl(vac);
+    if (!url) return nothing;
+    return html`<img class="align-seat-img align-reach-img ${cls}" src=${url} alt="" style=${styleMap({
+      ...op, left: (50 + seat.offset_x) + "%", top: (50 + seat.offset_y) + "%", width: seat.scale + "%",
+      transform: "translate(-50%,-50%) " + seatRotateScaleCss(seat.rotation, seat.scale, seat.scaleY),
+    })} />`;
+  }
+
+  /** Whether `vac` has any reach mask to show (either canvas). */
+  private _hasReach(vac: VacuumConfig): boolean {
+    const ar = this._mapAR > 0.1 ? this._mapAR : 3.636;
+    const home = !!this._homeFrameCropFor(vac) || !!this._homeAnchorFitFor(vac, ar);
+    return home ? !!this._reachHomeUrl(vac) : !!this._reachUrl(vac);
   }
 
   /** Kontrakt v2 gate: attributes of the vacuum's integration sensor, only when the
@@ -6386,6 +6449,76 @@ export class AnyVacCard extends LitElement {
     this._furnGesture = null;
     this._furnSaveError = "";
     if (this._furnAssets === null && !this._furnAssetsBusy) void this._furnLoadAssets();
+    void this._furnLoadScale();
+  }
+
+  /** Asks the integration how many mm one floorplan unit is — from the
+   *  floorplan's crop box (cut from a vacuum map or a home frame) or its
+   *  home-frame calibration. The card only multiplies by the answer; the
+   *  geometry stays in the backend (docs/14 §1). */
+  private async _furnLoadScale(): Promise<void> {
+    this._furnScale = null;
+    const ib = this._floorplanCardImageBase();
+    if (!ib || !(this.hass?.services as any)?.["anyvac"]?.["floorplan_scale"]) return;
+    const data: Record<string, unknown> = {};
+    if (ib.crop_box) data.crop_box = ib.crop_box;
+    if (ib.home_anchors?.length) {
+      data.home_anchors = ib.home_anchors;
+      data.aspect = this._furnAr();
+      if (ib.home_anchors_frame_id) data.home_anchors_frame_id = ib.home_anchors_frame_id;
+    }
+    if (!data.crop_box && !data.home_anchors) return;
+    try {
+      const res = (await (this.hass as any).callService("anyvac", "floorplan_scale", data, undefined, false, true)) as
+        { response?: { mm_per_unit?: number | null } } | undefined;
+      const v = res?.response?.mm_per_unit;
+      this._furnScale = typeof v === "number" && v > 0 ? v : null;
+    } catch (err) {
+      console.warn("[anyvac-card] Furniture: floorplan_scale failed", err);
+    }
+  }
+
+  /** Size of a piece in centimetres (`axis` w = across its width, h = its length). */
+  private _furnCm(it: FurnitureItem, axis: "w" | "h"): number | null {
+    if (!this._furnScale) return null;
+    const unit = axis === "w" ? it.w : it.h / this._furnAr();
+    return Math.round((unit * this._furnScale) / 10);
+  }
+
+  private _furnSetCm(id: string, axis: "w" | "h", raw: string): void {
+    const n = parseFloat(raw);
+    if (!this._furnScale || !Number.isFinite(n) || n <= 0) return;
+    const unit = (n * 10) / this._furnScale;
+    const ar = this._furnAr();
+    this._furnUpdate(id, (it) => ({ ...it, [axis]: Math.round((axis === "w" ? unit : unit * ar) * 100) / 100 }));
+  }
+
+  /** docs/51 §1.4 — upload an image into the furniture folder through the
+   *  integration, then add it as a piece. */
+  private async _furnUpload(file: File | undefined): Promise<void> {
+    if (!file) return;
+    this._furnUploadBusy = true;
+    this._furnAssetsError = "";
+    try {
+      const dataUrl = await new Promise<string>((resolve, reject) => {
+        const r = new FileReader();
+        r.onload = () => resolve(String(r.result ?? ""));
+        r.onerror = () => reject(r.error);
+        r.readAsDataURL(file);
+      });
+      const res = (await (this.hass as any).callService(
+        "anyvac", "upload_asset", { name: file.name, data: dataUrl }, undefined, false, true,
+      )) as { response?: { url?: string; width?: number | null; height?: number | null } } | undefined;
+      const a = res?.response;
+      if (!a?.url) throw new Error("no url in response");
+      await this._furnLoadAssets();
+      await this._furnAdd(a.url, a.width, a.height);
+    } catch (err) {
+      this._furnAssetsError = "Upload failed — " + ((err as { message?: string })?.message ?? "see the log") + ".";
+      console.warn("[anyvac-card] Furniture: upload_asset failed", err);
+    } finally {
+      this._furnUploadBusy = false;
+    }
   }
 
   private _furnHasUnsavedChanges(): boolean {
@@ -6703,16 +6836,9 @@ export class AnyVacCard extends LitElement {
               <img class="align-floorplan-img" src=${ib.src} alt="Floorplan"
                 @load=${this._onFloorplanLoad}
                 style=${styleMap({ transform: this._floorplanImgTransform(ib) })} />
-              ${this._furnShowReach ? this._config.vacuums.map((v) => {
-                const url = this._reachUrl(v);
-                if (!url) return nothing;
-                const gs = this._effectiveSeat(v);
-                return html`<img class="align-seat-img align-reach-img furn-reach-img" src=${url} alt=""
-                  style=${styleMap({
-                    left: (50 + gs.offset_x) + "%", top: (50 + gs.offset_y) + "%", width: gs.scale + "%",
-                    transform: "translate(-50%,-50%) " + seatRotateScaleCss(gs.rotation, gs.scale, gs.scaleY),
-                  })} />`;
-              }) : nothing}
+              ${this._furnShowReach
+                ? this._config.vacuums.map((v) => this._renderReachImg(v, this._effectiveSeat(v), wrapW, wrapH, "furn-reach-img"))
+                : nothing}
               ${rooms.map((r) => html`
                 <div class="rooms-rect furn-room-ref" style=${styleMap({
                   left: r.map_x + "%", top: r.map_y + "%", width: r.map_w + "%", height: r.map_h + "%",
@@ -6761,6 +6887,14 @@ export class AnyVacCard extends LitElement {
                     <img src=${a.url} alt="" loading="lazy" /><span>${a.name}</span>
                   </button>`)}
               </div>` : nothing}
+            ${(this.hass?.services as any)?.["anyvac"]?.["upload_asset"] ? html`
+              <label class="align-btn furn-upload" title="Upload an image into config/www/anyvac/furniture/ and add it">
+                <ha-icon icon=${this._furnUploadBusy ? "mdi:loading" : "mdi:upload"}></ha-icon>
+                <span>${this._furnUploadBusy ? "Uploading…" : "Upload image…"}</span>
+                <input type="file" class="furn-file-input" accept=".webp,.png,.svg,.jpg,.jpeg,image/webp,image/png,image/svg+xml,image/jpeg"
+                  ?disabled=${this._furnUploadBusy}
+                  @change=${(e: Event) => { const inp = e.target as HTMLInputElement; void this._furnUpload(inp.files?.[0]); inp.value = ""; }} />
+              </label>` : nothing}
             <div class="furn-url-row">
               <input type="text" class="align-color-text" placeholder="/local/anyvac/furniture/sofa.webp"
                 .value=${this._furnUrlDraft}
@@ -6771,7 +6905,7 @@ export class AnyVacCard extends LitElement {
               <button class="align-btn" title="Reload the file list" ?disabled=${this._furnAssetsBusy}
                 @click=${() => this._furnLoadAssets()}><ha-icon icon="mdi:refresh"></ha-icon></button>
             </div>
-            ${this._config.vacuums.some((v) => this._reachUrl(v)) ? html`
+            ${this._config.vacuums.some((v) => this._hasReach(v)) ? html`
               <label class="furn-check" title="Where the vacuums' bodies have been in their last complete clean of each room — the holes are furniture">
                 <input type="checkbox" .checked=${this._furnShowReach}
                   @change=${(e: Event) => { this._furnShowReach = (e.target as HTMLInputElement).checked; }} /> Show reach
@@ -6787,6 +6921,12 @@ export class AnyVacCard extends LitElement {
                     .value=${String(f === "rot" ? (sel.rot ?? 0) : sel[f])}
                     @change=${(e: Event) => this._furnSetField(sel.id, f, (e.target as HTMLInputElement).value)} />
                 </div>`)}
+              ${this._furnScale ? ([["w", "Width"], ["h", "Length"]] as const).map(([axis, label]) => html`
+                <div class="align-field-row" title="Real size — from the floorplan's scale">
+                  <label>${label}<span>cm</span></label>
+                  <input type="number" step="1" min="1" .value=${String(this._furnCm(sel, axis) ?? "")}
+                    @change=${(e: Event) => this._furnSetCm(sel.id, axis, (e.target as HTMLInputElement).value)} />
+                </div>`) : nothing}
               <div class="align-field-row">
                 <label>Opacity<span>%</span></label>
                 <input type="number" step="5" min="0" max="100" .value=${String(Math.round((sel.opacity ?? 1) * 100))}
@@ -8308,7 +8448,7 @@ export class AnyVacCard extends LitElement {
       : (this._config.vacuums.find((v) => v.image_base?.src === session.floorplan)?.image_base ?? vac.image_base);
     const mapEnt = this._mapEntityFor(vac);
     const mapUrl = mapEnt ? this._mapUrl(mapEnt) : null;
-    const reachUrl = this._reachUrl(vac);
+    const reachUrl = this._hasReach(vac);
     const draft = session.draft;
     const appearance = session.appearanceDraft;
     // Live preview (docs/42 §9 fáze H): the paths/marker layer reads its
@@ -8382,12 +8522,7 @@ export class AnyVacCard extends LitElement {
                       left: (50 + draft.offset_x) + "%", top: (50 + draft.offset_y) + "%", width: draft.scale + "%",
                       transform: "translate(-50%,-50%) " + seatRotateScaleCss(draft.rotation, draft.scale, draft.scaleY),
                     })} />` : nothing}
-                ${reachUrl && session.layers.reach > 0 ? html`<img class="align-seat-img align-reach-img" src=${reachUrl} alt=""
-                    style=${styleMap({
-                      opacity: String(session.layers.reach),
-                      left: (50 + draft.offset_x) + "%", top: (50 + draft.offset_y) + "%", width: draft.scale + "%",
-                      transform: "translate(-50%,-50%) " + seatRotateScaleCss(draft.rotation, draft.scale, draft.scaleY),
-                    })} />` : nothing}
+                ${reachUrl && session.layers.reach > 0 ? this._renderReachImg(vac, draft, wrapW, wrapH, "", session.layers.reach) : nothing}
                 ${this._renderIntegrationOverlay(previewVac, draft, "both")}
               </div>
               ${readOnly ? html`
@@ -13970,6 +14105,7 @@ export class AnyVacCard extends LitElement {
     .furn-svg image { pointer-events: none; }
     .align-seat-img.align-reach-img { pointer-events: none; cursor: default; }
     .furn-reach-img { opacity: 0.45; }
+    .reach-home-img { pointer-events: none; }
     .furn-assets, .furn-list, .furn-url-row, .furn-actions, .furn-check { flex: 0 0 auto; }
     .furn-file { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
     .furn-assets { display: grid; grid-template-columns: repeat(auto-fill, minmax(84px, 1fr)); gap: 6px; max-height: 220px; overflow: auto; }
@@ -13986,6 +14122,8 @@ export class AnyVacCard extends LitElement {
     .furn-url-row { display: flex; gap: 6px; align-items: center; }
     .furn-url-row input { flex: 1 1 auto; min-width: 0; }
     .furn-actions { display: flex; gap: 6px; }
+    .furn-upload { width: auto; align-self: flex-start; padding: 0 10px; gap: 6px; position: relative; cursor: pointer; flex: 0 0 auto; }
+    .furn-file-input { position: absolute; inset: 0; opacity: 0; cursor: pointer; width: 100%; }
     .furn-check { display: flex; gap: 6px; align-items: center; font-size: var(--avc-th-fs-s, 12px); }
     .furn-error { color: rgb(var(--avc-err-rgb)); }
     .rooms-rect-label { max-width: none; overflow: visible; text-overflow: clip; }

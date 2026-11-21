@@ -230,6 +230,11 @@ paste. When a snapshot floorplan is re-cut with a different crop (Re-crop, a
 new snapshot of the same vacuum or home frame), the pieces are moved with it
 so they stay on the same spot. The file list needs integration ≥ 1.55.0 and
 an administrator; without it, paste a `/local/...` URL into the tool instead.
+With integration ≥ 1.57.0 you can also **Upload image…** straight from the tab,
+and when the floorplan has a known scale (a snapshot with `crop_box`, or a
+drawing calibrated against the home frame) the tab shows each piece's width
+and length in **centimetres** — type the real size of the sofa and it is
+drawn to scale.
 
 ### Reach mask (docs/51 §2) — calibrating against where the vacuums really drove
 
@@ -242,7 +247,10 @@ it as the **Reach** layer in Seat & Appearance (same transform as the vacuum's
 map — align it to your floorplan) and under the pieces in Furniture. The mask
 fills in from ordinary cleans; after deleting and redrawing a map in the
 Roborock app, the old rooms are ignored until they are cleaned again.
-`anyvac.reset_reach` clears it by hand.
+`anyvac.reset_reach` clears it by hand. Vacuums drawn through the home frame
+(a home-frame snapshot or a home-frame calibration) use the home-frame copy of
+the mask (integration ≥ 1.57.0), placed through the same crop or fit as their
+rooms.
 
 ### Home frame (docs/40, Fáze 3) — one shared identity crop instead of per-vacuum seating
 
@@ -563,6 +571,8 @@ generated from
 | `anyvac.detect_floorplan_fiducials` | Scan a floorplan file for invisible fiducial markers and return `home_anchors` with zero clicking (docs/40 §5.A.2) — powers the Maps tab's "Detect markers in edited file" button. Requires integration ≥ 1.10.0. |
 | `anyvac.list_assets` | List the images in `config/www/anyvac/furniture/` (URL + pixel size) for the Visual editor's Furniture tool (docs/51). Administrators only. Requires integration ≥ 1.55.0. |
 | `anyvac.reset_reach` | Forget the stored reach mask (docs/51 §2) — `duid` and `room` optional. Requires integration ≥ 1.56.0. |
+| `anyvac.floorplan_scale` | mm per floorplan unit for a floorplan's `crop_box` / `home_anchors` — powers the Furniture tab's centimetre fields (docs/51). Requires integration ≥ 1.57.0. |
+| `anyvac.upload_asset` | Upload a furniture image into `config/www/anyvac/furniture/` (administrators; ≤ 2 MB) — the Furniture tab's **Upload image…** (docs/51). Requires integration ≥ 1.57.0. |
 
 `anyvac.run_job` also exists but is an internal executor (not documented
 here or in the editor) — use `anyvac.clean`/`anyvac.plan` instead.
