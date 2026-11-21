@@ -231,6 +231,19 @@ new snapshot of the same vacuum or home frame), the pieces are moved with it
 so they stay on the same spot. The file list needs integration ≥ 1.55.0 and
 an administrator; without it, paste a `/local/...` URL into the tool instead.
 
+### Reach mask (docs/51 §2) — calibrating against where the vacuums really drove
+
+With integration ≥ 1.56.0, every finished clean replaces the stored mask of
+each room the vacuum cleaned completely (≥ 80 % of the room's reachable
+floor): the footprint its body swept. The masks of all rooms together show
+the vacuum's whole reach — the outer edge sits a robot-radius inside the
+walls, the holes are furniture. Nothing to configure: the Visual editor shows
+it as the **Reach** layer in Seat & Appearance (same transform as the vacuum's
+map — align it to your floorplan) and under the pieces in Furniture. The mask
+fills in from ordinary cleans; after deleting and redrawing a map in the
+Roborock app, the old rooms are ignored until they are cleaned again.
+`anyvac.reset_reach` clears it by hand.
+
 ### Home frame (docs/40, Fáze 3) — one shared identity crop instead of per-vacuum seating
 
 When `image_base.crop_box` names a `frame_id` (via **"Snapshot home frame as
@@ -549,6 +562,7 @@ generated from
 | `anyvac.snap_wall_corner` | Snap a home-frame pixel point to the nearest wall corner (docs/40 §5.B) — powers the click-snap step of the Maps tab's "Calibrate floorplan against home frame" button. Requires integration ≥ 1.9.0. |
 | `anyvac.detect_floorplan_fiducials` | Scan a floorplan file for invisible fiducial markers and return `home_anchors` with zero clicking (docs/40 §5.A.2) — powers the Maps tab's "Detect markers in edited file" button. Requires integration ≥ 1.10.0. |
 | `anyvac.list_assets` | List the images in `config/www/anyvac/furniture/` (URL + pixel size) for the Visual editor's Furniture tool (docs/51). Administrators only. Requires integration ≥ 1.55.0. |
+| `anyvac.reset_reach` | Forget the stored reach mask (docs/51 §2) — `duid` and `room` optional. Requires integration ≥ 1.56.0. |
 
 `anyvac.run_job` also exists but is an internal executor (not documented
 here or in the editor) — use `anyvac.clean`/`anyvac.plan` instead.

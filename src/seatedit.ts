@@ -115,6 +115,8 @@ export interface AlignSession {
   layers: {
     floor: number;
     rawMap: number;
+    /** docs/51 §2.6 — the robot's reach mask over its own map (opacity). */
+    reach: number;
     dry: boolean;
     wet: boolean;
     rooms: boolean;
@@ -146,7 +148,7 @@ export function defaultAlignView(): AlignViewState {
 }
 
 export function defaultAlignLayers(): AlignSession["layers"] {
-  return { floor: 1, rawMap: 1, dry: true, wet: true, rooms: true, staticRooms: true, others: true };
+  return { floor: 1, rawMap: 1, reach: 0.6, dry: true, wet: true, rooms: true, staticRooms: true, others: true };
 }
 
 // ── Rooms tool session (docs/42 §3.3/§4.3, fáze I) ─────────────────────────

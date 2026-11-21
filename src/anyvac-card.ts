@@ -344,6 +344,8 @@ export class AnyVacCard extends LitElement {
   @state() private _furnUrlDraft = "";
   @state() private _furnCopiedFlash = false;
   @state() private _furnSaveError = "";
+  /** docs/51 §2.6 — reach masks under the pieces as a placement guide. */
+  @state() private _furnShowReach = true;
   /** In-progress room rect drag/resize gesture — mirrors `_alignGesture`'s
    *  own "start captured once, deltas computed against it" discipline
    *  (docs/38 §3.3's frozen-`orig` pattern, reused via `rectdrag.ts`'s pure
@@ -1568,6 +1570,17 @@ export class AnyVacCard extends LitElement {
       return !!st && st.state !== "unavailable" && st.state !== "unknown" && !!st.attributes["entity_picture"];
     });
     return live.length === 1 ? live[0] : undefined;
+  }
+
+  /** docs/51 §2.6 — the robot's reach mask image (served by the integration's
+   *  `image` entity, on the robot's own map canvas, so it stacks on the map with
+   *  the same seat). Undefined until the integration has recorded at least one
+   *  room that still matches the robot's map. */
+  private _reachUrl(vac: VacuumConfig): string | undefined {
+    const r = this._intAttrs(vac)?.reach as { entity_id?: string; updated?: string; rooms?: Record<string, { stale?: boolean }> } | undefined;
+    if (!r?.entity_id || !r.updated || !Object.values(r.rooms ?? {}).some((x) => !x?.stale)) return undefined;
+    const pic = this.hass?.states?.[r.entity_id]?.attributes?.entity_picture as string | undefined;
+    return pic ? (this.hass.hassUrl ? this.hass.hassUrl(pic) : pic) : undefined;
   }
 
   /** Kontrakt v2 gate: attributes of the vacuum's integration sensor, only when the
@@ -5365,7 +5378,7 @@ export class AnyVacCard extends LitElement {
    *  display preference: NOT pushed onto history/future (no undo, same as
    *  `_alignView`) and NOT gated by `_alignReadOnly()` — seeing through the
    *  raw map is just as useful in a read-only (home-frame) session. */
-  private _alignSetLayerOpacity(field: "floor" | "rawMap", raw: string): void {
+  private _alignSetLayerOpacity(field: "floor" | "rawMap" | "reach", raw: string): void {
     const session = this._alignSession;
     if (!session) return;
     const n = parseFloat(raw);
@@ -6690,6 +6703,16 @@ export class AnyVacCard extends LitElement {
               <img class="align-floorplan-img" src=${ib.src} alt="Floorplan"
                 @load=${this._onFloorplanLoad}
                 style=${styleMap({ transform: this._floorplanImgTransform(ib) })} />
+              ${this._furnShowReach ? this._config.vacuums.map((v) => {
+                const url = this._reachUrl(v);
+                if (!url) return nothing;
+                const gs = this._effectiveSeat(v);
+                return html`<img class="align-seat-img align-reach-img furn-reach-img" src=${url} alt=""
+                  style=${styleMap({
+                    left: (50 + gs.offset_x) + "%", top: (50 + gs.offset_y) + "%", width: gs.scale + "%",
+                    transform: "translate(-50%,-50%) " + seatRotateScaleCss(gs.rotation, gs.scale, gs.scaleY),
+                  })} />`;
+              }) : nothing}
               ${rooms.map((r) => html`
                 <div class="rooms-rect furn-room-ref" style=${styleMap({
                   left: r.map_x + "%", top: r.map_y + "%", width: r.map_w + "%", height: r.map_h + "%",
@@ -6748,6 +6771,11 @@ export class AnyVacCard extends LitElement {
               <button class="align-btn" title="Reload the file list" ?disabled=${this._furnAssetsBusy}
                 @click=${() => this._furnLoadAssets()}><ha-icon icon="mdi:refresh"></ha-icon></button>
             </div>
+            ${this._config.vacuums.some((v) => this._reachUrl(v)) ? html`
+              <label class="furn-check" title="Where the vacuums' bodies have been in their last complete clean of each room — the holes are furniture">
+                <input type="checkbox" .checked=${this._furnShowReach}
+                  @change=${(e: Event) => { this._furnShowReach = (e.target as HTMLInputElement).checked; }} /> Show reach
+              </label>` : nothing}
             <div class="align-side-panel-divider"></div>
             ${sel ? html`
               <div class="section-title">${sel.id}</div>
@@ -8280,6 +8308,7 @@ export class AnyVacCard extends LitElement {
       : (this._config.vacuums.find((v) => v.image_base?.src === session.floorplan)?.image_base ?? vac.image_base);
     const mapEnt = this._mapEntityFor(vac);
     const mapUrl = mapEnt ? this._mapUrl(mapEnt) : null;
+    const reachUrl = this._reachUrl(vac);
     const draft = session.draft;
     const appearance = session.appearanceDraft;
     // Live preview (docs/42 §9 fáze H): the paths/marker layer reads its
@@ -8350,6 +8379,12 @@ export class AnyVacCard extends LitElement {
                     @load=${(e: Event) => this._onAlignMapLoad(e)}
                     style=${styleMap({
                       opacity: String(session.layers.rawMap),
+                      left: (50 + draft.offset_x) + "%", top: (50 + draft.offset_y) + "%", width: draft.scale + "%",
+                      transform: "translate(-50%,-50%) " + seatRotateScaleCss(draft.rotation, draft.scale, draft.scaleY),
+                    })} />` : nothing}
+                ${reachUrl && session.layers.reach > 0 ? html`<img class="align-seat-img align-reach-img" src=${reachUrl} alt=""
+                    style=${styleMap({
+                      opacity: String(session.layers.reach),
                       left: (50 + draft.offset_x) + "%", top: (50 + draft.offset_y) + "%", width: draft.scale + "%",
                       transform: "translate(-50%,-50%) " + seatRotateScaleCss(draft.rotation, draft.scale, draft.scaleY),
                     })} />` : nothing}
@@ -8430,6 +8465,14 @@ export class AnyVacCard extends LitElement {
                 @input=${(e: Event) => this._alignSetLayerOpacity("rawMap", (e.target as HTMLInputElement).value)}
                 @change=${() => this._alignRefocusOverlay()} />
             </div>
+            ${reachUrl ? html`
+              <div class="align-field-row align-field-row--opacity" title="Where this vacuum's body has been in its last complete clean of each room — line its edges up with the walls, the holes are furniture">
+                <label>Reach<span>%</span></label>
+                <input type="range" min="0" max="100" step="5"
+                  .value=${String(Math.round(session.layers.reach * 100))}
+                  @input=${(e: Event) => this._alignSetLayerOpacity("reach", (e.target as HTMLInputElement).value)}
+                  @change=${() => this._alignRefocusOverlay()} />
+              </div>` : nothing}
             ${this._themed() ? html`
               <div class="align-field-row align-field-row--check">
                 <label title="Each vacuum's map in its own colour, background removed — easier to see what lines up with what">
@@ -13925,6 +13968,8 @@ export class AnyVacCard extends LitElement {
     .furn-svg .furn-handle--ne, .furn-svg .furn-handle--sw { cursor: nesw-resize; }
     .furn-svg .furn-handle--rot { cursor: grab; }
     .furn-svg image { pointer-events: none; }
+    .align-seat-img.align-reach-img { pointer-events: none; cursor: default; }
+    .furn-reach-img { opacity: 0.45; }
     .furn-assets, .furn-list, .furn-url-row, .furn-actions, .furn-check { flex: 0 0 auto; }
     .furn-file { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
     .furn-assets { display: grid; grid-template-columns: repeat(auto-fill, minmax(84px, 1fr)); gap: 6px; max-height: 220px; overflow: auto; }

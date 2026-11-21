@@ -4,6 +4,16 @@ All notable changes to this project are documented here.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## 1.56.0
+
+Pairs with integration 1.56.0 (needs it for the reach mask; everything else unchanged).
+
+- **Reach mask in the Visual editor (docs/51 §2.6).** Where each vacuum's body has actually been in its last complete clean of every room, served by the integration as an image on the vacuum's own map canvas.
+  - Seat & Appearance: the mask rides on the seated map with exactly the same transform, with its own **Reach** opacity slider (default 60 %). Line its edges up with the walls of your floorplan — it fills in from ordinary cleans, so no more driving one vacuum through the whole home on a single battery just to get a complete path.
+  - Furniture: every vacuum's mask under the pieces (with its own seat), **Show reach** toggle — the holes are where the furniture stands.
+  - Only shown once the integration has recorded at least one room that still matches the vacuum's map; nothing changes on the dashboard itself.
+- Tests: `reach.spec.ts` (3).
+
 ## 1.55.0
 
 Pairs with integration 1.55.0 (`anyvac.list_assets`; everything else works with any integration that has `set_floorplan_seat`).
