@@ -1652,6 +1652,10 @@ export class AnyVacCardEditor extends LitElement {
            { value: "auto", label: "Auto — follow the system" },
            { value: "legacy", label: "Legacy — the pre-1.2.0 look" }],
           v => this._setConfig({ theme: v === DEFAULT_THEME ? undefined : v }))}
+        ${this._selectField<"robots" | "time">("Queue while cleaning", this._config.queue_view ?? "robots",
+          [{ value: "robots", label: "By robot — one lane per vacuum" },
+           { value: "time", label: "By time — Now / Next / Done" }],
+          v => this._setConfig({ queue_view: v === "robots" ? undefined : v }))}
         ${this._colorField("Accent colour", this._config.accent, ACCENT_PRESETS,
           v => this._setConfig({ accent: v || undefined }), DEFAULT_ACCENT)}
         ${this._hint("START, room selection and focus rings.",

@@ -294,6 +294,24 @@ export class AnyVacCard extends LitElement {
    *  meaning: x/y are home-frame PX, and `_confirmPin` calls `goto` with
    *  `frame: "home"` + `x_home_px`/`y_home_px` instead of `x_pct`/`y_pct`). */
   @state() private _pinPending: Record<string, { x: number; y: number; frame?: "home" }> | null = null;
+  /** docs/52 (card 1.62.0): queue view toggle (per browser; null = config). */
+  @state() private _queueView: "robots" | "time" | null = null;
+  /** Queue item whose actions are open. */
+  @state() private _queueSel: string | null = null;
+  /** The "Add a room" panel of the running job. */
+  @state() private _queueAdd: { room: string | null; mode: "dry" | "wet" | "both" } | null = null;
+  /** Portrait: the queue sheet is open. */
+  @state() private _queueSheet = false;
+  /** Placing / renaming a service point (docs/52 §5 item 7). */
+  @state() private _spSet: {
+    idx: number; name: string; from?: string; renameOnly?: boolean;
+    point?: { x: number; y: number; frame?: "home" };
+  } | null = null;
+  @state() private _spMenu: string | null = null;
+  @state() private _spDelete: string | null = null;
+  /** A refused edit / service point call, shown for a few seconds. */
+  @state() private _notice: string | null = null;
+  private _noticeTimer: number | null = null;
   @state() private _layers: { dry: boolean; wet: boolean } = { dry: true, wet: false };
   @state() private _layerMenu: "dry" | "wet" | null = null;
   private _layerHoldTimer: number | null = null;
@@ -821,6 +839,7 @@ export class AnyVacCard extends LitElement {
       this._shownSet = this._loadShown();
       this._localRoomSel = this._loadRoomSel();
       this._flipLive = this._loadFlipLive();
+      this._queueView = this._loadQueueView();
     } else {
       const valid = new Set<number>();
       for (const i of this._shownSet) { if (i < config.vacuums.length) valid.add(i); }
@@ -3345,8 +3364,13 @@ export class AnyVacCard extends LitElement {
     const byEnt = new Map(this._config.vacuums.map((v) => [v.entity, v] as const));
     if (jp && Array.isArray(jp.rooms)) {
       const rows = jp.rooms as Array<Record<string, any>>;
+      const lanes = this._jobLanes(jp);
+      const open = lanes ? () => { this._queueSheet = true; } : undefined;
       return html`
-        <div class="rail-card rail-plan">
+        <div class="rail-card rail-plan ${open ? "rail-plan--open" : ""}" role=${open ? "button" : nothing} tabindex=${open ? "0" : nothing}
+          aria-label=${open ? this._t("Open the queue") : nothing}
+          @click=${open ?? nothing}
+          @keydown=${open ? (e: KeyboardEvent) => { if (e.key === "Enter" || e.key === " ") { e.preventDefault(); open(); } } : nothing}>
           <div class="rail-card-head"><ha-icon icon="mdi:format-list-checks"></ha-icon><span>${this._t("Plan")}</span>
             <small>${this._t("{done} of {total} passes", { done: jp.passes_done ?? 0, total: jp.passes_total ?? rows.length })}</small></div>
           ${rows.map((r) => {
@@ -3600,6 +3624,445 @@ export class AnyVacCard extends LitElement {
 
 
 
+  // ── docs/52: the room-by-room queue while a job runs (card 1.62.0) ──────────
+  //
+  // Everything shown comes from `job_progress.queues` (integration ≥ 1.60):
+  // item state, start / finish times, live %, `waits_for` (≥ 1.62) — the card
+  // only lays it out and turns taps into `anyvac.edit_job` calls (docs/14).
+
+  /** Effective queue view: the per-browser toggle, else the config default. */
+  private _queueViewEff(): "robots" | "time" {
+    return this._queueView ?? (this._config.queue_view === "time" ? "time" : "robots");
+  }
+  private _setQueueView(v: "robots" | "time"): void {
+    this._queueView = v;
+    try { localStorage.setItem(this._storeKey("queue-view"), v); } catch { /* storage unavailable */ }
+  }
+  private _loadQueueView(): "robots" | "time" | null {
+    try {
+      const raw = localStorage.getItem(this._storeKey("queue-view"));
+      return raw === "robots" || raw === "time" ? raw : null;
+    } catch {
+      return null;
+    }
+  }
+
+  /** A service call whose failure the user should read (an edit the backend
+   *  refused, a service point it won't drive to): the message shows for a few
+   *  seconds instead of only reaching the console. */
+  private async _callNoted(domain: string, service: string, data: Record<string, unknown>): Promise<boolean> {
+    try {
+      await this.hass.callService(domain, service, data);
+      return true;
+    } catch (err) {
+      console.error("[anyvac-card] " + domain + "." + service + " failed:", err);
+      const msg = String((err as { message?: string })?.message ?? err).replace(/^anyvac(\.[a-z_]+)?:\s*/, "");
+      this._notice = msg;
+      if (this._noticeTimer !== null) window.clearTimeout(this._noticeTimer);
+      this._noticeTimer = window.setTimeout(() => { this._notice = null; this._noticeTimer = null; }, 7000);
+      return false;
+    }
+  }
+
+  private _renderNotice() {
+    if (!this._notice) return nothing;
+    return html`<div class="avc-notice" role="alert"><ha-icon icon="mdi:alert-circle-outline"></ha-icon><span>${this._notice}</span>
+      <button class="avc-notice-x" aria-label=${this._t("Close")} @click=${() => { this._notice = null; }}><ha-icon icon="mdi:close"></ha-icon></button></div>`;
+  }
+
+  private _editJob(data: Record<string, unknown>): void {
+    this._queueSel = null;
+    void this._callNoted("anyvac", "edit_job", data);
+  }
+
+  /** Queues of the running job, in the card's vacuum order. Null = an
+   *  integration that publishes no `queues` (older than 1.60). */
+  private _jobLanes(jp: Record<string, any>): Array<{ ent: string; vac?: VacuumConfig; items: Array<Record<string, any>> }> | null {
+    const queues = jp.queues as Record<string, any> | undefined;
+    if (!queues || typeof queues !== "object") return null;
+    const order = new Map(this._config.vacuums.map((v, i) => [v.entity, i] as const));
+    return Object.entries(queues)
+      .map(([ent, q]) => ({ ent, vac: this._config.vacuums.find((v) => v.entity === ent), items: (q?.items ?? []) as Array<Record<string, any>> }))
+      .sort((a, b) => (order.get(a.ent) ?? 99) - (order.get(b.ent) ?? 99));
+  }
+
+  private _blockedReason(reason: unknown): string {
+    const r = String(reason ?? "");
+    const map: Record<string, string> = {
+      water_shortage: "water tank empty",
+      error: "robot error",
+      offline: "robot offline",
+      "command not accepted": "the robot did not take the command",
+      "command failed": "the command failed",
+      "could not reach the room": "could not reach the room",
+      "robot runs another clean": "the robot runs another clean",
+    };
+    return this._t(map[r] ?? (r.replace(/_/g, " ") || "blocked"));
+  }
+
+  private _roomLabel(it: Record<string, any>, names: Map<string, string>): string {
+    const rooms = (Array.isArray(it.rooms) && it.rooms.length ? it.rooms : [it.room]) as string[];
+    return rooms.map((r) => names.get(r) ?? r).join(", ");
+  }
+
+  /** One queue item. `withRobot` (time view) adds the robot's chip. */
+  private _renderQueueRow(
+    lane: { ent: string; vac?: VacuumConfig; items: Array<Record<string, any>> },
+    it: Record<string, any>,
+    names: Map<string, string>,
+    withRobot: boolean,
+  ) {
+    const st = String(it.state ?? "queued");
+    const kind = it.kind === "wet" ? "wet" : "dry";
+    const color = lane.vac ? this._color(lane.vac) : "rgb(var(--avc-accent-rgb))";
+    const sel = this._queueSel === it.id;
+    const single = !Array.isArray(it.rooms) || it.rooms.length <= 1;
+    const editable = single && (st === "queued" || st === "sent" || st === "active");
+    const room = String(it.room ?? (it.rooms ?? [])[0] ?? "");
+    const waits = (Array.isArray(it.waits_for) ? it.waits_for : []) as string[];
+    const waitNames = waits.map((e) => {
+      const v = this._config.vacuums.find((x) => x.entity === e);
+      return v ? this._vacName(v) : e.split(".")[1] ?? e;
+    });
+    const pct = Math.round(Number(it.pct ?? 0));
+    const lead = st === "done" ? html`<ha-icon class="q-lead q-lead--ok" icon="mdi:check"></ha-icon>`
+      : st === "blocked" ? html`<ha-icon class="q-lead q-lead--err" icon="mdi:alert-outline"></ha-icon>`
+      : html`<ha-icon class="q-lead" icon=${kind === "wet" ? "mdi:water" : "mdi:broom"}
+          style=${styleMap(st === "active" || st === "sent" ? { color } : {})}></ha-icon>`;
+    let right: unknown;
+    if (st === "active") right = html`<b class="q-pct">${pct}&thinsp;%</b>`;
+    else if (st === "sent") right = html`<span>${this._t("starting")}</span>`;
+    else if (st === "done") right = html`<span>${it.finish_at ? this._clockStr(it.finish_at) : ""}</span>`;
+    else if (st === "blocked") {
+      right = html`<button class="q-retry" @click=${(e: Event) => { e.stopPropagation(); this._editJob({ retry: [room], mode: kind }); }}>
+        <ha-icon icon="mdi:refresh"></ha-icon><span>${this._t("Retry")}</span></button>`;
+    } else if (waitNames.length) {
+      right = html`<span class="q-wait"><ha-icon icon="mdi:lock-outline"></ha-icon>${this._t("after {names}", { names: waitNames.join(", ") })}</span>`;
+    } else right = html`<span>${it.start_at ? this._clockStr(it.start_at) : ""}</span>`;
+    const queued = lane.items.filter((x) => x.state === "queued");
+    const qi = queued.findIndex((x) => x.id === it.id);
+    const others = st === "queued" ? this._pinCandidates(room, kind).filter((v) => v.entity !== lane.ent) : [];
+    const skipId = "qskip-" + it.id;
+    const actions = sel && editable ? html`
+      <div class="q-actions" @click=${(e: Event) => e.stopPropagation()}>
+        ${st === "queued" ? html`
+          <button class="q-act" ?disabled=${qi <= 0} aria-label=${this._t("Move up")} title=${this._t("Move up")}
+            @click=${() => this._editJob({ move: { room, kind, index: qi - 1 } })}><ha-icon icon="mdi:arrow-up"></ha-icon></button>
+          <button class="q-act" ?disabled=${qi < 0 || qi >= queued.length - 1} aria-label=${this._t("Move down")} title=${this._t("Move down")}
+            @click=${() => this._editJob({ move: { room, kind, index: qi + 1 } })}><ha-icon icon="mdi:arrow-down"></ha-icon></button>
+          ${others.map((v) => html`<button class="q-act q-act--wide" title=${this._t("Give it to {name}", { name: this._vacName(v) })}
+            @click=${() => this._editJob({ pin: { [room]: { [kind]: v.entity } } })}><ha-icon icon="mdi:swap-horizontal"></ha-icon><span>${this._vacAbbrev(v)}</span></button>`)}
+          <button class="q-act q-act--err" aria-label=${this._t("Remove from the queue")} title=${this._t("Remove from the queue")}
+            @click=${() => this._editJob({ remove: [room], mode: kind })}><ha-icon icon="mdi:delete-outline"></ha-icon></button>`
+        : html`
+          <button class="q-act q-act--wide q-act--err ${this._holdId === skipId ? "action-btn--holding" : ""}"
+            title=${this._t("Stops this room and goes on with the next one")}
+            @pointerdown=${this._holdStart(skipId, () => this._editJob({ remove: [room], mode: kind }))}
+            @pointermove=${this._holdMove} @pointerup=${this._holdEnd} @pointerleave=${this._holdEnd} @pointercancel=${this._holdEnd}>
+            <div class="hold-ring"></div><ha-icon icon="mdi:skip-next"></ha-icon><span>${this._t("Skip · hold")}</span></button>`}
+      </div>` : nothing;
+    return html`
+      <div class="q-item ${sel ? "q-item--sel" : ""}">
+        <div class="q-row q-row--${st}" role=${editable ? "button" : nothing} tabindex=${editable ? "0" : nothing}
+          aria-expanded=${editable ? (sel ? "true" : "false") : nothing}
+          @click=${editable ? () => { this._queueSel = sel ? null : String(it.id); } : nothing}
+          @keydown=${editable ? (e: KeyboardEvent) => { if (e.key === "Enter" || e.key === " ") { e.preventDefault(); this._queueSel = sel ? null : String(it.id); } } : nothing}>
+          ${lead}
+          ${withRobot ? this._vacChip(lane.ent) : nothing}
+          <span class="q-name">${this._roomLabel(it, names)}${withRobot ? html` <small>· ${this._t(kind)}</small>` : nothing}
+            ${st === "blocked" ? html`<small class="q-reason">${this._blockedReason(it.reason)}</small>` : nothing}</span>
+          <span class="q-right">${right}</span>
+          ${st === "active" ? html`<span class="q-bar"><span style=${styleMap({ width: Math.min(100, pct) + "%", background: color })}></span></span>` : nothing}
+        </div>
+        ${actions}
+      </div>`;
+  }
+
+  /** The "Add a room" panel (docs/52 §5 item 3): from the button or a tap on
+   *  a room on the map while a job runs. */
+  private _renderQueueAdd(jp: Record<string, any>, names: Map<string, string>) {
+    const add = this._queueAdd;
+    if (!add) return nothing;
+    const lanes = this._jobLanes(jp) ?? [];
+    const has = (room: string, kind: string) =>
+      lanes.some((l) => l.items.some((it) => it.kind === kind && it.state !== "removed" && it.state !== "blocked"
+        && ((it.rooms ?? [it.room]) as string[]).includes(room)));
+    const full = (room: string) => (add.mode === "both" ? has(room, "dry") && has(room, "wet") : has(room, add.mode));
+    const rooms = this._allRoomKeys();
+    const pick = add.room && !full(add.room) ? add.room : null;
+    const modeBtn = (m: "dry" | "wet" | "both", label: string) => html`
+      <button class="dock-mode ${add.mode === m ? "on" : ""}" aria-pressed=${add.mode === m ? "true" : "false"}
+        @click=${(e: Event) => { e.stopPropagation(); this._queueAdd = { ...add, mode: m }; }}><span>${this._t(label)}</span></button>`;
+    return html`
+      <div class="q-add" role="group" aria-label=${this._t("Add a room")} @click=${(e: Event) => e.stopPropagation()}>
+        <div class="q-add-head"><b>${this._t("Add a room")}</b>
+          <button class="robot-sheet-icon q-add-x" aria-label=${this._t("Close")} @click=${() => { this._queueAdd = null; }}><ha-icon icon="mdi:close"></ha-icon></button></div>
+        <div class="dock-head">${modeBtn("dry", "Dry")}${modeBtn("wet", "Wet")}${modeBtn("both", "Both")}</div>
+        <div class="q-add-rooms">
+          ${rooms.map((k) => html`<button class="q-room ${pick === k ? "on" : ""}" ?disabled=${full(k)} aria-pressed=${pick === k ? "true" : "false"}
+            title=${full(k) ? this._t("Already in the queue") : ""}
+            @click=${() => { this._queueAdd = { ...add, room: k }; }}>${names.get(k) ?? k}</button>`)}
+        </div>
+        <span class="q-add-hint">${this._t("or tap a room on the map")}</span>
+        <button class="action-btn dock-run q-add-go" ?disabled=${!pick}
+          @click=${() => { if (!pick) return; this._queueAdd = null; void this._callNoted("anyvac", "edit_job", { add: [pick], mode: add.mode }); }}>
+          <ha-icon icon="mdi:plus"></ha-icon><span>${this._t("Add to the queue")}</span></button>
+      </div>`;
+  }
+
+  /** The queue body: alerts, then lanes (by robot) or Now / Next / Done (by
+   *  time). `place` = the landscape column (lanes side by side) or the
+   *  portrait sheet (stacked). */
+  private _renderQueueBody(jp: Record<string, any>, place: "column" | "sheet") {
+    const lanes = this._jobLanes(jp);
+    if (!lanes) return nothing;
+    const names = new Map(this._mergedRoomDefs(this._config.vacuums).map(({ r }) => [r.key, r.name ?? r.key] as const));
+    if (this._queueAdd) return this._renderQueueAdd(jp, names);
+    const view = this._queueViewEff();
+    const blocked = lanes.flatMap((l) => l.items.filter((it) => it.state === "blocked").map((it) => ({ l, it })));
+    const warnings = (Array.isArray(jp.warnings) ? jp.warnings : []) as string[];
+    const alerts = blocked.length || warnings.length ? html`
+      <div class="q-alerts" role="alert">
+        ${blocked.map(({ l, it }) => html`<span><ha-icon icon="mdi:alert-outline"></ha-icon>${this._t("{name}: {room} ({kind}) — {reason}", {
+          name: l.vac ? this._vacName(l.vac) : l.ent, room: this._roomLabel(it, names), kind: this._t(it.kind === "wet" ? "wet" : "dry"),
+          reason: this._blockedReason(it.reason) })}</span>`)}
+        ${warnings.map((w) => html`<span class="q-alert--warn"><ha-icon icon="mdi:information-outline"></ha-icon>${w}</span>`)}
+      </div>` : nothing;
+    const visible = (l: { items: Array<Record<string, any>> }) => l.items.filter((it) => it.state !== "removed");
+    if (view === "robots") {
+      return html`${alerts}
+        <div class="q-lanes q-lanes--${place}">
+          ${lanes.map((l) => {
+            const items = visible(l);
+            if (!items.length) return nothing;
+            const kinds = [...new Set(items.map((it) => (it.kind === "wet" ? "wet" : "dry")))];
+            const cur = items.find((it) => it.state === "active" || it.state === "sent");
+            const sub = cur ? this._roomLabel(cur, names)
+              : items.every((it) => it.state === "done" || it.state === "blocked") ? this._t("done") : this._t("waiting");
+            return html`
+              <div class="q-lane">
+                <div class="q-lane-head">
+                  ${this._vacChip(l.ent)}
+                  <span class="q-lane-name">${l.vac ? this._vacName(l.vac) : l.ent}<small>${sub}</small></span>
+                  ${kinds.map((k) => html`<span class="q-kind">${this._t(k)}</span>`)}
+                </div>
+                ${items.map((it) => this._renderQueueRow(l, it, names, false))}
+              </div>`;
+          })}
+        </div>`;
+    }
+    const all = lanes.flatMap((l) => visible(l).map((it) => ({ l, it })));
+    const t = (x: { it: Record<string, any> }, k: "start_at" | "finish_at") => (x.it[k] ? Date.parse(x.it[k]) : Infinity);
+    const now = all.filter((x) => x.it.state === "active" || x.it.state === "sent");
+    const next = all.filter((x) => x.it.state === "queued" || x.it.state === "blocked")
+      .sort((a, b) => (a.it.state === "blocked" ? -1 : 0) - (b.it.state === "blocked" ? -1 : 0) || t(a, "start_at") - t(b, "start_at"));
+    const done = all.filter((x) => x.it.state === "done").sort((a, b) => t(a, "finish_at") - t(b, "finish_at"));
+    const sec = (title: string, rows: typeof all) => rows.length ? html`
+      <div class="q-sec"><span class="q-sec-title">${this._t(title)}</span>
+        ${rows.map(({ l, it }) => this._renderQueueRow(l, it, names, true))}</div>` : nothing;
+    return html`${alerts}
+      <div class="q-time q-time--${place}">
+        <div class="q-time-col">${sec("Now", now)}${place === "column" ? sec("Done", done) : nothing}</div>
+        <div class="q-time-col">${sec("Next", next)}${place === "sheet" ? sec("Done", done) : nothing}</div>
+      </div>`;
+  }
+
+  private _renderQueueViewToggle() {
+    const v = this._queueViewEff();
+    const b = (k: "robots" | "time", icon: string, label: string) => html`
+      <button class="q-view ${v === k ? "on" : ""}" aria-pressed=${v === k ? "true" : "false"}
+        aria-label=${this._t(label)} title=${this._t(label)}
+        @click=${(e: Event) => { e.stopPropagation(); this._setQueueView(k); }}><ha-icon icon=${icon}></ha-icon></button>`;
+    return html`<span class="q-views" role="group" aria-label=${this._t("Queue view")}>
+      ${b("robots", "mdi:view-column-outline", "By robot")}${b("time", "mdi:format-list-bulleted", "By time")}</span>`;
+  }
+
+  /** "Add a room" button of the queue footer. */
+  private _renderQueueAddBtn() {
+    return html`<button class="mtbtn q-add-btn" @click=${(e: Event) => { e.stopPropagation(); this._queueSel = null; this._queueAdd = { room: null, mode: this._planMode }; }}>
+      <ha-icon icon="mdi:plus"></ha-icon><span>${this._t("Add a room")}</span></button>`;
+  }
+
+  /** Portrait: the queue as a sheet, opened from the hero bar or the rail's
+   *  plan card (docs/52 §5 item 3). */
+  private _renderQueueSheet() {
+    if (!this._queueSheet) return nothing;
+    const jp = this._jobProgress();
+    const close = () => { this._queueSheet = false; this._queueAdd = null; this._queueSel = null; };
+    if (!jp || !this._jobLanes(jp)) { void Promise.resolve().then(close); return nothing; }
+    const left = typeof jp.eta_min_left === "number" ? Math.round(jp.eta_min_left) : null;
+    const cancelId = "q-cancel";
+    return html`
+      <div class="robot-sheet-scrim" @click=${close}></div>
+      <div class="robot-sheet q-sheet" role="dialog" aria-modal="true" aria-label=${this._t("Queue")}
+        @keydown=${(e: KeyboardEvent) => { if (e.key === "Escape") close(); }}>
+        <span class="robot-sheet-grip" aria-hidden="true"></span>
+        <div class="robot-sheet-head">
+          <span class="robot-sheet-id">
+            <span class="robot-sheet-name">${this._t("Queue")}</span>
+            <span class="tile-sub">${this._t("{done} of {total} {rooms} done", { done: jp.rooms_done ?? 0, total: jp.rooms_total ?? 0, rooms: this._pl(Number(jp.rooms_total ?? 0), "room|rooms") })}${jp.finish_at ? " · " + this._t("done around {time}", { time: this._clockStr(jp.finish_at) }) : ""}</span>
+          </span>
+          ${this._renderQueueViewToggle()}
+          <button class="robot-sheet-icon" aria-label=${this._t("Close")} @click=${close}><ha-icon icon="mdi:close"></ha-icon></button>
+        </div>
+        ${this._renderNotice()}
+        ${this._renderQueueBody(jp, "sheet")}
+        ${this._queueAdd ? nothing : html`
+          <div class="q-foot">
+            ${this._renderQueueAddBtn()}
+            <button class="action-btn dock-run plan-cancel ${this._holdId === cancelId ? "action-btn--holding" : ""}"
+              @pointerdown=${this._holdStart(cancelId, () => { close(); void this._call("anyvac", "cancel", {}); })}
+              @pointermove=${this._holdMove} @pointerup=${this._holdEnd} @pointerleave=${this._holdEnd} @pointercancel=${this._holdEnd}>
+              <div class="hold-ring"></div><ha-icon icon="mdi:stop"></ha-icon><span>${this._t("Cancel · hold")}</span></button>
+          </div>
+          ${left !== null ? html`<span class="q-left">${this._t("~{min} min left", { min: left })}</span>` : nothing}`}
+      </div>`;
+  }
+
+  // ── service points (docs/52 §5 item 7, card 1.62.0) ──────────────────────
+
+  private _servicePoints(vac: VacuumConfig): Array<Record<string, any>> {
+    const sp = this._intAttrs(vac)?.service_points;
+    return Array.isArray(sp) ? sp : [];
+  }
+
+  /** Rooms this vacuum still has in the running job — the backend refuses a
+   *  service point then (a goto would end the room it cleans, and the firmware
+   *  would not continue where it stopped). */
+  private _spBusy(vac: VacuumConfig): boolean {
+    const jp = this._jobProgress();
+    const items = ((jp?.queues ?? {})[vac.entity]?.items ?? []) as Array<Record<string, any>>;
+    return items.some((it) => it.state === "queued" || it.state === "sent" || it.state === "active");
+  }
+
+  /** The robot stands at one of its points: not cleaning, its position within
+   *  ~0.4 m (in its own map's px) of the point. Only for the "at the point"
+   *  look — nothing is decided from it. */
+  private _spAt(vac: VacuumConfig): Record<string, any> | null {
+    const at = this._intAttrs(vac);
+    const vp = at?.vacuum_position_px;
+    const d = at?.image_dims;
+    const st = this.hass.states[vac.entity]?.state;
+    if (!vp || !d || this._isCleaning(vac) || st === "docked" || st === "returning") return null;
+    // Within about one robot marker of the point (the marker is 1/55 of the map).
+    const tol = (Math.max(Number(d.width) || 0, Number(d.height) || 0) * (Number(d.scale) || 1)) / 40;
+    for (const p of this._servicePoints(vac)) {
+      const px = p.px;
+      if (px && Math.hypot(px.x - vp.x, px.y - vp.y) <= tol) return p;
+    }
+    return null;
+  }
+
+  /** Clean-tab section of the robot sheet. */
+  private _renderSpSection(vac: VacuumConfig, idx: number) {
+    if (!this.hass.services?.["anyvac"]?.["set_service_point"] || !this._intAttrs(vac)) return nothing;
+    const points = this._servicePoints(vac);
+    const busy = this._spBusy(vac);
+    const here = this._spAt(vac);
+    const name = this._vacName(vac);
+    const go = (p: Record<string, any>) => void this._callNoted("anyvac", "go_to_service_point", { entity_id: vac.entity, name: p.name });
+    return html`
+      <div class="sp-section">
+        <span class="robot-sheet-label">${this._t(points.length > 1 ? "Service points" : "Service point")}</span>
+        ${here ? html`
+          <div class="sp-here"><ha-icon icon="mdi:flag-variant"></ha-icon>
+            <span><b>${this._t("At {name}", { name: here.name })}</b><small>${this._t("Waiting — send it home when you're done")}</small></span></div>
+          <button class="action-btn dock-run sp-home" @click=${() => this._dock(vac)}><ha-icon icon="mdi:home-import-outline"></ha-icon><span>${this._t("Back to dock")}</span></button>` : nothing}
+        ${points.map((p) => {
+          const key = idx + ":" + p.name;
+          const menu = this._spMenu === key;
+          const del = this._spDelete === key;
+          return html`
+            <div class="sp-row">
+              <ha-icon class="sp-flag" icon="mdi:flag-variant"></ha-icon>
+              <span class="sp-text"><b>${p.name}</b><small>${p.room ?? this._t("outside the rooms")}</small></span>
+              <button class="sp-go" ?disabled=${busy || here?.name === p.name} @click=${() => go(p)}
+                title=${busy ? this._t("Available when {name} has finished its rooms", { name }) : this._t("Go to {point}", { point: p.name })}>
+                <ha-icon icon="mdi:play"></ha-icon><span>${this._t("Go")}</span></button>
+              <button class="robot-sheet-icon sp-more" aria-label=${this._t("{point} — rename, move or delete", { point: p.name })} aria-expanded=${menu ? "true" : "false"}
+                @click=${() => { this._spMenu = menu ? null : key; this._spDelete = null; }}><ha-icon icon="mdi:dots-vertical"></ha-icon></button>
+            </div>
+            ${menu ? html`
+              <div class="sp-menu">
+                <button class="mtbtn" @click=${() => this._spStart(idx, p.name, p.name, true)}><ha-icon icon="mdi:pencil-outline"></ha-icon><span>${this._t("Rename")}</span></button>
+                <button class="mtbtn" @click=${() => this._spStart(idx, p.name, p.name, false)}><ha-icon icon="mdi:cursor-move"></ha-icon><span>${this._t("Move")}</span></button>
+                <button class="mtbtn sp-del" @click=${() => {
+                  if (!del) { this._spDelete = key; return; }
+                  this._spMenu = null; this._spDelete = null;
+                  void this._callNoted("anyvac", "remove_service_point", { entity_id: vac.entity, name: p.name });
+                }}><ha-icon icon="mdi:delete-outline"></ha-icon><span>${del ? this._t("Tap again to delete") : this._t("Delete")}</span></button>
+              </div>` : nothing}`;
+        })}
+        ${busy && points.length ? html`<span class="sp-why"><ha-icon icon="mdi:clock-outline"></ha-icon>${this._t("Available when {name} has finished its rooms — going there now would end the room it is cleaning, and it could not continue where it stopped.", { name })}</span>` : nothing}
+        ${points.length < 8 ? html`<button class="sp-add" @click=${() => this._spStart(idx, points.length ? "" : this._t("Service point"))}>
+          <ha-icon icon="mdi:plus"></ha-icon><span>${this._t("Add a service point")}</span></button>` : nothing}
+      </div>`;
+  }
+
+  /** Enter the setting mode: the sheet steps aside, a bar at the bottom holds
+   *  the name and the buttons, and a tap on the map places the point (the
+   *  Pin & Go capture, `_onMapClick`). `renameOnly` keeps the point. */
+  private _spStart(idx: number, name: string, from?: string, renameOnly = false): void {
+    const vac = this._config.vacuums[idx];
+    if (!vac) return;
+    this._robotSheet = null; this._robotSheetTab = null; this._spMenu = null; this._spDelete = null;
+    this._pinPending = null;
+    this._spSet = { idx, name, from, renameOnly };
+    if (!renameOnly) { this._mapMode = "pin"; this._modeEntity = vac.entity; }
+  }
+
+  private _spEnd(): void {
+    this._spSet = null;
+    if (this._mapMode === "pin") { this._mapMode = "normal"; this._modeEntity = null; }
+  }
+
+  private async _spSave(here: boolean): Promise<void> {
+    const s = this._spSet;
+    if (!s) return;
+    const vac = this._config.vacuums[s.idx];
+    const name = s.name.trim();
+    if (!vac || !name) return;
+    const data: Record<string, unknown> = { entity_id: vac.entity, name };
+    if (s.from) data.from_name = s.from;
+    if (here) data.here = true;
+    else if (s.point) {
+      if (s.point.frame === "home") Object.assign(data, { frame: "home", x_home_px: s.point.x, y_home_px: s.point.y });
+      else Object.assign(data, { x_pct: s.point.x, y_pct: s.point.y });
+    } else if (!s.renameOnly) return;
+    if (await this._callNoted("anyvac", "set_service_point", data)) this._spEnd();
+  }
+
+  /** The setting bar (instead of the robot sheet while a point is placed). */
+  private _renderSpBar() {
+    const s = this._spSet;
+    if (!s) return nothing;
+    const vac = this._config.vacuums[s.idx];
+    if (!vac) return nothing;
+    const name = this._vacName(vac);
+    const title = s.renameOnly ? this._t("Rename {point}", { point: s.from ?? "" })
+      : s.from ? this._t("Move {point}", { point: s.from }) : this._t("New service point");
+    return html`
+      <div class="sp-bar" role="dialog" aria-label=${title} @keydown=${(e: KeyboardEvent) => { if (e.key === "Escape") this._spEnd(); }}>
+        <div class="sp-bar-head">${this._vacChip(vac.entity)}<b>${title}</b></div>
+        ${this._renderNotice()}
+        ${s.renameOnly ? nothing : html`<span class="sp-bar-hint">${s.point
+          ? html`<ha-icon icon="mdi:flag-variant"></ha-icon>${this._t("Point placed — tap again to adjust")}`
+          : this._t("Tap the spot on the map where {name} should park — or save where it stands now.", { name })}</span>`}
+        <label class="sp-name"><span>${this._t("Name")}</span>
+          <input class="sp-name-input" maxlength="40" .value=${s.name}
+            @input=${(e: Event) => { this._spSet = { ...s, name: (e.target as HTMLInputElement).value }; }}
+            @keydown=${(e: KeyboardEvent) => { if (e.key === "Enter") void this._spSave(false); }}></label>
+        <div class="sp-bar-btns">
+          ${s.renameOnly ? nothing : html`<button class="mtbtn" @click=${() => void this._spSave(true)}>
+            <ha-icon icon="mdi:crosshairs-gps"></ha-icon><span>${this._t("Use where {name} stands", { name })}</span></button>`}
+          <span class="sp-bar-gap"></span>
+          <button class="mtbtn" @click=${() => this._spEnd()}><span>${this._t("Cancel")}</span></button>
+          <button class="action-btn dock-run sp-save" ?disabled=${!s.renameOnly && !s.point || !s.name.trim()} @click=${() => void this._spSave(false)}>
+            <span>${this._t("Save")}</span></button>
+        </div>
+      </div>`;
+  }
+
   /** docs/46 G2: does the landscape right column render as the plan column
    *  (themed, integration present, not the `debug_dense_dock` dense view)? */
   private _usesPlanColumn(): boolean {
@@ -3641,6 +4104,27 @@ export class AnyVacCard extends LitElement {
         <ha-icon icon=${icon}></ha-icon><span>${text}</span>
       </button>`;
 
+    if (jp && this._jobLanes(jp)) {
+      const left = typeof jp.eta_min_left === "number" ? Math.round(jp.eta_min_left) : null;
+      return html`
+        <div class="dock plan-col q-col">
+          <div class="plan-head">
+            <span>${this._t("Queue · {done} of {total} {rooms} done", { done: jp.rooms_done ?? 0, total: jp.rooms_total ?? 0, rooms: this._pl(Number(jp.rooms_total ?? 0), "room|rooms") })}</span>
+            ${this._queueAdd ? nothing : this._renderQueueViewToggle()}
+          </div>
+          ${this._renderNotice()}
+          <div class="q-scroll">${this._renderQueueBody(jp, "column")}</div>
+          ${this._queueAdd ? nothing : html`
+          <div class="plan-foot">
+            ${this._renderQueueAddBtn()}
+            <span class="plan-sum">
+              <b>${jp.finish_at ? this._t("Done around {time}", { time: this._clockStr(jp.finish_at) }) : this._t("Cleaning")}</b>
+              <small>${left !== null ? this._t("~{min} min left", { min: left }) : ""}</small>
+            </span>
+            ${holdBtn("plan-cancel", "mdi:stop", this._t("Cancel · hold"), true, () => void this._call("anyvac", "cancel", {}))}
+          </div>`}
+        </div>`;
+    }
     if (jp && Array.isArray(jp.rooms)) {
       const rows = jp.rooms as Array<Record<string, any>>;
       const left = typeof jp.eta_min_left === "number" ? Math.round(jp.eta_min_left) : null;
@@ -4446,6 +4930,20 @@ export class AnyVacCard extends LitElement {
   private _onMapClick(vac: VacuumConfig, e: MouseEvent): void {
     if (this._mapMode !== "pin") return;
     if (!this._isModeCandidate(vac)) return;
+    const sp = this._spSet;
+    if (sp && this._config.vacuums[sp.idx]?.entity === vac.entity) {
+      // Placing a service point (docs/52 §5 item 7): the same capture as
+      // Pin & Go, kept on the bar until Save — and the tool stays armed so a
+      // second tap moves it.
+      const crop = this._homeFrameCropFor(vac);
+      const ar = this._wrapAspect(this._baseHeightFor(vac));
+      const af = crop ? null : this._homeAnchorFitFor(vac, ar);
+      const p = crop ? this._clickToHomePx(crop, e.clientX, e.clientY)
+        : af ? this._clickToHomeAnchorPx(af.fit, af.dims, ar, e.clientX, e.clientY)
+        : this._clickToContent(vac, e.clientX, e.clientY);
+      if (p) this._spSet = { ...sp, point: crop || af ? { x: p.x, y: p.y, frame: "home" } : { x: this._clampPct(p.x), y: this._clampPct(p.y) } };
+      return;
+    }
     if (this._modeEntity === "*" && this._config.map_mode === "merged") {
       // Merged multi-candidate: capture the SAME screen point through every
       // candidate vacuum's own map transform (docs/40 §4.4: home px through the
@@ -9766,6 +10264,7 @@ export class AnyVacCard extends LitElement {
       imageRot: (vp && vp.a != null ? vp.a : 0) + (vac.robot_image_rotation ?? 0),
       filterId: "avc-err-blur-" + vac.entity.replace(/[^a-zA-Z0-9]/g, "-"),
       scaleYRatio: seatScaleYRatio(m?.scale ?? 100, m?.scaleY),
+      sp: this._spMarks(vac, (p) => p.px, (q) => ({ x: (q.x / 100) * NW, y: (q.y / 100) * NH })),
     }, part);
     return html`<svg class="map-vector" viewBox="0 0 ${NW} ${NH}" preserveAspectRatio="none" style=${styleMap(seat)}>${inner}</svg>`;
   }
@@ -9776,6 +10275,30 @@ export class AnyVacCard extends LitElement {
    *  with a straight line, so neither may the card: one polyline per
    *  segment, never one flat polyline across all of them (the 2026-07-15
    *  "scribble" bug). */
+  /** Service points of `vac` for the overlay: the saved ones (`saved` picks
+   *  their px for this renderer) plus the one being placed. `pending` comes as
+   *  the capture stored it — robot-map % for the legacy renderer, home px for
+   *  the home-frame ones (`homeSpace`). */
+  private _spMarks(
+    vac: VacuumConfig,
+    saved: (p: Record<string, any>) => { x: number; y: number } | null | undefined,
+    pending: (q: { x: number; y: number }) => Pt,
+    homeSpace = false,
+  ): Array<{ pt: Pt; pending?: boolean; name?: string }> {
+    const out: Array<{ pt: Pt; pending?: boolean; name?: string }> = [];
+    const s = this._spSet;
+    const placing = s && this._config.vacuums[s.idx]?.entity === vac.entity ? s : null;
+    for (const p of this._servicePoints(vac)) {
+      if (placing?.point && placing.from === p.name) continue; // shown at its new place instead
+      const q = saved(p);
+      if (q && Number.isFinite(q.x) && Number.isFinite(q.y)) out.push({ pt: { x: q.x, y: q.y }, name: p.name });
+    }
+    if (placing?.point && (placing.point.frame === "home") === homeSpace) {
+      out.push({ pt: pending(placing.point), pending: true, name: placing.name });
+    }
+    return out;
+  }
+
   private _vecSegs(raw: unknown, proj?: (p: { x: number; y: number }) => Pt): Pt[][] {
     if (!Array.isArray(raw)) return [];
     // No projection (legacy px contract: already in this SVG's space) → the
@@ -9806,10 +10329,25 @@ export class AnyVacCard extends LitElement {
       rr: number; digits: number; filterId: string; scaleYRatio?: number;
       /** Raw backend pose, only to tell robot movement from re-projection. */
       pose?: string;
+      /** Service points (docs/52 §5 item 7), projected; `pending` = being placed. */
+      sp?: Array<{ pt: Pt; pending?: boolean; name?: string }>;
     },
     part: "both" | "paths" | "marker",
   ) {
     const { rob, head, rr, digits: dg } = g;
+    // Service points: a flag disc above every path, below nothing — drawn
+    // with the markers so merged mode keeps them on top of all trails.
+    const spT = (g.sp ?? []).length && part !== "paths"
+      ? svg`${(g.sp ?? []).map(({ pt, pending, name }) => {
+          const r = rr * 0.95, k = (r * 1.25) / 24, upright = -this._mapRotationDeg();
+          return svg`<g class="avc-sp ${pending ? "avc-sp--pending" : ""}" transform=${"translate(" + pt.x.toFixed(dg) + " " + pt.y.toFixed(dg) + ")"}>
+            ${name ? svg`<title>${name}</title>` : nothing}
+            ${pending ? svg`<circle class="avc-sp-ring" r=${(r * 1.6).toFixed(2)} fill="none" stroke="#E0A84A" stroke-width=${(rr * 0.2).toFixed(2)}></circle>` : nothing}
+            <circle r=${r.toFixed(2)} fill="#E0A84A" stroke="#ffffff" stroke-width=${(rr * 0.16).toFixed(2)}></circle>
+            <path d="M-5 9V-9M-5 -9h10l-2.5 4L5 -1H-5" transform=${"rotate(" + upright + ") scale(" + k.toFixed(4) + ")"} fill="none" stroke="#2a1d05" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"></path>
+          </g>`;
+        })}`
+      : nothing;
     const color = this._color(vac);
     const ct = this._vacCleanType(vac);
     const layersOn = this._layersEff();
@@ -9866,7 +10404,7 @@ export class AnyVacCard extends LitElement {
         ? svg`<g transform=${"translate(" + rob.x.toFixed(1) + "," + rob.y.toFixed(1) + ") scale(1," + (1 / ry).toFixed(4) + ") translate(" + (-rob.x).toFixed(1) + "," + (-rob.y).toFixed(1) + ")"}>${markerContent}</g>`
         : markerContent;
       const pathsInner = svg`${mopBand}${mopLine}${traceT}`;
-      return part === "paths" ? pathsInner : part === "marker" ? markerInner : svg`${pathsInner}${markerInner}`;
+      return part === "paths" ? pathsInner : part === "marker" ? svg`${spT}${markerInner}` : svg`${pathsInner}${spT}${markerInner}`;
     }
     const cleaning = this._isCleaning(vac);
     // Trail C (docs/43 §5, chosen over the fading comet): the whole history
@@ -9947,7 +10485,7 @@ export class AnyVacCard extends LitElement {
         ry !== 1 ? svg`<g transform=${"scale(1," + (1 / ry).toFixed(4) + ")"}>${body}</g>` : body}</g>`;
     }
     const livePaths = svg`${mopBand}${mopLine}${traceT}${heads}`;
-    return part === "paths" ? livePaths : part === "marker" ? liveMarker : svg`${livePaths}${liveMarker}`;
+    return part === "paths" ? livePaths : part === "marker" ? svg`${spT}${liveMarker}` : svg`${livePaths}${spT}${liveMarker}`;
   }
 
   /** docs/40 §4.4 (Fáje 3) home-frame twin of `_renderIntegrationOverlay` —
@@ -9992,6 +10530,7 @@ export class AnyVacCard extends LitElement {
       rob, head, rr, digits: 1, pose: vp ? vp.x + "," + vp.y : "",
       imageRot: (vp && vp.a != null ? vp.a : 0) + (vac.robot_image_rotation ?? 0),
       filterId: "avc-hf-err-blur-" + vac.entity.replace(/[^a-zA-Z0-9]/g, "-"),
+      sp: this._spMarks(vac, (p) => (p.home_px ? local(p.home_px) : null), (q) => local(q), true),
     }, part);
     return html`<svg class="map-vector" viewBox="0 0 ${cropW} ${cropH}" preserveAspectRatio="none" style=${styleMap(style)}>${inner}</svg>`;
   }
@@ -10055,6 +10594,7 @@ export class AnyVacCard extends LitElement {
       rob, head, rr, digits: 2, pose: vp ? vp.x + "," + vp.y : "",
       imageRot: (vp && vp.a != null ? vp.a + fit.rotation : 0) + (vac.robot_image_rotation ?? 0),
       filterId: "avc-ha-err-blur-" + vac.entity.replace(/[^a-zA-Z0-9]/g, "-"),
+      sp: this._spMarks(vac, (p) => (p.home_px ? proj(p.home_px) : null), (q) => proj(q), true),
     }, part);
     return html`<svg class="map-vector" viewBox=${"0 0 100 " + (100 / ar).toFixed(3)} preserveAspectRatio="none" style=${styleMap(style)}>${inner}</svg>`;
   }
@@ -10772,6 +11312,15 @@ export class AnyVacCard extends LitElement {
       if (this._holdTimer !== null) {
         this._cancelHold();
         if (this._inspectKey !== null) { this._inspectKey = null; return; }
+        // docs/52: while a job runs a tap adds the room to it (the queue's
+        // "Add a room" panel, pre-filled) instead of changing the selection.
+        const jp = this._jobProgress();
+        if (jp && this._jobLanes(jp) && this.hass.services?.["anyvac"]?.["edit_job"]) {
+          this._queueSel = null;
+          this._queueAdd = { room: room.key, mode: this._queueAdd?.mode ?? this._planMode };
+          if (!this._usesPlanColumn()) this._queueSheet = true;
+          return;
+        }
         if (vacs) this._toggleRoomAcross(room.key, vacs); else this._toggleRoom(room, vac);
       } else {
         this._holdId = null;
@@ -11393,8 +11942,12 @@ export class AnyVacCard extends LitElement {
           return this._t(v.kind === "wet" ? "{name} mopping {room}" : "{name} in {room}", { name: nm, room: v.room });
         });
       const left = Math.round(Number(jp.eta_min_left ?? 0));
+      const open = this._jobLanes(jp) && !this._usesPlanColumn() ? () => { this._queueSheet = true; } : undefined;
       return html`
-        <div class="meta-hero">
+        <div class="meta-hero ${open ? "meta-hero--open" : ""}" role=${open ? "button" : nothing} tabindex=${open ? "0" : nothing}
+          aria-label=${open ? this._t("Open the queue") : nothing}
+          @click=${open ?? nothing}
+          @keydown=${open ? (e: KeyboardEvent) => { if (e.key === "Enter" || e.key === " ") { e.preventDefault(); open(); } } : nothing}>
           <span class="hero-ring" aria-hidden="true">
             <svg width="40" height="40" viewBox="0 0 40 40">
               <circle cx="20" cy="20" r=${r} fill="none" style="stroke: rgba(var(--avc-ink-rgb),0.1)" stroke-width="3.5"></circle>
@@ -11463,6 +12016,7 @@ export class AnyVacCard extends LitElement {
           : html`<small>${this._t("Pick rooms on the map first")}</small>`}</span>
       </div>
       ${this._renderActions(vac, idx)}
+      ${this._renderSpSection(vac, idx)}
       <div class="robot-sheet-foot">
         <button class="mtbtn" @click=${() => this._dock(vac)}><ha-icon icon="mdi:home-import-outline"></ha-icon><span>${this._t("Send to dock")}</span></button>
       </div>`;
@@ -11881,7 +12435,7 @@ export class AnyVacCard extends LitElement {
             return html`<div class="avc-region avc-region--${name}" style=${styleMap(regionStyles(pl))}>${tpl}</div>`;
           })}
         </div>
-        ${this._renderRobotSheet()}${this._renderVeNotice()}
+        ${this._renderRobotSheet()}${this._renderQueueSheet()}${this._renderSpBar()}${this._renderVeNotice()}
       </ha-card>
     `;
   }
@@ -11917,7 +12471,7 @@ export class AnyVacCard extends LitElement {
                 ${this._renderMapTools(this._config.vacuums[i])}
                 ${this._renderStatusCard(this._config.vacuums[i], i)}
               `)}
-        ${this._renderRobotSheet()}${this._renderVeNotice()}
+        ${this._renderRobotSheet()}${this._renderQueueSheet()}${this._renderSpBar()}${this._renderVeNotice()}
       </ha-card>
     `;
   }
@@ -13496,6 +14050,155 @@ export class AnyVacCard extends LitElement {
       background: rgba(var(--avc-err-rgb), 0.16); border-color: rgba(var(--avc-err-rgb), 0.5);
       color: rgb(var(--avc-err-rgb)); box-shadow: none;
     }
+    /* ── docs/52 (card 1.62.0): the room-by-room queue ────────────────── */
+    .q-col .plan-head { align-items: center; }
+    /* A stable width: the column must not change size (and move the map) when
+     * a row opens its actions, the view switches or the Add panel opens. */
+    .q-col { width: 520px; max-width: 48vw; box-sizing: border-box; }
+    .q-scroll { flex: 1 1 auto; min-height: 0; overflow-y: auto; display: flex; flex-direction: column; gap: 8px; }
+    .q-views { display: inline-flex; gap: 2px; padding: 2px; border-radius: var(--avc-r-m); background: rgba(var(--avc-ink-rgb), 0.07); }
+    .q-view {
+      width: 32px; height: 28px; border: none; border-radius: var(--avc-r-s, 8px); cursor: pointer; padding: 0;
+      display: flex; align-items: center; justify-content: center; --mdc-icon-size: 17px;
+      background: transparent; color: rgba(var(--avc-ink-rgb), 0.6);
+    }
+    .q-view.on { background: rgba(var(--avc-ink-rgb), 0.14); color: rgb(var(--avc-ink-rgb)); }
+    .q-lanes { display: flex; gap: 8px; min-height: 0; }
+    .q-lanes--sheet { flex-direction: column; }
+    .q-lane {
+      flex: 1 1 0; min-width: 0; display: flex; flex-direction: column; gap: 2px;
+      padding: 8px; border-radius: var(--avc-r-m); background: rgba(var(--avc-ink-rgb), 0.04);
+    }
+    .q-lane-head { display: flex; align-items: center; gap: 8px; padding: 0 2px 4px; }
+    .q-lane-name { display: flex; flex-direction: column; min-width: 0; flex: 1; font-size: var(--avc-fs-m); font-weight: 600; }
+    .q-lane-name small, .q-name small { font-size: var(--avc-fs-s); font-weight: 400; color: rgba(var(--avc-ink-rgb), 0.6); }
+    .q-kind {
+      font-size: var(--avc-fs-xs); padding: 1px 7px; border-radius: var(--avc-r-pill);
+      background: rgba(var(--avc-ink-rgb), 0.08); color: rgba(var(--avc-ink-rgb), 0.7);
+    }
+    .q-item--sel { border-radius: var(--avc-r-m); background: rgba(var(--avc-ink-rgb), 0.06); box-shadow: inset 0 0 0 1px rgba(var(--avc-ink-rgb), 0.14); }
+    .q-row {
+      position: relative; display: flex; align-items: center; gap: 8px; min-height: 36px; padding: 0 8px;
+      border-radius: var(--avc-r-m); font-size: var(--avc-fs-m); outline-offset: -2px;
+    }
+    .q-row[role="button"] { cursor: pointer; }
+    .q-lead { --mdc-icon-size: 15px; flex-shrink: 0; color: rgba(var(--avc-ink-rgb), 0.5); }
+    .q-lead--ok { color: rgb(var(--avc-ok-rgb)); }
+    .q-lead--err { color: rgb(var(--avc-err-rgb)); }
+    .q-name { flex: 1; min-width: 0; display: block; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+    .q-row--done .q-name { color: rgba(var(--avc-ink-rgb), 0.5); }
+    .q-row--active .q-name { font-weight: 600; }
+    .q-row--blocked { background: rgba(var(--avc-err-rgb), 0.09); }
+    small.q-reason { display: block; white-space: normal; color: rgb(var(--avc-err-rgb)); }
+    .q-right {
+      display: inline-flex; align-items: center; gap: 4px; white-space: nowrap; font-variant-numeric: tabular-nums;
+      font-size: var(--avc-fs-s); color: rgba(var(--avc-ink-rgb), 0.62); --mdc-icon-size: 14px;
+    }
+    .q-pct { color: rgb(var(--avc-ok-rgb)); font-weight: 600; }
+    .q-wait { display: inline-flex; align-items: center; gap: 3px; }
+    .q-bar { position: absolute; left: 8px; right: 8px; bottom: 3px; height: 3px; border-radius: 2px; background: rgba(var(--avc-ink-rgb), 0.08); overflow: hidden; }
+    .q-bar span { display: block; height: 100%; }
+    .q-retry, .q-act {
+      height: 30px; padding: 0 10px; border: none; border-radius: var(--avc-r-s, 8px); cursor: pointer;
+      display: inline-flex; align-items: center; justify-content: center; gap: 5px; --mdc-icon-size: 16px;
+      font: inherit; font-size: var(--avc-fs-s); font-weight: 600;
+      background: rgba(var(--avc-ink-rgb), 0.1); color: rgb(var(--avc-ink-rgb));
+    }
+    .q-retry { background: rgba(var(--avc-err-rgb), 0.16); color: rgb(var(--avc-err-rgb)); }
+    .q-act { width: 36px; padding: 0; position: relative; overflow: hidden; }
+    .q-act--wide { width: auto; padding: 0 10px; flex: 1; }
+    .q-act--err { background: rgba(var(--avc-err-rgb), 0.14); color: rgb(var(--avc-err-rgb)); }
+    .q-act:disabled { opacity: 0.35; cursor: default; }
+    .q-actions { display: flex; flex-wrap: wrap; gap: 4px; padding: 2px 6px 6px; }
+    .q-alerts { display: flex; flex-direction: column; gap: 4px; padding: 8px 10px; border-radius: var(--avc-r-m); background: rgba(var(--avc-err-rgb), 0.12); font-size: var(--avc-fs-s); }
+    .q-alerts span { display: flex; align-items: flex-start; gap: 6px; --mdc-icon-size: 15px; }
+    .q-alerts ha-icon { color: rgb(var(--avc-err-rgb)); flex-shrink: 0; }
+    .q-alerts .q-alert--warn ha-icon { color: rgb(var(--avc-warn-rgb, 224, 168, 74)); }
+    .q-time { display: grid; grid-template-columns: 1fr 1fr; gap: 6px 14px; align-content: start; }
+    .q-time--sheet { grid-template-columns: 1fr; }
+    .q-time-col { display: flex; flex-direction: column; gap: 8px; min-width: 0; }
+    .q-sec { display: flex; flex-direction: column; gap: 1px; }
+    .q-sec-title { font-size: var(--avc-fs-xs); text-transform: uppercase; letter-spacing: 0.05em; color: rgba(var(--avc-ink-rgb), 0.5); padding: 0 8px 3px; }
+    .q-add-btn { flex-shrink: 0; }
+    .q-add { display: flex; flex-direction: column; gap: 10px; padding: 10px; border-radius: var(--avc-r-m); background: rgba(var(--avc-ink-rgb), 0.04); }
+    .q-add-head { display: flex; align-items: center; justify-content: space-between; font-size: var(--avc-fs-m); }
+    .q-add-x { width: 32px; height: 32px; }
+    .q-add-rooms { display: flex; flex-wrap: wrap; gap: 6px; }
+    .q-room {
+      min-height: 34px; padding: 0 12px; border-radius: var(--avc-r-m); cursor: pointer; font: inherit; font-size: var(--avc-fs-m);
+      border: 1px solid rgba(var(--avc-ink-rgb), 0.16); background: transparent; color: rgb(var(--avc-ink-rgb));
+    }
+    .q-room.on { border-color: rgb(var(--avc-accent-rgb)); background: rgba(var(--avc-accent-rgb), 0.16); font-weight: 600; }
+    .q-room:disabled { opacity: 0.35; cursor: default; }
+    .q-add-hint { font-size: var(--avc-fs-s); color: rgba(var(--avc-ink-rgb), 0.55); }
+    .q-add-go { justify-content: center; }
+    .q-foot { display: flex; align-items: center; gap: 8px; }
+    .q-foot .dock-run { flex: 1; justify-content: center; padding: 12px 14px; }
+    .q-left { font-size: var(--avc-fs-s); color: rgba(var(--avc-ink-rgb), 0.6); text-align: center; }
+    .q-sheet .robot-sheet-head { align-items: center; }
+    .rail-plan--open, .meta-hero--open { cursor: pointer; }
+    .avc-notice {
+      display: flex; align-items: center; gap: 8px; padding: 8px 10px; border-radius: var(--avc-r-m);
+      background: rgba(var(--avc-err-rgb), 0.14); font-size: var(--avc-fs-s); --mdc-icon-size: 16px;
+    }
+    .avc-notice > ha-icon { color: rgb(var(--avc-err-rgb)); flex-shrink: 0; }
+    .avc-notice span { flex: 1; }
+    .avc-notice-x { border: none; background: none; color: inherit; cursor: pointer; padding: 2px; display: flex; }
+    /* ── service points (docs/52 §5 item 7) ─────────────────────────────── */
+    .sp-section { display: flex; flex-direction: column; gap: 8px; }
+    .sp-row {
+      display: flex; align-items: center; gap: 10px; padding: 8px 8px 8px 12px;
+      border-radius: var(--avc-r-m); background: rgba(var(--avc-ink-rgb), 0.05);
+    }
+    .sp-flag { --mdc-icon-size: 20px; color: #E0A84A; flex-shrink: 0; }
+    .sp-text { display: flex; flex-direction: column; flex: 1; min-width: 0; font-size: var(--avc-fs-m); }
+    .sp-text small { font-size: var(--avc-fs-s); color: rgba(var(--avc-ink-rgb), 0.6); }
+    .sp-go {
+      height: 38px; padding: 0 14px; border: none; border-radius: var(--avc-r-m); cursor: pointer;
+      display: inline-flex; align-items: center; gap: 5px; --mdc-icon-size: 16px;
+      font: inherit; font-weight: 700; font-size: var(--avc-fs-m);
+      background: rgba(224, 168, 74, 0.18); color: #E0A84A;
+    }
+    .avc-theme--light .sp-go { color: #8a5a00; }
+    .sp-go:disabled { background: rgba(var(--avc-ink-rgb), 0.07); color: rgba(var(--avc-ink-rgb), 0.4); cursor: not-allowed; }
+    .sp-more { width: 36px; height: 38px; background: transparent; }
+    .sp-menu { display: flex; gap: 6px; flex-wrap: wrap; padding: 0 4px; }
+    .sp-del { color: rgb(var(--avc-err-rgb)); }
+    .sp-why { display: flex; gap: 7px; align-items: flex-start; font-size: var(--avc-fs-s); line-height: 1.4; color: rgba(var(--avc-ink-rgb), 0.6); --mdc-icon-size: 15px; }
+    .sp-add {
+      min-height: 40px; border: 1px dashed rgba(var(--avc-ink-rgb), 0.2); border-radius: var(--avc-r-m); cursor: pointer;
+      background: transparent; color: rgba(var(--avc-ink-rgb), 0.7); font: inherit; font-size: var(--avc-fs-m);
+      display: flex; align-items: center; justify-content: center; gap: 6px; --mdc-icon-size: 16px;
+    }
+    .sp-here {
+      display: flex; align-items: center; gap: 12px; padding: 12px; border-radius: var(--avc-r-m);
+      background: rgba(224, 168, 74, 0.1); box-shadow: inset 0 0 0 1px rgba(224, 168, 74, 0.35); --mdc-icon-size: 20px;
+    }
+    .sp-here > ha-icon { color: #E0A84A; }
+    .sp-here span { display: flex; flex-direction: column; font-size: var(--avc-fs-m); }
+    .sp-here small { font-size: var(--avc-fs-s); color: rgba(var(--avc-ink-rgb), 0.6); }
+    .sp-home { justify-content: center; }
+    .sp-bar {
+      position: absolute; left: 50%; bottom: 0; z-index: 41; transform: translateX(-50%);
+      width: min(520px, 100%); box-sizing: border-box; display: flex; flex-direction: column; gap: 10px;
+      padding: 12px 16px 14px; border-radius: var(--avc-th-r-l, 22px) var(--avc-th-r-l, 22px) 0 0;
+      background: rgb(var(--avc-scrim-2-rgb)); color: rgb(var(--avc-ink-rgb)); box-shadow: 0 -12px 40px rgba(0, 0, 0, 0.45);
+    }
+    .sp-bar-head { display: flex; align-items: center; gap: 8px; font-size: var(--avc-fs-l, 15px); }
+    .sp-bar-hint { display: flex; align-items: center; gap: 6px; font-size: var(--avc-fs-s); color: rgba(var(--avc-ink-rgb), 0.7); --mdc-icon-size: 16px; }
+    .sp-bar-hint ha-icon { color: #E0A84A; }
+    .sp-name { display: flex; align-items: center; gap: 10px; font-size: var(--avc-fs-s); color: rgba(var(--avc-ink-rgb), 0.6); }
+    .sp-name-input {
+      flex: 1; height: 38px; box-sizing: border-box; padding: 0 10px; border-radius: var(--avc-r-m);
+      border: 1px solid rgba(var(--avc-ink-rgb), 0.18); background: rgba(var(--avc-ink-rgb), 0.04);
+      color: rgb(var(--avc-ink-rgb)); font: inherit; font-size: var(--avc-fs-m);
+    }
+    .sp-bar-btns { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
+    .sp-bar-gap { flex: 1; }
+    .sp-save { padding: 10px 18px; }
+    .avc-sp-ring { animation: avc-sp-pulse 1.8s ease-out infinite; transform-box: fill-box; transform-origin: center; }
+    @keyframes avc-sp-pulse { from { opacity: 0.9; transform: scale(0.7); } to { opacity: 0; transform: scale(1.4); } }
+    @media (prefers-reduced-motion: reduce) { .avc-sp-ring { animation: none; } }
     .rail-tile-text { display: flex; flex-direction: column; gap: 1px; min-width: 0; flex: 1; }
     .rail-tile-name {
       display: flex; align-items: center; gap: 4px; min-width: 0;

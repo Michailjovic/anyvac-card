@@ -54,6 +54,7 @@ Everything is optional unless stated otherwise — the whole card boots from
 | `layout` | `LayoutConfig` | unset | Always | Opts into the responsive percentage-grid layout. See [Layout](#layout-responsive-grid). |
 | `theme` | `"dark" \| "light" \| "auto" \| "legacy"` | `"auto"` | Always | Visual theme. `auto` follows Home Assistant's own dark/light theme. `legacy` is the exact pre-1.2.0 appearance. See [Appearance](#appearance-theme-accent-calm-state). |
 | `accent` | hex string | `"#6FBF73"` | Always | Accent colour for START, room selection and focus rings. Status colours are unaffected. See [Appearance](#appearance-theme-accent-calm-state). |
+| `queue_view` | `"robots" \| "time"` | `"robots"` | Integration ≥ 1.62.0 | How the running job's queue is shown: one lane per vacuum, or one list (Now / Next / Done). The toggle in the queue header overrides it per browser. |
 | `calm_state` | boolean | `true` | Always | Step the leftover map trace and secondary numbers back when nothing is running and nothing is selected. Purely de-emphasis — nothing is hidden or disabled. |
 | `reduce_motion` | boolean | `false` | Always | Turn off press feedback and live pulses. The OS `prefers-reduced-motion` setting already does this on its own; this is for switching them off without it. |
 | `marker_glide_s` | number | `1.5` | Themed (not `legacy`) | Seconds the robot marker takes to drive the stretch of trail since the previous position update, along the drawn line. `0` = jump. Max `25`. |
@@ -562,7 +563,8 @@ generated from
 | `anyvac.select_rooms` | Change the shared room selection (set/add/remove/toggle/clear). |
 | `anyvac.pin_room` | Pin a room to a specific vacuum for a given pass (dry/wet), overriding automatic assignment. Auto-clears once that pass is actually cleaned. |
 | `anyvac.set_layers` | Set shared dry/wet path visibility on the map (synced across browsers). |
-| `anyvac.edit_job` | Change the running job: add / remove rooms, move a room in its vacuum's queue, hand a room's pass to another vacuum (integration 1.60.0, docs/52). |
+| `anyvac.edit_job` | Change the running job: add / remove rooms, move a room in its vacuum's queue, hand a room's pass to another vacuum (integration 1.60.0, docs/52), retry a blocked room (1.62.0). The queue's row actions and **Add a room** call it. |
+| `anyvac.set_service_point` / `go_to_service_point` / `remove_service_point` | Named service points per vacuum (integration ≥ 1.61.0; rename via `from_name` ≥ 1.62.0) — the **Service point** section of each robot's sheet. Go is refused while the vacuum still has rooms in a running job. |
 | `anyvac.reset_learning` | Clear learned clean-time estimates and/or coverage baselines, e.g. after moving furniture or resetting a robot's map. |
 | `anyvac.dock_resolve_error` | Confirm the dock's latched error, like "Resolved" in the Roborock app (card 1.50.0: the Resolved button in the Dock tab, shown only while the dock reports an error). |
 | `anyvac.dock_empty` / `dock_wash` / `dock_dry` / `dock_pump` / `dock_self_clean` | Manual dock control (empty dustbin, wash/dry mop, pump, Fill&Drain self-clean) — the Dock tab of each robot's sheet (card 1.48.0; before that one shared dock sheet). Shown/hidden per vacuum based on detected dock capability. |

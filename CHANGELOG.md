@@ -4,6 +4,19 @@ All notable changes to this project are documented here.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## 1.62.0
+
+Pairs with integration 1.62.0. The card side of docs/52 — the room-by-room queue — and service points (designs: "AnyVac – redesign mockupy", row "Fronta po místnostech").
+
+- **The queue while cleaning.** The plan column (landscape) shows the running job from `job_progress.queues`: one lane per robot, or one list by time (Now / Next / Done). The toggle in its header is remembered per browser; `queue_view: time` makes the list the default (Global tab → Appearance). Each row: done ✓ with its time, live % with a bar, the start time of the next ones, and a lock with "after S7" while a mop pass waits for the room's dry pass (`waits_for`, integration 1.62.0). The column keeps one width, so the map does not move when a row opens or the view changes.
+- **Editing it.** Tap a row: move it up / down in its robot's queue, hand it to another robot that can do that pass, or remove it; the room being cleaned can be skipped (hold). All of it is `anyvac.edit_job`. A blocked room shows the reason (e.g. water tank empty) in red with **Retry**, and an alert at the top of the queue. A refused edit shows the integration's message for a few seconds instead of only reaching the console.
+- **Add a room** — a button under the queue, or a tap on a room on the map while a job runs (instead of changing the selection): pick Dry / Wet / Both and the room; the integration picks the robot. Rooms whose pass is already queued are greyed out.
+- **Portrait:** the queue opens as a sheet from the top bar or the rail's plan card, with the same rows, Add a room and Cancel.
+- **Service points** (integration 1.61.0+). A section in each robot's sheet: the saved points with **Go**, ⋮ to rename, move or delete (a second tap confirms), and **Add a service point**. Placing one: the sheet steps aside, a bar holds the name, a tap on the map places the point (tap again to adjust), or **Use where S6 stands**. While the robot still has rooms in a running job, Go is disabled with the reason — a trip there would end the room it is cleaning and the firmware would not continue where it stopped. At a point: **Back to dock**. Points are drawn on the map as a flag (kept upright on a rotated map).
+- Docs: README (while a job runs, service points), CONFIGURATION (`queue_view`, the services).
+- Tests: `queue.spec.ts` (10 — lanes, the view toggle and its default, each row action's `edit_job` shape, a map tap adding a room, the portrait sheet, service point Go / busy / placing / rename, the map marker); 414 Playwright tests.
+- Not yet: dragging a row to reorder (↑ ↓ do the same for now); the add panel opens in the queue rather than as a popover next to the tapped room.
+
 ## 1.60.0
 
 Pairs with integration 1.60.0 (room-by-room clean jobs, docs/52). Published as 1.60.0; 1.58.0 was prepared but never reached Home Assistant.

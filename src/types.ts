@@ -457,6 +457,10 @@ export interface AnyVacCardConfig {
   /** Visual theme (v1.2.0, docs/35). "auto" (default: follows Home Assistant's
    *  dark/light theme) / "dark" / "light" / "legacy" (the exact pre-1.2.0 look). */
   theme?: CardTheme;
+  /** How the running job's queue is shown by default (docs/52, card 1.62.0):
+   *  "robots" = one lane per vacuum, "time" = one list (Now / Next / Done).
+   *  The header toggle overrides it per browser. Default "robots". */
+  queue_view?: "robots" | "time";
   /** Accent colour driving START, room selection and focus rings. Any hex; the
    *  editor offers curated presets (`ACCENT_PRESETS`). Deliberately does NOT
    *  touch status colours — those stay semantic (docs/25 §6, docs/35 §3). */

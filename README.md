@@ -43,6 +43,18 @@ stacked into a single column and reachable with one thumb: map on top, then
 the vacuum icon strip (equivalent to the picker), the mode row, and the start
 bar at the very bottom.
 
+**While a job runs** (integration 1.62.0): the plan becomes the job's queue — one
+lane per robot or one list by time (toggle in its header, default
+`queue_view`). Tap a row to move it, hand it to another robot or remove it; a
+blocked room shows why, with **Retry**. **Add a room** — or a tap on a room on the
+map — adds it to the running job. On a phone the queue opens as a sheet from the
+top bar.
+
+**Service points** (integration 1.61.0+): each robot's sheet can hold named
+points ("Trash bin"). Place one with a tap on the map or where the robot stands,
+then **Go** and **Back to dock**. Only outside a clean — a trip there would end the
+room being cleaned, and the robot would not continue where it stopped.
+
 ## What it's built around
 
 - **Pick where, not how.** Rooms are tap targets on the map. Cleaning
