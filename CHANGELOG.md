@@ -4,6 +4,15 @@ All notable changes to this project are documented here.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## 1.58.0
+
+Pairs with integration 1.58.0 (room-by-room clean jobs, docs/52).
+
+- **Removed: the cleaning sequence editor** (Global tab, merged mode). Since integration 1.58.0 every vacuum gets one room per command and AnyVac chooses the order itself, so a hand-kept copy of the Roborock app's order has no use any more; the integration reads the app's order from the robot when a vacuum is set to get all rooms in one command (docs/52 O1). The `anyvac.set_room_sequence` service it called is gone.
+- The "unsequenced room" warnings never show any more (the integration always returns an empty list); they go away with the card redesign of the cleaning queue.
+- Docs: README and CONFIGURATION no longer describe the sequence editor; `anyvac.edit_job` listed.
+- Tests: the editor test for the sequence section now checks that it is gone; 404 Playwright tests (`layout.spec` 5b settle test is flaky under full parallel load, passes alone, as before).
+
 ## 1.57.0
 
 Pairs with integration 1.57.0. Completes docs/51.

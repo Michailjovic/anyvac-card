@@ -31,7 +31,7 @@ switch, one-tap start bar:
 | # | Region | What it does |
 |---|---|---|
 | 1 | **Map** | The shared floorplan (or the vacuum's own map in split mode), with live robot position and dry/wet cleaning paths colour-coded per vacuum. Tap a room to select it — this is the only way to pick specific rooms, on this or any other region. The small avatar chip in a room's corner shows which vacuum is currently assigned to clean it. |
-| 2 | **Meta bar** | Left: **Pin & Go** (tap a point on the map to send a robot straight there) and **Zone** (draw a rectangle to spot-clean an area, draggable/resizable before you confirm). Right: per-layer dry/wet path visibility toggles and a manual refresh button — an amber warning icon can also appear here for unassigned or unsequenced rooms (see Troubleshooting below). |
+| 2 | **Meta bar** | Left: **Pin & Go** (tap a point on the map to send a robot straight there) and **Zone** (draw a rectangle to spot-clean an area, draggable/resizable before you confirm). Right: per-layer dry/wet path visibility toggles and a manual refresh button — a warning icon can also appear here for unassigned rooms (see Troubleshooting below). |
 | 3 | **Status cards** | One card per vacuum — current state and room, battery, when it last charged, and its own **START**, showing that vacuum's own room selection and ETA. This is where you monitor an individual robot, and in `ui_mode: manual` it's the primary way to start each robot independently on its own presets. Tap the robot's avatar to open Home Assistant's own more-info dialog for that entity — a quick escape hatch to a native action this card doesn't have a shortcut for (e.g. a one-off fan-speed change, or the vendor integration's own segment picker). |
 | 4 | **Robot tiles (hide/show)** | Hold a robot's tile to hide/show it on the merged map — handy with 3+ robots sharing one floorplan when the overlapping paths get busy. A hidden robot keeps a dimmed tile, so the same hold brings it back. (`theme: legacy` keeps the older pill picker in the right column.) |
 | 5 | **Mode row** | The **Dry / Wet / Both** pass selector for the orchestrated clean. Dock control and consumables are per robot: tap a robot to open its sheet, with **Clean / Dock / Care** tabs (Dock: Empty / Wash / Dry / Pump / Self-clean as the dock supports; Care: brushes, filter and sensors, worst first, with reset). A red dot on a robot's avatar and on the tab marks what needs a look. |
@@ -179,11 +179,6 @@ here has a working default:
   knows about that aren't on the floorplan yet, placed via its current seat.
   Use this on any vacuum with rooms exclusive to it (a robot covering an
   extra floor, say) after seating it against the shared reference.
-- **Cleaning sequence** — drag to match the room order in the Roborock app.
-  The app's own order always wins regardless of what Home Assistant sends,
-  so the integration needs to know it to predict wet-clean timing correctly.
-  This is shared across all vacuums/dashboards (backend-owned), not saved in
-  this card's config.
 
 ### ⚙ Global
 
@@ -233,10 +228,9 @@ type and whether it needs the integration, applies only in merged mode, etc.
 - **A vacuum's rooms cluster in the wrong spot on the shared floorplan.**
   Its room names don't match the reference vacuum's — see the callout under
   the Maps tab above.
-- **An amber warning icon next to a room or the ETA.** "Unsequenced" means
-  that room has no position in the Roborock app's cleaning order yet (drag
-  it into place on the Maps tab); "unassigned" means the current plan
-  couldn't find a capable vacuum for it (check Role on the Vacuums tab).
+- **A warning icon next to a room or the ETA.** "Unassigned" means the
+  current plan couldn't find a capable vacuum for it (check Role on the
+  Vacuums tab).
 - **Pin & Go / Zone tools greyed out.** These are disabled while the map is
   shown rotated (portrait, or a tall/narrow floorplan in landscape) — the
   click-to-coordinate math doesn't support it yet.

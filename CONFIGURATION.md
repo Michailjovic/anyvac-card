@@ -562,7 +562,7 @@ generated from
 | `anyvac.select_rooms` | Change the shared room selection (set/add/remove/toggle/clear). |
 | `anyvac.pin_room` | Pin a room to a specific vacuum for a given pass (dry/wet), overriding automatic assignment. Auto-clears once that pass is actually cleaned. |
 | `anyvac.set_layers` | Set shared dry/wet path visibility on the map (synced across browsers). |
-| `anyvac.set_room_sequence` | Replace the stored room cleaning order (for sequence-aware ETA) — should mirror the order configured in the Roborock app. |
+| `anyvac.edit_job` | Change the running job: add / remove rooms, move a room in its vacuum's queue, hand a room's pass to another vacuum (integration 1.58.0, docs/52). |
 | `anyvac.reset_learning` | Clear learned clean-time estimates and/or coverage baselines, e.g. after moving furniture or resetting a robot's map. |
 | `anyvac.dock_resolve_error` | Confirm the dock's latched error, like "Resolved" in the Roborock app (card 1.50.0: the Resolved button in the Dock tab, shown only while the dock reports an error). |
 | `anyvac.dock_empty` / `dock_wash` / `dock_dry` / `dock_pump` / `dock_self_clean` | Manual dock control (empty dustbin, wash/dry mop, pump, Fill&Drain self-clean) — the Dock tab of each robot's sheet (card 1.48.0; before that one shared dock sheet). Shown/hidden per vacuum based on detected dock capability. |

@@ -187,13 +187,7 @@ test.describe("Global tab: merged-mode Floorplan + Rooms (shared) (docs/42 fáze
     expect(cfg.vacuums[0].rooms ?? []).toHaveLength(0);
   });
 
-  test("cleaning-sequence section only appears once an AnyVac integration sensor and shared rooms both exist", async ({ page }) => {
-    await mountEditor(page, { mapMode: "merged" });
-    await page.evaluate(() => { (window as any).__editor._tab = "global"; });
-    await page.evaluate(async () => { await (window as any).__editor.updateComplete; });
-    let html = await shadow(page);
-    expect(html).not.toContain("Cleaning sequence");
-
+  test("the hand-edited cleaning sequence is gone (docs/52 O1)", async ({ page }) => {
     await mountEditor(page, {
       mapMode: "merged",
       vacuumOverrides: { integration_entity: "sensor.anyvac_my_roborock" },
@@ -201,8 +195,8 @@ test.describe("Global tab: merged-mode Floorplan + Rooms (shared) (docs/42 fáze
     });
     await page.evaluate(() => { (window as any).__editor._tab = "global"; });
     await page.evaluate(async () => { await (window as any).__editor.updateComplete; });
-    html = await shadow(page);
-    expect(html).toContain("Cleaning sequence");
+    const html = await shadow(page);
+    expect(html).not.toContain("Cleaning sequence");
   });
 });
 
