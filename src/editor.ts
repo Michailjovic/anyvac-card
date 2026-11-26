@@ -450,9 +450,20 @@ export class AnyVacCardEditor extends LitElement {
   /** Mirrors the card's `_mapEntityFor` (2026-07-30 onboarding audit, docs/30 §2.1)
    *  so the Maps tab preview/hints reflect the same auto-resolved entity the card
    *  will actually use, not just what's explicitly typed into the picker below. */
+  /** `map_entity` from the vacuum's AnyVac sensor (same device as the vacuum,
+   *  platform anyvac), when it names an existing entity. */
+  private _intAttrsMap(vacEntity: string): string | undefined {
+    const ie = this._intEntityFor({ entity: vacEntity });
+    const cur = ie ? this.hass.states[ie]?.attributes?.map_entity : undefined;
+    return typeof cur === "string" && this.hass.states[cur] ? cur : undefined;
+  }
+
   private _mapEntityFor(vac: { entity: string; map?: { entity: string } } | undefined): string | undefined {
     if (!vac) return undefined;
     if (vac.map?.entity) return vac.map.entity;
+    // Integration ≥ 1.62.1: the image entity of the robot's current map.
+    const cur = this._intAttrsMap(vac.entity);
+    if (cur) return cur;
     const reg = (this.hass as any)?.entities as Record<string, any> | undefined;
     const dev = reg?.[vac.entity]?.device_id;
     if (!dev) return undefined;

@@ -38,7 +38,7 @@ const JOB = {
     ] },
   },
 };
-const SP = [{ name: "Trash bin", x: 1200, y: 900, px: { x: 40, y: 30 }, home_px: null, room: "Kitchen" }];
+const SP = [{ name: "Trash bin", x: 1200, y: 900, px: { x: 200, y: 150 }, home_px: null, room: "Kitchen" }];
 
 async function mount(page: Page, o: { width?: number; height?: number; job?: boolean; points?: boolean; view?: string } = {}) {
   const { width = 1270, height = 714, job = true, points = false, view } = o;
@@ -224,7 +224,64 @@ test("service point: placing one — map tap, name, Save sends set_service_point
   expect((await calls(page, "set_service_point")).pop()).toEqual({ entity_id: "vacuum.s6", name: "Bin", from_name: "Trash bin" });
 });
 
-test("service points are drawn on the map", async ({ page }) => {
+test("service points: hidden until the toolbar flag shows them; a tap on one offers to send the robot", async ({ page }) => {
   await mount(page, { points: true, job: false });
+  await page.evaluate(() => { try { localStorage.clear(); } catch { /* */ } });
+  await expect(shadow(page, "g.avc-sp")).toHaveCount(0);
+  const toggle = shadow(page, 'button[aria-label="Service points"]');
+  await expect(toggle).toHaveCount(1);
+  await toggle.click();
   await expect(shadow(page, "g.avc-sp")).toHaveCount(1);
+  // A real tap reaches the flag (the room buttons are below it).
+  const hit = await page.evaluate(() => {
+    const r = (window as any).__card.shadowRoot as ShadowRoot;
+    const g = r.querySelector("g.avc-sp--tap") as SVGGElement;
+    const b = g.getBoundingClientRect();
+    const el = r.elementFromPoint(b.x + b.width / 2, b.y + b.height / 2);
+    return !!el && g.contains(el) ? true : [el?.tagName, (el as any)?.className?.baseVal ?? (el as any)?.className, b.x, b.y, b.width];
+  });
+  expect(hit).toBe(true);
+  await shadow(page, "g.avc-sp--tap").dispatchEvent("click");
+  await expect(shadow(page, ".sp-bar")).toHaveCount(1);
+  await shadow(page, ".sp-bar .sp-save").click();
+  expect((await calls(page, "go_to_service_point")).pop()).toEqual({ entity_id: "vacuum.s6", name: "Trash bin" });
+  await toggle.click();
+  await expect(shadow(page, "g.avc-sp")).toHaveCount(0);
+});
+
+test("map entity: the integration's map_entity picks between two live maps", async ({ page }) => {
+  await mount(page, { job: false });
+  const got = await page.evaluate(() => {
+    const c = (window as any).__card;
+    const now = new Date().toISOString();
+    const img = (id: string) => ({ entity_id: id, state: now, attributes: { entity_picture: "/api/image_proxy/" + id }, last_changed: now, last_updated: now });
+    c.hass.states["image.s7_a"] = img("image.s7_a");
+    c.hass.states["image.s7_b"] = img("image.s7_b");
+    c.hass.entities = { "vacuum.s7": { device_id: "d7" }, "image.s7_a": { device_id: "d7" }, "image.s7_b": { device_id: "d7" } };
+    const vac = c._config.vacuums[1];
+    const before = c._mapEntityFor(vac);
+    c.hass.states["sensor.anyvac_s7"].attributes.map_entity = "image.s7_b";
+    return [before, c._mapEntityFor(vac)];
+  });
+  expect(got).toEqual([undefined, "image.s7_b"]);
+});
+
+test("service point flags stay upright whatever angle the vacuum's map is seated at", async ({ page }) => {
+  await mount(page, { points: true, job: false });
+  const angles = await page.evaluate(async () => {
+    const c = (window as any).__card;
+    c._spShow = true;
+    const out: number[] = [];
+    for (const rot of [0, 37, 90, 180, 251]) {
+      c._effectiveSeat = () => ({ offset_x: 0, offset_y: 0, scale: 100, rotation: rot, scaleY: rot === 37 ? 130 : undefined });
+      c.requestUpdate();
+      await c.updateComplete;
+      const path = c.shadowRoot.querySelector("g.avc-sp path") as SVGGraphicsElement;
+      const m = path.getScreenCTM()!;
+      // Upright: no rotation and no shear in the flag's own screen matrix.
+      out.push(Math.round((Math.atan2(m.b, m.a) * 180) / Math.PI) + 0, Math.round(Math.abs(m.a * m.c + m.b * m.d) * 1000) + 0);
+    }
+    return out;
+  });
+  expect(angles).toEqual([0, 0, 0, 0, 0, 0, 0, 0, 0, 0]);
 });

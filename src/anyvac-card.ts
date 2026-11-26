@@ -308,6 +308,11 @@ export class AnyVacCard extends LitElement {
     point?: { x: number; y: number; frame?: "home" };
   } | null = null;
   @state() private _spMenu: string | null = null;
+  /** Saved service points are drawn only when this is on (toolbar flag
+   *  button, per browser) — a point being placed is always drawn. */
+  @state() private _spShow = false;
+  /** Tapped a service point on the map: confirm sending the robot there. */
+  @state() private _spGo: { entity: string; name: string } | null = null;
   @state() private _spDelete: string | null = null;
   /** A refused edit / service point call, shown for a few seconds. */
   @state() private _notice: string | null = null;
@@ -839,6 +844,7 @@ export class AnyVacCard extends LitElement {
       this._shownSet = this._loadShown();
       this._localRoomSel = this._loadRoomSel();
       this._flipLive = this._loadFlipLive();
+      this._spShow = this._loadSpShow();
       this._queueView = this._loadQueueView();
     } else {
       const valid = new Set<number>();
@@ -1576,6 +1582,12 @@ export class AnyVacCard extends LitElement {
   private _mapCandCache = new Map<string, string[]>();
   private _mapEntityFor(vac: VacuumConfig): string | undefined {
     if (vac.map?.entity) return vac.map.entity;
+    // Integration ≥ 1.62.1 names the image entity of the robot's CURRENT map.
+    // Roborock makes one per saved floor and keeps every one of them "live"
+    // (same picture timestamp) — an S7 MaxV with two maps had no map at all
+    // here, so Pin & Go, zones and service points could not place a point.
+    const cur = this._intAttrs(vac)?.map_entity;
+    if (typeof cur === "string" && this.hass.states[cur]) return cur;
     const reg = this._registry();
     if (!reg || !vac.entity) return undefined;
     let candidates = this._mapCandCache.get(vac.entity);
@@ -3425,6 +3437,7 @@ export class AnyVacCard extends LitElement {
     return html`
       <div class="rail-tools">
         ${this._renderLayerToggleCompact(vacs)}
+        ${this._renderSpToggle(vacs, true)}
         ${withMap.length ? html`<button class="mtbtn mtbtn--icon" title=${this._t("Refresh map")} aria-label=${this._t("Refresh map")} @click=${refreshTap}>
             <ha-icon icon="mdi:refresh"></ha-icon></button>` : nothing}
         ${this._config.layout ? html`<button class="mtbtn mtbtn--icon ${this._flipEff ? "on" : ""}"
@@ -3530,7 +3543,7 @@ export class AnyVacCard extends LitElement {
              toggle path visibility (field feedback 2026-07-17). Reuses the same
              compact toggle, just placed in the dock column instead of a meta bar. */
           this._profile === "portrait" ? html`
-            <div class="dock-layers">${this._renderLayerToggleCompact(vacs)}
+            <div class="dock-layers">${this._renderLayerToggleCompact(vacs)}${this._renderSpToggle(vacs)}
               ${this._config.layout ? html`<button class="mtbtn ${this._flipEff ? "on" : ""}"
                   title=${this._t("Flip map 180° for this screen (this session only)")} aria-label=${this._t("Flip map")}
                   aria-pressed=${this._flipEff ? "true" : "false"}
@@ -4030,6 +4043,55 @@ export class AnyVacCard extends LitElement {
       else Object.assign(data, { x_pct: s.point.x, y_pct: s.point.y });
     } else if (!s.renameOnly) return;
     if (await this._callNoted("anyvac", "set_service_point", data)) this._spEnd();
+  }
+
+  /** Toolbar flag button: show / hide the saved service points on the map. */
+  private _renderSpToggle(vacs: VacuumConfig[], icon = false) {
+    if (!vacs.some((v) => this._servicePoints(v).length)) return nothing;
+    const on = this._spShow;
+    return html`<button class="mtbtn ${icon ? "mtbtn--icon" : ""} ${on ? "on" : ""}"
+        title=${this._t(on ? "Hide service points" : "Show service points")} aria-label=${this._t("Service points")}
+        aria-pressed=${on ? "true" : "false"}
+        @click=${() => { this._spShow = !on; this._spGo = null; this._saveSpShow(); }}>
+      <ha-icon icon="mdi:flag-variant${on ? "" : "-outline"}"></ha-icon></button>`;
+  }
+
+  private _saveSpShow(): void {
+    try { localStorage.setItem(this._storeKey("sp-show"), this._spShow ? "1" : "0"); } catch { /* storage unavailable */ }
+  }
+
+  private _loadSpShow(): boolean {
+    try { return localStorage.getItem(this._storeKey("sp-show")) === "1"; } catch { return false; }
+  }
+
+  /** Tapped a flag on the map: send the robot there (or explain why not). */
+  private _renderSpGoBar() {
+    const g = this._spGo;
+    if (!g) return nothing;
+    const vac = this._config.vacuums.find((v) => v.entity === g.entity);
+    const point = vac ? this._servicePoints(vac).find((p) => p.name === g.name) : undefined;
+    if (!vac || !point) return nothing;
+    const name = this._vacName(vac);
+    const busy = this._spBusy(vac);
+    const here = this._spAt(vac)?.name === point.name;
+    const go = async () => {
+      if (await this._callNoted("anyvac", "go_to_service_point", { entity_id: vac.entity, name: point.name })) this._spGo = null;
+    };
+    return html`
+      <div class="sp-bar" role="dialog" aria-label=${point.name} @keydown=${(e: KeyboardEvent) => { if (e.key === "Escape") this._spGo = null; }}>
+        <div class="sp-bar-head">${this._vacChip(vac.entity)}<b>${point.name}</b></div>
+        ${this._renderNotice()}
+        <span class="sp-bar-hint"><ha-icon icon="mdi:flag-variant"></ha-icon>${here
+          ? this._t("{name} is already there", { name })
+          : busy ? this._t("Available when {name} has finished its rooms — going there now would end the room it is cleaning, and it could not continue where it stopped.", { name })
+          : this._t("Send {name} to {point}?", { name, point: point.name })}</span>
+        <div class="sp-bar-btns">
+          <span class="sp-bar-gap"></span>
+          <button class="mtbtn" @click=${() => { this._spGo = null; }}><span>${this._t("Cancel")}</span></button>
+          <button class="action-btn dock-run sp-save" ?disabled=${busy || here} @click=${() => void go()}>
+            <ha-icon icon="mdi:play"></ha-icon><span>${this._t("Go")}</span></button>
+        </div>
+      </div>`;
   }
 
   /** The setting bar (instead of the robot sheet while a point is placed). */
@@ -5375,7 +5437,10 @@ export class AnyVacCard extends LitElement {
     if (!withMap.length) {
       // No map entity: no map tools, but the hero (docs/44 F2) still belongs here.
       const hero = this._renderHero(vacs);
-      return hero === nothing ? nothing : html`<div class="meta-bar">${hero}</div>`;
+      const sp = this._renderSpToggle(vacs);
+      return hero === nothing && sp === nothing ? nothing
+        : html`<div class="meta-bar">${hero}${sp === nothing ? nothing : html`<div class="meta-bar-spacer"></div>
+            <div class="meta-bar-cluster meta-bar-cluster--right">${sp}</div>`}</div>`;
     }
     // Pin & Go / Zone here is armed for ALL candidates at once ("*", `_armMode`) —
     // in merged mode the capture (click/drag) happens once on the shared map and
@@ -5448,6 +5513,7 @@ export class AnyVacCard extends LitElement {
             <ha-icon icon="mdi:sort-variant-off"></ha-icon><b>${unsequenced.length}</b>
           </span>` : nothing}
           ${this._renderLayerToggleCompact(vacs)}
+          ${this._renderSpToggle(vacs)}
           ${this._config.layout ? html`<button class="mtbtn ${this._flipEff ? "on" : ""}"
               title=${this._t("Flip map 180° for this screen (this session only)")} aria-label=${this._t("Flip map")}
               aria-pressed=${this._flipEff ? "true" : "false"}
@@ -10220,7 +10286,7 @@ export class AnyVacCard extends LitElement {
    *  report 2026-07-26: S6's marker disappearing under S8's wet trace).
    *  Split mode's `_renderMap` renders one fully independent box per vacuum
    *  (no shared stacking context), so it keeps using the default "both". */
-  private _renderIntegrationOverlay(vac: VacuumConfig, m: any, part: "both" | "paths" | "marker" = "both") {
+  private _renderIntegrationOverlay(vac: VacuumConfig, m: any, part: "both" | "paths" | "marker" | "sp" = "both") {
     const at = mergeLive(this._intAttrs(vac)); // docs/48 live position
     if (!at) return nothing;
     const dims = at.image_dims;
@@ -10264,6 +10330,7 @@ export class AnyVacCard extends LitElement {
       imageRot: (vp && vp.a != null ? vp.a : 0) + (vac.robot_image_rotation ?? 0),
       filterId: "avc-err-blur-" + vac.entity.replace(/[^a-zA-Z0-9]/g, "-"),
       scaleYRatio: seatScaleYRatio(m?.scale ?? 100, m?.scaleY),
+      spRot: m?.rotation ?? 0,
       sp: this._spMarks(vac, (p) => p.px, (q) => ({ x: (q.x / 100) * NW, y: (q.y / 100) * NH })),
     }, part);
     return html`<svg class="map-vector" viewBox="0 0 ${NW} ${NH}" preserveAspectRatio="none" style=${styleMap(seat)}>${inner}</svg>`;
@@ -10279,6 +10346,13 @@ export class AnyVacCard extends LitElement {
    *  their px for this renderer) plus the one being placed. `pending` comes as
    *  the capture stored it — robot-map % for the legacy renderer, home px for
    *  the home-frame ones (`homeSpace`). */
+  /** Does this vacuum have anything to draw in the service-point pass? */
+  private _spMarksWanted(vac: VacuumConfig): boolean {
+    const s = this._spSet;
+    if (s && this._config.vacuums[s.idx]?.entity === vac.entity) return true;
+    return this._spShow && this._servicePoints(vac).length > 0;
+  }
+
   private _spMarks(
     vac: VacuumConfig,
     saved: (p: Record<string, any>) => { x: number; y: number } | null | undefined,
@@ -10288,7 +10362,8 @@ export class AnyVacCard extends LitElement {
     const out: Array<{ pt: Pt; pending?: boolean; name?: string }> = [];
     const s = this._spSet;
     const placing = s && this._config.vacuums[s.idx]?.entity === vac.entity ? s : null;
-    for (const p of this._servicePoints(vac)) {
+    const saved_on = this._spShow || !!placing;
+    for (const p of saved_on ? this._servicePoints(vac) : []) {
       if (placing?.point && placing.from === p.name) continue; // shown at its new place instead
       const q = saved(p);
       if (q && Number.isFinite(q.x) && Number.isFinite(q.y)) out.push({ pt: { x: q.x, y: q.y }, name: p.name });
@@ -10331,16 +10406,28 @@ export class AnyVacCard extends LitElement {
       pose?: string;
       /** Service points (docs/52 §5 item 7), projected; `pending` = being placed. */
       sp?: Array<{ pt: Pt; pending?: boolean; name?: string }>;
+      /** Rotation the SVG itself gets from its seat (merged mode seats each
+       *  vacuum's map at its own angle) — undone on the service-point flag. */
+      spRot?: number;
     },
-    part: "both" | "paths" | "marker",
+    part: "both" | "paths" | "marker" | "sp",
   ) {
     const { rob, head, rr, digits: dg } = g;
-    // Service points: a flag disc above every path, below nothing — drawn
-    // with the markers so merged mode keeps them on top of all trails.
-    const spT = (g.sp ?? []).length && part !== "paths"
+    // Service points have their OWN pass (`part: "sp"`), drawn after the room
+    // buttons, so a tap on a flag reaches it (card 1.62.1: tap = send the robot).
+    const spT = (g.sp ?? []).length && part === "sp"
       ? svg`${(g.sp ?? []).map(({ pt, pending, name }) => {
-          const r = rr * 0.95, k = (r * 1.25) / 24, upright = -this._mapRotationDeg();
-          return svg`<g class="avc-sp ${pending ? "avc-sp--pending" : ""}" transform=${"translate(" + pt.x.toFixed(dg) + " " + pt.y.toFixed(dg) + ")"}>
+          // Upright on screen: undo the map's rotation AND this vacuum's seat
+          // rotation (each map in merged mode has its own), and the seat's
+          // y-only stretch (field 2026-11-26: every flag pointed elsewhere).
+          const r = rr * 0.7, k = (r * 1.25) / 24, upright = -(this._mapRotationDeg() + (g.spRot ?? 0));
+          const ry = g.scaleYRatio && g.scaleYRatio !== 1 ? g.scaleYRatio : 1;
+          const tap = !pending && name && !this._spSet
+            ? (e: Event) => { e.stopPropagation(); this._spGo = { entity: vac.entity, name }; }
+            : undefined;
+          return svg`<g class="avc-sp ${pending ? "avc-sp--pending" : ""} ${tap ? "avc-sp--tap" : ""}" transform=${"translate(" + pt.x.toFixed(dg) + " " + pt.y.toFixed(dg) + ")" + (ry !== 1 ? " scale(1," + (1 / ry).toFixed(4) + ")" : "")}
+              @click=${tap ?? nothing}>
+            ${tap ? svg`<circle r=${(r * 1.4).toFixed(2)} fill="transparent"></circle>` : nothing}
             ${name ? svg`<title>${name}</title>` : nothing}
             ${pending ? svg`<circle class="avc-sp-ring" r=${(r * 1.6).toFixed(2)} fill="none" stroke="#E0A84A" stroke-width=${(rr * 0.2).toFixed(2)}></circle>` : nothing}
             <circle r=${r.toFixed(2)} fill="#E0A84A" stroke="#ffffff" stroke-width=${(rr * 0.16).toFixed(2)}></circle>
@@ -10348,6 +10435,7 @@ export class AnyVacCard extends LitElement {
           </g>`;
         })}`
       : nothing;
+    if (part === "sp") return spT;
     const color = this._color(vac);
     const ct = this._vacCleanType(vac);
     const layersOn = this._layersEff();
@@ -10404,7 +10492,7 @@ export class AnyVacCard extends LitElement {
         ? svg`<g transform=${"translate(" + rob.x.toFixed(1) + "," + rob.y.toFixed(1) + ") scale(1," + (1 / ry).toFixed(4) + ") translate(" + (-rob.x).toFixed(1) + "," + (-rob.y).toFixed(1) + ")"}>${markerContent}</g>`
         : markerContent;
       const pathsInner = svg`${mopBand}${mopLine}${traceT}`;
-      return part === "paths" ? pathsInner : part === "marker" ? svg`${spT}${markerInner}` : svg`${pathsInner}${spT}${markerInner}`;
+      return part === "paths" ? pathsInner : part === "marker" ? markerInner : svg`${pathsInner}${markerInner}`;
     }
     const cleaning = this._isCleaning(vac);
     // Trail C (docs/43 §5, chosen over the fading comet): the whole history
@@ -10485,7 +10573,7 @@ export class AnyVacCard extends LitElement {
         ry !== 1 ? svg`<g transform=${"scale(1," + (1 / ry).toFixed(4) + ")"}>${body}</g>` : body}</g>`;
     }
     const livePaths = svg`${mopBand}${mopLine}${traceT}${heads}`;
-    return part === "paths" ? livePaths : part === "marker" ? svg`${spT}${liveMarker}` : svg`${livePaths}${spT}${liveMarker}`;
+    return part === "paths" ? livePaths : part === "marker" ? liveMarker : svg`${livePaths}${liveMarker}`;
   }
 
   /** docs/40 §4.4 (Fáje 3) home-frame twin of `_renderIntegrationOverlay` —
@@ -10508,7 +10596,7 @@ export class AnyVacCard extends LitElement {
    *  unlike the legacy `vacuum_position_px` contract, where the card negates
    *  `sin` to undo a flip baked into THAT contract's solved affine. Since
    *  home-px space needs no such correction, this uses `+sin`. */
-  private _renderHomeFrameOverlay(vac: VacuumConfig, crop: CropBox, part: "both" | "paths" | "marker" = "both") {
+  private _renderHomeFrameOverlay(vac: VacuumConfig, crop: CropBox, part: "both" | "paths" | "marker" | "sp" = "both") {
     const at = mergeLive(this._intAttrs(vac)); // docs/48 live position
     if (!at) return nothing;
     const cropW = crop.x1 - crop.x0;
@@ -10571,7 +10659,7 @@ export class AnyVacCard extends LitElement {
     fit: SeatFitResult,
     dims: { NW: number; NH: number },
     ar: number,
-    part: "both" | "paths" | "marker" = "both",
+    part: "both" | "paths" | "marker" | "sp" = "both",
   ) {
     const at = mergeLive(this._intAttrs(vac)); // docs/48 live position
     if (!at || !(ar > 0)) return nothing;
@@ -11106,6 +11194,14 @@ export class AnyVacCard extends LitElement {
         ${this._config.layout ? nothing : this._renderLayerToggles(shown)}
         ${this._renderRoomOutlines(this._mergedRoomDefs(shown), shown)}
         ${this._renderMergedRooms(shown)}
+        ${shown.map((v) => {
+            if (!this._intAttrs(v) || !this._spMarksWanted(v)) return nothing;
+            const crop = this._homeFrameCropFor(v);
+            if (crop) return this._renderHomeFrameOverlay(v, crop, "sp");
+            const af = this._homeAnchorFitFor(v, this._wrapAspect(this._baseHeightFor(v)));
+            if (af) return this._renderHomeAnchorOverlay(v, af.fit, af.dims, this._wrapAspect(this._baseHeightFor(v)), "sp");
+            return this._renderIntegrationOverlay(v, this._effectiveSeat(v), "sp");
+          })}
         ${this._renderStartSeqAvatars(this._mergedRoomDefs(shown))}
         ${/* Pin & Go / Zone interaction layer — merged mode used to render NONE of
            this (only split-mode _renderMap had it), so clicks fell straight through
@@ -11180,6 +11276,7 @@ export class AnyVacCard extends LitElement {
           const wholeHome = !rooms.some((r) => this._isRoomSelected(r, vac));
           return rooms.map((r) => this._renderRoomOverlay(r, vac, { wholeHome }));
         })()}
+        ${showMap && this._spMarksWanted(vac) ? this._renderIntegrationOverlay(vac, seat, "sp") : nothing}
         ${(this._mapMode !== "normal" && this._isModeCandidate(vac)) || (this._zoneRectShown && this._hasZoneEditTarget(vac))
           ? html`<div class="map-clickcatch" style="touch-action:none"
               @click=${(e: MouseEvent) => this._onMapClick(vac, e)}
@@ -12435,7 +12532,7 @@ export class AnyVacCard extends LitElement {
             return html`<div class="avc-region avc-region--${name}" style=${styleMap(regionStyles(pl))}>${tpl}</div>`;
           })}
         </div>
-        ${this._renderRobotSheet()}${this._renderQueueSheet()}${this._renderSpBar()}${this._renderVeNotice()}
+        ${this._renderRobotSheet()}${this._renderQueueSheet()}${this._renderSpBar()}${this._renderSpGoBar()}${this._renderVeNotice()}
       </ha-card>
     `;
   }
@@ -12471,7 +12568,7 @@ export class AnyVacCard extends LitElement {
                 ${this._renderMapTools(this._config.vacuums[i])}
                 ${this._renderStatusCard(this._config.vacuums[i], i)}
               `)}
-        ${this._renderRobotSheet()}${this._renderQueueSheet()}${this._renderSpBar()}${this._renderVeNotice()}
+        ${this._renderRobotSheet()}${this._renderQueueSheet()}${this._renderSpBar()}${this._renderSpGoBar()}${this._renderVeNotice()}
       </ha-card>
     `;
   }
@@ -14196,6 +14293,7 @@ export class AnyVacCard extends LitElement {
     .sp-bar-btns { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
     .sp-bar-gap { flex: 1; }
     .sp-save { padding: 10px 18px; }
+    .avc-sp--tap { pointer-events: auto; cursor: pointer; }
     .avc-sp-ring { animation: avc-sp-pulse 1.8s ease-out infinite; transform-box: fill-box; transform-origin: center; }
     @keyframes avc-sp-pulse { from { opacity: 0.9; transform: scale(0.7); } to { opacity: 0; transform: scale(1.4); } }
     @media (prefers-reduced-motion: reduce) { .avc-sp-ring { animation: none; } }

@@ -4,6 +4,16 @@ All notable changes to this project are documented here.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## 1.62.1
+
+Pairs with integration 1.62.1. Field fixes after the first night with 1.62.0.
+
+- **S7 could not place a service point** (nor Pin & Go / zones). A robot with more than one saved map has one Roborock image entity per map, and all of them look live, so the card could not tell which map to use and drew none. It now takes the image entity of the robot's **current** map from the integration (`map_entity`, integration 1.62.1); the old guess stays as the fallback.
+- **Service points are hidden by default.** A flag button in the toolbar (landscape meta bar, portrait rail and dock row) shows or hides them; remembered per browser. A point being placed is always drawn.
+- **Tap a flag on the map to send the robot there**: a bar asks "Send S6 to Trash bin?" with Go. While the robot still has rooms in the job, Go is disabled with the reason, as in the robot sheet. The flags are drawn above the room buttons now, so the tap reaches them.
+- **Service point flags point up again.** In merged mode each vacuum's map is seated at its own angle (and may be stretched in Y); the flag only undid the map's display rotation, so every robot's flags leaned a different way. The flag now also undoes the seat's rotation and Y stretch. Flags are smaller (about the robot marker's size).
+- Tests: `queue.spec.ts` 12 (the toggle, a real hit test on the flag, the send bar, `map_entity` choosing between two live maps, flags upright at seat angles 0 / 37 (with Y stretch) / 90 / 180 / 251 — fails without the fix).
+
 ## 1.62.0
 
 Pairs with integration 1.62.0. The card side of docs/52 — the room-by-room queue — and service points (designs: "AnyVac – redesign mockupy", row "Fronta po místnostech").
